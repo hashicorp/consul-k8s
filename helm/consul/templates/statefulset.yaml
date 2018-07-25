@@ -1,0 +1,90 @@
+# StatefulSet to run the actual Consul server cluster.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: consul-server
+spec:
+  selector:
+    matchLabels:
+      app: consul-server
+  serviceName: consul-server
+  podManagementPolicy: Parallel
+  replicas: {{ .Values.server.replicas }}
+  template:
+    metadata:
+      labels:
+        app: consul-server
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - consul-server
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: consul
+          image: "{{ .Values.server.image }}"
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              exec /bin/consul agent \
+                -advertise="${POD_IP}" \
+                -bind=0.0.0.0 \
+                -bootstrap-expect={{ .Values.server.bootstrapExpect }} \
+                -client=0.0.0.0 \
+                -datacenter=dc1 \
+                -data-dir=/consul/data \
+                -domain=cluster.local \
+                -server \
+                -ui \
+                {{- range $index := until (.Values.server.replicas | int) }}
+                -retry-join=consul-server-{{ $index }}.consul-server.${NAMESPACE}.svc.cluster.local \
+                {{- end }}
+                -disable-host-node-id
+          volumeMounts:
+            - name: data
+              mountPath: /consul/data
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - consul leave
+          ports:
+            - containerPort: 8500
+              name: http
+            - containerPort: 8301
+              name: serflan
+            - containerPort: 8302
+              name: serfwan
+            - containerPort: 8300
+              name: server
+            - containerPort: 8600
+              name: dns
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.server.storage }}

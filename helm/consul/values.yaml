@@ -1,0 +1,12 @@
+# Available parameters and their default values for the Consul chart.
+
+server:
+  enabled: true
+  image: "consul:1.2.1"
+  replicas: 3
+  bootstrapExpect: 3 # Should <= replicas count
+  storage: 10Gi
+
+test:
+  image: lachlanevenson/k8s-kubectl
+  imageTag: v1.4.8-bash
