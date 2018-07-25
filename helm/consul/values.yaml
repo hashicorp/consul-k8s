@@ -7,6 +7,21 @@ server:
   bootstrapExpect: 3 # Should <= replicas count
   storage: 10Gi
 
+ui:
+  # True if you want to enable the Consul UI. The UI will run only
+  # on the server nodes. This makes UI access via the service below (if
+  # enabled) predictable rather than "any node" if you're running Consul
+  # clients as well.
+  enabled: true
+
+  # True if you want to create a Service entry for the Consul UI.
+  #
+  # serviceType can be used to control the type of service created. For
+  # example, setting this to "LoadBalancer" will create an external load
+  # balancer (for supported K8S installations) to access the UI.
+  service: true
+  serviceType: null
+
 test:
   image: lachlanevenson/k8s-kubectl
   imageTag: v1.4.8-bash

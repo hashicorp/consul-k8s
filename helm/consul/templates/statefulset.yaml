@@ -53,7 +53,9 @@ spec:
                 -data-dir=/consul/data \
                 -domain=cluster.local \
                 -server \
+                {{- if .Values.ui.enabled }}
                 -ui \
+                {{- end }}
                 {{- range $index := until (.Values.server.replicas | int) }}
                 -retry-join=consul-server-{{ $index }}.consul-server.${NAMESPACE}.svc.cluster.local \
                 {{- end }}
