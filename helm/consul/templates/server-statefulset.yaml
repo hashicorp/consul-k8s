@@ -1,4 +1,5 @@
 # StatefulSet to run the actual Consul server cluster.
+{{- if .Values.server.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -89,3 +90,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.server.storage }}
+{{- end }}
