@@ -3,6 +3,11 @@
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
+
+common:
+  # Domain to register the Consul DNS server to listen for.
+  domain: consul
+
 server:
   enabled: true
   image: "consul:1.2.1"
@@ -15,9 +20,6 @@ server:
   # since Consul doesn't support an automatic way to change this value
   # currently: https://github.com/hashicorp/consul/issues/1858
   datacenter: dc1
-
-  # Domain to register the Consul DNS server to listen for.
-  domain: "consul"
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
