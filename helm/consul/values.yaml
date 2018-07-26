@@ -7,6 +7,12 @@ server:
   bootstrapExpect: 3 # Should <= replicas count
   storage: 10Gi
 
+  # Datacenter is the name of the datacenter that the server should register
+  # as. This shouldn't be changed once the Consul cluster is up and running
+  # since Consul doesn't support an automatic way to change this value
+  # currently: https://github.com/hashicorp/consul/issues/1858
+  datacenter: dc1
+
   # Domain to register the Consul DNS server to listen for.
   domain: "consul"
 
