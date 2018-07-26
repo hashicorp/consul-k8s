@@ -44,12 +44,18 @@ spec:
                 -client=0.0.0.0 \
                 -datacenter={{ .Values.server.datacenter }} \
                 -data-dir=/consul/data \
+                {{- if (.Values.client.join) and (gt (len .Values.client.join) 0) }}
+                {{- range $value := .Values.client.join }}
+                -retry-join={{ $value }} \
+                {{- end }}
+                {{- else }}
                 {{- if .Values.server.enabled }}
                 {{- range $index := until (.Values.server.replicas | int) }}
                 -retry-join=consul-server-{{ $index }}.consul-server.${NAMESPACE}.svc \
                 {{- end }}
                 {{- end }}
-                -domain={{ .Values.domain }}
+                {{- end }}
+                -domain={{ .Values.common.domain }}
           volumeMounts:
             - name: data
               mountPath: /consul/data
