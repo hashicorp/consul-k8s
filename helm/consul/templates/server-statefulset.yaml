@@ -51,15 +51,14 @@ spec:
                 -client=0.0.0.0 \
                 -datacenter=dc1 \
                 -data-dir=/consul/data \
-                -domain=cluster.local \
+                -domain={{ .Values.domain }} \
                 -server \
                 {{- if .Values.ui.enabled }}
                 -ui \
                 {{- end }}
                 {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join=consul-server-{{ $index }}.consul-server.${NAMESPACE}.svc.cluster.local \
+                -retry-join=consul-server-{{ $index }}.consul-server.${NAMESPACE}.svc \
                 {{- end }}
-                -disable-host-node-id
           volumeMounts:
             - name: data
               mountPath: /consul/data

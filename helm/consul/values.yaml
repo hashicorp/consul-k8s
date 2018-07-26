@@ -7,6 +7,9 @@ server:
   bootstrapExpect: 3 # Should <= replicas count
   storage: 10Gi
 
+  # Domain to register the Consul DNS server to listen for.
+  domain: "consul"
+
 ui:
   # True if you want to enable the Consul UI. The UI will run only
   # on the server nodes. This makes UI access via the service below (if
