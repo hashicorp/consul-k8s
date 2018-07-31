@@ -69,13 +69,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /consul/data
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - /bin/sh
-                - -c
-                - consul leave
           ports:
             - containerPort: 8500
               name: http
