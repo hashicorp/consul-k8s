@@ -78,4 +78,6 @@ spec:
               name: server
             - containerPort: 8600
               name: dns
+          resources:
+{{ toYaml .Values.server.resources | indent 12 }}
 {{- end }}
