@@ -21,6 +21,16 @@ server:
   # currently: https://github.com/hashicorp/consul/issues/1858
   datacenter: dc1
 
+  # Resource requests, limits, etc. for the server cluster placement. This
+  # should map directly to the value of the resources field for a PodSpec.
+  # By default no direct resource request is made.
+  resources: {}
+
+  # updatePartition is used to control a careful rolling update of Consul
+  # servers. This should be done particularly when changing the version
+  # of Consul. Please refer to the documentation for more information.
+  updatePartition: 0
+
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
 # DC where a single agent is deployed per node.
