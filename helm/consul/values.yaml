@@ -31,6 +31,15 @@ server:
   # of Consul. Please refer to the documentation for more information.
   updatePartition: 0
 
+  # disruptionBudget enables the creation of a PodDisruptionBudget to
+  # prevent voluntary degrading of the Consul server cluster.
+  disruptionBudget:
+    enabled: true
+
+    # maxUnavailable will default to (n/2)-1 where n is the number of
+    # replicas. If you'd like a custom value, you can specify an override here.
+    maxUnavailable: null
+
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
 # DC where a single agent is deployed per node.
