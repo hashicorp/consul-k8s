@@ -36,3 +36,8 @@ If the tests fail, deployed resources in the Kubernetes cluster may not
 be properly cleaned up. We recommend recycling the Kubernetes cluster to
 start from a clean slate.
 
+**Note:** There is a Terraform configuration in the
+[terraform/ directory](https://github.com/hashicorp/consul-k8s/tree/master/terraform)
+that can be used to quickly bring up a GKE cluster and configure
+`kubectl` and `helm` locally. This can be used to quickly spin up a test
+cluster.
