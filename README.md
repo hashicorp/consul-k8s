@@ -29,7 +29,7 @@ money.
 
 ### Terraform
 
-This folder contains a Terraform configuration that can be used to setup
+The `terraform/` folder contains a Terraform configuration that can be used to setup
 an example cluster. This is the easiest and most automated way to setup a
 demo cluster.
 
@@ -39,7 +39,7 @@ The pre-requisites for Terraform are:
   * `gcloud` installed and configured locally with GKE components.
   * The following programs available on the PATH: `kubectl`, `helm`, `grep`, `xargs`.
 
-With that available, run the following:
+With that available, run the following in that directory:
 
 ```
 $ terraform init
