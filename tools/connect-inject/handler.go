@@ -51,7 +51,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Could not decode admission request: %s", err)
 		admResp.Response = admissionError(err)
 	} else {
-		admResp.Response = h.Mutate(&admReq)
+		admResp.Response = h.Mutate(admReq.Request)
 	}
 
 	resp, err := json.Marshal(&admResp)
@@ -69,7 +69,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 // Mutate takes an admission request and performs mutation if necessary,
 // returning the final API response.
-func (h *Handler) Mutate(req *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionResponse {
 	// TODO: actual things, for now just say its allowed
 	return &v1beta1.AdmissionResponse{
 		Allowed: true,
