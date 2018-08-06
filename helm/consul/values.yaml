@@ -15,6 +15,11 @@ server:
   bootstrapExpect: 3 # Should <= replicas count
   storage: 10Gi
 
+  # connect will enable Connect on all the servers, initializing a CA
+  # for Connect-related connections. Other customizations can be done
+  # via the extraConfig setting.
+  connect: true
+
   # Datacenter is the name of the datacenter that the server should register
   # as. This shouldn't be changed once the Consul cluster is up and running
   # since Consul doesn't support an automatic way to change this value
@@ -39,6 +44,11 @@ server:
     # maxUnavailable will default to (n/2)-1 where n is the number of
     # replicas. If you'd like a custom value, you can specify an override here.
     maxUnavailable: null
+
+  # extraConfig is a raw string of extra configuration to set with the
+  # server. This should be JSON or HCL.
+  extraConfig: |
+    {}
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional

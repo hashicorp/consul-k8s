@@ -35,6 +35,10 @@ spec:
       terminationGracePeriodSeconds: 10
       securityContext:
         fsGroup: 1000
+      volumes:
+        - name: config
+          configMap:
+            name: consul-server-config
       containers:
         - name: consul
           image: "{{ .Values.server.image }}"
@@ -56,9 +60,13 @@ spec:
                 -bind=0.0.0.0 \
                 -bootstrap-expect={{ .Values.server.bootstrapExpect }} \
                 -client=0.0.0.0 \
+                -config-dir=/consul/config \
                 -datacenter={{ .Values.server.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.common.domain }} \
+                {{- if .Values.server.connect }}
+                -hcl="connect { enabled = true }" \
+                {{- end }}
                 {{- if .Values.ui.enabled }}
                 -ui \
                 {{- end }}
@@ -69,6 +77,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /consul/data
+            - name: config
+              mountPath: /consul/config
           lifecycle:
             preStop:
               exec:
