@@ -1,5 +1,5 @@
 locals {
-  service_account_path = "${path.module}/../../helm/service-account.yaml"
+  service_account_path = "${path.module}/../../../helm/service-account.yaml"
 }
 
 resource "null_resource" "service_account" {
