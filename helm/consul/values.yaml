@@ -10,7 +10,7 @@ common:
 
 server:
   enabled: true
-  image: "consul:1.2.1"
+  image: "consul:1.2.2"
   replicas: 3
   bootstrapExpect: 3 # Should <= replicas count
   storage: 10Gi
@@ -45,7 +45,8 @@ server:
 # DC where a single agent is deployed per node.
 client:
   enabled: true
-  image: "consul:1.2.1"
+  image: "consul:1.2.2"
+  join: null
 
 ui:
   # True if you want to enable the Consul UI. The UI will run only
