@@ -3,3 +3,5 @@
 terraform.tfstate*
 terraform.tfvars
 values.yaml
+cmd/bin
+cmd/pkg
