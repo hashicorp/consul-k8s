@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +20,7 @@ func TestHandlerHandle(t *testing.T) {
 		Handler Handler
 		Req     v1beta1.AdmissionRequest
 		Err     string // expected error string, not exact
+		Patches []jsonpatch.JsonPatchOperation
 	}{
 		{
 			"kube-system namespace",
@@ -31,6 +33,28 @@ func TestHandlerHandle(t *testing.T) {
 				}),
 			},
 			"",
+			nil,
+		},
+
+		{
+			"empty pod",
+			Handler{},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: corev1.PodSpec{},
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+			},
 		},
 	}
 
@@ -45,6 +69,15 @@ func TestHandlerHandle(t *testing.T) {
 				require.Contains(resp.Result.Message, tt.Err)
 				return
 			}
+
+			var actual []jsonpatch.JsonPatchOperation
+			if len(resp.Patch) > 0 {
+				require.NoError(json.Unmarshal(resp.Patch, &actual))
+				for i, _ := range actual {
+					actual[i].Value = nil
+				}
+			}
+			require.Equal(actual, tt.Patches)
 		})
 	}
 }
