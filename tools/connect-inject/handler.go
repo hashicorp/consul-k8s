@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
@@ -154,6 +155,15 @@ func (h *Handler) shouldInject(pod *corev1.Pod) bool {
 }
 
 func (h *Handler) containerSidecar() corev1.Container {
+	cmd := []string{
+		"exec /bin/consul connect proxy",
+		"-http-addr=${HOST_IP}:8500",
+		"-service=temp-test",
+		"-service-addr=127.0.0.1:8080",
+		"-listen=${POD_IP}:1234",
+		"-register",
+	}
+
 	return corev1.Container{
 		Name:  "consul-connect-proxy",
 		Image: "consul:1.2.2",
@@ -171,9 +181,7 @@ func (h *Handler) containerSidecar() corev1.Container {
 				},
 			},
 		},
-		Command: []string{
-			"/bin/sh", "-ec",
-		},
+		Command: []string{"/bin/sh", "-ec", strings.Join(cmd, " ")},
 	}
 }
 
