@@ -47,6 +47,12 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
+  name = "github.com/gorilla/handlers"
+  packages = ["."]
+  revision = "7e0847f9db758cdebd26c149d0ae9d5d0b9c98ce"
+  version = "v1.4.0"
+
+[[projects]]
   name = "github.com/hashicorp/consul"
   packages = [
     "api",
@@ -261,6 +267,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "eb684142ab654080dc47b7daa577a5dce75c289ded507ead146bcd20406c3f24"
+  inputs-digest = "3494843a3266644824c0754de2ec90664cfcba67cdccff91b138d087b78d76b0"
   solver-name = "gps-cdcl"
   solver-version = 1
