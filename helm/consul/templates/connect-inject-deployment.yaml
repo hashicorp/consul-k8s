@@ -1,0 +1,36 @@
+# The deployment for running the Connect sidecar injector
+{{- if .Values.connectInject.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consul-connect-injector-webhook-deployment
+  labels:
+    app: consul-connect-injector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consul-connect-injector
+  template:
+    metadata:
+      labels:
+        app: consul-connect-injector
+    spec:
+      containers:
+        - name: sidecar-injector
+          image: us.gcr.io/mitchellh-k8s/consul-k8s:latest
+          command:
+            - consul-k8s
+            - inject
+            - -listen=:8080
+            - -tls-cert-file=/etc/injector/certs/cert.pem
+            - -tls-key-file=/etc/injector/certs/key.pem
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/injector/certs
+              readOnly: true
+      volumes:
+        - name: certs
+          secret:
+            secretName: consul-connect-injector-certs
+{{- end }}

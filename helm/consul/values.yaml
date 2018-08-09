@@ -58,6 +58,11 @@ client:
   image: "consul:1.2.2"
   join: null
 
+# ConnectInject will enable the automatic Connect sidecar injector.
+connectInject:
+  enabled: true
+  caBundle: null
+
 ui:
   # True if you want to enable the Consul UI. The UI will run only
   # on the server nodes. This makes UI access via the service below (if
