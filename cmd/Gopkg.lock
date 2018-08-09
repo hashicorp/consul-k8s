@@ -47,6 +47,15 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
+  name = "github.com/hashicorp/consul"
+  packages = [
+    "api",
+    "command/flags"
+  ]
+  revision = "e716d1b5f8be252b3e53906c6d5632e0228f30fa"
+  version = "v1.2.2"
+
+[[projects]]
   branch = "f-inject"
   name = "github.com/hashicorp/consul-k8s"
   packages = ["tools/connect-inject"]
@@ -60,9 +69,27 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/hashicorp/go-cleanhttp"
+  packages = ["."]
+  revision = "d5fe4b57a186c716b0e00b8c301cbd9b4182694d"
+
+[[projects]]
+  branch = "master"
   name = "github.com/hashicorp/go-multierror"
   packages = ["."]
   revision = "3d5d8f294aa03d8e98859feac328afbdf1ae0703"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-rootcerts"
+  packages = ["."]
+  revision = "6bb64b370b90e7ef1fa532be9e591a81c3493e00"
+
+[[projects]]
+  name = "github.com/hashicorp/serf"
+  packages = ["coordinate"]
+  revision = "d6574a5bb1226678d7010325fb6c985db20ee458"
+  version = "v0.8.1"
 
 [[projects]]
   name = "github.com/json-iterator/go"
@@ -95,6 +122,18 @@
   revision = "c48282d14eba4b0817ddef3f832ff8d13851aefd"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/go-homedir"
+  packages = ["."]
+  revision = "58046073cbffe2f25d425fe1331102f55cf719de"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/mapstructure"
+  packages = ["."]
+  revision = "f15292f7a699fcc1a38a80977f80a046874ba8ac"
+
+[[projects]]
   name = "github.com/modern-go/concurrent"
   packages = ["."]
   revision = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
@@ -116,6 +155,12 @@
   ]
   revision = "98eb9847f27ba2008d380a32c98be474dea55bdf"
   version = "v1.1.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/tonnerre/golang-text"
+  packages = ["."]
+  revision = "048ed3d792f7104850acbc8cfc01e5a6070f4c04"
 
 [[projects]]
   branch = "master"
@@ -216,6 +261,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2c8c9a6067e99e68078580707f5dcca317af589ecedcf784f199903143d20e90"
+  inputs-digest = "eb684142ab654080dc47b7daa577a5dce75c289ded507ead146bcd20406c3f24"
   solver-name = "gps-cdcl"
   solver-version = 1
