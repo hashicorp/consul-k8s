@@ -35,8 +35,7 @@ var (
 )
 
 // Handler is the HTTP handler for admission webhooks.
-type Handler struct {
-}
+type Handler struct{}
 
 // Handle is the http.HandlerFunc implementation that actually handles the
 // webhook request for admission control. This should be registered or
