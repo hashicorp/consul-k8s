@@ -29,6 +29,16 @@ type GenSource struct {
 	Name  string   // Name is used as part of the common name
 	Hosts []string // Hosts is the list of hosts to make the leaf valid for
 
+	// Expiry is the duration that a certificate is valid for. This
+	// defaults to 24 hours.
+	Expiry time.Duration
+
+	// ExpiryWithin is the duration value used for determining whether to
+	// regenerate a new leaf certificate. If the old leaf certificate is
+	// expiring within this value, then a new leaf will be generated. Default
+	// is about 10% of Expiry.
+	ExpiryWithin time.Duration
+
 	mu             sync.Mutex
 	caCert         []byte
 	caCertTemplate *x509.Certificate
@@ -51,21 +61,57 @@ func (s *GenSource) Certificate(ctx context.Context, last *Bundle) (Bundle, erro
 	// Set the CA cert
 	result.CACert = s.caCert
 
-	// If we have no prior cert, then generate that and return
-	if last == nil {
-		cert, key, err := s.generateCert()
-		if err == nil {
-			result.Cert = []byte(cert)
-			result.Key = []byte(key)
+	// If we have a prior cert, we wait for getting near to the expiry
+	// (within 30 minutes arbitrarily chosen).
+	if last != nil {
+		// We have a prior certificate, let's parse it to get the expiry
+		cert, err := parseCert(last.Cert)
+		if err != nil {
+			return result, err
 		}
 
-		return result, err
+		waitTime := cert.NotAfter.Sub(time.Now()) - s.expiryWithin()
+		if waitTime < 0 {
+			waitTime = 1 * time.Millisecond
+		}
+
+		timer := time.NewTimer(waitTime)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			// Fall through, generate cert
+
+		case <-ctx.Done():
+			return result, ctx.Err()
+		}
 	}
 
-	// We have a prior certificate, let's parse it to get the expiry
-	// TODO
+	// Generate cert, set it on the result, and return
+	cert, key, err := s.generateCert()
+	if err == nil {
+		result.Cert = []byte(cert)
+		result.Key = []byte(key)
+	}
 
-	return *last, nil
+	return result, err
+}
+
+func (s *GenSource) expiry() time.Duration {
+	if s.Expiry > 0 {
+		return s.Expiry
+	}
+
+	return 24 * time.Hour
+}
+
+func (s *GenSource) expiryWithin() time.Duration {
+	if s.ExpiryWithin > 0 {
+		return s.ExpiryWithin
+	}
+
+	// Roughly 10% accounting for float errors
+	return time.Duration(float64(s.expiry()) * 0.10)
 }
 
 func (s *GenSource) generateCert() (string, string, error) {
@@ -88,7 +134,7 @@ func (s *GenSource) generateCert() (string, string, error) {
 		BasicConstraintsValid: true,
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+		NotAfter:              time.Now().Add(s.expiry()),
 		NotBefore:             time.Now().Add(-1 * time.Minute),
 	}
 	for _, h := range s.Hosts {
@@ -211,4 +257,19 @@ func keyId(raw interface{}) ([]byte, error) {
 	// String formatted
 	kID := sha256.Sum256(bs)
 	return []byte(strings.Replace(fmt.Sprintf("% x", kID), " ", ":", -1)), nil
+}
+
+// parseCert parses the x509 certificate from a PEM-encoded value.
+func parseCert(pemValue []byte) (*x509.Certificate, error) {
+	// The _ result below is not an error but the remaining PEM bytes.
+	block, _ := pem.Decode(pemValue)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM-encoded data found")
+	}
+
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("first PEM-block should be CERTIFICATE type")
+	}
+
+	return x509.ParseCertificate(block.Bytes)
 }

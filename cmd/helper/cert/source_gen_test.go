@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,17 +22,58 @@ func init() {
 
 // Test that valid certificates are generated
 func TestGenSource_valid(t *testing.T) {
+	t.Parallel()
+
 	if !hasOpenSSL {
 		t.Skip("openssl not found")
 		return
 	}
 
-	require := require.New(t)
-
 	// Generate the bundle
 	source := testGenSource()
 	bundle, err := source.Certificate(context.Background(), nil)
-	require.NoError(err)
+	require.NoError(t, err)
+	testBundle(t, &bundle)
+}
+
+// Test that certs are regenerated near expiry
+func TestGenSource_expiry(t *testing.T) {
+	t.Parallel()
+
+	if !hasOpenSSL {
+		t.Skip("openssl not found")
+		return
+	}
+
+	// Generate the bundle
+	source := testGenSource()
+	source.Expiry = 5 * time.Second
+	source.ExpiryWithin = 2 * time.Second
+
+	// First bundle
+	bundle, err := source.Certificate(context.Background(), nil)
+	require.NoError(t, err)
+	testBundle(t, &bundle)
+
+	// Generate again
+	start := time.Now()
+	next, err := source.Certificate(context.Background(), &bundle)
+	dur := time.Now().Sub(start)
+	require.NoError(t, err)
+	require.False(t, bundle.Equal(&next))
+	require.True(t, dur > time.Second)
+	testBundle(t, &bundle)
+}
+
+func testGenSource() *GenSource {
+	return &GenSource{
+		Name:  "Test",
+		Hosts: []string{"127.0.0.1", "localhost"},
+	}
+}
+
+func testBundle(t *testing.T, bundle *Bundle) {
+	require := require.New(t)
 
 	// Create a temporary directory for storing the certs
 	td, err := ioutil.TempDir("", "consul")
@@ -50,11 +92,4 @@ func TestGenSource_valid(t *testing.T) {
 	output, err := cmd.Output()
 	t.Log(string(output))
 	require.NoError(err)
-}
-
-func testGenSource() *GenSource {
-	return &GenSource{
-		Name:  "Test",
-		Hosts: []string{"127.0.0.1", "localhost"},
-	}
 }
