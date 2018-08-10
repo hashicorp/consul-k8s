@@ -3,10 +3,12 @@ package subcommand
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,11 +26,12 @@ import (
 type Inject struct {
 	UI cli.Ui
 
-	flagListen   string
-	flagAutoName string // MutatingWebhookConfiguration for updating
-	flagCertFile string // TLS cert for listening (PEM)
-	flagKeyFile  string // TLS cert private key (PEM)
-	flagSet      *flag.FlagSet
+	flagListen    string
+	flagAutoName  string // MutatingWebhookConfiguration for updating
+	flagAutoHosts string // SANs for the auto-generated TLS cert.
+	flagCertFile  string // TLS cert for listening (PEM)
+	flagKeyFile   string // TLS cert private key (PEM)
+	flagSet       *flag.FlagSet
 
 	once sync.Once
 	help string
@@ -40,6 +43,8 @@ func (c *Inject) init() {
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
 	c.flagSet.StringVar(&c.flagAutoName, "tls-auto", "",
 		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
+	c.flagSet.StringVar(&c.flagAutoHosts, "tls-auto-hosts", "",
+		"Comma-separated hosts for auto-generated TLS cert. If specified, will auto generate cert bundle.")
 	c.flagSet.StringVar(&c.flagCertFile, "tls-cert-file", "",
 		"PEM-encoded TLS certificate to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
@@ -66,7 +71,10 @@ func (c *Inject) Run(args []string) int {
 	}
 
 	// Determine where to source the certificates from
-	var certSource cert.Source = &cert.GenSource{Name: "Connect Inject"}
+	var certSource cert.Source = &cert.GenSource{
+		Name:  "Connect Inject",
+		Hosts: strings.Split(c.flagAutoHosts, ","),
+	}
 	if c.flagCertFile != "" {
 		certSource = &cert.DiskSource{
 			CertPath: c.flagCertFile,
@@ -141,14 +149,17 @@ func (c *Inject) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clients
 
 		// If there is a MWC name set, then update the CA bundle.
 		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
+			// The CA Bundle value must be base64 encoded
+			value := base64.StdEncoding.EncodeToString(bundle.CACert)
+
 			_, err := clientset.Admissionregistration().
 				MutatingWebhookConfigurations().
 				Patch(c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
-					`{
-						"op": "replace",
+					`[{
+						"op": "add",
 						"path": "/webhooks/0/clientConfig/caBundle",
-						"value": %q,
-					}`, string(bundle.CACert))))
+						"value": %q
+					}]`, value)))
 			if err != nil {
 				c.UI.Error(fmt.Sprintf(
 					"Error updating MutatingWebhookConfiguration: %s",

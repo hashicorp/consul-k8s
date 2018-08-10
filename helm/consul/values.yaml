@@ -61,7 +61,7 @@ client:
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
   enabled: true
-  caBundle: null
+  caBundle: "" # empty will auto generate the bundle
 
 ui:
   # True if you want to enable the Consul UI. The UI will run only

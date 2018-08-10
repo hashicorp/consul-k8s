@@ -19,18 +19,17 @@ spec:
       containers:
         - name: sidecar-injector
           image: us.gcr.io/mitchellh-k8s/consul-k8s:latest
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           command:
-            - consul-k8s
-            - inject
-            - -listen=:8080
-            - -tls-cert-file=/etc/injector/certs/cert.pem
-            - -tls-key-file=/etc/injector/certs/key.pem
-          volumeMounts:
-            - name: certs
-              mountPath: /etc/injector/certs
-              readOnly: true
-      volumes:
-        - name: certs
-          secret:
-            secretName: consul-connect-injector-certs
+            - "/bin/sh"
+            - "-ec"
+            - |
+              consul-k8s inject \
+                -listen=:8080 \
+                -tls-auto=consul-connect-injector-cfg \
+                -tls-auto-hosts=consul-connect-injector-svc,consul-connect-injector-svc.${NAMESPACE},consul-connect-injector-svc.${NAMESPACE}.svc
 {{- end }}
