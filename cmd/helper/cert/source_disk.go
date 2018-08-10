@@ -26,10 +26,10 @@ func (s *DiskSource) Certificate(ctx context.Context, last *Bundle) (Bundle, err
 	defer w.Close()
 	w.SetMaxEvents(1)
 	if err := w.Add(s.CertPath); err != nil {
-		return Bundle{}, nil
+		return Bundle{}, err
 	}
 	if err := w.Add(s.KeyPath); err != nil {
-		return Bundle{}, nil
+		return Bundle{}, err
 	}
 	go w.Start(250 * time.Millisecond)
 	w.Wait()
@@ -47,8 +47,7 @@ func (s *DiskSource) Certificate(ctx context.Context, last *Bundle) (Bundle, err
 
 		// If there was no prior certificate bundle or the bundle has
 		// changed, then return it.
-		// TODO: detect change
-		if last == nil {
+		if last == nil || !last.Equal(&bundle) {
 			return bundle, nil
 		}
 
@@ -80,8 +79,17 @@ func (s *DiskSource) loadCerts() (Bundle, error) {
 		return Bundle{}, err
 	}
 
+	var caPEMBlock []byte
+	if s.CAPath != "" {
+		caPEMBlock, err = ioutil.ReadFile(s.CAPath)
+		if err != nil {
+			return Bundle{}, err
+		}
+	}
+
 	return Bundle{
-		Cert: certPEMBlock,
-		Key:  keyPEMBlock,
+		Cert:   certPEMBlock,
+		Key:    keyPEMBlock,
+		CACert: caPEMBlock,
 	}, nil
 }

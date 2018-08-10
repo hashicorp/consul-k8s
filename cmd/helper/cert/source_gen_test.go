@@ -33,7 +33,7 @@ func TestGenSource_valid(t *testing.T) {
 	source := testGenSource()
 	bundle, err := source.Certificate(context.Background(), nil)
 	require.NoError(t, err)
-	testBundle(t, &bundle)
+	testBundleVerify(t, &bundle)
 }
 
 // Test that certs are regenerated near expiry
@@ -53,7 +53,7 @@ func TestGenSource_expiry(t *testing.T) {
 	// First bundle
 	bundle, err := source.Certificate(context.Background(), nil)
 	require.NoError(t, err)
-	testBundle(t, &bundle)
+	testBundleVerify(t, &bundle)
 
 	// Generate again
 	start := time.Now()
@@ -62,7 +62,7 @@ func TestGenSource_expiry(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, bundle.Equal(&next))
 	require.True(t, dur > time.Second)
-	testBundle(t, &bundle)
+	testBundleVerify(t, &bundle)
 }
 
 func testGenSource() *GenSource {
@@ -72,17 +72,40 @@ func testGenSource() *GenSource {
 	}
 }
 
-func testBundle(t *testing.T, bundle *Bundle) {
+// testBundle returns a valid bundle.
+func testBundle(t *testing.T) *Bundle {
+	source := testGenSource()
+	bundle, err := source.Certificate(context.Background(), nil)
+	require.NoError(t, err)
+	return &bundle
+}
+
+// testBundleDir writes the bundle contents to a directory and returns the
+// directory. The directory must be removed by the caller. The files in the
+// directory are ca.pem, leaf.pem, and leaf.key.pem.
+func testBundleDir(t *testing.T, bundle *Bundle, dir string) string {
+	if dir == "" {
+		// Create a temporary directory for storing the certs
+		td, err := ioutil.TempDir("", "consul")
+		require.NoError(t, err)
+		dir = td
+	}
+
+	// Write the cert
+	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "ca.pem"), bundle.CACert, 0644))
+	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.pem"), bundle.Cert, 0644))
+	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.key.pem"), bundle.Key, 0644))
+
+	return dir
+}
+
+// testBundleVerify verifies that a bundle is valid with OpenSSL (if installed).
+func testBundleVerify(t *testing.T, bundle *Bundle) {
 	require := require.New(t)
 
 	// Create a temporary directory for storing the certs
-	td, err := ioutil.TempDir("", "consul")
-	require.NoError(err)
+	td := testBundleDir(t, bundle, "")
 	defer os.RemoveAll(td)
-
-	// Write the cert
-	require.NoError(ioutil.WriteFile(filepath.Join(td, "ca.pem"), bundle.CACert, 0644))
-	require.NoError(ioutil.WriteFile(filepath.Join(td, "leaf.pem"), bundle.Cert, 0644))
 
 	// Use OpenSSL to verify so we have an external, known-working process
 	// that can verify this outside of our own implementations.
