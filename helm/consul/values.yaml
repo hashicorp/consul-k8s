@@ -64,6 +64,29 @@ connectInject:
   default: false # true will inject by default, otherwise requires annotation
   caBundle: "" # empty will auto generate the bundle
 
+  # The certs section configures how the webhook TLS certs are configured.
+  # These are the TLS certs for the Kube apiserver communicating to the
+  # webhook. By default, the injector will generate and manage its own certs,
+  # but this requires the ability for the injector to update its own
+  # MutatingWebhookConfiguration. In a production environment, custom certs
+  # should probaly be used. Configure the values below to enable this.
+  certs:
+    # secretName is the name of the secret that has the TLS certificate and
+    # private key to serve the injector webhook. If this is null, then the
+    # injector will default to its automatic management mode.
+    secretName: null
+
+    # caBundle is a base64-encoded PEM-encoded certificate bundle for the
+    # CA that signed the TLS certificate that the webhook serves. This must
+    # be set if secretName is non-null.
+    caBundle: ""
+
+    # certName and keyName are the names of the files within the secret for
+    # the TLS cert and private key, respectively. These have reasonable
+    # defaults but can be customized if necessary.
+    certName: tls.crt
+    keyName: tls.key
+
 ui:
   # True if you want to enable the Consul UI. The UI will run only
   # on the server nodes. This makes UI access via the service below (if
