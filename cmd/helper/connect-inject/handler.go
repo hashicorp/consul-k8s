@@ -26,6 +26,14 @@ const (
 	// injection is explicitly enabled or disabled for a pod. This should
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
 	annotationInject = "consul.hashicorp.com/connect-inject"
+
+	// annotationService is the name of the service to proxy. This defaults
+	// to the name of the first container.
+	annotationService = "consul.hashicorp.com/connect-service"
+
+	// annotationPort is the name or value of the port to proxy incoming
+	// connections to.
+	annotationPort = "consul.hashicorp.com/connect-service-port"
 )
 
 var (
@@ -108,6 +116,17 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		UID:     req.UID,
 	}
 
+	// Setup the default annotation values that are used for the container.
+	// This MUST be done before shouldInject is called since shouldInject
+	// will return false if there is no service name.
+	if err := h.defaultAnnotations(&pod); err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: err.Error(),
+			},
+		}
+	}
+
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
 	if shouldInject, err := h.shouldInject(&pod); err != nil {
@@ -126,7 +145,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// Add a container to it
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
-		[]corev1.Container{h.containerSidecar()},
+		[]corev1.Container{h.containerSidecar(&pod)},
 		"/spec/containers")...)
 	patches = append(patches, updateAnnotation(
 		pod.Annotations,
@@ -164,20 +183,87 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 
 	// If the explicit true/false is on, then take that value
 	if raw, ok := pod.Annotations[annotationInject]; ok {
-		return strconv.ParseBool(raw)
+		v, err := strconv.ParseBool(raw)
+		if err != nil || !v {
+			return v, err
+		}
+	}
+
+	// A service name is required. Whether a proxy accepting connections
+	// or just establishing outbound, a service name is required to acquire
+	// the correct certificate.
+	if pod.Annotations[annotationService] == "" {
+		return false, nil
 	}
 
 	return true, nil
 }
 
-func (h *Handler) containerSidecar() corev1.Container {
+func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
+	if pod.ObjectMeta.Annotations == nil {
+		pod.ObjectMeta.Annotations = make(map[string]string)
+	}
+
+	// Default service name is the name of the first container.
+	if _, ok := pod.ObjectMeta.Annotations[annotationService]; !ok {
+		if cs := pod.Spec.Containers; len(cs) > 0 {
+			pod.ObjectMeta.Annotations[annotationService] = cs[0].Name
+		}
+	}
+
+	// Default service port is the first port exported in the container
+	if _, ok := pod.ObjectMeta.Annotations[annotationPort]; !ok {
+		if cs := pod.Spec.Containers; len(cs) > 0 {
+			if ps := cs[0].Ports; len(ps) > 0 {
+				pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
+			}
+		}
+	}
+
+	return nil
+}
+
+func (h *Handler) containerSidecar(pod *corev1.Pod) corev1.Container {
 	cmd := []string{
 		"exec /bin/consul connect proxy",
 		"-http-addr=${HOST_IP}:8500",
-		"-service=temp-test",
-		"-service-addr=127.0.0.1:8080",
-		"-listen=${POD_IP}:1234",
-		"-register",
+	}
+
+	svc := pod.Annotations[annotationService]
+	if svc == "" {
+		// Assertion, since we call defaultAnnotations above and do
+		// not mutate pods without a service specified.
+		panic("No service found. This should be impossible since we default it.")
+	}
+	cmd = append(cmd, "-service="+svc)
+
+	// If a port is specified, then we determine the value of that port
+	// and register this proxy as a listener. This enables the proxy to
+	// act as an inbound connection receiver.
+	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
+		var port int32
+	PortSearch:
+		for _, c := range pod.Spec.Containers {
+			for _, p := range c.Ports {
+				if p.Name == raw {
+					port = p.ContainerPort
+					break PortSearch
+				}
+			}
+		}
+
+		rawInt, err := strconv.ParseInt(raw, 0, 32)
+		if err == nil {
+			port = int32(rawInt)
+		}
+
+		if port > 0 {
+			cmd = append(cmd,
+				fmt.Sprintf("-service-addr=127.0.0.1:%d", port),
+				"-listen=${POD_IP}:12500",
+				"-register",
+			)
+		}
 	}
 
 	return corev1.Container{
