@@ -34,6 +34,13 @@ const (
 	// annotationPort is the name or value of the port to proxy incoming
 	// connections to.
 	annotationPort = "consul.hashicorp.com/connect-service-port"
+
+	// annotationUpstreams is a list of upstreams to register with the
+	// proxy in the format of `<service-name>:<local-port>,...`. The
+	// service name should map to a Consul service namd and the local port
+	// is the local port in the pod that the listener will bind to. It can
+	// be a named port.
+	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
 )
 
 var (
@@ -241,28 +248,24 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) corev1.Container {
 	// and register this proxy as a listener. This enables the proxy to
 	// act as an inbound connection receiver.
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-		var port int32
-	PortSearch:
-		for _, c := range pod.Spec.Containers {
-			for _, p := range c.Ports {
-				if p.Name == raw {
-					port = p.ContainerPort
-					break PortSearch
-				}
-			}
-		}
-
-		rawInt, err := strconv.ParseInt(raw, 0, 32)
-		if err == nil {
-			port = int32(rawInt)
-		}
-
-		if port > 0 {
+		if port, _ := portValue(pod, raw); port > 0 {
 			cmd = append(cmd,
 				fmt.Sprintf("-service-addr=127.0.0.1:%d", port),
 				"-listen=${POD_IP}:12500",
 				"-register",
 			)
+		}
+	}
+
+	// If upstreams are specified, configure those
+	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
+		for _, raw := range strings.Split(raw, ",") {
+			parts := strings.SplitN(raw, ":", 2)
+			port, _ := portValue(pod, strings.TrimSpace(parts[1]))
+			if port > 0 {
+				cmd = append(cmd, fmt.Sprintf(
+					"-upstream=%s:%d", strings.TrimSpace(parts[0]), port))
+			}
 		}
 	}
 
@@ -285,6 +288,21 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) corev1.Container {
 		},
 		Command: []string{"/bin/sh", "-ec", strings.Join(cmd, " ")},
 	}
+}
+
+func portValue(pod *corev1.Pod, value string) (int32, error) {
+	// First search for the named port
+	for _, c := range pod.Spec.Containers {
+		for _, p := range c.Ports {
+			if p.Name == value {
+				return p.ContainerPort, nil
+			}
+		}
+	}
+
+	// Named port not found, return the parsed value
+	raw, err := strconv.ParseInt(value, 0, 32)
+	return int32(raw), err
 }
 
 func admissionError(err error) *v1beta1.AdmissionResponse {
