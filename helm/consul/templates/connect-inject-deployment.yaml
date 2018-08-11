@@ -31,8 +31,13 @@ spec:
               consul-k8s inject \
                 -default-inject={{ .Values.connectInject.default }} \
                 -listen=:8080 \
+{{- if .Values.connectInject.certs.secretName }}
+                -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }}
+                -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
+{{- else }}
                 -tls-auto=consul-connect-injector-cfg \
                 -tls-auto-hosts=consul-connect-injector-svc,consul-connect-injector-svc.${NAMESPACE},consul-connect-injector-svc.${NAMESPACE}.svc
+{{- end }}
           livenessProbe:
             tcpSocket:
               port: 8080
@@ -51,4 +56,14 @@ spec:
             periodSeconds: 2
             successThreshold: 1
             timeoutSeconds: 5
+{{- if .Values.connectInject.certs.secretName }}
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/connect-injector/certs
+              readOnly: true
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ .Values.connectInject.certs.secretName }}
+{{- end }}
 {{- end }}
