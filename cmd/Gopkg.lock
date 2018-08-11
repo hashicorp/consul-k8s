@@ -254,7 +254,7 @@
     "http2/hpack",
     "idna"
   ]
-  revision = "f9ce57c11b242f0f1599cf25c89d8cb02c45295a"
+  revision = "c39426892332e1bb5ec0a434a079bf82f5d30c54"
 
 [[projects]]
   branch = "master"
@@ -263,7 +263,7 @@
     "unix",
     "windows"
   ]
-  revision = "f0d5e33068cb57c22a181f5df0ffda885309eb5a"
+  revision = "98c5dad5d1a0e8a73845ecc8897d0bd56586511d"
 
 [[projects]]
   name = "golang.org/x/text"
