@@ -56,6 +56,47 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"empty pod with injection disabled",
+			Handler{},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationInject: "false",
+						},
+					},
+				}),
+			},
+			"",
+			nil,
+		},
+
+		{
+			"empty pod with injection truthy",
+			Handler{},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationInject: "t",
+						},
+					},
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {

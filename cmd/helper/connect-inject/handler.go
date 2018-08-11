@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/mattbaird/jsonpatch"
@@ -20,6 +21,11 @@ const (
 	// annotationStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
 	annotationStatus = "consul.hashicorp.com/connect-inject-status"
+
+	// annotationInject is the key of the annotation that controls whether
+	// injection is explicitly enabled or disabled for a pod. This should
+	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
+	annotationInject = "consul.hashicorp.com/connect-inject"
 )
 
 var (
@@ -104,7 +110,13 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
-	if !h.shouldInject(&pod) {
+	if shouldInject, err := h.shouldInject(&pod); err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error checking if should inject: %s", err),
+			},
+		}
+	} else if !shouldInject {
 		return resp
 	}
 
@@ -142,15 +154,20 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	return resp
 }
 
-func (h *Handler) shouldInject(pod *corev1.Pod) bool {
+func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 	// Don't inject in the Kubernetes system namespaces
 	for _, ns := range kubeSystemNamespaces {
 		if pod.ObjectMeta.Namespace == ns {
-			return false
+			return false, nil
 		}
 	}
 
-	return true
+	// If the explicit true/false is on, then take that value
+	if raw, ok := pod.Annotations[annotationInject]; ok {
+		return strconv.ParseBool(raw)
+	}
+
+	return true, nil
 }
 
 func (h *Handler) containerSidecar() corev1.Container {
