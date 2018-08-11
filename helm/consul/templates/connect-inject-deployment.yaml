@@ -29,7 +29,26 @@ spec:
             - "-ec"
             - |
               consul-k8s inject \
+                -default-inject={{ .Values.connectInject.default }} \
                 -listen=:8080 \
                 -tls-auto=consul-connect-injector-cfg \
                 -tls-auto-hosts=consul-connect-injector-svc,consul-connect-injector-svc.${NAMESPACE},consul-connect-injector-svc.${NAMESPACE}.svc
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            failureThreshold: 2
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+              scheme: HTTPS
+            failureThreshold: 2
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 5
 {{- end }}

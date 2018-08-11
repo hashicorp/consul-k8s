@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: consul
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
     spec:
       terminationGracePeriodSeconds: 10
 

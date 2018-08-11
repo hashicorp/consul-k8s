@@ -21,6 +21,8 @@ spec:
     metadata:
       labels:
         app: consul-server
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
     spec:
       affinity:
         podAntiAffinity:
