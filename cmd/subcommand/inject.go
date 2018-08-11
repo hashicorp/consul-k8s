@@ -98,6 +98,7 @@ func (c *Inject) Run(args []string) int {
 	injector := connectinject.Handler{RequireAnnotation: !c.flagDefaultInject}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
+	mux.HandleFunc("/health/ready", c.handleReady)
 	var handler http.Handler = mux
 	handler = handlers.LoggingHandler(os.Stdout, handler)
 	server := &http.Server{
@@ -113,6 +114,13 @@ func (c *Inject) Run(args []string) int {
 	}
 
 	return 0
+}
+
+func (c *Inject) handleReady(rw http.ResponseWriter, req *http.Request) {
+	// Always ready at this point. The main readiness check is whether
+	// there is a TLS certificate. If we reached this point it means we
+	// served a TLS certificate.
+	rw.WriteHeader(204)
 }
 
 func (c *Inject) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
