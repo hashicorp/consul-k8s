@@ -56,7 +56,11 @@ var (
 )
 
 // Handler is the HTTP handler for admission webhooks.
-type Handler struct{}
+type Handler struct {
+	// RequireAnnotation means that the annotation must be given to inject.
+	// If this is false, injection is default.
+	RequireAnnotation bool
+}
 
 // Handle is the http.HandlerFunc implementation that actually handles the
 // webhook request for admission control. This should be registered or
@@ -192,14 +196,6 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 		return false, nil
 	}
 
-	// If the explicit true/false is on, then take that value
-	if raw, ok := pod.Annotations[annotationInject]; ok {
-		v, err := strconv.ParseBool(raw)
-		if err != nil || !v {
-			return v, err
-		}
-	}
-
 	// A service name is required. Whether a proxy accepting connections
 	// or just establishing outbound, a service name is required to acquire
 	// the correct certificate.
@@ -207,7 +203,14 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 		return false, nil
 	}
 
-	return true, nil
+	// If the explicit true/false is on, then take that value. Note that
+	// this has to be the last check since it sets a default value after
+	// all other checks.
+	if raw, ok := pod.Annotations[annotationInject]; ok {
+		return strconv.ParseBool(raw)
+	}
+
+	return !h.RequireAnnotation, nil
 }
 
 func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {

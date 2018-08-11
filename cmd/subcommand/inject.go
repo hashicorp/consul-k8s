@@ -26,12 +26,13 @@ import (
 type Inject struct {
 	UI cli.Ui
 
-	flagListen    string
-	flagAutoName  string // MutatingWebhookConfiguration for updating
-	flagAutoHosts string // SANs for the auto-generated TLS cert.
-	flagCertFile  string // TLS cert for listening (PEM)
-	flagKeyFile   string // TLS cert private key (PEM)
-	flagSet       *flag.FlagSet
+	flagListen        string
+	flagAutoName      string // MutatingWebhookConfiguration for updating
+	flagAutoHosts     string // SANs for the auto-generated TLS cert.
+	flagCertFile      string // TLS cert for listening (PEM)
+	flagKeyFile       string // TLS cert private key (PEM)
+	flagDefaultInject bool   // True to inject by default
+	flagSet           *flag.FlagSet
 
 	once sync.Once
 	help string
@@ -40,6 +41,7 @@ type Inject struct {
 
 func (c *Inject) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
+	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
 	c.flagSet.StringVar(&c.flagAutoName, "tls-auto", "",
 		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
@@ -93,7 +95,7 @@ func (c *Inject) Run(args []string) int {
 	go c.certWatcher(ctx, certCh, clientset)
 
 	// Build the HTTP handler and server
-	var injector connectinject.Handler
+	injector := connectinject.Handler{RequireAnnotation: !c.flagDefaultInject}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
 	var handler http.Handler = mux
