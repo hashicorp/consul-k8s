@@ -124,8 +124,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	}
 
 	// Setup the default annotation values that are used for the container.
-	// This MUST be done before shouldInject is called since shouldInject
-	// will return false if there is no service name.
+	// This MUST be done before shouldInject is called since k.
 	if err := h.defaultAnnotations(&pod); err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
@@ -186,6 +185,11 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 		if pod.ObjectMeta.Namespace == ns {
 			return false, nil
 		}
+	}
+
+	// If we already injected then don't inject again
+	if pod.Annotations[annotationStatus] != "" {
+		return false, nil
 	}
 
 	// If the explicit true/false is on, then take that value
