@@ -19,4 +19,8 @@ webhooks:
         apiGroups: [""]
         apiVersions: ["v1"]
         resources: ["pods"]
+{{- if .Values.connectInject.namespaceSelector }}
+    namespaceSelector:
+{{ tpl .Values.connectInject.namespaceSelector . | indent 6 }}
+{{- end }}
 {{- end }}
