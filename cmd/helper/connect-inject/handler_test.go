@@ -45,6 +45,24 @@ func TestHandlerHandle(t *testing.T) {
 		},
 
 		{
+			"already injected",
+			Handler{},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationStatus: "injected",
+						},
+					},
+
+					Spec: basicSpec,
+				}),
+			},
+			"",
+			nil,
+		},
+
+		{
 			"empty pod",
 			Handler{},
 			v1beta1.AdmissionRequest{
