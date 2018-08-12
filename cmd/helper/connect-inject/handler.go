@@ -346,23 +346,23 @@ func addContainer(target, add []corev1.Container, base string) []jsonpatch.JsonP
 
 func updateAnnotation(target, add map[string]string) []jsonpatch.JsonPatchOperation {
 	var result []jsonpatch.JsonPatchOperation
-	for key, value := range add {
-		if target == nil || target[key] == "" {
-			target = map[string]string{}
-			result = append(result, jsonpatch.JsonPatchOperation{
-				Operation: "add",
-				Path:      "/metadata/annotations",
-				Value: map[string]string{
-					key: value,
-				},
-			})
-		} else {
-			result = append(result, jsonpatch.JsonPatchOperation{
-				Operation: "replace",
-				Path:      "/metadata/annotations/" + key,
-				Value:     value,
-			})
-		}
+	if len(target) == 0 {
+		result = append(result, jsonpatch.JsonPatchOperation{
+			Operation: "add",
+			Path:      "/metadata/annotations",
+			Value:     add,
+		})
+
+		return result
 	}
+
+	for key, value := range add {
+		result = append(result, jsonpatch.JsonPatchOperation{
+			Operation: "add",
+			Path:      "/metadata/annotations/" + key,
+			Value:     value,
+		})
+	}
+
 	return result
 }
