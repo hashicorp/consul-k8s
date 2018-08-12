@@ -359,10 +359,17 @@ func updateAnnotation(target, add map[string]string) []jsonpatch.JsonPatchOperat
 	for key, value := range add {
 		result = append(result, jsonpatch.JsonPatchOperation{
 			Operation: "add",
-			Path:      "/metadata/annotations/" + key,
+			Path:      "/metadata/annotations/" + escapeJSONPointer(key),
 			Value:     value,
 		})
 	}
 
 	return result
+}
+
+// https://tools.ietf.org/html/rfc6901
+func escapeJSONPointer(s string) string {
+	s = strings.Replace(s, "~", "~0", -1)
+	s = strings.Replace(s, "/", "~1", -1)
+	return s
 }
