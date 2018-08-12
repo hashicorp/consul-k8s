@@ -1,5 +1,5 @@
 variable "k8s_version" {
-  default     = "1.10.5-gke.0"
+  default     = "1.10.5-gke.4"
   description = "The K8S version to use for both master and nodes."
 }
 
