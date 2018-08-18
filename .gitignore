@@ -1,7 +1,3 @@
 .DS_Store
-.terraform/
-terraform.tfstate*
-terraform.tfvars
-values.yaml
-cmd/bin
-cmd/pkg
+/bin
+/pkg

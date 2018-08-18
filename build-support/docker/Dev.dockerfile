@@ -10,4 +10,4 @@ RUN make
 
 FROM consul:latest
 
-COPY --from=builder /go/src/github.com/hashicorp/consul-k8s/cmd/bin/consul-k8s /bin
+COPY --from=builder /go/src/github.com/hashicorp/consul-k8s/bin/consul-k8s /bin
