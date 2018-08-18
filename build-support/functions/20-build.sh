@@ -142,7 +142,7 @@ function build_consul {
          status "Running build in container" &&
          docker start -i ${container_id} &&
          status "Copying back artifacts" &&
-         docker cp ${container_id}:/go/src/github.com/hashicorp/consul-k8s/cmd/pkg/bin pkg.bin.new
+         docker cp ${container_id}:/go/src/github.com/hashicorp/consul-k8s/pkg/bin pkg.bin.new
       )
       ret=$?
       docker rm ${container_id} > /dev/null
@@ -273,7 +273,7 @@ function build_consul_local {
             then
                GOBIN_EXTRA="${os}_${arch}/"
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}cmd" "${outdir}/consul-k8s"
+            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}" "${outdir}/consul-k8s"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"

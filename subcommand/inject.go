@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/gorilla/handlers"
-	"github.com/hashicorp/consul-k8s/cmd/helper/cert"
-	"github.com/hashicorp/consul-k8s/cmd/helper/connect-inject"
+	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/helper/connect-inject"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/types"
