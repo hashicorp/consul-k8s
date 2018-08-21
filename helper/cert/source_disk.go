@@ -16,10 +16,18 @@ type DiskSource struct {
 	CertPath string // CertPath is the path to the PEM-encoded cert
 	KeyPath  string // KeyPath is the path to the PEM-encoded private key
 	CAPath   string // CAPath is the path to the PEM-encoded CA root bundle (optional)
+
+	pollInterval time.Duration
 }
 
 // Certificate implements Source
 func (s *DiskSource) Certificate(ctx context.Context, last *Bundle) (Bundle, error) {
+	// Setup the poll interval
+	pollInterval := s.pollInterval
+	if pollInterval == 0 {
+		pollInterval = 250 * time.Millisecond
+	}
+
 	// Setup the file watcher. We do this first so taht there isn't a race
 	// between reading the files below initially and detecting a change.
 	w := watcher.New()
@@ -31,7 +39,7 @@ func (s *DiskSource) Certificate(ctx context.Context, last *Bundle) (Bundle, err
 	if err := w.Add(s.KeyPath); err != nil {
 		return Bundle{}, err
 	}
-	go w.Start(250 * time.Millisecond)
+	go w.Start(pollInterval)
 	w.Wait()
 
 	// At this point the file watcher is started and we can start reading
