@@ -29,6 +29,8 @@ dev:
 dev-docker:
 	@docker build -t '$(DEV_IMAGE)' --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' -f $(CURDIR)/build-support/docker/Dev.dockerfile $(CURDIR)
 
+test:
+	go test ./...
 
 clean:
 	@rm -rf \
@@ -36,4 +38,4 @@ clean:
 		$(CURDIR)/pkg
 
 
-.PHONY: all bin clean dev
+.PHONY: all bin clean dev test
