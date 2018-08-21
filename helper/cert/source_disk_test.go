@@ -56,9 +56,10 @@ func TestGenDisk_blockWrite(t *testing.T) {
 	defer os.RemoveAll(td)
 
 	source := &DiskSource{
-		CertPath: filepath.Join(td, "leaf.pem"),
-		KeyPath:  filepath.Join(td, "leaf.key.pem"),
-		CAPath:   filepath.Join(td, "ca.pem"),
+		CertPath:     filepath.Join(td, "leaf.pem"),
+		KeyPath:      filepath.Join(td, "leaf.key.pem"),
+		CAPath:       filepath.Join(td, "ca.pem"),
+		pollInterval: 5 * time.Millisecond, // Fast for tests
 	}
 	bundle, err := source.Certificate(context.Background(), nil)
 	require.NoError(err)
@@ -76,7 +77,7 @@ func TestGenDisk_blockWrite(t *testing.T) {
 	select {
 	case <-nextCh:
 		t.Fatal("should not have received next")
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 	}
 
 	// Update the file
