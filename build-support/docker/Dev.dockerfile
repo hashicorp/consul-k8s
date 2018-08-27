@@ -1,13 +1,13 @@
-FROM golang:latest as builder
+FROM golang:1.11rc2 as builder
 ARG GIT_COMMIT
 ARG GIT_DIRTY
 ARG GIT_DESCRIBE
-WORKDIR /go/src/github.com/hashicorp/consul-k8s
 ENV CONSUL_DEV=1
 ENV COLORIZE=0
-Add . /go/src/github.com/hashicorp/consul-k8s/
+Add . /opt/build
+WORKDIR /opt/build
 RUN make
 
 FROM consul:latest
 
-COPY --from=builder /go/src/github.com/hashicorp/consul-k8s/bin/consul-k8s /bin
+COPY --from=builder /opt/build/bin/consul-k8s /bin
