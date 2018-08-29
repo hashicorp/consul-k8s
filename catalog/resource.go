@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -59,11 +60,13 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 		return nil
 	}
 
+	if !t.shouldSync(service) {
+		t.Log.Debug("syncing disabled for service, ignoring", "key", key)
+		return nil
+	}
+
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
-	t.Log.Info("upsert", "key", key)
-
-	// TODO(mitchellh): check if syncing is enabled for this service
 
 	// Syncing is enabled, let's keep track of this service.
 	if t.serviceMap == nil {
@@ -76,6 +79,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// Update the registration and trigger a sync
 	t.generateRegistrations(key)
 	t.sync()
+	t.Log.Info("upsert", "key", key)
 	return nil
 }
 
@@ -104,6 +108,11 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 		Log:      t.Log,
 		Resource: &serviceEndpointsResource{Service: t},
 	}).Run(ch)
+}
+
+// shouldSync returns true if resyncing should be enabled for the given service.
+func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
+	return true
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -144,7 +153,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		},
 	}
 
-	// TODO(mitchellh): read annotations and modify the base here
+	// If the name is explicitly annotated, adopt that name
+	if v, ok := svc.Annotations[annotationServiceName]; ok {
+		baseService.Service = strings.TrimSpace(v)
+	}
 
 	switch svc.Spec.Type {
 	// For LoadBalancer type services, we create a service instance for
