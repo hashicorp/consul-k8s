@@ -75,7 +75,22 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	}
 	t.serviceMap[key] = service
 
-	// TODO(mitchellh): on initial load populate the endpoints
+	// If we care about endpoints, we should do the initial endpoints load.
+	if t.shouldTrackEndpoints(key) {
+		endpoints, err := t.Client.CoreV1().
+			Endpoints(metav1.NamespaceDefault).
+			Get(service.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Log.Warn("error loading initial endpoints",
+				"key", key,
+				"err", err)
+		} else {
+			if t.endpointsMap == nil {
+				t.endpointsMap = make(map[string]*apiv1.Endpoints)
+			}
+			t.endpointsMap[key] = endpoints
+		}
+	}
 
 	// Update the registration and trigger a sync
 	t.generateRegistrations(key)
@@ -114,6 +129,26 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 // shouldSync returns true if resyncing should be enabled for the given service.
 func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	return true
+}
+
+// shouldTrackEndpoints returns true if the endpoints for the given key
+// should be tracked.
+//
+// Precondition: this requires the lock to be held
+func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
+	// The service must be one we care about for us to watch the endpoints.
+	// We care about a service that exists in our service map (is enabled
+	// for syncing) and is a NodePort type. Only NodePort type services
+	// use the endpoints at all.
+	if t.serviceMap == nil {
+		return false
+	}
+	svc, ok := t.serviceMap[key]
+	if !ok {
+		return false
+	}
+
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -338,10 +373,8 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	svc.serviceLock.Lock()
 	defer svc.serviceLock.Unlock()
 
-	if svc.serviceMap == nil {
-		return nil
-	}
-	if _, ok := svc.serviceMap[key]; !ok {
+	// Check if we care about endpoints for this service
+	if !svc.shouldTrackEndpoints(key) {
 		return nil
 	}
 
@@ -361,10 +394,16 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 func (t *serviceEndpointsResource) Delete(key string) error {
 	t.Service.serviceLock.Lock()
 	defer t.Service.serviceLock.Unlock()
-	delete(t.Service.endpointsMap, key)
-	if _, ok := t.Service.consulMap[key]; ok {
-		delete(t.Service.consulMap, key)
-		t.Service.sync()
+
+	// This is a bit of an optimization. We only want to force a resync
+	// if we were tracking this endpoint to begin with and that endpoint
+	// had associated registrations.
+	if _, ok := t.Service.endpointsMap[key]; ok {
+		delete(t.Service.endpointsMap, key)
+		if _, ok := t.Service.consulMap[key]; ok {
+			delete(t.Service.consulMap, key)
+			t.Service.sync()
+		}
 	}
 
 	t.Service.Log.Info("delete endpoint", "key", key)
