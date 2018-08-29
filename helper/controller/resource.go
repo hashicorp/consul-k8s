@@ -4,6 +4,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// ResourceUpsertFunc and ResourceDeleteFunc are the callback types for
+// when a resource is inserted, updated, or deleted.
 type ResourceUpsertFunc func(string, interface{}) error
 type ResourceDeleteFunc func(string) error
 
@@ -22,6 +24,16 @@ type Resource interface {
 	// will be retried.
 	Upsert(string, interface{}) error
 	Delete(string) error
+}
+
+// Backgrounder should be implemented by a Resource that requires additional
+// background processing. If a Resource implements this, then the Controller
+// will automatically Run the Backgrounder for the duration of the controller.
+//
+// The channel will be closed when the Controller is quitting. The Controller
+// will block until the Backgrounder completes.
+type Backgrounder interface {
+	Run(<-chan struct{})
 }
 
 // NewResource returns a Resource implementation for the given informer,
