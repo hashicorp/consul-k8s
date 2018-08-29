@@ -25,7 +25,7 @@ type ServiceResource struct {
 	serviceLock sync.RWMutex
 }
 
-// Informer implements the Type interface.
+// Informer implements the controller.Resource interface.
 func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -43,6 +43,7 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	)
 }
 
+// Upsert implements the controller.Resource interface.
 func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// We expect a Service. If it isn't a service then just ignore it.
 	service, ok := raw.(*apiv1.Service)
@@ -63,6 +64,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	return nil
 }
 
+// Delete implements the controller.Resource interface.
 func (t *ServiceResource) Delete(key string) error {
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
@@ -72,11 +74,18 @@ func (t *ServiceResource) Delete(key string) error {
 	return nil
 }
 
+// Run implements the controller.Backgrounder interface.
 func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
-	(&controller.Controller{Log: t.Log, Resource: &serviceEndpointsResource{Service: t}}).Run(ch)
+	(&controller.Controller{
+		Log:      t.Log,
+		Resource: &serviceEndpointsResource{Service: t},
+	}).Run(ch)
 }
 
+// serviceEndpointsResource implements controller.Resource and starts
+// a background watcher on endpoints that is used by the ServiceResource
+// to keep track of changing endpoints for registered services.
 type serviceEndpointsResource struct {
 	Service *ServiceResource
 }
