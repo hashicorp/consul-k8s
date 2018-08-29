@@ -233,6 +233,36 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	require.Equal([]string{"k8s", "one", "two", "three"}, actual[0].Service.Tags)
 }
 
+// Test annotated service meta
+func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Annotations[annotationServiceMetaPrefix+"foo"] = "bar"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("bar", actual[0].Service.Meta["foo"])
+}
+
 // testService returns a service that will result in a registration.
 func testService(name string) *apiv1.Service {
 	return &apiv1.Service{
