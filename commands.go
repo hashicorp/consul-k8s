@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/hashicorp/consul-k8s/subcommand"
+	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
 	"github.com/mitchellh/cli"
 )
 
@@ -16,6 +17,10 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"inject": func() (cli.Command, error) {
 			return &subcommand.Inject{UI: ui}, nil
+		},
+
+		"sync-catalog": func() (cli.Command, error) {
+			return &cmdSyncCatalog.Command{UI: ui}, nil
 		},
 	}
 }
