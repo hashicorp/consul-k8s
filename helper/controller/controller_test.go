@@ -146,6 +146,54 @@ func TestController_update(t *testing.T) {
 	closer()
 }
 
+// Test that backgrounders are started and stopped.
+func TestController_backgrounder(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	client := fake.NewSimpleClientset()
+	resource, _, _ := testResource(client)
+	bgresource := &testBackgrounder{Resource: resource}
+
+	// Start the controller
+	closer := testControllerRun(bgresource)
+
+	// Wait some period of time
+	time.Sleep(50 * time.Millisecond)
+	require.True(bgresource.Running(), "running")
+
+	// Wait some period of time
+	closer()
+	require.False(bgresource.Running(), "running")
+}
+
+// testBackgrounder implements Backgrounder and has a simple func to check
+// if its running.
+type testBackgrounder struct {
+	sync.Mutex
+	Resource
+
+	running bool
+}
+
+func (r *testBackgrounder) Running() bool {
+	r.Lock()
+	defer r.Unlock()
+	return r.running
+}
+
+func (r *testBackgrounder) Run(ch <-chan struct{}) {
+	r.Lock()
+	r.running = true
+	r.Unlock()
+
+	<-ch
+
+	r.Lock()
+	r.running = false
+	r.Unlock()
+}
+
 // testService returns a bare bones apiv1.Service structure with the
 // given name set. This is useful with the fake client.
 func testService(name string) *apiv1.Service {

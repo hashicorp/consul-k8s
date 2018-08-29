@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -68,6 +69,36 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 			}
 		},
 	})
+
+	// If the type is a background syncer, then we startup the background
+	// process.
+	if bg, ok := c.Resource.(Backgrounder); ok {
+		ctx, cancelF := context.WithCancel(context.Background())
+
+		// Run the backgrounder
+		doneCh := make(chan struct{})
+		go func() {
+			defer close(doneCh)
+			bg.Run(ctx.Done())
+		}()
+
+		// Start a goroutine that automatically closes the context when we stop
+		go func() {
+			select {
+			case <-stopCh:
+				cancelF()
+
+			case <-ctx.Done():
+				// Cancelled outside
+			}
+		}()
+
+		// When we exit, close the context so the backgrounder ends
+		defer func() {
+			cancelF()
+			<-doneCh
+		}()
+	}
 
 	// Run the informer to start requesting resources
 	go func() {
