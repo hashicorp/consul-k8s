@@ -39,7 +39,7 @@ func TestServiceResource_createDelete(t *testing.T) {
 	// Insert an LB service
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
 	require.NoError(err)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Delete
 	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete("foo", nil))
@@ -90,7 +90,7 @@ func TestServiceResource_lb(t *testing.T) {
 	require.NoError(err)
 
 	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Verify what we got
 	syncer.Lock()
@@ -101,11 +101,42 @@ func TestServiceResource_lb(t *testing.T) {
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 }
 
+// Test explicit name annotation
+func TestServiceResource_lbAnnotatedName(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Annotations[annotationServiceName] = "bar"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("bar", actual[0].Service.Service)
+}
+
 // testService returns a service that will result in a registration.
 func testService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:        name,
+			Annotations: map[string]string{},
 		},
 
 		Spec: apiv1.ServiceSpec{
