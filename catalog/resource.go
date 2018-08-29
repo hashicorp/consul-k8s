@@ -133,6 +133,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		t.consulMap = make(map[string][]*consulapi.CatalogRegistration)
 	}
 
+	// Begin by always clearing the old value out since we'll regenerate
+	// a new one if there is one.
+	delete(t.consulMap, key)
+
 	// baseNode and baseService are the base that should be modified with
 	// service-type specific changes. These are not pointers, they should be
 	// shallow copied for each instance.
@@ -210,7 +214,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// each LoadBalancer entry. We only support entries that have an IP
 	// address assigned (not hostnames).
 	case apiv1.ServiceTypeLoadBalancer:
-		t.consulMap[key] = []*consulapi.CatalogRegistration{}
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			addr := ingress.IP
 			if addr == "" {
@@ -225,6 +228,51 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service = &rs
 			r.Service.Address = addr
 			t.consulMap[key] = append(t.consulMap[key], &r)
+		}
+
+	// For NodePort services, we create a service instance for each
+	// endpoint of the service. This way we don't register _every_ K8S
+	// node as part of the service.
+	case apiv1.ServiceTypeNodePort:
+		if t.endpointsMap == nil {
+			return
+		}
+
+		endpoints := t.endpointsMap[key]
+		if endpoints == nil {
+			return
+		}
+
+		seen := map[string]struct{}{}
+		for _, subset := range endpoints.Subsets {
+			for _, subsetAddr := range subset.Addresses {
+				addr := subsetAddr.IP
+				if addr == "" {
+					addr = subsetAddr.Hostname
+				}
+				if addr == "" {
+					continue
+				}
+
+				// Its not clear whether K8S guarantees ready addresses to
+				// be unique so we maintain a set to prevent duplicates just
+				// in case.
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
+
+				r := baseNode
+				rs := baseService
+				r.Service = &rs
+				r.Service.Address = addr
+				if subsetAddr.NodeName != nil {
+					r.Node = *subsetAddr.NodeName
+					r.Address = addr
+				}
+
+				t.consulMap[key] = append(t.consulMap[key], &r)
+			}
 		}
 	}
 
@@ -262,11 +310,15 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Service.Client.CoreV1().Endpoints(metav1.NamespaceDefault).List(options)
+				return t.Service.Client.CoreV1().
+					Endpoints(metav1.NamespaceDefault).
+					List(options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Service.Client.CoreV1().Endpoints(metav1.NamespaceDefault).Watch(options)
+				return t.Service.Client.CoreV1().
+					Endpoints(metav1.NamespaceDefault).
+					Watch(options)
 			},
 		},
 		&apiv1.Endpoints{},
@@ -276,11 +328,45 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 }
 
 func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
-	t.Service.Log.Info("upsert", "raw", raw)
+	svc := t.Service
+	endpoints, ok := raw.(*apiv1.Endpoints)
+	if !ok {
+		svc.Log.Warn("upsert got invalid type", "raw", raw)
+		return nil
+	}
+
+	svc.serviceLock.Lock()
+	defer svc.serviceLock.Unlock()
+
+	if svc.serviceMap == nil {
+		return nil
+	}
+	if _, ok := svc.serviceMap[key]; !ok {
+		return nil
+	}
+
+	// We are tracking this service so let's keep track of the endpoints
+	if svc.endpointsMap == nil {
+		svc.endpointsMap = make(map[string]*apiv1.Endpoints)
+	}
+	svc.endpointsMap[key] = endpoints
+
+	// Update the registration and trigger a sync
+	svc.generateRegistrations(key)
+	svc.sync()
+	svc.Log.Info("upsert endpoint", "key", key)
 	return nil
 }
 
 func (t *serviceEndpointsResource) Delete(key string) error {
-	t.Service.Log.Info("delete", "key", key)
+	t.Service.serviceLock.Lock()
+	defer t.Service.serviceLock.Unlock()
+	delete(t.Service.endpointsMap, key)
+	if _, ok := t.Service.consulMap[key]; ok {
+		delete(t.Service.consulMap, key)
+		t.Service.sync()
+	}
+
+	t.Service.Log.Info("delete endpoint", "key", key)
 	return nil
 }
