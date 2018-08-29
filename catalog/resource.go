@@ -190,6 +190,13 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 	}
 
+	// Parse any additional tags
+	if tags, ok := svc.Annotations[annotationServiceTags]; ok {
+		for _, t := range strings.Split(tags, ",") {
+			baseService.Tags = append(baseService.Tags, strings.TrimSpace(t))
+		}
+	}
+
 	switch svc.Spec.Type {
 	// For LoadBalancer type services, we create a service instance for
 	// each LoadBalancer entry. We only support entries that have an IP
