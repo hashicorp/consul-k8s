@@ -85,7 +85,13 @@ func (t *ServiceResource) Delete(key string) error {
 	defer t.serviceLock.Unlock()
 	delete(t.serviceMap, key)
 	delete(t.endpointsMap, key)
-	delete(t.consulMap, key)
+
+	// If there were registrations related to this service, then
+	// delete them and sync.
+	if _, ok := t.consulMap[key]; ok {
+		delete(t.consulMap, key)
+		t.sync()
+	}
 
 	t.Log.Info("delete", "key", key)
 	return nil
@@ -161,12 +167,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service.Address = addr
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
-
-		t.Log.Debug("generated registration",
-			"key", key,
-			"service", baseService.Service,
-			"instances", len(t.consulMap[key]))
 	}
+
+	t.Log.Debug("generated registration",
+		"key", key,
+		"service", baseService.Service,
+		"instances", len(t.consulMap[key]))
 }
 
 // sync calls the Syncer.Sync function from the generated registrations.

@@ -21,6 +21,37 @@ func TestServiceResource_impl(t *testing.T) {
 	var _ controller.Backgrounder = &ServiceResource{}
 }
 
+// Test that deleting a service properly deletes the registration.
+func TestServiceResource_createDelete(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	require.NoError(err)
+	time.Sleep(100 * time.Millisecond)
+
+	// Delete
+	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete("foo", nil))
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 0)
+}
+
 // Test that the proper registrations are generated for a LoadBalancer.
 func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
