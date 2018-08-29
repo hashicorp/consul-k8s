@@ -1,6 +1,7 @@
 module github.com/hashicorp/consul-k8s
 
 require (
+	cloud.google.com/go v0.26.0 // indirect
 	github.com/DataDog/datadog-go v0.0.0-20180822151419-281ae9f2d895 // indirect
 	github.com/armon/go-metrics v0.0.0-20180713145231-3c58d8115a78 // indirect
 	github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310 // indirect
@@ -8,7 +9,6 @@ require (
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/circonus-labs/circonus-gometrics v2.2.1+incompatible // indirect
 	github.com/circonus-labs/circonusllhist v0.0.0-20180430145027-5eb751da55c6 // indirect
-	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/gogo/protobuf v1.1.1 // indirect
@@ -22,6 +22,7 @@ require (
 	github.com/hashicorp/consul v1.2.2
 	github.com/hashicorp/errwrap v0.0.0-20180715044906-d6c0cd880357 // indirect
 	github.com/hashicorp/go-cleanhttp v0.0.0-20171218145408-d5fe4b57a186 // indirect
+	github.com/hashicorp/go-hclog v0.0.0-20180828044259-75ecd6e6d645
 	github.com/hashicorp/go-immutable-radix v0.0.0-20180129170900-7f3cd4390caa // indirect
 	github.com/hashicorp/go-msgpack v0.0.0-20150518234257-fa3f63826f7c // indirect
 	github.com/hashicorp/go-multierror v0.0.0-20180717150148-3d5d8f294aa0 // indirect
@@ -33,6 +34,7 @@ require (
 	github.com/hashicorp/memberlist v0.1.0 // indirect
 	github.com/hashicorp/serf v0.8.1 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
+	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/json-iterator/go v0.0.0-20180806060727-1624edc4454b // indirect
 	github.com/mattbaird/jsonpatch v0.0.0-20171005235357-81af80346b1a
 	github.com/mattn/go-colorable v0.0.9 // indirect
@@ -48,7 +50,6 @@ require (
 	github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.8.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/posener/complete v1.1.1 // indirect
 	github.com/prometheus/client_golang v0.8.0 // indirect
 	github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910 // indirect
@@ -62,6 +63,7 @@ require (
 	github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926 // indirect
 	golang.org/x/crypto v0.0.0-20180808211826-de0752318171 // indirect
 	golang.org/x/net v0.0.0-20180811021610-c39426892332 // indirect
+	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be // indirect
 	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
 	golang.org/x/sys v0.0.0-20180810173357-98c5dad5d1a0 // indirect
 	golang.org/x/text v0.3.0 // indirect
@@ -73,4 +75,5 @@ require (
 	k8s.io/api v0.0.0-20180628040859-072894a440bd
 	k8s.io/apimachinery v0.0.0-20180621070125-103fd098999d
 	k8s.io/client-go v8.0.0+incompatible
+	k8s.io/kube-openapi v0.0.0-20180731170545-e3762e86a74c // indirect
 )
