@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +34,7 @@ func TestController_initialData(t *testing.T) {
 	require.NoError(err)
 
 	// Start the controller
-	closer := testControllerRun(resource)
+	closer := TestControllerRun(resource)
 
 	// Wait some period of time
 	time.Sleep(200 * time.Millisecond)
@@ -52,7 +51,7 @@ func TestController_create(t *testing.T) {
 	resource, data, _ := testResource(client)
 
 	// Start the controller
-	closer := testControllerRun(resource)
+	closer := TestControllerRun(resource)
 
 	// Wait some period of time
 	time.Sleep(100 * time.Millisecond)
@@ -79,7 +78,7 @@ func TestController_createDelete(t *testing.T) {
 	resource, data, _ := testResource(client)
 
 	// Start the controller
-	closer := testControllerRun(resource)
+	closer := TestControllerRun(resource)
 
 	// Wait some period of time
 	time.Sleep(100 * time.Millisecond)
@@ -110,7 +109,7 @@ func TestController_update(t *testing.T) {
 	resource, data, dataLock := testResource(client)
 
 	// Start the controller
-	closer := testControllerRun(resource)
+	closer := TestControllerRun(resource)
 
 	// Wait some period of time
 	time.Sleep(100 * time.Millisecond)
@@ -156,7 +155,7 @@ func TestController_backgrounder(t *testing.T) {
 	bgresource := &testBackgrounder{Resource: resource}
 
 	// Start the controller
-	closer := testControllerRun(bgresource)
+	closer := TestControllerRun(bgresource)
 
 	// Wait some period of time
 	time.Sleep(50 * time.Millisecond)
@@ -248,23 +247,4 @@ func testResource(client kubernetes.Interface) (Resource, map[string]interface{}
 			return nil
 		},
 	), m, &lock
-}
-
-// testControllerRun takes the given Resource and runs the Controller. The
-// returned function should be called to stop the controller. The returned
-// function will block until the controller stops.
-func testControllerRun(r Resource) func() {
-	c := &Controller{Log: hclog.Default(), Resource: r}
-
-	stopCh := make(chan struct{})
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		c.Run(stopCh)
-	}()
-
-	return func() {
-		close(stopCh)
-		<-doneCh
-	}
 }
