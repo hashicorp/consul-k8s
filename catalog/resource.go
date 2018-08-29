@@ -197,6 +197,14 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 	}
 
+	// Parse any additional meta
+	for k, v := range svc.Annotations {
+		if strings.HasPrefix(k, annotationServiceMetaPrefix) {
+			k = strings.TrimPrefix(k, annotationServiceMetaPrefix)
+			baseService.Meta[k] = v
+		}
+	}
+
 	switch svc.Spec.Type {
 	// For LoadBalancer type services, we create a service instance for
 	// each LoadBalancer entry. We only support entries that have an IP
