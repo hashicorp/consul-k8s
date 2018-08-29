@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -129,6 +130,77 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	actual := syncer.Registrations
 	require.Len(actual, 1)
 	require.Equal("bar", actual[0].Service.Service)
+}
+
+// Test default port and additional ports in the meta
+func TestServiceResource_lbPort(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Spec.Ports = []apiv1.ServicePort{
+		apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
+		apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
+	}
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal(80, actual[0].Service.Port)
+	require.Equal("80", actual[0].Service.Meta["port-http"])
+	require.Equal("8500", actual[0].Service.Meta["port-rpc"])
+}
+
+// Test default port works with override annotation
+func TestServiceResource_lbAnnotatedPort(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Annotations[annotationServicePort] = "rpc"
+	svc.Spec.Ports = []apiv1.ServicePort{
+		apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
+		apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
+	}
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal(8500, actual[0].Service.Port)
+	require.Equal("80", actual[0].Service.Meta["port-http"])
+	require.Equal("8500", actual[0].Service.Meta["port-rpc"])
 }
 
 // testService returns a service that will result in a registration.
