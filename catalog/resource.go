@@ -16,6 +16,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	// ConsulSourceKey is the key used in the meta to track the "k8s" source.
+	ConsulSourceKey = "sync-source"
+
+	// ConsulK8SKey is the key used in the meta to record the internal key
+	// used to track the service. This is used for reconciliation. If it
+	// isn't present the service will be deleted.
+	ConsulK8SKey = "sync-k8s-key"
+
+	// ConsulK8STag is the tag value for services registered.
+	ConsulK8STag = "k8s"
+)
+
 // ServiceResource implements controller.Resource to sync Service resource
 // types from K8S.
 type ServiceResource struct {
@@ -180,16 +193,16 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Node:           "k8s-sync",
 		Address:        "127.0.0.1",
 		NodeMeta: map[string]string{
-			"consul-source": "k8s",
+			ConsulSourceKey: ConsulK8STag,
 		},
 	}
 
 	baseService := consulapi.AgentService{
 		Service: svc.Name,
-		Tags:    []string{"k8s"},
+		Tags:    []string{ConsulK8STag},
 		Meta: map[string]string{
-			"consul-source":  "k8s",
-			"consul-k8s-key": key,
+			ConsulSourceKey: ConsulK8STag,
+			ConsulK8SKey:    key,
 		},
 	}
 
