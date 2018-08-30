@@ -1,7 +1,9 @@
 package synccatalog
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/catalog"
@@ -19,18 +21,31 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flagSet *flag.FlagSet
+	flags *flag.FlagSet
+	http  *flags.HTTPFlags
 
 	once sync.Once
 	help string
 }
 
 func (c *Command) init() {
-	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.help = flags.Usage(help, c.flagSet)
+	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+	c.http = &flags.HTTPFlags{}
+	flags.Merge(c.flags, c.http.ClientFlags())
+	flags.Merge(c.flags, c.http.ServerFlags())
+	c.help = flags.Usage(help, c.flags)
 }
 
 func (c *Command) Run(args []string) int {
+	c.once.Do(c.init)
+	if err := c.flags.Parse(args); err != nil {
+		return 1
+	}
+	if len(c.flags.Args()) > 0 {
+		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		return 1
+	}
+
 	// use the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", "/Users/mitchellh/.kube/config")
 	if err != nil {
@@ -43,11 +58,26 @@ func (c *Command) Run(args []string) int {
 		panic(err.Error())
 	}
 
+	// Setup Consul client
+	consulClient, err := c.http.APIClient()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
+		return 1
+	}
+
+	syncer := &catalog.ConsulSyncer{
+		Client: consulClient,
+		Log:    hclog.Default().Named("consul-sync"),
+	}
+
+	go syncer.Run(context.Background())
+
 	ctl := &controller.Controller{
 		Log: hclog.Default().Named("controller"),
 		Resource: &catalog.ServiceResource{
-			Log:    hclog.Default().Named("service"),
+			Log:    hclog.Default().Named("service-resource"),
 			Client: clientset,
+			Syncer: syncer,
 		},
 	}
 
