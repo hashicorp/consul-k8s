@@ -8,12 +8,13 @@ import (
 
 	"github.com/hashicorp/consul-k8s/catalog"
 	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/subcommand"
+	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Command is the command for syncing the K8S and Consul service
@@ -23,6 +24,7 @@ type Command struct {
 
 	flags *flag.FlagSet
 	http  *flags.HTTPFlags
+	k8s   *k8sflags.K8SFlags
 
 	once sync.Once
 	help string
@@ -31,8 +33,10 @@ type Command struct {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.http = &flags.HTTPFlags{}
+	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.http.ClientFlags())
 	flags.Merge(c.flags, c.http.ServerFlags())
+	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
 
@@ -46,16 +50,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/mitchellh/.kube/config")
+	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 	if err != nil {
-		panic(err.Error())
+		c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
+		return 1
 	}
 
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
+		return 1
 	}
 
 	// Setup Consul client
