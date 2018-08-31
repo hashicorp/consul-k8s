@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/catalog"
@@ -70,13 +72,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// Create the context we'll use to cancel everything
+	ctx, cancelF := context.WithCancel(context.Background())
+
+	// Build the Consul sync and start it
 	syncer := &catalog.ConsulSyncer{
 		Client: consulClient,
 		Log:    hclog.Default().Named("syncer/consul"),
 	}
+	go syncer.Run(ctx)
 
-	go syncer.Run(context.Background())
-
+	// Build the controller and start it
 	ctl := &controller.Controller{
 		Log: hclog.Default().Named("controller/service"),
 		Resource: &catalog.ServiceResource{
@@ -86,7 +92,18 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	ctl.Run(make(chan struct{}))
+	doneCh := make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		ctl.Run(ctx.Done())
+	}()
+
+	// Wait on an interrupt to exit
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	<-sigCh
+	cancelF()
+	<-doneCh
 	return 0
 }
 
