@@ -101,6 +101,61 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	require.Equal("127.0.0.1", service.Address)
 }
 
+// Test that the syncer reaps invalid services by instance
+func TestConsulSyncer_reapServiceInstance(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	s, closer := testConsulSyncer(t, client)
+	defer closer()
+
+	// Sync
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("foo", "bar"),
+	})
+
+	// Wait for the first service
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := client.Catalog().Service("bar", "", nil)
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(services) != 1 {
+			r.Fatal("service not found or too many")
+		}
+	})
+
+	// Create an invalid service directly in Consul
+	svc := testRegistration("foo", "bar")
+	svc.Service.ID = serviceID("foo", "bar2")
+	_, err := client.Catalog().Register(svc, nil)
+	require.NoError(err)
+
+	// Valid service should exist
+	var service *api.CatalogService
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := client.Catalog().Service("bar", "", nil)
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(services) != 1 {
+			r.Fatal("service not found or too many")
+		}
+		service = services[0]
+	})
+
+	// Verify the settings
+	require.Equal(serviceID("foo", "bar"), service.ServiceID)
+	require.Equal("foo", service.Node)
+	require.Equal("bar", service.ServiceName)
+	require.Equal("127.0.0.1", service.Address)
+}
+
 func testRegistration(node, service string) *api.CatalogRegistration {
 	return &api.CatalogRegistration{
 		Node:           node,
@@ -108,6 +163,7 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 		NodeMeta:       map[string]string{ConsulSourceKey: ConsulK8STag},
 		SkipNodeUpdate: true,
 		Service: &api.AgentService{
+			ID:      serviceID(node, service),
 			Service: service,
 			Tags:    []string{ConsulK8STag},
 			Meta: map[string]string{

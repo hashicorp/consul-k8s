@@ -152,11 +152,10 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	actual := syncer.Registrations
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("foo-0", actual[0].Service.ID)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("foo-1", actual[1].Service.ID)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
+	require.NotEqual(actual[1].Service.ID, actual[0].Service.ID)
 }
 
 // Test explicit name annotation
