@@ -1,4 +1,4 @@
-FROM golang:1.11rc2 as builder
+FROM golang:1.11.0 as builder
 ARG GIT_COMMIT
 ARG GIT_DIRTY
 ARG GIT_DESCRIBE
