@@ -24,9 +24,10 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags *flag.FlagSet
-	http  *flags.HTTPFlags
-	k8s   *k8sflags.K8SFlags
+	flags       *flag.FlagSet
+	http        *flags.HTTPFlags
+	k8s         *k8sflags.K8SFlags
+	flagDefault bool
 
 	once sync.Once
 	help string
@@ -34,6 +35,11 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+	c.flags.BoolVar(&c.flagDefault, "default-sync", true,
+		"If true, all valid services are synced by default. If false, "+
+			"the service must be annotated properly to sync. In either case "+
+			"an annotation can override the default")
+
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.http.ClientFlags())
@@ -86,9 +92,10 @@ func (c *Command) Run(args []string) int {
 	ctl := &controller.Controller{
 		Log: hclog.Default().Named("controller/service"),
 		Resource: &catalog.ServiceResource{
-			Log:    hclog.Default().Named("controller/service"),
-			Client: clientset,
-			Syncer: syncer,
+			Log:            hclog.Default().Named("controller/service"),
+			Client:         clientset,
+			Syncer:         syncer,
+			ExplicitEnable: !c.flagDefault,
 		},
 	}
 
