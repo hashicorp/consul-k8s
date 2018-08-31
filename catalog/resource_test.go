@@ -388,6 +388,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
+	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
 // Test that a NodePort created earlier works (doesn't require an Endpoints

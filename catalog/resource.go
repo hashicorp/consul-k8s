@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -263,7 +262,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// each LoadBalancer entry. We only support entries that have an IP
 	// address assigned (not hostnames).
 	case apiv1.ServiceTypeLoadBalancer:
-		for i, ingress := range svc.Status.LoadBalancer.Ingress {
+		seen := map[string]struct{}{}
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			addr := ingress.IP
 			if addr == "" {
 				addr = ingress.Hostname
@@ -272,10 +272,15 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				continue
 			}
 
+			if _, ok := seen[addr]; ok {
+				continue
+			}
+			seen[addr] = struct{}{}
+
 			r := baseNode
 			rs := baseService
 			r.Service = &rs
-			r.Service.ID = fmt.Sprintf("%s-%d", r.Service.Service, i)
+			r.Service.ID = serviceID(r.Service.Service, addr)
 			r.Service.Address = addr
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
@@ -315,6 +320,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r := baseNode
 				rs := baseService
 				r.Service = &rs
+				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
 				if subsetAddr.NodeName != nil {
 					r.Node = *subsetAddr.NodeName
