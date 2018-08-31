@@ -102,6 +102,63 @@ func TestServiceResource_lb(t *testing.T) {
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 }
 
+// Test that the proper registrations are generated for a LoadBalancer
+// with multiple endpoints.
+func TestServiceResource_lbMultiEndpoint(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeLoadBalancer,
+		},
+
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{
+					apiv1.LoadBalancerIngress{
+						IP: "1.2.3.4",
+					},
+					apiv1.LoadBalancerIngress{
+						IP: "2.3.4.5",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("foo-0", actual[0].Service.ID)
+	require.Equal("1.2.3.4", actual[0].Service.Address)
+	require.Equal("foo", actual[1].Service.Service)
+	require.Equal("foo-1", actual[1].Service.ID)
+	require.Equal("2.3.4.5", actual[1].Service.Address)
+}
+
 // Test explicit name annotation
 func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	t.Parallel()
