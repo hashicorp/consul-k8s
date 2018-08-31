@@ -36,6 +36,11 @@ type ServiceResource struct {
 	Client kubernetes.Interface
 	Syncer Syncer
 
+	// ExplictEnable should be set to true to require explicit enabling
+	// using annotations. If this is false, then services are implicitly
+	// enabled (aka default enabled).
+	ExplicitEnable bool
+
 	// serviceMap is a mapping of unique key (given by controller) to
 	// the service structure. endpointsMap is the mapping of the same
 	// uniqueKey to a set of endpoints.
@@ -141,7 +146,23 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 
 // shouldSync returns true if resyncing should be enabled for the given service.
 func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
-	return true
+	raw, ok := svc.Annotations[annotationServiceSync]
+	if !ok {
+		// If there is no explicit value, then set it to our current default.
+		return !t.ExplicitEnable
+	}
+
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		t.Log.Warn("error parsing service-sync annotation",
+			"service-name", svc.Name,
+			"err", err)
+
+		// Fallback to default
+		return !t.ExplicitEnable
+	}
+
+	return v
 }
 
 // shouldTrackEndpoints returns true if the endpoints for the given key

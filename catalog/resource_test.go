@@ -53,6 +53,121 @@ func TestServiceResource_createDelete(t *testing.T) {
 	require.Len(actual, 0)
 }
 
+// Test that we're default enabled.
+func TestServiceResource_defaultEnable(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+}
+
+// Test that we can explicitly disable.
+func TestServiceResource_defaultEnableDisable(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Annotations[annotationServiceSync] = "false"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 0)
+}
+
+// Test that we can default disable
+func TestServiceResource_defaultDisable(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:            hclog.Default(),
+		Client:         client,
+		Syncer:         syncer,
+		ExplicitEnable: true,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 0)
+}
+
+// Test that we can default disable but override
+func TestServiceResource_defaultDisableEnable(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:            hclog.Default(),
+		Client:         client,
+		Syncer:         syncer,
+		ExplicitEnable: true,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	svc.Annotations[annotationServiceSync] = "t"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+}
+
 // Test that the proper registrations are generated for a LoadBalancer.
 func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
