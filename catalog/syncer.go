@@ -39,48 +39,43 @@ type ConsulSyncer struct {
 
 	lock     sync.Mutex
 	once     sync.Once
-	services map[string]*consulSyncState
+	services map[string]struct{} // set of valid service names
+	nodes    map[string]*consulSyncState
+	deregs   map[string]*api.CatalogDeregistration
+	watchers map[string]context.CancelFunc
 }
 
 // consulSyncState keeps track of the state of syncing nodes/services.
 type consulSyncState struct {
-	// Registrations is the list of registrations for this service.
-	Registrations []*api.CatalogRegistration
-
-	// Deregistrations are a list of deregistrations for this service
-	// to reconcile changes.
-	Deregistrations []*api.CatalogDeregistration
+	// Services keeps track of the valid services on this node (by service ID)
+	Services map[string]*api.CatalogRegistration
 }
 
 // Sync implements Syncer
 func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
-	// Build the new state, we don't need a lock for this.
-	services := make(map[string]*consulSyncState, len(rs))
-	for _, r := range rs {
-		state, ok := services[r.Service.Service]
-		if !ok {
-			state = &consulSyncState{}
-			services[r.Service.Service] = state
-		}
-		state.Registrations = append(state.Registrations, r)
-	}
-
 	// Grab the lock so we can replace the sync state
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// First go through and find any services marked for deletion
-	for k, state := range s.services {
-		if state == nil || len(state.Deregistrations) == 0 {
-			continue
+	s.services = make(map[string]struct{})
+	s.nodes = make(map[string]*consulSyncState)
+	for _, r := range rs {
+		// Mark this as a valid service
+		s.services[r.Service.Service] = struct{}{}
+
+		// Initialize the state if we don't have it
+		state, ok := s.nodes[r.Node]
+		if !ok {
+			state = &consulSyncState{
+				Services: make(map[string]*api.CatalogRegistration),
+			}
+
+			s.nodes[r.Node] = state
 		}
 
-		if _, ok := services[k]; !ok {
-			services[k] = state
-		}
+		// Add our registration
+		state.Services[r.Service.ID] = r
 	}
-
-	s.services = services
 }
 
 // Run is the long-running runloop for reconciling the local set of
@@ -101,7 +96,7 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 			return
 
 		case <-reconcileTimer.C:
-			s.syncFull()
+			s.syncFull(ctx)
 			reconcileTimer.Reset(s.ReconcilePeriod)
 		}
 	}
@@ -153,13 +148,13 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 			for _, tag := range tags {
 				if tag == ConsulK8STag {
 					// We only care if we don't know about this service at all.
-					if s.services[name] != nil {
+					if _, ok := s.services[name]; ok {
 						continue
 					}
 
 					s.Log.Info("invalid service found, scheduling for delete",
 						"service-name", name)
-					if err := s.scheduleReapService(name); err != nil {
+					if err := s.scheduleReapServiceLocked(name); err != nil {
 						s.Log.Info("error querying service for delete",
 							"service-name", name,
 							"err", err)
@@ -175,9 +170,66 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 	}
 }
 
+// watchService watches all instances of a service by name for changes
+// and schedules re-registration or deletion if necessary.
+func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
+	s.Log.Info("starting service watcher", "service-name", name)
+	defer s.Log.Info("stopping service watcher", "service-name", name)
+
+	opts := api.QueryOptions{
+		AllowStale: true,
+		WaitIndex:  1,
+		WaitTime:   1 * time.Minute,
+	}
+
+	for {
+		// Wait for service changes
+		services, meta, err := s.Client.Catalog().Service(name, ConsulK8STag, &opts)
+		if err != nil {
+			s.Log.Warn("error querying service, will retry",
+				"service-name", name,
+				"err", err)
+			continue
+		}
+
+		// Quit if our context is over
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// Update our blocking index
+		opts.WaitIndex = meta.LastIndex
+
+		// Lock so we can modify the set of actions to take
+		s.lock.Lock()
+
+		for _, svc := range services {
+			// We delete unless we have a service and the node mapping
+			delete := true
+			if _, ok := s.services[svc.ServiceName]; ok {
+				nodeSvc := s.nodes[svc.Node]
+				delete = nodeSvc == nil || nodeSvc.Services[svc.ServiceID] == nil
+			}
+
+			if delete {
+				s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
+					Node:      svc.Node,
+					ServiceID: svc.ServiceID,
+				}
+			}
+		}
+
+		s.lock.Unlock()
+	}
+}
+
 // scheduleReapService finds all the instances of the service with the given
 // name that have the k8s tag and schedules them for removal.
-func (s *ConsulSyncer) scheduleReapService(name string) error {
+//
+// Precondition: lock must be held
+func (s *ConsulSyncer) scheduleReapServiceLocked(name string) error {
 	services, _, err := s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
 		AllowStale: true,
 	})
@@ -185,45 +237,61 @@ func (s *ConsulSyncer) scheduleReapService(name string) error {
 		return err
 	}
 
-	s.services[name] = &consulSyncState{}
-	state := s.services[name]
 	for _, svc := range services {
-		state.Deregistrations = append(state.Deregistrations, &api.CatalogDeregistration{
+		s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
 			Node:      svc.Node,
 			ServiceID: svc.ServiceID,
-		})
+		}
 	}
 
 	return nil
 }
 
-func (s *ConsulSyncer) syncFull() {
+// syncFull is called periodically to perform all the write-based API
+// calls to sync the data with Consul. This may also start background
+// watchers for specific services.
+func (s *ConsulSyncer) syncFull(ctx context.Context) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.Log.Info("registering services")
 
+	// Start the service watchers
+	for k, cf := range s.watchers {
+		if _, ok := s.services[k]; !ok {
+			cf()
+			delete(s.watchers, k)
+		}
+	}
+	for k := range s.services {
+		if _, ok := s.watchers[k]; !ok {
+			svcCtx, cancelF := context.WithCancel(ctx)
+			go s.watchService(svcCtx, k)
+			s.watchers[k] = cancelF
+		}
+	}
+
+	// Do all deregistrations first
+	for _, r := range s.deregs {
+		s.Log.Info("deregistering service",
+			"node-name", r.Node,
+			"service-id", r.ServiceID)
+		_, err := s.Client.Catalog().Deregister(r, nil)
+		if err != nil {
+			s.Log.Warn("error deregistering service",
+				"node-name", r.Node,
+				"service-id", r.ServiceID,
+				"err", err)
+		}
+	}
+
+	// Always clear deregistrations, they'll repopulate if we had errors
+	s.deregs = make(map[string]*api.CatalogDeregistration)
+
 	// Register all the services. This will overwrite any changes that
 	// may have been made to the registered services.
-	for name, state := range s.services {
-		// Service is scheduled for deletion, delete it.
-		for _, r := range state.Deregistrations {
-			s.Log.Info("deregistering service",
-				"node-name", r.Node,
-				"service-id", r.ServiceID)
-			_, err := s.Client.Catalog().Deregister(r, nil)
-			if err != nil {
-				s.Log.Warn("error deregistering service",
-					"node-name", r.Node,
-					"service-id", r.ServiceID,
-					"err", err)
-			}
-		}
-
-		// Always clear deregistrations, any invalid ones will repopulate later
-		state.Deregistrations = nil
-
-		for _, r := range state.Registrations {
+	for _, state := range s.nodes {
+		for _, r := range state.Services {
 			_, err := s.Client.Catalog().Register(r, nil)
 			if err != nil {
 				s.Log.Warn("error registering service",
@@ -232,15 +300,26 @@ func (s *ConsulSyncer) syncFull() {
 					"err", err)
 				continue
 			}
-		}
 
-		s.Log.Debug("registered service", "service-name", name)
+			s.Log.Debug("registered service instance",
+				"node-name", r.Node,
+				"service-name", r.Service.Service)
+		}
 	}
 }
 
 func (s *ConsulSyncer) init() {
 	if s.services == nil {
-		s.services = make(map[string]*consulSyncState)
+		s.services = make(map[string]struct{})
+	}
+	if s.nodes == nil {
+		s.nodes = make(map[string]*consulSyncState)
+	}
+	if s.deregs == nil {
+		s.deregs = make(map[string]*api.CatalogDeregistration)
+	}
+	if s.watchers == nil {
+		s.watchers = make(map[string]context.CancelFunc)
 	}
 	if s.ReconcilePeriod == 0 {
 		s.ReconcilePeriod = ConsulReconcilePeriod
