@@ -134,7 +134,7 @@ func (t *ServiceResource) Delete(key string) error {
 func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
 	(&controller.Controller{
-		Log:      t.Log,
+		Log:      t.Log.Named("controller/endpoints"),
 		Resource: &serviceEndpointsResource{Service: t},
 	}).Run(ch)
 }

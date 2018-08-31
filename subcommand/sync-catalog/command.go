@@ -67,15 +67,15 @@ func (c *Command) Run(args []string) int {
 
 	syncer := &catalog.ConsulSyncer{
 		Client: consulClient,
-		Log:    hclog.Default().Named("consul-sync"),
+		Log:    hclog.Default().Named("syncer/consul"),
 	}
 
 	go syncer.Run(context.Background())
 
 	ctl := &controller.Controller{
-		Log: hclog.Default().Named("controller"),
+		Log: hclog.Default().Named("controller/service"),
 		Resource: &catalog.ServiceResource{
-			Log:    hclog.Default().Named("service-resource"),
+			Log:    hclog.Default().Named("controller/service"),
 			Client: clientset,
 			Syncer: syncer,
 		},
