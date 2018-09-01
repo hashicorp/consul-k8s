@@ -278,6 +278,29 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 	}
 
+	// Always log what we generated
+	defer func() {
+		t.Log.Debug("generated registration",
+			"key", key,
+			"service", baseService.Service,
+			"instances", len(t.consulMap[key]))
+	}()
+
+	// If there are external IPs then those become the instance registrations
+	// for any type of service.
+	if ips := svc.Spec.ExternalIPs; len(ips) > 0 {
+		for _, ip := range ips {
+			r := baseNode
+			rs := baseService
+			r.Service = &rs
+			r.Service.ID = serviceID(r.Service.Service, ip)
+			r.Service.Address = ip
+			t.consulMap[key] = append(t.consulMap[key], &r)
+		}
+
+		return
+	}
+
 	switch svc.Spec.Type {
 	// For LoadBalancer type services, we create a service instance for
 	// each LoadBalancer entry. We only support entries that have an IP
@@ -352,11 +375,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			}
 		}
 	}
-
-	t.Log.Debug("generated registration",
-		"key", key,
-		"service", baseService.Service,
-		"instances", len(t.consulMap[key]))
 }
 
 // sync calls the Syncer.Sync function from the generated registrations.
