@@ -168,6 +168,58 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require.Len(actual, 1)
 }
 
+// Test that external IPs take priority.
+func TestServiceResource_externalIP(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type:        apiv1.ServiceTypeLoadBalancer,
+			ExternalIPs: []string{"a", "b"},
+		},
+
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{
+					apiv1.LoadBalancerIngress{
+						IP: "1.2.3.4",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("a", actual[0].Service.Address)
+	require.Equal("foo", actual[1].Service.Service)
+	require.Equal("b", actual[1].Service.Address)
+}
+
 // Test that the proper registrations are generated for a LoadBalancer.
 func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
