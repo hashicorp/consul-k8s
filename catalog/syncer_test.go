@@ -156,6 +156,93 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	require.Equal("127.0.0.1", service.Address)
 }
 
+// Test that the syncer does not reap services in another NS.
+func TestConsulSyncer_reapServiceOtherNamespace(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	s, closer := testConsulSyncer(t, client)
+	defer closer()
+
+	// Sync
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("foo", "bar"),
+	})
+
+	// Create an invalid service directly in Consul
+	svc := testRegistration("foo", "baz")
+	svc.Service.Meta[ConsulK8SNS] = "other"
+	_, err := client.Catalog().Register(svc, nil)
+	require.NoError(err)
+
+	// Sleep for a bit
+	time.Sleep(500 * time.Millisecond)
+
+	// Valid service should exist
+	services, _, err := client.Catalog().Service("baz", "", nil)
+	require.NoError(err)
+	require.Len(services, 1)
+}
+
+// Test that the syncer reaps services with no NS set.
+func TestConsulSyncer_reapServiceSameNamespace(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	s, closer := testConsulSyncer(t, client)
+	defer closer()
+
+	// Sync
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("foo", "bar"),
+	})
+
+	// Create an invalid service directly in Consul
+	svc := testRegistration("foo", "baz")
+	svc.Service.Meta[ConsulK8SNS] = ""
+	_, err := client.Catalog().Register(svc, nil)
+	require.NoError(err)
+
+	// Reaped service should not exist
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := client.Catalog().Service("baz", "", nil)
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(services) > 0 {
+			r.Fatal("service still exists")
+		}
+	})
+
+	// Valid service should exist
+	var service *api.CatalogService
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := client.Catalog().Service("bar", "", nil)
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(services) == 0 {
+			r.Fatal("service not found")
+		}
+		service = services[0]
+	})
+
+	// Verify the settings
+	require.Equal("foo", service.Node)
+	require.Equal("bar", service.ServiceName)
+	require.Equal("127.0.0.1", service.Address)
+}
+
 func testRegistration(node, service string) *api.CatalogRegistration {
 	return &api.CatalogRegistration{
 		Node:           node,
@@ -168,7 +255,7 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 			Tags:    []string{ConsulK8STag},
 			Meta: map[string]string{
 				ConsulSourceKey: ConsulK8STag,
-				ConsulK8SKey:    service,
+				ConsulK8SNS:     "default",
 			},
 		},
 	}
@@ -179,6 +266,7 @@ func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) 
 		Client:          client,
 		Log:             hclog.Default(),
 		ReconcilePeriod: 200 * time.Millisecond,
+		Namespace:       "default",
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())

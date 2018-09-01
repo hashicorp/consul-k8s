@@ -20,10 +20,9 @@ const (
 	// ConsulSourceKey is the key used in the meta to track the "k8s" source.
 	ConsulSourceKey = "external-source"
 
-	// ConsulK8SKey is the key used in the meta to record the internal key
-	// used to track the service. This is used for reconciliation. If it
-	// isn't present the service will be deleted.
-	ConsulK8SKey = "external-k8s-key"
+	// ConsulK8SNS is the key used in the meta to record the namespace
+	// of the service/node registration.
+	ConsulK8SNS = "external-k8s-ns"
 
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag = "k8s"
@@ -224,7 +223,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Tags:    []string{ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulK8STag,
-			ConsulK8SKey:    key,
+			ConsulK8SNS:     t.namespace(),
 		},
 	}
 
@@ -401,7 +400,7 @@ func (t *ServiceResource) namespace() string {
 		return t.Namespace
 	}
 
-	return metav1.NamespaceDefault
+	return metav1.NamespaceAll
 }
 
 // serviceEndpointsResource implements controller.Resource and starts
