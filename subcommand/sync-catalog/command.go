@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -24,10 +25,11 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags       *flag.FlagSet
-	http        *flags.HTTPFlags
-	k8s         *k8sflags.K8SFlags
-	flagDefault bool
+	flags         *flag.FlagSet
+	http          *flags.HTTPFlags
+	k8s           *k8sflags.K8SFlags
+	flagDefault   bool
+	flagNamespace string
 
 	once sync.Once
 	help string
@@ -39,6 +41,9 @@ func (c *Command) init() {
 		"If true, all valid services are synced by default. If false, "+
 			"the service must be annotated properly to sync. In either case "+
 			"an annotation can override the default")
+	c.flags.StringVar(&c.flagNamespace, "-k8s-namespace", metav1.NamespaceAll,
+		"The Kubernetes namespace to watch for service changes and sync. "+
+			"If this is not set then it will default to all namespaces.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -83,8 +88,9 @@ func (c *Command) Run(args []string) int {
 
 	// Build the Consul sync and start it
 	syncer := &catalog.ConsulSyncer{
-		Client: consulClient,
-		Log:    hclog.Default().Named("syncer/consul"),
+		Client:    consulClient,
+		Log:       hclog.Default().Named("syncer/consul"),
+		Namespace: c.flagNamespace,
 	}
 	go syncer.Run(ctx)
 
@@ -95,6 +101,7 @@ func (c *Command) Run(args []string) int {
 			Log:            hclog.Default().Named("controller/service"),
 			Client:         clientset,
 			Syncer:         syncer,
+			Namespace:      c.flagNamespace,
 			ExplicitEnable: !c.flagDefault,
 		},
 	}

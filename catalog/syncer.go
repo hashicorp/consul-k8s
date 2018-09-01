@@ -32,6 +32,15 @@ type ConsulSyncer struct {
 	Client *api.Client
 	Log    hclog.Logger
 
+	// Namespace is the namespace to run this syncer for. This is used
+	// primarily to limit the reaping of the syncer: the syncer will only
+	// reap services/nodes that 1.) have no NS key set or 2.) have an NS
+	// key set that is equal to this.
+	//
+	// If this is blank, any NS key is allowed. This should only be blank
+	// if a single syncer is running for the entire cluster.
+	Namespace string
+
 	// ReconcilePeriod is the duration that the syncer will wait (at most)
 	// to reconcile the remote catalog with the local catalog. We may sync
 	// more frequently in certain situations.
@@ -206,6 +215,15 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		s.lock.Lock()
 
 		for _, svc := range services {
+			// If we have a namespace set and the key exactly matches this
+			// namespace, then we skip it.
+			if s.Namespace != "" &&
+				len(svc.ServiceMeta) > 0 &&
+				svc.ServiceMeta[ConsulK8SNS] != "" &&
+				svc.ServiceMeta[ConsulK8SNS] != s.Namespace {
+				continue
+			}
+
 			// We delete unless we have a service and the node mapping
 			delete := true
 			if _, ok := s.services[svc.ServiceName]; ok {
@@ -238,6 +256,15 @@ func (s *ConsulSyncer) scheduleReapServiceLocked(name string) error {
 	}
 
 	for _, svc := range services {
+		// If we have a namespace set and the key exactly matches this
+		// namespace, then we skip it.
+		if s.Namespace != "" &&
+			len(svc.ServiceMeta) > 0 &&
+			svc.ServiceMeta[ConsulK8SNS] != "" &&
+			svc.ServiceMeta[ConsulK8SNS] != s.Namespace {
+			continue
+		}
+
 		s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
 			Node:      svc.Node,
 			ServiceID: svc.ServiceID,
