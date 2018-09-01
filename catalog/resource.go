@@ -32,9 +32,10 @@ const (
 // ServiceResource implements controller.Resource to sync Service resource
 // types from K8S.
 type ServiceResource struct {
-	Log    hclog.Logger
-	Client kubernetes.Interface
-	Syncer Syncer
+	Log       hclog.Logger
+	Client    kubernetes.Interface
+	Syncer    Syncer
+	Namespace string // K8S namespace to watch
 
 	// ExplictEnable should be set to true to require explicit enabling
 	// using annotations. If this is false, then services are implicitly
@@ -57,11 +58,11 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceDefault).List(options)
+				return t.Client.CoreV1().Services(t.namespace()).List(options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceDefault).Watch(options)
+				return t.Client.CoreV1().Services(t.namespace()).Watch(options)
 			},
 		},
 		&apiv1.Service{},
@@ -96,7 +97,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
-			Endpoints(metav1.NamespaceDefault).
+			Endpoints(t.namespace()).
 			Get(service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
@@ -394,6 +395,15 @@ func (t *ServiceResource) sync() {
 	t.Syncer.Sync(rs)
 }
 
+// namespace returns the K8S namespace to setup the resource watchers in.
+func (t *ServiceResource) namespace() string {
+	if t.Namespace != "" {
+		return t.Namespace
+	}
+
+	return metav1.NamespaceDefault
+}
+
 // serviceEndpointsResource implements controller.Resource and starts
 // a background watcher on endpoints that is used by the ServiceResource
 // to keep track of changing endpoints for registered services.
@@ -406,13 +416,13 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return t.Service.Client.CoreV1().
-					Endpoints(metav1.NamespaceDefault).
+					Endpoints(t.Service.namespace()).
 					List(options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return t.Service.Client.CoreV1().
-					Endpoints(metav1.NamespaceDefault).
+					Endpoints(t.Service.namespace()).
 					Watch(options)
 			},
 		},
