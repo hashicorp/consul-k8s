@@ -18,12 +18,12 @@ import (
 
 const (
 	// ConsulSourceKey is the key used in the meta to track the "k8s" source.
-	ConsulSourceKey = "sync-source"
+	ConsulSourceKey = "external-source"
 
 	// ConsulK8SKey is the key used in the meta to record the internal key
 	// used to track the service. This is used for reconciliation. If it
 	// isn't present the service will be deleted.
-	ConsulK8SKey = "sync-k8s-key"
+	ConsulK8SKey = "external-k8s-key"
 
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag = "k8s"
