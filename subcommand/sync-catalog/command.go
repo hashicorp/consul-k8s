@@ -26,12 +26,12 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags         *flag.FlagSet
-	http          *flags.HTTPFlags
-	k8s           *k8sflags.K8SFlags
-	flagDefault   bool
-	flagNamespace string
-	flagReconcile flags.DurationValue
+	flags          *flag.FlagSet
+	http           *flags.HTTPFlags
+	k8s            *k8sflags.K8SFlags
+	flagDefault    bool
+	flagNamespace  string
+	flagSyncPeriod flags.DurationValue
 
 	once sync.Once
 	help string
@@ -46,7 +46,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagNamespace, "-k8s-namespace", metav1.NamespaceAll,
 		"The Kubernetes namespace to watch for service changes and sync. "+
 			"If this is not set then it will default to all namespaces.")
-	c.flags.Var(&c.flagReconcile, "-sync-interval",
+	c.flags.Var(&c.flagSyncPeriod, "-sync-interval",
 		"The interval to perform syncing operations. All changes are "+
 			"merged and write calls are only made on this interval. Defaults "+
 			"to 30 seconds.")
@@ -91,17 +91,18 @@ func (c *Command) Run(args []string) int {
 
 	// Get the sync interval
 	var syncInterval time.Duration
-	c.flagReconcile.Merge(&syncInterval)
+	c.flagSyncPeriod.Merge(&syncInterval)
 
 	// Create the context we'll use to cancel everything
 	ctx, cancelF := context.WithCancel(context.Background())
 
 	// Build the Consul sync and start it
 	syncer := &catalog.ConsulSyncer{
-		Client:          consulClient,
-		Log:             hclog.Default().Named("syncer/consul"),
-		Namespace:       c.flagNamespace,
-		ReconcilePeriod: syncInterval,
+		Client:            consulClient,
+		Log:               hclog.Default().Named("syncer/consul"),
+		Namespace:         c.flagNamespace,
+		SyncPeriod:        syncInterval,
+		ServicePollPeriod: syncInterval * 2,
 	}
 	go syncer.Run(ctx)
 
