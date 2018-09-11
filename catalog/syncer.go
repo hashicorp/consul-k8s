@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
@@ -141,9 +142,16 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 	minWaitCh := time.After(0)
 	for {
 		// Get all services with tags.
-		serviceMap, meta, err := s.Client.Catalog().Services(&opts)
+		var serviceMap map[string][]string
+		var meta *api.QueryMeta
+		err := backoff.Retry(func() error {
+			var err error
+			serviceMap, meta, err = s.Client.Catalog().Services(&opts)
+			return err
+		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 		if err != nil {
 			s.Log.Warn("error querying services, will retry", "err", err)
+			continue
 		}
 
 		// Wait our minimum time before continuing or retrying
@@ -209,9 +217,14 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		}
 
 		// Wait for service changes
-		services, _, err := s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
-			AllowStale: true,
-		})
+		var services []*api.CatalogService
+		err := backoff.Retry(func() error {
+			var err error
+			services, _, err = s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
+				AllowStale: true,
+			})
+			return err
+		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 		if err != nil {
 			s.Log.Warn("error querying service, will retry",
 				"service-name", name,
