@@ -10,9 +10,13 @@ import (
 )
 
 const (
-	// ConsulReconcilePeriod is how often the syncer will attempt to
+	// ConsulSyncPeriod is how often the syncer will attempt to
 	// reconcile the expected service states with the remote Consul server.
-	ConsulReconcilePeriod = 30 * time.Second
+	ConsulSyncPeriod = 30 * time.Second
+
+	// ConsulServicePollPeriod is how often a service is checked for
+	// whether it has instances to reap.
+	ConsulServicePollPeriod = 60 * time.Second
 )
 
 // Syncer is responsible for syncing a set of Consul catalog registrations.
@@ -41,10 +45,18 @@ type ConsulSyncer struct {
 	// if a single syncer is running for the entire cluster.
 	Namespace string
 
-	// ReconcilePeriod is the duration that the syncer will wait (at most)
-	// to reconcile the remote catalog with the local catalog. We may sync
-	// more frequently in certain situations.
-	ReconcilePeriod time.Duration
+	// SyncPeriod is the interval between full catalog syncs. These will
+	// re-register all services to prevent overwrites of data. This should
+	// happen relatively infrequently and default to 30 seconds.
+	//
+	// ServicePollPeriod is the interval to look for invalid services to
+	// deregister. One request will be made for each synced service in
+	// Kubernetes.
+	//
+	// For both syncs, smaller more frequent and focused syncs may be
+	// triggered by known drift or changes.
+	SyncPeriod        time.Duration
+	ServicePollPeriod time.Duration
 
 	lock     sync.Mutex
 	once     sync.Once
@@ -95,7 +107,7 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 	// Start the background watchers
 	go s.watchReapableServices(ctx)
 
-	reconcileTimer := time.NewTimer(s.ReconcilePeriod)
+	reconcileTimer := time.NewTimer(s.SyncPeriod)
 	defer reconcileTimer.Stop()
 
 	for {
@@ -106,7 +118,7 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 
 		case <-reconcileTimer.C:
 			s.syncFull(ctx)
-			reconcileTimer.Reset(s.ReconcilePeriod)
+			reconcileTimer.Reset(s.SyncPeriod)
 		}
 	}
 }
@@ -125,7 +137,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 
 	// minWait is the minimum time to wait between scheduling service deletes.
 	// This prevents a lot of churn in services causing high CPU usage.
-	minWait := s.ReconcilePeriod / 4
+	minWait := s.SyncPeriod / 4
 	minWaitCh := time.After(0)
 	for {
 		// Get all services with tags.
@@ -185,31 +197,27 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 	s.Log.Info("starting service watcher", "service-name", name)
 	defer s.Log.Info("stopping service watcher", "service-name", name)
 
-	opts := api.QueryOptions{
-		AllowStale: true,
-		WaitIndex:  1,
-		WaitTime:   1 * time.Minute,
-	}
-
 	for {
+		select {
+		// Quit if our context is over
+		case <-ctx.Done():
+			return
+
+		// Wait for our poll period
+		case <-time.After(s.SyncPeriod):
+		default:
+		}
+
 		// Wait for service changes
-		services, meta, err := s.Client.Catalog().Service(name, ConsulK8STag, &opts)
+		services, _, err := s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
+			AllowStale: true,
+		})
 		if err != nil {
 			s.Log.Warn("error querying service, will retry",
 				"service-name", name,
 				"err", err)
 			continue
 		}
-
-		// Quit if our context is over
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		// Update our blocking index
-		opts.WaitIndex = meta.LastIndex
 
 		// Lock so we can modify the set of actions to take
 		s.lock.Lock()
@@ -348,7 +356,10 @@ func (s *ConsulSyncer) init() {
 	if s.watchers == nil {
 		s.watchers = make(map[string]context.CancelFunc)
 	}
-	if s.ReconcilePeriod == 0 {
-		s.ReconcilePeriod = ConsulReconcilePeriod
+	if s.SyncPeriod == 0 {
+		s.SyncPeriod = ConsulSyncPeriod
+	}
+	if s.ServicePollPeriod == 0 {
+		s.ServicePollPeriod = ConsulServicePollPeriod
 	}
 }

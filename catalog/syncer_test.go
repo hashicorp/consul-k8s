@@ -263,10 +263,11 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 
 func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) {
 	s := &ConsulSyncer{
-		Client:          client,
-		Log:             hclog.Default(),
-		ReconcilePeriod: 200 * time.Millisecond,
-		Namespace:       "default",
+		Client:            client,
+		Log:               hclog.Default(),
+		SyncPeriod:        200 * time.Millisecond,
+		ServicePollPeriod: 50 * time.Millisecond,
+		Namespace:         "default",
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())
