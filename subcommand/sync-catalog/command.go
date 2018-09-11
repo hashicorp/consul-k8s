@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/catalog"
+	catalogFromK8S "github.com/hashicorp/consul-k8s/catalog/from-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -97,7 +97,7 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelF := context.WithCancel(context.Background())
 
 	// Build the Consul sync and start it
-	syncer := &catalog.ConsulSyncer{
+	syncer := &catalogFromK8S.ConsulSyncer{
 		Client:            consulClient,
 		Log:               hclog.Default().Named("syncer/consul"),
 		Namespace:         c.flagNamespace,
@@ -109,7 +109,7 @@ func (c *Command) Run(args []string) int {
 	// Build the controller and start it
 	ctl := &controller.Controller{
 		Log: hclog.Default().Named("controller/service"),
-		Resource: &catalog.ServiceResource{
+		Resource: &catalogFromK8S.ServiceResource{
 			Log:            hclog.Default().Named("controller/service"),
 			Client:         clientset,
 			Syncer:         syncer,
