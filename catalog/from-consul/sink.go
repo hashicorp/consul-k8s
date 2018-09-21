@@ -1,9 +1,11 @@
 package catalog
 
 import (
+	"context"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/helper/coalesce"
 	"github.com/hashicorp/go-hclog"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,8 +16,12 @@ import (
 )
 
 const (
-	// K8SSyncPeriod is the time between syncing services into Kubernetes.
-	K8SSyncPeriod = 5 * time.Second
+	// K8SQuietPeriod is the time to wait for no service changes before syncing.
+	K8SQuietPeriod = 1 * time.Second
+
+	// K8SMaxPeriod is the maximum time to wait before forcing a sync, even
+	// if there are active changes going on.
+	K8SMaxPeriod = 5 * time.Second
 )
 
 // Sink is the destination where services are registered.
@@ -167,8 +173,15 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 		case <-ch:
 			return
 		case <-triggerCh:
-			// NOTE(mitchellh): we probably want to introduce coalescing
-			// here as soon as possible.
+			// Coalesce to prevent lots of API calls during churn periods.
+			coalesce.Coalesce(context.Background(),
+				K8SQuietPeriod, K8SMaxPeriod,
+				func(ctx context.Context) {
+					select {
+					case <-triggerCh:
+					case <-ctx.Done():
+					}
+				})
 		}
 
 		s.lock.Lock()
