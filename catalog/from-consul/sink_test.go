@@ -19,7 +19,7 @@ func init() {
 
 func TestK8SSink_impl(t *testing.T) {
 	var _ controller.Resource = &K8SSink{}
-	//var _ controller.Backgrounder = &K8SSink{}
+	var _ controller.Backgrounder = &K8SSink{}
 	var _ Sink = &K8SSink{}
 }
 
@@ -59,6 +59,59 @@ func TestK8SSink_create(t *testing.T) {
 	}
 
 	require.True(found, "found service")
+}
+
+// Test that a service isn't registered if it exists already.
+func TestK8SSink_createExists(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+
+	// Create the existing service
+	_, err := client.CoreV1().Services(metav1.NamespaceAll).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "web",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type:         apiv1.ServiceTypeExternalName,
+			ExternalName: "example.com.",
+		},
+	})
+	require.NoError(err)
+
+	// Start the controller
+	sink, closer := testSink(t, client)
+	defer closer()
+
+	// Set a service
+	sink.SetServices(map[string]string{"web": "web.service.local."})
+
+	// Verify service gets registered
+	retry.Run(t, func(r *retry.R) {
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(list.Items) == 0 {
+			r.Fatal("no services")
+		}
+
+		var actual *apiv1.Service
+		for _, s := range list.Items {
+			if s.Name == "web" {
+				actual = &s
+				break
+			}
+		}
+
+		if actual == nil {
+			r.Fatal("web not found")
+		}
+		if actual.Spec.ExternalName != "example.com." {
+			r.Fatal("modified")
+		}
+	})
 }
 
 // Test that if the service is updated remotely, that we change it back.
