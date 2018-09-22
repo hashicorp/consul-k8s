@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	fromk8s "github.com/hashicorp/consul-k8s/catalog/from-k8s"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/testrpc"
@@ -48,6 +49,44 @@ func TestSource_initServices(t *testing.T) {
 		"consul": "consul.service.test",
 		"svcA":   "svcA.service.test",
 		"svcB":   "svcB.service.test",
+	}
+	require.Equal(expected, actual)
+}
+
+// Test that the source ignores K8S services.
+func TestSource_ignoreK8S(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	// Create services before the source is running
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(err)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
+	require.NoError(err)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{fromk8s.ConsulK8STag}), nil)
+	require.NoError(err)
+
+	_, sink, closer := testSource(t, client)
+	defer closer()
+
+	var actual map[string]string
+	retry.Run(t, func(r *retry.R) {
+		sink.Lock()
+		defer sink.Unlock()
+		actual = sink.Services
+		if len(actual) == 0 {
+			r.Fatal("services not found")
+		}
+	})
+
+	expected := map[string]string{
+		"consul": "consul.service.test",
+		"svcA":   "svcA.service.test",
 	}
 	require.Equal(expected, actual)
 }

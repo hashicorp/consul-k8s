@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	fromk8s "github.com/hashicorp/consul-k8s/catalog/from-k8s"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
@@ -53,8 +54,22 @@ func (s *Source) Run(ctx context.Context) {
 
 		// Setup the services
 		services := make(map[string]string, len(serviceMap))
-		for name, _ := range serviceMap {
-			services[name] = fmt.Sprintf("%s.service.%s", name, s.Domain)
+		for name, tags := range serviceMap {
+			// We ignore services that are synced from k8s so we can avoid
+			// circular syncing. Realistically this shouldn't happen since
+			// we won't register services that already exist but we double
+			// check here.
+			k8s := false
+			for _, t := range tags {
+				if t == fromk8s.ConsulK8STag {
+					k8s = true
+					break
+				}
+			}
+
+			if !k8s {
+				services[name] = fmt.Sprintf("%s.service.%s", name, s.Domain)
+			}
 		}
 		s.Log.Info("received services from Consul", "count", len(services))
 
