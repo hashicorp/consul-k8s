@@ -54,7 +54,7 @@ func (s *Source) Run(ctx context.Context) {
 		// Setup the services
 		services := make(map[string]string, len(serviceMap))
 		for name, _ := range serviceMap {
-			services[name] = fmt.Sprintf("%s.service.%s.", name, s.Domain)
+			services[name] = fmt.Sprintf("%s.service.%s", name, s.Domain)
 		}
 		s.Log.Info("received services from Consul", "count", len(services))
 
