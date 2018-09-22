@@ -18,7 +18,9 @@ import (
 
 const (
 	// ConsulSourceKey is the key used in the meta to track the "k8s" source.
-	ConsulSourceKey = "external-source"
+	// ConsulSourceValue is the value of the source.
+	ConsulSourceKey   = "external-source"
+	ConsulSourceValue = "kubernetes"
 
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
@@ -214,7 +216,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Node:           "k8s-sync",
 		Address:        "127.0.0.1",
 		NodeMeta: map[string]string{
-			ConsulSourceKey: ConsulK8STag,
+			ConsulSourceKey: ConsulSourceValue,
 		},
 	}
 
@@ -222,7 +224,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Service: svc.Name,
 		Tags:    []string{ConsulK8STag},
 		Meta: map[string]string{
-			ConsulSourceKey: ConsulK8STag,
+			ConsulSourceKey: ConsulSourceValue,
 			ConsulK8SNS:     t.namespace(),
 		},
 	}
