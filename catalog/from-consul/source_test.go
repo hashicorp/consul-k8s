@@ -45,9 +45,9 @@ func TestSource_initServices(t *testing.T) {
 	})
 
 	expected := map[string]string{
-		"consul": "consul.service.test.",
-		"svcA":   "svcA.service.test.",
-		"svcB":   "svcB.service.test.",
+		"consul": "consul.service.test",
+		"svcA":   "svcA.service.test",
+		"svcB":   "svcB.service.test",
 	}
 	require.Equal(expected, actual)
 }
@@ -100,8 +100,8 @@ func TestSource_deleteService(t *testing.T) {
 	})
 
 	expected := map[string]string{
-		"consul": "consul.service.test.",
-		"svcA":   "svcA.service.test.",
+		"consul": "consul.service.test",
+		"svcA":   "svcA.service.test",
 	}
 	require.Equal(expected, actual)
 }
