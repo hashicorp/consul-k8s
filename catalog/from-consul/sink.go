@@ -243,6 +243,10 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   k,
 				Labels: map[string]string{"consul": "true"},
+				Annotations: map[string]string{
+					// Ensure we don't sync the service back to Consul
+					"consul.hashicorp.com/service-sync": "false",
+				},
 			},
 
 			Spec: apiv1.ServiceSpec{
