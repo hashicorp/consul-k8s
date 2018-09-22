@@ -234,7 +234,7 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 
 		// If this is a registered K8S service, ignore.
 		if _, ok := s.serviceMap[k]; ok {
-			s.Log.Warn("conflicting service in K8S, not registering", "name", k)
+			s.Log.Warn("service already registered in K8S, not registering", "name", k)
 			continue
 		}
 
