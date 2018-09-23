@@ -4,8 +4,16 @@ GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 GOPATH=$(shell go env GOPATH)
 GOTAGS ?=
+GOTOOLS = \
+	github.com/magiconair/vendorfmt/cmd/vendorfmt \
+	github.com/mitchellh/gox \
+	golang.org/x/tools/cmd/cover \
+	golang.org/x/tools/cmd/stringer \
+	github.com/axw/gocov/gocov \
+	gopkg.in/matm/v1/gocov-html
 
 DEV_IMAGE?=consul-k8s-dev
+GO_BUILD_TAG?=consul-k8s-build-go
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
@@ -17,6 +25,28 @@ export GIT_DIRTY
 export GIT_DESCRIBE
 export GOLDFLAGS
 export GOTAGS
+
+DIST_TAG?=1
+DIST_BUILD?=1
+DIST_SIGN?=1
+
+ifdef DIST_VERSION
+DIST_VERSION_ARG=-v "$(DIST_VERSION)"
+else
+DIST_VERSION_ARG=
+endif
+
+ifdef DIST_RELEASE_DATE
+DIST_DATE_ARG=-d "$(DIST_RELEASE_DATE)"
+else
+DIST_DATE_ARG=
+endif
+
+ifdef DIST_PRERELEASE
+DIST_REL_ARG=-r "$(DIST_PRERELEASE)"
+else
+DIST_REL_ARG=
+endif
 
 all: bin
 
@@ -32,10 +62,25 @@ dev-docker:
 test:
 	go test ./...
 
+tools:
+	go get -u -v $(GOTOOLS)
+
+# dist builds binaries for all platforms and packages them for distribution
+# make dist DIST_VERSION=<Desired Version> DIST_RELEASE_DATE=<release date>
+# date is in "month day, year" format.
+dist:
+	@$(SHELL) $(CURDIR)/build-support/scripts/release.sh -t '$(DIST_TAG)' -b '$(DIST_BUILD)' -S '$(DIST_SIGN)' $(DIST_VERSION_ARG) $(DIST_DATE_ARG) $(DIST_REL_ARG)
+
+docker-images: go-build-image
+
+go-build-image:
+	@echo "Building Golang build container"
+	@docker build $(NOCACHE) $(QUIET) --build-arg 'GOTOOLS=$(GOTOOLS)' -t $(GO_BUILD_TAG) - < build-support/docker/Build-Go.dockerfile
+
 clean:
 	@rm -rf \
 		$(CURDIR)/bin \
 		$(CURDIR)/pkg
 
 
-.PHONY: all bin clean dev test
+.PHONY: all bin clean dev dist docker-images go-build-image test tools

@@ -136,13 +136,13 @@ function build_consul {
 
    if test $ret -eq 0
    then
-      status "Copying the source from '${sdir}' to /go/src/github.com/hashicorp/consul-k8s"
+      status "Copying the source from '${sdir}' to /go-build"
       (
-         tar -c $(ls | grep -v "^(ui\|ui-v2\|website\|bin\|pkg\|.git)") | docker cp - ${container_id}:/go/src/github.com/hashicorp/consul-k8s &&
+         tar -c $(ls | grep -v "^(ui\|ui-v2\|website\|bin\|pkg\|.git)") | docker cp - ${container_id}:/go-build &&
          status "Running build in container" &&
          docker start -i ${container_id} &&
          status "Copying back artifacts" &&
-         docker cp ${container_id}:/go/src/github.com/hashicorp/consul-k8s/pkg/bin pkg.bin.new
+         docker cp ${container_id}:/go-build/pkg/bin pkg.bin.new
       )
       ret=$?
       docker rm ${container_id} > /dev/null
