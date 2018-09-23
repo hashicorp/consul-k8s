@@ -48,6 +48,21 @@ else
 DIST_REL_ARG=
 endif
 
+PUB_GIT?=1
+PUB_WEBSITE?=1
+
+ifeq ($(PUB_GIT),1)
+PUB_GIT_ARG=-g
+else
+PUB_GIT_ARG=
+endif
+
+ifeq ($(PUB_WEBSITE),1)
+PUB_WEBSITE_ARG=-w
+else
+PUB_WEBSITE_ARG=
+endif
+
 all: bin
 
 bin:
@@ -70,6 +85,9 @@ tools:
 # date is in "month day, year" format.
 dist:
 	@$(SHELL) $(CURDIR)/build-support/scripts/release.sh -t '$(DIST_TAG)' -b '$(DIST_BUILD)' -S '$(DIST_SIGN)' $(DIST_VERSION_ARG) $(DIST_DATE_ARG) $(DIST_REL_ARG)
+
+publish:
+	@$(SHELL) $(CURDIR)/build-support/scripts/publish.sh $(PUB_GIT_ARG) $(PUB_WEBSITE_ARG)
 
 docker-images: go-build-image
 
