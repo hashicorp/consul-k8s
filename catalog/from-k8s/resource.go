@@ -148,6 +148,15 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 
 // shouldSync returns true if resyncing should be enabled for the given service.
 func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
+	// If we're listening on all namespaces, we explicitly ignore the
+	// system namespace. The user can explicitly enable this by starting
+	// a sync for that namespace.
+	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
+		t.Log.Debug("ignoring system service since we're listening on all namespaces",
+			"service-name", svc.Name)
+		return false
+	}
+
 	raw, ok := svc.Annotations[annotationServiceSync]
 	if !ok {
 		// If there is no explicit value, then set it to our current default.
