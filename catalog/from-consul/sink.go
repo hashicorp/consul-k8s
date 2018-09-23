@@ -221,7 +221,12 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 	for k, v := range s.sourceServices {
 		// If this is an already registered service, then update it
 		if s.serviceMapConsul != nil {
-			if svc, ok := s.serviceMapConsul[k]; ok && svc.Spec.ExternalName != v {
+			if svc, ok := s.serviceMapConsul[k]; ok {
+				if svc.Spec.ExternalName == v {
+					// Matching service, no update required.
+					continue
+				}
+
 				svc.Spec = apiv1.ServiceSpec{
 					Type:         apiv1.ServiceTypeExternalName,
 					ExternalName: v,

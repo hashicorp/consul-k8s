@@ -166,7 +166,7 @@ func (c *Controller) processSingle(
 
 	// If we got the item successfully, call the proper method
 	if err == nil {
-		c.Log.Info("processing object", "key", keyRaw, "exists", exists)
+		c.Log.Debug("processing object", "key", keyRaw, "exists", exists)
 		c.Log.Trace("processing object", "object", item)
 		if !exists {
 			err = c.Resource.Delete(keyRaw)
