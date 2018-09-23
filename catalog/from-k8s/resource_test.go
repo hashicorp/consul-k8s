@@ -168,6 +168,34 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require.Len(actual, 1)
 }
 
+// Test that system resources are not synced by default.
+func TestServiceResource_system(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:    hclog.Default(),
+		Client: client,
+		Syncer: syncer,
+	})
+	defer closer()
+
+	// Insert an LB service
+	svc := testService("foo")
+	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(svc)
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 0)
+}
+
 // Test that external IPs take priority.
 func TestServiceResource_externalIP(t *testing.T) {
 	t.Parallel()
