@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type Inject struct {
+type Command struct {
 	UI cli.Ui
 
 	flagListen        string
@@ -39,7 +39,7 @@ type Inject struct {
 	cert atomic.Value
 }
 
-func (c *Inject) init() {
+func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
@@ -54,7 +54,7 @@ func (c *Inject) init() {
 	c.help = flags.Usage(help, c.flagSet)
 }
 
-func (c *Inject) Run(args []string) int {
+func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
@@ -116,14 +116,14 @@ func (c *Inject) Run(args []string) int {
 	return 0
 }
 
-func (c *Inject) handleReady(rw http.ResponseWriter, req *http.Request) {
+func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
 	// Always ready at this point. The main readiness check is whether
 	// there is a TLS certificate. If we reached this point it means we
 	// served a TLS certificate.
 	rw.WriteHeader(204)
 }
 
-func (c *Inject) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	certRaw := c.cert.Load()
 	if certRaw == nil {
 		return nil, fmt.Errorf("No certificate available.")
@@ -132,7 +132,7 @@ func (c *Inject) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) 
 	return certRaw.(*tls.Certificate), nil
 }
 
-func (c *Inject) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset *kubernetes.Clientset) {
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset *kubernetes.Clientset) {
 	var bundle cert.Bundle
 	for {
 		select {
@@ -183,8 +183,8 @@ func (c *Inject) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clients
 	}
 }
 
-func (c *Inject) Synopsis() string { return synopsis }
-func (c *Inject) Help() string {
+func (c *Command) Synopsis() string { return synopsis }
+func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.help
 }
