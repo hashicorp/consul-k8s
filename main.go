@@ -12,6 +12,7 @@ func main() {
 	c := cli.NewCLI("consul-k8s", version.GetHumanVersion())
 	c.Args = os.Args[1:]
 	c.Commands = Commands
+	c.HelpFunc = helpFunc()
 
 	exitStatus, err := c.Run()
 	if err != nil {
