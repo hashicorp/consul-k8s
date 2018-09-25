@@ -1,6 +1,6 @@
 # This Dockerfile creates a production release image for the project. This
 # downloads the release from releases.hashicorp.com and therefore requires that
-# the release is published before building the Docker iamge.
+# the release is published before building the Docker image.
 #
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
