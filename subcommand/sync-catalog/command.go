@@ -34,6 +34,7 @@ type Command struct {
 	flagToK8S              bool
 	flagConsulDomain       string
 	flagK8SDefault         bool
+	flagK8SServicePrefix   string
 	flagK8SSourceNamespace string
 	flagK8SWriteNamespace  string
 	flagConsulWritePeriod  flags.DurationValue
@@ -52,6 +53,9 @@ func (c *Command) init() {
 		"If true, all valid services in K8S are synced by default. If false, "+
 			"the service must be annotated properly to sync. In either case "+
 			"an annotation can override the default")
+	c.flags.StringVar(&c.flagK8SServicePrefix, "k8s-service-prefix", "",
+		"A prefix to prepend to all services written to Kubernetes from Consul. "+
+			"If this is not set then services will have no prefix.")
 	c.flags.StringVar(&c.flagK8SSourceNamespace, "k8s-source-namespace", metav1.NamespaceAll,
 		"The Kubernetes namespace to watch for service changes and sync to Consul. "+
 			"If this is not set then it will default to all namespaces.")
@@ -158,6 +162,7 @@ func (c *Command) Run(args []string) int {
 			Client: consulClient,
 			Domain: c.flagConsulDomain,
 			Sink:   sink,
+			Prefix: c.flagK8SServicePrefix,
 			Log:    hclog.Default().Named("to-k8s/source"),
 		}
 		go source.Run(ctx)
