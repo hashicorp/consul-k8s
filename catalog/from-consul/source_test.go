@@ -53,6 +53,46 @@ func TestSource_initServices(t *testing.T) {
 	require.Equal(expected, actual)
 }
 
+// Test that we can specify a prefix to prepend to all destination services.
+func TestSource_prefix(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	src, sink, closer := testSource(t, client)
+	src.Prefix = "foo-" // This is a race, we should fix this, but test only
+	defer closer()
+
+	// Create services before the source is running
+	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(err)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
+	require.NoError(err)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
+	require.NoError(err)
+
+	var actual map[string]string
+	retry.Run(t, func(r *retry.R) {
+		sink.Lock()
+		defer sink.Unlock()
+		actual = sink.Services
+		if len(actual) != 3 {
+			r.Fatal("services not found")
+		}
+	})
+
+	expected := map[string]string{
+		"foo-consul": "consul.service.test",
+		"foo-svcA":   "svcA.service.test",
+		"foo-svcB":   "svcB.service.test",
+	}
+	require.Equal(expected, actual)
+}
+
 // Test that the source ignores K8S services.
 func TestSource_ignoreK8S(t *testing.T) {
 	t.Parallel()

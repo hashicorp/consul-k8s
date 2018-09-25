@@ -17,6 +17,7 @@ type Source struct {
 	Client *api.Client  // Consul API client
 	Domain string       // Consul DNS domain
 	Sink   Sink         // Sink is the sink to update with services
+	Prefix string       // Prefix is a prefix to prepend to services
 	Log    hclog.Logger // Logger
 }
 
@@ -68,7 +69,7 @@ func (s *Source) Run(ctx context.Context) {
 			}
 
 			if !k8s {
-				services[name] = fmt.Sprintf("%s.service.%s", name, s.Domain)
+				services[s.Prefix+name] = fmt.Sprintf("%s.service.%s", name, s.Domain)
 			}
 		}
 		s.Log.Info("received services from Consul", "count", len(services))
