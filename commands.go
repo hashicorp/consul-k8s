@@ -5,6 +5,8 @@ import (
 
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
+	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/mitchellh/cli"
 )
 
@@ -21,6 +23,10 @@ func init() {
 
 		"sync-catalog": func() (cli.Command, error) {
 			return &cmdSyncCatalog.Command{UI: ui}, nil
+		},
+
+		"version": func() (cli.Command, error) {
+			return &cmdVersion.Command{UI: ui, Version: version.GetHumanVersion()}, nil
 		},
 	}
 }
