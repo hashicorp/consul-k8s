@@ -131,7 +131,12 @@ function build_consul {
       extra_dir="${extra_dir_name}/"
    fi
 
-   local container_id=$(docker create -it -e CGO_ENABLED=0 ${image_name} gox -os="${XC_OS}" -arch="${XC_ARCH}" -osarch="!darwin/arm !darwin/arm64" -ldflags "${GOLDFLAGS}" -output "pkg/bin/${extra_dir}{{.OS}}_{{.Arch}}/consul-k8s" -tags="${GOTAGS}")
+   if [ ! -d "${MAIN_GOPATH}/pkg/mod" ]
+   then
+       mkdir -p "${MAIN_GOPATH}/pkg/mod"
+   fi
+
+   local container_id=$(docker create -v "${MAIN_GOPATH}/pkg/mod:/go/pkg/mod:ro" -it -e CGO_ENABLED=0 ${image_name} gox -os="${XC_OS}" -arch="${XC_ARCH}" -osarch="!darwin/arm !darwin/arm64" -ldflags "${GOLDFLAGS}" -output "pkg/bin/${extra_dir}{{.OS}}_{{.Arch}}/consul-k8s" -tags="${GOTAGS}")
    ret=$?
 
    if test $ret -eq 0
