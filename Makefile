@@ -63,6 +63,13 @@ else
 PUB_WEBSITE_ARG=
 endif
 
+DEV_PUSH?=0
+ifeq ($(DEV_PUSH),1)
+DEV_PUSH_ARG=
+else
+DEV_PUSH_ARG=--no-push
+endif
+
 all: bin
 
 bin:
@@ -73,6 +80,9 @@ dev:
 
 dev-docker:
 	@docker build -t '$(DEV_IMAGE)' --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' -f $(CURDIR)/build-support/docker/Dev.dockerfile $(CURDIR)
+
+dev-tree:
+	@$(SHELL) $(CURDIR)/build-support/scripts/dev.sh $(DEV_PUSH_ARG)
 
 test:
 	go test ./...
