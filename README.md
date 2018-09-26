@@ -30,8 +30,7 @@ without forcing Consul users to do a full Consul upgrade.
     automatically configure the Consul and Kubernetes integration to run within
     an existing Kubernetes cluster.
 
-  * A [Docker image](#) is available. This can be used to manually run
-    `consul-k8s` within a scheduled environment.
+  * A [Docker image `hashicorp/consul-k8s`](https://hub.docker.com/r/hashicorp/consul-k8s) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
 
   * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
     These can be used to run `consul-k8s` directly or build custom packages.
