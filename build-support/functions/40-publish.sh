@@ -133,7 +133,7 @@ function extract_consul_local {
    local ret=0
    local tfile="$(mktemp) -t "${CONSUL_PKG_NAME}_")"
 
-   unzip -p "${zfile}" "consul" > "${tfile}"
+   unzip -p "${zfile}" "consul-k8s" > "${tfile}"
    if test $? -eq 0
    then
       chmod +x "${tfile}"
@@ -187,125 +187,6 @@ function confirm_consul_version {
    done
 }
 
-function confirm_consul_info {
-   # Arguments:
-   #   $1 - Path to a consul exe that can be run on this system
-   #
-   # Returns:
-   #   0 - success
-   #   * - error
-
-   local consul_exe="$1"
-   local log_file="$(mktemp) -t "consul_log_")"
-   "${consul_exe}" agent -dev > "${log_file}" 2>&1 &
-   local consul_pid=$!
-   sleep 1
-   status "First 25 lines/1s of the agents output:"
-   head -n 25 "${log_file}"
-
-   echo ""
-   local ret=0
-   local answer=""
-
-   while true
-   do
-      case "${answer}" in
-         [yY]* )
-            status "Consul Agent Output Accepted"
-            break
-            ;;
-         [nN]* )
-            err "Consul Agent Output Rejected"
-            ret=1
-            break
-            ;;
-         * )
-            read -p "Is this Consul Agent Output correct? [y/n]: " answer
-            ;;
-      esac
-   done
-
-   if test "${ret}" -eq 0
-   then
-      status "Consul Info Output"
-      "${consul_exe}" info
-      echo ""
-      local answer=""
-
-      while true
-      do
-         case "${answer}" in
-            [yY]* )
-               status "Consul Info Output Accepted"
-               break
-               ;;
-            [nN]* )
-               err "Consul Info Output Rejected"
-               return 1
-               break
-               ;;
-            * )
-               read -p "Is this Consul Info Output correct? [y/n]: " answer
-               ;;
-         esac
-      done
-   fi
-
-   if test "${ret}" -eq 0
-   then
-      local tfile="$(mktemp) -t "${CONSUL_PKG_NAME}_")"
-      if ! curl -o "${tfile}" "http://localhost:8500/ui/"
-      then
-         err "ERROR: Failed to curl http://localhost:8500/ui/"
-         return 1
-      fi
-
-      local ui_vers=$(ui_version "${tfile}")
-      if test $? -ne 0
-      then
-         err "ERROR: Failed to determine the ui version from the index.html file"
-         return 1
-      fi
-      status "UI Version: ${ui_vers}"
-      local ui_logo_type=$(ui_logo_type "${tfile}")
-      if test $? -ne 0
-      then
-         err "ERROR: Failed to determine the ui logo/binary type from the index.html file"
-         return 1
-      fi
-      status "UI Logo: ${ui_logo_type}"
-
-      echo ""
-      local answer=""
-
-      while true
-      do
-         case "${answer}" in
-            [yY]* )
-               status "Consul UI/Logo Version Accepted"
-               break
-               ;;
-            [nN]* )
-               err "Consul UI/Logo Version Rejected"
-               return 1
-               break
-               ;;
-            * )
-               read -p "Is this Consul UI/Logo Version correct? [y/n]: " answer
-               ;;
-         esac
-      done
-   fi
-
-
-
-   status "Requesting Consul to leave the cluster / shutdown"
-   "${consul_exe}" leave
-   wait ${consul_pid} > /dev/null 2>&1
-
-   return $?
-}
-
 function extract_consul {
    extract_consul_local "$1" "$2"
 }
@@ -349,9 +230,6 @@ function verify_release_build {
 
    status_stage "==> Confirming Consul Version"
    confirm_consul_version "${consul_exe}" || return 1
-
-   status_stage "==> Confirming Consul Agent Info"
-   confirm_consul_info "${consul_exe}" || return 1
 }
 
 function publish_release {
