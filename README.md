@@ -61,7 +61,7 @@ may not be properly cleaned up. We recommend recycling the Kubernetes cluster to
 start from a clean slate.
 
 **Note:** There is a Terraform configuration in the
-[test/terraform/ directory](https://github.com/hashicorp/consul-helm/tree/master/test/terraform)
+[`test/terraform/`](https://github.com/hashicorp/consul-helm/tree/master/test/terraform) directory
 that can be used to quickly bring up a GKE cluster and configure
 `kubectl` and `helm` locally. This can be used to quickly spin up a test
 cluster for acceptance tests. Unit tests _do not_ require a running Kubernetes
