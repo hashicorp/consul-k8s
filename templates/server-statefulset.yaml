@@ -37,15 +37,10 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
+    {{- if .Values.server.affinity }}
       affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  app: {{ template "consul.name" . }}
-                  release: "{{ .Release.Name }}"
-                  component: server
-              topologyKey: kubernetes.io/hostname
+{{ tpl .Values.server.affinity . | indent 8 }}
+{{- end }}
       terminationGracePeriodSeconds: 10
       securityContext:
         fsGroup: 1000
