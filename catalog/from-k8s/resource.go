@@ -98,7 +98,6 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
-			//Endpoints(t.namespace()).
 			Endpoints(service.Namespace).
 			Get(service.Name, metav1.GetOptions{})
 		if err != nil {
@@ -173,6 +172,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 		// Fallback to default
 		return !t.ExplicitEnable
 	}
+
 	return v
 }
 
@@ -245,7 +245,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	// Determine the default port
 	if len(svc.Spec.Ports) > 0 {
-		defPort := (svc.Spec.Type == apiv1.ServiceTypeNodePort ||
+		nodePort := (svc.Spec.Type == apiv1.ServiceTypeNodePort ||
 			svc.Spec.Type == apiv1.ServiceTypeClusterIP)
 		main := svc.Spec.Ports[0].Name
 
@@ -261,7 +261,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		// also use this opportunity to find our default port.
 		for _, p := range svc.Spec.Ports {
 			target := p.Port
-			if defPort && p.NodePort > 0 {
+			if nodePort && p.NodePort > 0 {
 				target = p.NodePort
 			}
 
@@ -342,8 +342,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 
 	// For NodePort and ClusterIP services, we create a service instance 
-        // for each endpoint of the service. This way we don't register 
-        // _every_ K8S node as part of the service.
+	// for each endpoint of the service. This way we don't register 
+	// _every_ K8S node as part of the service.
 	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
