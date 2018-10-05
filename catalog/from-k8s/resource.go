@@ -98,7 +98,8 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
-			Endpoints(t.namespace()).
+			//Endpoints(t.namespace()).
+			Endpoints(service.Namespace).
 			Get(service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
@@ -172,7 +173,6 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 		// Fallback to default
 		return !t.ExplicitEnable
 	}
-
 	return v
 }
 
@@ -183,8 +183,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	// The service must be one we care about for us to watch the endpoints.
 	// We care about a service that exists in our service map (is enabled
-	// for syncing) and is a NodePort type. Only NodePort type services
-	// use the endpoints at all.
+	// for syncing) and is either NodePort or ClusterIP type.
 	if t.serviceMap == nil {
 		return false
 	}
@@ -193,7 +192,8 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort
+	return (svc.Spec.Type == apiv1.ServiceTypeNodePort ||
+		svc.Spec.Type == apiv1.ServiceTypeClusterIP)
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -245,7 +245,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	// Determine the default port
 	if len(svc.Spec.Ports) > 0 {
-		nodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
+		defPort := (svc.Spec.Type == apiv1.ServiceTypeNodePort ||
+			svc.Spec.Type == apiv1.ServiceTypeClusterIP)
 		main := svc.Spec.Ports[0].Name
 
 		// If a specific port is specified, then use that port value
@@ -260,7 +261,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		// also use this opportunity to find our default port.
 		for _, p := range svc.Spec.Ports {
 			target := p.Port
-			if nodePort && p.NodePort > 0 {
+			if defPort && p.NodePort > 0 {
 				target = p.NodePort
 			}
 
@@ -340,10 +341,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 
-	// For NodePort services, we create a service instance for each
-	// endpoint of the service. This way we don't register _every_ K8S
-	// node as part of the service.
-	case apiv1.ServiceTypeNodePort:
+	// For NodePort and ClusterIP services, we create a service instance 
+        // for each endpoint of the service. This way we don't register 
+        // _every_ K8S node as part of the service.
+	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
 		}
