@@ -32,6 +32,8 @@ type Command struct {
 	flagCertFile      string // TLS cert for listening (PEM)
 	flagKeyFile       string // TLS cert private key (PEM)
 	flagDefaultInject bool   // True to inject by default
+	flagConsulImage   string // Docker image for Consul
+	flagEnvoyImage    string // Docker image for Envoy
 	flagSet           *flag.FlagSet
 
 	once sync.Once
@@ -51,6 +53,10 @@ func (c *Command) init() {
 		"PEM-encoded TLS certificate to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
 		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
+	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", connectinject.DefaultConsulImage,
+		"Docker image for Consul. Defaults to an early version of Consul.")
+	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
+		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -95,7 +101,11 @@ func (c *Command) Run(args []string) int {
 	go c.certWatcher(ctx, certCh, clientset)
 
 	// Build the HTTP handler and server
-	injector := connectinject.Handler{RequireAnnotation: !c.flagDefaultInject}
+	injector := connectinject.Handler{
+		ImageConsul:       c.flagConsulImage,
+		ImageEnvoy:        c.flagEnvoyImage,
+		RequireAnnotation: !c.flagDefaultInject,
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
 	mux.HandleFunc("/health/ready", c.handleReady)
