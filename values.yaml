@@ -67,7 +67,7 @@ server:
     maxUnavailable: null
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
@@ -87,13 +87,17 @@ client:
   image: null
   join: null
 
+  # grpc should be set to true if the gRPC listener should be enabled.
+  # This should be set to true if connectInject is enabled.
+  grpc: false
+
   # Resource requests, limits, etc. for the client cluster placement. This
   # should map directly to the value of the resources field for a PodSpec.
   # By default no direct resource request is made.
   resources: {}
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
