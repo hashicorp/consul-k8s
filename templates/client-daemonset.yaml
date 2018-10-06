@@ -71,6 +71,9 @@ spec:
                 -advertise="${POD_IP}" \
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
+                {{- if .Values.client.grpc }}
+                -hcl="ports { grpc = 8502 }" \
+                {{- end }}
                 -config-dir=/consul/config \
                 {{- range .Values.client.extraVolumes }}
                 {{- if .load }}
@@ -112,6 +115,9 @@ spec:
             - containerPort: 8500
               hostPort: 8500
               name: http
+            - containerPort: 8502
+              hostPort: 8502
+              name: grpc
             - containerPort: 8301
               name: serflan
             - containerPort: 8302
