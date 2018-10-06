@@ -131,7 +131,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -sidecar-for={{ .ServiceName }} \
+  -sidecar-for="{{ .PodName }}-{{ .ServiceName }}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
