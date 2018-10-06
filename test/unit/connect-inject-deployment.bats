@@ -42,6 +42,56 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+#--------------------------------------------------------------------
+# consul and envoy images
+
+@test "connectInject/Deployment: consul-image defaults to global" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'global.image=foo' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-image=\"foo\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: consul-image can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'global.image=foo' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.imageConsul=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-image=\"bar\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: envoy-image is not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: envoy-image can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.imageEnvoy=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image=\"foo\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# cert secrets
+
 @test "connectInject/Deployment: no secretName: no tls-{cert,key}-file set" {
   cd `chart_dir`
   local actual=$(helm template \
