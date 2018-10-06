@@ -109,6 +109,8 @@ services {
 
   connect {
     sidecar_service {
+      address = "${POD_IP}"
+
       checks {
         name = "Connect Sidecar Alias"
         alias_service = "{{ .ServiceName }}"
