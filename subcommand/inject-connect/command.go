@@ -191,9 +191,9 @@ func (c *Command) Help() string {
 
 const synopsis = "Inject Connect proxy sidecar."
 const help = `
-Usage: consul-k8s inject [options]
+Usage: consul-k8s inject-connect [options]
 
   Run the admission webhook server for injecting the Consul Connect
-  proxy sidecar.
+  proxy sidecar. The sidecar uses Envoy by default.
 
 `
