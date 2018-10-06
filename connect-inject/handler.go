@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
@@ -152,11 +151,35 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// Accumulate any patches here
 	var patches []jsonpatch.JsonPatchOperation
 
-	// Add a container to it
+	// Add our volume that will be shared by the init container and
+	// the sidecar for passing data in the pod.
+	patches = append(patches, addVolume(
+		pod.Spec.Volumes,
+		[]corev1.Volume{h.containerVolume()},
+		"/spec/volumes")...)
+
+	// Add the init container that registers the service and sets up
+	// the Envoy configuration.
+	container, err := h.containerInit(&pod)
+	if err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring injection init container: %s", err),
+			},
+		}
+	}
+	patches = append(patches, addContainer(
+		pod.Spec.InitContainers,
+		[]corev1.Container{container},
+		"/spec/initContainers")...)
+
+	// Add the Envoy sidecar
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
 		[]corev1.Container{h.containerSidecar(&pod)},
 		"/spec/containers")...)
+
+	// Add annotations so that we know we're injected
 	patches = append(patches, updateAnnotation(
 		pod.Annotations,
 		map[string]string{annotationStatus: "injected"})...)
@@ -237,66 +260,6 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 	return nil
 }
 
-func (h *Handler) containerSidecar(pod *corev1.Pod) corev1.Container {
-	cmd := []string{
-		"exec /bin/consul connect proxy",
-		"-http-addr=${HOST_IP}:8500",
-	}
-
-	svc := pod.Annotations[annotationService]
-	if svc == "" {
-		// Assertion, since we call defaultAnnotations above and do
-		// not mutate pods without a service specified.
-		panic("No service found. This should be impossible since we default it.")
-	}
-	cmd = append(cmd, "-service="+svc)
-
-	// If a port is specified, then we determine the value of that port
-	// and register this proxy as a listener. This enables the proxy to
-	// act as an inbound connection receiver.
-	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-		if port, _ := portValue(pod, raw); port > 0 {
-			cmd = append(cmd,
-				fmt.Sprintf("-service-addr=127.0.0.1:%d", port),
-				"-listen=${POD_IP}:12500",
-				"-register",
-			)
-		}
-	}
-
-	// If upstreams are specified, configure those
-	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
-		for _, raw := range strings.Split(raw, ",") {
-			parts := strings.SplitN(raw, ":", 2)
-			port, _ := portValue(pod, strings.TrimSpace(parts[1]))
-			if port > 0 {
-				cmd = append(cmd, fmt.Sprintf(
-					"-upstream=%s:%d", strings.TrimSpace(parts[0]), port))
-			}
-		}
-	}
-
-	return corev1.Container{
-		Name:  "consul-connect-proxy",
-		Image: "consul:1.2.2",
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-				},
-			},
-			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
-		},
-		Command: []string{"/bin/sh", "-ec", strings.Join(cmd, " ")},
-	}
-}
-
 func portValue(pod *corev1.Pod, value string) (int32, error) {
 	// First search for the named port
 	for _, c := range pod.Spec.Containers {
@@ -318,58 +281,4 @@ func admissionError(err error) *v1beta1.AdmissionResponse {
 			Message: err.Error(),
 		},
 	}
-}
-
-func addContainer(target, add []corev1.Container, base string) []jsonpatch.JsonPatchOperation {
-	var result []jsonpatch.JsonPatchOperation
-	first := len(target) == 0
-	var value interface{}
-	for _, container := range add {
-		value = container
-		path := base
-		if first {
-			first = false
-			value = []corev1.Container{container}
-		} else {
-			path = path + "/-"
-		}
-
-		result = append(result, jsonpatch.JsonPatchOperation{
-			Operation: "add",
-			Path:      path,
-			Value:     value,
-		})
-	}
-
-	return result
-}
-
-func updateAnnotation(target, add map[string]string) []jsonpatch.JsonPatchOperation {
-	var result []jsonpatch.JsonPatchOperation
-	if len(target) == 0 {
-		result = append(result, jsonpatch.JsonPatchOperation{
-			Operation: "add",
-			Path:      "/metadata/annotations",
-			Value:     add,
-		})
-
-		return result
-	}
-
-	for key, value := range add {
-		result = append(result, jsonpatch.JsonPatchOperation{
-			Operation: "add",
-			Path:      "/metadata/annotations/" + escapeJSONPointer(key),
-			Value:     value,
-		})
-	}
-
-	return result
-}
-
-// https://tools.ietf.org/html/rfc6901
-func escapeJSONPointer(s string) string {
-	s = strings.Replace(s, "~", "~0", -1)
-	s = strings.Replace(s, "/", "~1", -1)
-	return s
 }
