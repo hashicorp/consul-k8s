@@ -17,6 +17,11 @@ import (
 )
 
 const (
+	DefaultConsulImage = "consul:1.3.0"
+	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.8.0"
+)
+
+const (
 	// annotationStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
 	annotationStatus = "consul.hashicorp.com/connect-inject-status"
@@ -56,6 +61,13 @@ var (
 
 // Handler is the HTTP handler for admission webhooks.
 type Handler struct {
+	// ImageConsul is the container image for Consul to use.
+	// ImageEnvoy is the container imae for Envoy to use.
+	//
+	// Both of these MUST be set.
+	ImageConsul string
+	ImageEnvoy  string
+
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.
 	RequireAnnotation bool

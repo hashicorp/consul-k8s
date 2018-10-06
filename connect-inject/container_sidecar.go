@@ -9,7 +9,7 @@ import (
 func (h *Handler) containerSidecar(pod *corev1.Pod) corev1.Container {
 	return corev1.Container{
 		Name:  "consul-connect-envoy-sidecar",
-		Image: "envoyproxy/envoy-alpine:v1.8.0",
+		Image: h.ImageEnvoy,
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",

@@ -66,7 +66,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 
 	return corev1.Container{
 		Name:  "consul-connect-inject-init",
-		Image: "us.gcr.io/mitchellh-k8s/consul-dev:latest",
+		Image: h.ImageConsul,
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
