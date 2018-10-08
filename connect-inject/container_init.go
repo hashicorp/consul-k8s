@@ -101,30 +101,38 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "{{ .PodName }}-{{ .ServiceName }}"
-  name = "{{ .ServiceName }}"
-  {{ if (gt .ServicePort 0) -}}
-  port = {{ .ServicePort }}
-  {{ end -}}
+  id   = "{{ .PodName }}-{{ .ServiceName }}-proxy"
+  name = "{{ .ServiceName }}-proxy"
+  kind = "connect-proxy"
+  address = "${POD_IP}"
+  port = 20000
 
-  connect {
-    sidecar_service {
-      address = "${POD_IP}"
+  proxy {
+    destination_service_name = "{{ .ServiceName }}"
+    {{ if (gt .ServicePort 0) -}}
+    local_service_address = "127.0.0.1"
+    local_service_port = {{ .ServicePort }}
+    {{ end -}}
 
-      checks {
-        name = "Connect Sidecar Alias"
-        alias_service = "{{ .ServiceName }}"
-      }
 
-      proxy {
-        {{ range .Upstreams -}}
-        upstreams {
-          destination_name = "{{ .Name }}"
-          local_bind_port = {{ .LocalPort }}
-        }
-        {{ end }}
-      }
+    {{ range .Upstreams -}}
+    upstreams {
+      destination_name = "{{ .Name }}"
+      local_bind_port = {{ .LocalPort }}
     }
+    {{ end }}
+  }
+
+  checks {
+    name = "Proxy Public Listener"
+    tcp = "${POD_IP}:20000"
+    interval = "10s"
+    deregister_critical_service_after = "10m"
+  }
+
+  checks {
+    name = "Destination Alias"
+    alias_service = "{{ .ServiceName }}"
   }
 }
 EOF
@@ -133,7 +141,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -sidecar-for="{{ .PodName }}-{{ .ServiceName }}" \
+  -proxy-id="{{ .PodName }}-{{ .ServiceName }}-proxy" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
