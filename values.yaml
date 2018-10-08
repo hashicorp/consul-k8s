@@ -160,9 +160,7 @@ syncCatalog:
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
   enabled: false # "-" disable this by default for now until the image is public
-  image: null
   default: false # true will inject by default, otherwise requires annotation
-  caBundle: "" # empty will auto generate the bundle
 
   # imageConsul and imageEnvoy can be set to Docker images for Consul and
   # Envoy, respectively. If the Consul image is not specified, the global
