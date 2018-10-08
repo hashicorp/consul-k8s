@@ -170,6 +170,21 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Volume{h.containerVolume()},
 		"/spec/volumes")...)
 
+	// Add the upstream services as environment variables for easy
+	// service discovery.
+	for i, container := range pod.Spec.InitContainers {
+		patches = append(patches, addEnvVar(
+			container.Env,
+			h.containerEnvVars(&pod),
+			fmt.Sprintf("/spec/initContainers/%d/env", i))...)
+	}
+	for i, container := range pod.Spec.Containers {
+		patches = append(patches, addEnvVar(
+			container.Env,
+			h.containerEnvVars(&pod),
+			fmt.Sprintf("/spec/containers/%d/env", i))...)
+	}
+
 	// Add the init container that registers the service and sets up
 	// the Envoy configuration.
 	container, err := h.containerInit(&pod)

@@ -109,6 +109,7 @@ services {
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
+    destination_service_id = "{{ .ServiceName}}"
     {{ if (gt .ServicePort 0) -}}
     local_service_address = "127.0.0.1"
     local_service_port = {{ .ServicePort }}

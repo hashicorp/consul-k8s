@@ -92,6 +92,57 @@ func TestHandlerHandle(t *testing.T) {
 		},
 
 		{
+			"pod with upstreams specified",
+			Handler{},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationUpstreams: "echo:1234,db:1234",
+						},
+					},
+
+					Spec: basicSpec,
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+			},
+		},
+
+		{
 			"empty pod with injection disabled",
 			Handler{},
 			v1beta1.AdmissionRequest{

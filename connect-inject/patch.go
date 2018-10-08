@@ -27,7 +27,6 @@ func addVolume(target, add []corev1.Volume, base string) []jsonpatch.JsonPatchOp
 			Value:     value,
 		})
 	}
-
 	return result
 }
 
@@ -41,6 +40,30 @@ func addContainer(target, add []corev1.Container, base string) []jsonpatch.JsonP
 		if first {
 			first = false
 			value = []corev1.Container{container}
+		} else {
+			path = path + "/-"
+		}
+
+		result = append(result, jsonpatch.JsonPatchOperation{
+			Operation: "add",
+			Path:      path,
+			Value:     value,
+		})
+	}
+
+	return result
+}
+
+func addEnvVar(target, add []corev1.EnvVar, base string) []jsonpatch.JsonPatchOperation {
+	var result []jsonpatch.JsonPatchOperation
+	first := len(target) == 0
+	var value interface{}
+	for _, v := range add {
+		value = v
+		path := base
+		if first {
+			first = false
+			value = []corev1.EnvVar{v}
 		} else {
 			path = path + "/-"
 		}
