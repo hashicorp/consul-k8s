@@ -16,7 +16,7 @@ webhooks:
         name: {{ template "consul.fullname" . }}-connect-injector-svc
         namespace: default
         path: "/mutate"
-      caBundle: {{ .Values.connectInject.caBundle }}
+      caBundle: {{ .Values.connectInject.certs.caBundle }}
     rules:
       - operations: [ "CREATE" ]
         apiGroups: [""]
