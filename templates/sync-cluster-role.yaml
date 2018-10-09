@@ -1,0 +1,25 @@
+{{- $rbacEnabled := (or (and (ne (.Values.rbac.enabled | toString) "-") .Values.rbac.enabled) (and (eq (.Values.rbac.enabled | toString) "-") .Values.rbac.enabled)) }}
+{{- $syncEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and $rbacEnabled $syncEnabled) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: consul:sync
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+rules:
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+{{- end }}
