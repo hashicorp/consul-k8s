@@ -67,7 +67,7 @@ server:
     maxUnavailable: null
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
@@ -87,13 +87,17 @@ client:
   image: null
   join: null
 
+  # grpc should be set to true if the gRPC listener should be enabled.
+  # This should be set to true if connectInject is enabled.
+  grpc: false
+
   # Resource requests, limits, etc. for the client cluster placement. This
   # should map directly to the value of the resources field for a PodSpec.
   # By default no direct resource request is made.
   resources: {}
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
@@ -155,10 +159,15 @@ syncCatalog:
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
-  enabled: false # "-" disable this by default for now until the image is public
-  image: "TODO"
+  enabled: false
   default: false # true will inject by default, otherwise requires annotation
-  caBundle: "" # empty will auto generate the bundle
+
+  # imageConsul and imageEnvoy can be set to Docker images for Consul and
+  # Envoy, respectively. If the Consul image is not specified, the global
+  # default will be used. If the Envoy image is not specified, an early
+  # version of Envoy will be used.
+  imageConsul: null
+  imageEnvoy: null
 
   # namespaceSelector is the selector for restricting the webhook to only
   # specific namespaces. This should be set to a multiline string.

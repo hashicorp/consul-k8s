@@ -24,6 +24,8 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: sync-catalog
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
     spec:
       containers:
         - name: consul-sync-catalog
