@@ -1,3 +1,9 @@
+## UNRELEASED
+
+FEATURES:
+
+  * `connectInject` can install the automatic Connect sidecar injector.
+
 ## 0.2.0 (September 26, 2018)
 
 FEATURES:
