@@ -45,6 +45,29 @@ load _helpers
 #--------------------------------------------------------------------
 # consul and envoy images
 
+@test "connectInject/Deployment: container image is global default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.imageK8S=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+  [ "${actual}" = "\"foo\"" ]
+}
+
+@test "connectInject/Deployment: container image overrides" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.imageK8S=foo' \
+      --set 'connectInject.image=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+  [ "${actual}" = "\"bar\"" ]
+}
+
 @test "connectInject/Deployment: consul-image defaults to global" {
   cd `chart_dir`
   local actual=$(helm template \
