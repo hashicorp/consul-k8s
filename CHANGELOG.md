@@ -1,8 +1,8 @@
-## UNRELEASED
+## 0.2.0 (October 10, 2018)
 
 Features:
 
-* **New subcommand: `inject-connect`** runs a mutating admission webhook for 
+* **New subcommand: `inject-connect`** runs a mutating admission webhook for
   automatic Connect sidecar injection in Kubernetes. While this can be setup
   manually, we recommend using the Consul helm chart.
 
