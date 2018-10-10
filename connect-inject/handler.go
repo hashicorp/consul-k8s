@@ -62,7 +62,7 @@ var (
 // Handler is the HTTP handler for admission webhooks.
 type Handler struct {
 	// ImageConsul is the container image for Consul to use.
-	// ImageEnvoy is the container imae for Envoy to use.
+	// ImageEnvoy is the container image for Envoy to use.
 	//
 	// Both of these MUST be set.
 	ImageConsul string
