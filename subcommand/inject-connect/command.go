@@ -54,7 +54,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
 		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", connectinject.DefaultConsulImage,
-		"Docker image for Consul. Defaults to an early version of Consul.")
+		"Docker image for Consul. Defaults to an Consul 1.3.0.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
 	c.help = flags.Usage(help, c.flagSet)
