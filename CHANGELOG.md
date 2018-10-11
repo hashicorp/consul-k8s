@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.3.0 (October 11, 2018)
 
 FEATURES:
 
