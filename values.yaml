@@ -112,9 +112,9 @@ server:
   
   ## server node selectors and tolerations for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
-  nodeSelector: {}
+  # nodeSelector: {"beta.kubernetes.io/arch": "amd64"}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  tolerations: []
+  # tolerations: []
 
   # Affinity Settings
   # Commenting out or setting as empty the affinity variable, will allow
@@ -213,9 +213,9 @@ client:
   ## client tolerations for pod assignment
   ## client node selectors and tolerations for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
-  nodeSelector: {}
+  # nodeSelector: {"beta.kubernetes.io/arch": "amd64"}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  tolerations: []
+  # tolerations: []
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
@@ -300,9 +300,9 @@ syncCatalog:
 
   ## syncCatalog node selectors and tolerations for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
-  nodeSelector: {}
+  # nodeSelector: {"beta.kubernetes.io/arch": "amd64"}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  tolerations: []
+  # tolerations: []
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
@@ -347,6 +347,6 @@ connectInject:
 
   ## connectInject node selectors and tolerations for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
-  nodeSelector: {}
+  # nodeSelector: {"beta.kubernetes.io/arch": "amd64"}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  tolerations: []
+  # tolerations: []
