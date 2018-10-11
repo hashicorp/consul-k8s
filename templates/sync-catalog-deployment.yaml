@@ -95,6 +95,10 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 5
+    {{- if .Values.syncCatalog.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.syncCatalog.nodeSelector | indent 8 }}
+    {{- end }}
     {{- if .Values.syncCatalog.tolerations }}
       tolerations:
 {{ toYaml .Values.syncCatalog.tolerations | indent 8 }}

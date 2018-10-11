@@ -87,6 +87,10 @@ spec:
           secret:
             secretName: {{ .Values.connectInject.certs.secretName }}
 {{- end }}
+    {{- if .Values.connectInject.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.connectInject.nodeSelector | indent 8 }}
+    {{- end }}
     {{- if .Values.connectInject.tolerations }}
       tolerations:
 {{ toYaml .Values.connectInject.tolerations | indent 8 }}
