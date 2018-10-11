@@ -173,6 +173,10 @@ spec:
           resources:
             {{ tpl .Values.server.resources . | nindent 12 | trim }}
           {{- end }}
+    {{- if .Values.server.tolerations }}
+      tolerations:
+{{ toYaml .Values.server.tolerations | indent 8 }}
+    {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data-{{ .Release.Namespace }}
