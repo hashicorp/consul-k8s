@@ -109,6 +109,10 @@ server:
     # - type: secret (or "configMap")
     #   name: my-secret
     #   load: false # if true, will add to `-config-dir` to load by Consul
+  
+  ## server tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
 
   # Affinity Settings
   # Commenting out or setting as empty the affinity variable, will allow
@@ -204,6 +208,10 @@ client:
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
 
+  ## client tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns
@@ -285,6 +293,10 @@ syncCatalog:
     secretName: null
     secretKey: null
 
+  ## syncCatalog tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
   enabled: false
@@ -325,3 +337,7 @@ connectInject:
     # defaults but can be customized if necessary.
     certName: tls.crt
     keyName: tls.key
+
+  ## connectInject tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []

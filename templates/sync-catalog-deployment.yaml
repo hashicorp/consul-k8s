@@ -95,4 +95,8 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 5
+    {{- if .Values.syncCatalog.tolerations }}
+      tolerations:
+{{ toYaml .Values.syncCatalog.tolerations | indent 8 }}
+    {{- end }}
 {{- end }}
