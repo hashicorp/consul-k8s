@@ -110,7 +110,9 @@ server:
     #   name: my-secret
     #   load: false # if true, will add to `-config-dir` to load by Consul
   
-  ## server tolerations for pod assignment
+  ## server node selectors and tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+  nodeSelector: {}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   tolerations: []
 
@@ -209,6 +211,9 @@ client:
     # no_proxy: internal.domain.com
 
   ## client tolerations for pod assignment
+  ## client node selectors and tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+  nodeSelector: {}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   tolerations: []
 
@@ -293,7 +298,9 @@ syncCatalog:
     secretName: null
     secretKey: null
 
-  ## syncCatalog tolerations for pod assignment
+  ## syncCatalog node selectors and tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+  nodeSelector: {}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   tolerations: []
 
@@ -338,6 +345,8 @@ connectInject:
     certName: tls.crt
     keyName: tls.key
 
-  ## connectInject tolerations for pod assignment
+  ## connectInject node selectors and tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+  nodeSelector: {}
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   tolerations: []

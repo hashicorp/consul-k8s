@@ -173,6 +173,10 @@ spec:
           resources:
             {{ tpl .Values.client.resources . | nindent 12 | trim }}
           {{- end }}
+    {{- if .Values.client.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.client.nodeSelector | indent 8 }}
+    {{- end }}
     {{- if .Values.client.tolerations }}
       tolerations:
 {{ toYaml .Values.client.tolerations | indent 8 }}
