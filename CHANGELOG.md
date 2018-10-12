@@ -1,3 +1,9 @@
+## UNRELEASED
+
+BUG FIXES:
+
+  * Updated images to point to latest versions for 0.3.0.
+
 ## 0.3.0 (October 11, 2018)
 
 FEATURES:
