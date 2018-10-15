@@ -183,7 +183,8 @@ connectInject:
   certs:
     # secretName is the name of the secret that has the TLS certificate and
     # private key to serve the injector webhook. If this is null, then the
-    # injector will default to its automatic management mode.
+    # injector will default to its automatic management mode that will assign
+    # a service account to the injector to generate its own certificates.
     secretName: null
 
     # caBundle is a base64-encoded PEM-encoded certificate bundle for the

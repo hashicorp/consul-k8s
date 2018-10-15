@@ -25,6 +25,9 @@ spec:
         release: {{ .Release.Name }}
         component: connect-injector
     spec:
+  {{- if not .Values.connectInject.certs.secretName }}
+      serviceAccountName: connect-injector-webhook-service-account
+  {{- end }}
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
@@ -50,7 +53,7 @@ spec:
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }}
                 -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
 {{- else }}
-                -tls-auto=consul-connect-injector-cfg \
+                -tls-auto={{ template "consul.fullname" . }}-connect-injector-cfg \
                 -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc
 {{- end }}
           livenessProbe:
