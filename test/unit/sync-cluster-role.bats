@@ -17,7 +17,7 @@ load _helpers
       -x templates/sync-cluster-role.yaml  \
       --set 'global.enabled=false' \
       --set 'syncCatalog.enabled=true' \
-      --set 'rbac.enabled=true' \
+      --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -28,7 +28,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/sync-cluster-role.yaml  \
       --set 'syncCatalog.enabled=false' \
-      --set 'rbac.enabled=true' \
+      --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -39,7 +39,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/sync-cluster-role.yaml  \
       --set 'syncCatalog.enabled=true' \
-      --set 'rbac.enabled=false' \
+      --set 'syncCatalog.rbac.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -50,6 +50,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/sync-cluster-role.yaml  \
       --set 'global.enabled=false' \
+      --set 'syncCatalog.rbac.enabled="-"' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
