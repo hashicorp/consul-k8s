@@ -50,7 +50,7 @@ spec:
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }}
                 -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
 {{- else }}
-                -tls-auto=consul-connect-injector-cfg \
+                -tls-auto=${CONSUL_FULLNAME}-connect-injector-cfg \
                 -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc
 {{- end }}
           livenessProbe:
