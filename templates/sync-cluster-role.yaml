@@ -4,7 +4,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}:sync-catalog
+  name: {{ template "consul.fullname" . }}-sync-catalog
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}

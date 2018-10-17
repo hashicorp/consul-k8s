@@ -27,7 +27,7 @@ spec:
         component: sync-catalog
     spec:
       {{- if $rbacEnabled }}
-      serviceAccountName: {{ template "consul.fullname" . }}:sync-catalog
+      serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       {{- end }}
       containers:
         - name: consul-sync-catalog
