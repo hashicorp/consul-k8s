@@ -3,6 +3,7 @@
 BUG FIXES:
 
   * Updated images to point to latest versions for 0.3.0.
+  * Add missing continuation characters to long commands [GH-26].
 
 ## 0.3.0 (October 11, 2018)
 
