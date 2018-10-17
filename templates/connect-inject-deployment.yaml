@@ -26,7 +26,7 @@ spec:
         component: connect-injector
     spec:
   {{- if not .Values.connectInject.certs.secretName }}
-      serviceAccountName: connect-injector-webhook-service-account
+      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
   {{- end }}
       containers:
         - name: sidecar-injector
