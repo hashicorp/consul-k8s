@@ -1,4 +1,5 @@
 # The deployment for running the Connect sidecar injector
+{{- $rbacEnabled := (or (and (ne (.Values.syncCatalog.rbac.enabled | toString) "-") .Values.syncCatalog.rbac.enabled) (and (eq (.Values.syncCatalog.rbac.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
 apiVersion: apps/v1
 kind: Deployment
@@ -27,6 +28,9 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
+      {{- if $rbacEnabled }}
+      serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
+      {{- end }}
       containers:
         - name: consul-sync-catalog
           image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
