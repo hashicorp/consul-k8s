@@ -2,19 +2,19 @@
 
 load _helpers
 
-@test "sync/ClusterRoleBinding: disabled by default" {
+@test "sync/ClusterRole: disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-cluster-role-binding.yaml  \
+      -x templates/sync-catalog-cluster-role.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRoleBinding: enable with global.enabled false" {
+@test "sync/ClusterRole: enable with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-cluster-role-binding.yaml  \
+      -x templates/sync-catalog-cluster-role.yaml  \
       --set 'global.enabled=false' \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.rbac.enabled=true' \
@@ -23,10 +23,10 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "sync/ClusterRoleBinding: disable with syncCatalog.enabled" {
+@test "sync/ClusterRole: disable with syncCatalog.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-cluster-role-binding.yaml  \
+      -x templates/sync-catalog-cluster-role.yaml  \
       --set 'syncCatalog.enabled=false' \
       --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
@@ -34,10 +34,10 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRoleBinding: disable with syncCatalog.rbac.enabled" {
+@test "sync/ClusterRole: disable with rbac.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-cluster-role-binding.yaml  \
+      -x templates/sync-catalog-cluster-role.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.rbac.enabled=false' \
       . | tee /dev/stderr |
@@ -45,12 +45,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRoleBinding: disable with global.enabled" {
+@test "sync/ClusterRole: disable with global.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-cluster-role-binding.yaml  \
-      --set 'syncCatalog.rbac.enabled="-"' \
+      -x templates/sync-catalog-cluster-role.yaml  \
       --set 'global.enabled=false' \
+      --set 'syncCatalog.rbac.enabled="-"' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
