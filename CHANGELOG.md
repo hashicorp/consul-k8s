@@ -11,6 +11,8 @@ BUG FIXES:
 
   * Updated images to point to latest versions for 0.3.0.
   * Add missing continuation characters to long commands [GH-26].
+  * connectInject: set the correct namespace for the MutatingWebhookConfiguration
+    so that deployments work in non-default namespaces. [GH-41]
 
 ## 0.3.0 (October 11, 2018)
 
