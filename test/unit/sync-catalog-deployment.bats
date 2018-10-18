@@ -149,3 +149,17 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-k8s-service-prefix=\"foo-\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# serviceAccount
+
+@test "syncCatalog/Deployment: serviceAccount set with rbac.enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.rbac.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.serviceAccountName | contains("sync-catalog")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
