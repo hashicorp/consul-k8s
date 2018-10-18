@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+  * RBAC support for `syncCatalog`. This is enabled by default if the catalog
+    sync is enabled but can be controlled with `syncCatalog.rbac.enabled`.
+    This will create the `ClusterRole` and `ClusterRoleBinding` necessary
+    for the catalog sync. [GH-29]
+
 BUG FIXES:
 
   * Updated images to point to latest versions for 0.3.0.
