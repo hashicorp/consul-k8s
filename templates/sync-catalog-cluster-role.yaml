@@ -22,4 +22,5 @@ rules:
       - update
       - patch
       - delete
+      - create
 {{- end }}
