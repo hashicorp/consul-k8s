@@ -193,7 +193,11 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort
+	switch svc.Spec.Type {
+	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
+		return true
+	}
+	return false
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -243,10 +247,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		baseService.Service = strings.TrimSpace(v)
 	}
 
+	var main string
 	// Determine the default port
 	if len(svc.Spec.Ports) > 0 {
-		nodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
-		main := svc.Spec.Ports[0].Name
+		main = svc.Spec.Ports[0].Name
 
 		// If a specific port is specified, then use that port value
 		if target, ok := svc.Annotations[annotationServicePort]; ok {
@@ -260,9 +264,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		// also use this opportunity to find our default port.
 		for _, p := range svc.Spec.Ports {
 			target := p.Port
-			if nodePort && p.NodePort > 0 {
-				target = p.NodePort
-			}
 
 			// Set the tag
 			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(target), 10)
@@ -343,7 +344,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For NodePort services, we create a service instance for each
 	// endpoint of the service. This way we don't register _every_ K8S
 	// node as part of the service.
-	case apiv1.ServiceTypeNodePort:
+	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
 		}
@@ -371,6 +372,13 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					continue
 				}
 				seen[addr] = struct{}{}
+
+				for _, port := range subset.Ports {
+					if port.Name == main {
+						baseService.Port = int(port.Port)
+						break
+					}
+				}
 
 				r := baseNode
 				rs := baseService
