@@ -116,8 +116,7 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelF := context.WithCancel(context.Background())
 
 	// Start the K8S-to-Consul syncer
-	toConsulCh := make(chan struct{})
-	close(toConsulCh)
+	var toConsulCh chan struct{}
 	if c.flagToConsul {
 		// Build the Consul sync and start it
 		syncer := &catalogFromK8S.ConsulSyncer{
@@ -149,8 +148,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Start Consul-to-K8S sync
-	toK8SCh := make(chan struct{})
-	close(toK8SCh)
+	var toK8SCh chan struct{}
 	if c.flagToK8S {
 		sink := &catalogFromConsul.K8SSink{
 			Client:    clientset,
