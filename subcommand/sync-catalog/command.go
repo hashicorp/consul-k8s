@@ -185,20 +185,28 @@ func (c *Command) Run(args []string) int {
 	// Unexpected exit
 	case <-toConsulCh:
 		cancelF()
-		<-toK8SCh
+		if toK8SCh != nil {
+			<-toK8SCh
+		}
 		return 1
 
 	// Unexpected exit
 	case <-toK8SCh:
 		cancelF()
-		<-toConsulCh
+		if toConsulCh != nil {
+			<-toConsulCh
+		}
 		return 1
 
 	// Interrupted, gracefully exit
 	case <-sigCh:
 		cancelF()
-		<-toConsulCh
-		<-toK8SCh
+		if toConsulCh != nil {
+			<-toConsulCh
+		}
+		if toK8SCh != nil {
+			<-toK8SCh
+		}
 		return 0
 	}
 }
