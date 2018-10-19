@@ -25,6 +25,9 @@ spec:
         release: {{ .Release.Name }}
         component: connect-injector
     spec:
+  {{- if not .Values.connectInject.certs.secretName }}
+      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
+  {{- end }}
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
