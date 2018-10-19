@@ -165,3 +165,28 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-auto"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+
+#--------------------------------------------------------------------
+# service account name
+
+@test "connectInject/Deployment: with secretName: no serviceAccountName set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.certs.secretName=foo' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.serviceAccountName | has("serviceAccountName")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: no secretName: serviceAccountName set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.serviceAccountName | contains("connect-injector-webhook-svc-account")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
