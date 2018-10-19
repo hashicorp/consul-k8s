@@ -61,6 +61,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           command:
             - "/bin/sh"
             - "-ec"
@@ -68,6 +72,7 @@ spec:
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
               exec /bin/consul agent \
+                -node="${NODE}" \
                 -advertise="${POD_IP}" \
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
