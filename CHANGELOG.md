@@ -6,6 +6,7 @@ IMPROVEMENTS:
     sync is enabled but can be controlled with `syncCatalog.rbac.enabled`.
     This will create the `ClusterRole` and `ClusterRoleBinding` necessary
     for the catalog sync. [GH-29]
+  * client: agents now have the node name set to the actual K8S node name [GH-14]
 
 BUG FIXES:
 
