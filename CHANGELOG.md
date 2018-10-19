@@ -7,6 +7,9 @@ IMPROVEMENTS:
     This will create the `ClusterRole` and `ClusterRoleBinding` necessary
     for the catalog sync. [GH-29]
   * client: agents now have the node name set to the actual K8S node name [GH-14]
+  * RBAC support for `connectInject`. This will create a `ClusterRole`, `ClusterRoleBinding`,
+    and `ServiceAccount` that is necessary for the connect injector to automatically generate
+    TLS certificates to interact with the Kubernetes API.
 
 BUG FIXES:
 
