@@ -37,8 +37,8 @@ without forcing Consul users to do a full Consul upgrade.
 
 ## Contributing
 
-To build and install Consul ESM locally, you will need to install the
-Docker engine:
+To build and install `consul-k8s` locally, Go version 1.11+ is required because this repository uses go modules. 
+You will also need to install the Docker engine:
 
 - [Docker for Mac](https://docs.docker.com/engine/installation/mac/)
 - [Docker for Windows](https://docs.docker.com/engine/installation/windows/)
@@ -75,4 +75,10 @@ Or to run a specific test in the suite:
 
 ```shell
 go test ./... -run SomeTestFunction_name
+```
+
+To create a docker image with your local changes:
+
+```shell
+$ make dev-docker
 ```
