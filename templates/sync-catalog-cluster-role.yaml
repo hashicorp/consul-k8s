@@ -27,4 +27,11 @@ rules:
       - nodes
     verbs:
       - get
+  - apiGroups: ["policy"]
+    resources:
+      - podsecuritypolicies
+    resourceNames:
+      - {{ template "consul.fullname" . }}-sync-catalog
+    verbs:
+      - use
 {{- end }}

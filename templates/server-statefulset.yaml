@@ -46,6 +46,8 @@ spec:
         {{ tpl .Values.server.affinity . | nindent 8 | trim }}
     {{- end }}
       terminationGracePeriodSeconds: 10
+      serviceAccount: {{ template "consul.fullname" . }}-server
+      serviceAccountName: {{ template "consul.fullname" . }}-server
       securityContext:
         fsGroup: 1000
       volumes:
