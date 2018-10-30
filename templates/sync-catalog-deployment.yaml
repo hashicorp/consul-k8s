@@ -49,6 +49,7 @@ spec:
             - |
               consul-k8s sync-catalog \
                 -http-addr=${HOST_IP}:8500 \
+                -k8s-default-sync={{ .Values.syncCatalog.default }} \
                 {{- if (not .Values.syncCatalog.toConsul) }}
                 -to-consul=false \
                 {{- end }}
