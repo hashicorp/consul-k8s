@@ -69,6 +69,30 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# default sync
+
+@test "syncCatalog/Deployment: default sync is true by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command | any(contains("-k8s-default-sync=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "syncCatalog/Deployment: default sync can be turned off" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.default=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command | any(contains("-k8s-default-sync=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # toConsul and toK8S
 
 @test "syncCatalog/Deployment: bidirectional by default" {
