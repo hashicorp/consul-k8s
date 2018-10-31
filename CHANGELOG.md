@@ -13,6 +13,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 
+  * Add catalog sync default behavior flag to the chart [GH-28]
   * Updated images to point to latest versions for 0.3.0.
   * Add missing continuation characters to long commands [GH-26].
   * connectInject: set the correct namespace for the MutatingWebhookConfiguration
