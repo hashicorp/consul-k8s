@@ -146,6 +146,7 @@ syncCatalog:
   # True if you want to enable the catalog sync. "-" for default.
   enabled: false
   image: null
+  default: true # true will sync by default, otherwise requires annotation
 
   # Enabling rbac will create cluster roles and cluster role bindings to
   # allow the syncCatalog service to communicate with the kubernetes api
