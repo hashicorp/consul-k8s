@@ -23,8 +23,13 @@ type initContainerCommandUpstreamData struct {
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
+	var podName string
+	if podName = pod.Name; podName == "" {
+		podName = strings.Trim(pod.GenerateName, "-")
+	}
+
 	data := initContainerCommandData{
-		PodName:     pod.Name,
+		PodName:     podName,
 		ServiceName: pod.Annotations[annotationService],
 	}
 	if data.ServiceName == "" {
