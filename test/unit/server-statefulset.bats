@@ -11,6 +11,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+
+@test "server/StatefulSet: affinity not set with server.affinity" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.affinity=' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: affinity set with server.affinity as empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.affinity=""' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "server/StatefulSet: enable with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
