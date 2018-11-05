@@ -39,8 +39,8 @@ spec:
     spec:
     {{- if .Values.server.affinity }}
       affinity:
-{{ tpl .Values.server.affinity . | indent 8 }}
-{{- end }}
+      {{ tpl .Values.server.affinity . | indent 8 }}
+    {{- end }}
       terminationGracePeriodSeconds: 10
       securityContext:
         fsGroup: 1000
