@@ -162,6 +162,8 @@ Here are some examples of common test patterns:
     In this case, the same command is run twice in the same test.
     This can be used to look for several things in the same field, or to check that something is not present that shouldn't be.
 
+    *Note:* If testing more than two conditions, it would be good to separate the `helm template` part of the command from the `yq` sections to reduce redundant work.
+
 - Check that an entire template file is not rendered
     ```
     @test "syncCatalog/Deployment: disabled by default" {
