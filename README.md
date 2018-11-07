@@ -80,9 +80,9 @@ Changes to the Helm chart should be accompanied by appropriate unit tests.
     # annotations
     ```
 
-- Name the test based on what it's testing in the following format:
+- Name the test based on what it's testing in the following format (this will be its first line):
     ```
-    { section being tested }: { short description of the test case }
+    @test "<section being tested>: <short description of the test case>" {
     ```
 
     When adding tests to an existing file, the first section will be the same as the other tests in the file.
@@ -95,7 +95,8 @@ In this way, we're able to test that the various conditionals in the templates r
 
 Each test defines the files that should be rendered using the `-x` flag, then it might adjust chart values by adding `--set` flags as well.
 The output from this `helm template` command is then piped to [yq](https://pypi.org/project/yq/). 
-`yq` allows us to pull out just the information we're interested in, either by referencing its position in the yaml file directly or giving information about it (like its length).
+`yq` allows us to pull out just the information we're interested in, either by referencing its position in the yaml file directly or giving information about it (like its length). 
+The `-r` flag can be used with `yq` to return a raw string instead of a quoted one which is especially useful when looking for an exact match.
 
 The test passes or fails based on the conditional at the end that is in square brackets, which is a comparison of our expected value and the output of  `helm template` piped to `yq`.
 
@@ -119,7 +120,7 @@ Here are some examples of common test patterns:
     ```
 
     In this example, nothing is changed from the default templates (no `--set` flags), then we use `yq` to retrieve the value we're checking, `.spec.type`.
-    This output is then compared against our expected value (`null` in this case) in the assertion `[ "${actual}" = "null" ]`
+    This output is then compared against our expected value (`null` in this case) in the assertion `[ "${actual}" = "null" ]`.
 
 
 - Check that a template value is rendered to a specific value
@@ -137,7 +138,7 @@ Here are some examples of common test patterns:
 
     This is very similar to the last example, except we've changed a default value with the `--set` flag and correspondingly changed the expected value.
 
- - Check that a template value contains several values
+- Check that a template value contains several values
     ```
     @test "syncCatalog/Deployment: to-k8s only" {
       cd `chart_dir`
