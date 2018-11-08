@@ -93,6 +93,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# affinity
+
+@test "server/StatefulSet: affinity not set with server.affinity" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.affinity=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: affinity set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity | .podAntiAffinity? != null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # extraVolumes
 
 @test "server/StatefulSet: adds extra volume" {
