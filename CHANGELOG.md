@@ -10,6 +10,8 @@ IMPROVEMENTS:
   * RBAC support for `connectInject`. This will create a `ClusterRole`, `ClusterRoleBinding`,
     and `ServiceAccount` that is necessary for the connect injector to automatically generate
     TLS certificates to interact with the Kubernetes API.
+  * Server affinity is now configurable. This makes it easier to run an entire
+    Consul cluster on Minikube. [GH-13]
 
 BUG FIXES:
 
