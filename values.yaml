@@ -16,12 +16,12 @@ global:
 
   # Image is the name (and tag) of the Consul Docker image for clients and
   # servers below. This can be overridden per component.
-  image: "consul:1.2.3"
+  image: "consul:1.3.0"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
   # per component below.
-  imageK8S: "hashicorp/consul-k8s:0.1.0"
+  imageK8S: "hashicorp/consul-k8s:0.2.1"
 
   # Datacenter is the name of the datacenter that the agents should register
   # as. This shouldn't be changed once the Consul cluster is up and running
@@ -67,7 +67,7 @@ server:
     maxUnavailable: null
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
@@ -100,13 +100,17 @@ client:
   image: null
   join: null
 
+  # grpc should be set to true if the gRPC listener should be enabled.
+  # This should be set to true if connectInject is enabled.
+  grpc: false
+
   # Resource requests, limits, etc. for the client cluster placement. This
   # should map directly to the value of the resources field for a PodSpec.
   # By default no direct resource request is made.
   resources: {}
 
   # extraConfig is a raw string of extra configuration to set with the
-  # server. This should be JSON or HCL.
+  # server. This should be JSON.
   extraConfig: |
     {}
 
@@ -155,6 +159,13 @@ syncCatalog:
   # True if you want to enable the catalog sync. "-" for default.
   enabled: false
   image: null
+  default: true # true will sync by default, otherwise requires annotation
+
+  # Enabling rbac will create cluster roles and cluster role bindings to
+  # allow the syncCatalog service to communicate with the kubernetes api
+  # to get/create services.
+  rbac:
+    enabled: true
 
   # toConsul and toK8S control whether syncing is enabled to Consul or K8S
   # as a destination. If both of these are disabled, the sync will do nothing.
@@ -168,10 +179,16 @@ syncCatalog:
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
-  enabled: false # "-" disable this by default for now until the image is public
-  image: "TODO"
+  enabled: false
+  image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
-  caBundle: "" # empty will auto generate the bundle
+
+  # imageConsul and imageEnvoy can be set to Docker images for Consul and
+  # Envoy, respectively. If the Consul image is not specified, the global
+  # default will be used. If the Envoy image is not specified, an early
+  # version of Envoy will be used.
+  imageConsul: null
+  imageEnvoy: null
 
   # namespaceSelector is the selector for restricting the webhook to only
   # specific namespaces. This should be set to a multiline string.
@@ -186,7 +203,8 @@ connectInject:
   certs:
     # secretName is the name of the secret that has the TLS certificate and
     # private key to serve the injector webhook. If this is null, then the
-    # injector will default to its automatic management mode.
+    # injector will default to its automatic management mode that will assign
+    # a service account to the injector to generate its own certificates.
     secretName: null
 
     # caBundle is a base64-encoded PEM-encoded certificate bundle for the
