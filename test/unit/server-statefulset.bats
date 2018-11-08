@@ -11,27 +11,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-
-@test "server/StatefulSet: affinity not set with server.affinity" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-statefulset.yaml  \
-      --set 'server.affinity=' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: affinity set with server.affinity as empty" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-statefulset.yaml  \
-      --set 'server.affinity=""' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "server/StatefulSet: enable with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -111,6 +90,28 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.updateStrategy.rollingUpdate.partition' | tee /dev/stderr)
   [ "${actual}" = "2" ]
+}
+
+#--------------------------------------------------------------------
+# affinity
+
+@test "server/StatefulSet: affinity not set with server.affinity" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.affinity=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: affinity set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity | .podAntiAffinity? != null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
