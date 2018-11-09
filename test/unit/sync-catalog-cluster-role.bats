@@ -11,47 +11,43 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: enable with global.enabled false" {
+@test "sync/ClusterRole: disabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-cluster-role.yaml  \
       --set 'global.enabled=false' \
-      --set 'syncCatalog.enabled=true' \
-      --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
-      yq -s 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: disable with syncCatalog.enabled" {
+@test "sync/ClusterRole: disabled with sync disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-cluster-role.yaml  \
       --set 'syncCatalog.enabled=false' \
-      --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: disable with rbac.enabled" {
+@test "sync/ClusterRole: enabled with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-cluster-role.yaml  \
       --set 'syncCatalog.enabled=true' \
-      --set 'syncCatalog.rbac.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
-@test "sync/ClusterRole: disable with global.enabled" {
+@test "sync/ClusterRole: enabled with sync enabled and global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-cluster-role.yaml  \
       --set 'global.enabled=false' \
-      --set 'syncCatalog.rbac.enabled="-"' \
+      --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      yq -s 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
