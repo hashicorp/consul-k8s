@@ -1,6 +1,5 @@
-{{- $rbacEnabled := (or (and (ne (.Values.syncCatalog.rbac.enabled | toString) "-") .Values.syncCatalog.rbac.enabled) (and (eq (.Values.syncCatalog.rbac.enabled | toString) "-") .Values.global.enabled)) }}
 {{- $syncEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if (and $rbacEnabled $syncEnabled) }}
+{{- if $syncEnabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
