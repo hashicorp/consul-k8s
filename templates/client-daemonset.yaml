@@ -89,7 +89,7 @@ spec:
                 -data-dir=/consul/data \
                 {{- if (.Values.client.join) and (gt (len .Values.client.join) 0) }}
                 {{- range $value := .Values.client.join }}
-                -retry-join={{ $value }} \
+                -retry-join="{{ $value }}" \
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
