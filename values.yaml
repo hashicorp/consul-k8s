@@ -161,12 +161,6 @@ syncCatalog:
   image: null
   default: true # true will sync by default, otherwise requires annotation
 
-  # Enabling rbac will create cluster roles and cluster role bindings to
-  # allow the syncCatalog service to communicate with the kubernetes api
-  # to get/create services.
-  rbac:
-    enabled: true
-
   # toConsul and toK8S control whether syncing is enabled to Consul or K8S
   # as a destination. If both of these are disabled, the sync will do nothing.
   toConsul: true
