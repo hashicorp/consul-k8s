@@ -146,6 +146,8 @@ spec:
             periodSeconds: 3
             successThreshold: 1
             timeoutSeconds: 5
+          resources:
+{{ toYaml .Values.server.resources | indent 12 }}
   volumeClaimTemplates:
     - metadata:
         name: data
