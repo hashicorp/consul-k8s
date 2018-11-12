@@ -20,6 +20,7 @@ BUG FIXES:
   * Add missing continuation characters to long commands [GH-26].
   * connectInject: set the correct namespace for the MutatingWebhookConfiguration
     so that deployments work in non-default namespaces. [GH-41]
+  * Provide a valid `maxUnavailable` value when replicas=1. [GH-58]
 
 ## 0.3.0 (October 11, 2018)
 
