@@ -335,6 +335,33 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"basic pod, with unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									ContainerPort: 8080,
+								},
+							},
+						},
+
+						corev1.Container{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				annotationService: "web",
+				annotationPort:    "8080",
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {
@@ -356,6 +383,93 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				actual = nil
 			}
 			require.Equal(actual, tt.Expected)
+		})
+	}
+}
+
+// Test portValue function
+func TestHandlerPortValue(t *testing.T) {
+	cases := []struct {
+		Name     string
+		Pod      *corev1.Pod
+		Value    string
+		Expected int32
+		Err      string
+	}{
+		{
+			"empty",
+			&corev1.Pod{},
+			"",
+			0,
+			"strconv.ParseInt: parsing \"\": invalid syntax",
+		},
+
+		{
+			"basic pod, with ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+							},
+						},
+
+						corev1.Container{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			"http",
+			int32(8080),
+			"",
+		},
+
+		{
+			"basic pod, with unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									ContainerPort: 8080,
+								},
+							},
+						},
+
+						corev1.Container{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			"8080",
+			int32(8080),
+			"",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			port, err := portValue(tt.Pod, tt.Value)
+			if (tt.Err != "") != (err != nil) {
+				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
+			}
+			if tt.Err != "" {
+				require.Contains(err.Error(), tt.Err)
+				return
+			}
+
+			require.Equal(port, tt.Expected)
 		})
 	}
 }
