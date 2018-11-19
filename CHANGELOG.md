@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+Bug fixes:
+
+* Allow unnamed container ports to be used in connect-inject default
+  annotations.
+
 ## 0.2.1 (October 26, 2018)
 
 Bug fixes:
