@@ -279,7 +279,11 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 	if _, ok := pod.ObjectMeta.Annotations[annotationPort]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
-				pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
+				if ps[0].Name != "" {
+					pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
+				} else {
+					pod.ObjectMeta.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
+				}
 			}
 		}
 	}
