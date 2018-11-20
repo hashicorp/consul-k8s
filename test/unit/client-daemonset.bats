@@ -95,6 +95,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# resources
+
+@test "client/DaemonSet: no resources defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "client/DaemonSet: resources can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.resources=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+}
+
+#--------------------------------------------------------------------
 # extraVolumes
 
 @test "client/DaemonSet: adds extra volume" {
