@@ -10,6 +10,7 @@ IMPROVEMENTS:
     TLS certificates to interact with the Kubernetes API.
   * Server affinity is now configurable. This makes it easier to run an entire
     Consul cluster on Minikube. [GH-13]
+  * Liveness probes are now http calls, reducing errors in the logs.
 
 BUG FIXES:
 
