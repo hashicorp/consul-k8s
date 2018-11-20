@@ -14,11 +14,12 @@ import (
 // Source is the source for the sync that watches Consul services and
 // updates a Sink whenever the set of services to register changes.
 type Source struct {
-	Client *api.Client  // Consul API client
-	Domain string       // Consul DNS domain
-	Sink   Sink         // Sink is the sink to update with services
-	Prefix string       // Prefix is a prefix to prepend to services
-	Log    hclog.Logger // Logger
+	Client     *api.Client  // Consul API client
+	Domain     string       // Consul DNS domain
+	Datacenter string       // Consul Datacenter
+	Sink       Sink         // Sink is the sink to update with services
+	Prefix     string       // Prefix is a prefix to prepend to services
+	Log        hclog.Logger // Logger
 }
 
 // Run is the long-running runloop for watching Consul services and
@@ -26,6 +27,7 @@ type Source struct {
 func (s *Source) Run(ctx context.Context) {
 	opts := (&api.QueryOptions{
 		AllowStale: true,
+		Datacenter: s.Datacenter,
 		WaitIndex:  1,
 		WaitTime:   1 * time.Minute,
 	}).WithContext(ctx)

@@ -33,6 +33,7 @@ type Command struct {
 	flagToConsul           bool
 	flagToK8S              bool
 	flagConsulDomain       string
+	flagConsulDatacenter   string
 	flagK8SDefault         bool
 	flagK8SServicePrefix   string
 	flagK8SSourceNamespace string
@@ -69,6 +70,9 @@ func (c *Command) init() {
 		"The interval to perform syncing operations creating Consul services. "+
 			"All changes are merged and write calls are only made on this "+
 			"interval. Defaults to 30 seconds.")
+	c.flags.StringVar(&c.flagConsulDatacenter, "consul-datacenter", "",
+		"The Consul datacenter to query for Consul services when writing "+
+			"to Kubernetes. Defaults to the datacenter of the agent.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -157,11 +161,12 @@ func (c *Command) Run(args []string) int {
 		}
 
 		source := &catalogFromConsul.Source{
-			Client: consulClient,
-			Domain: c.flagConsulDomain,
-			Sink:   sink,
-			Prefix: c.flagK8SServicePrefix,
-			Log:    hclog.Default().Named("to-k8s/source"),
+			Client:     consulClient,
+			Domain:     c.flagConsulDomain,
+			Sink:       sink,
+			Prefix:     c.flagK8SServicePrefix,
+			Datacenter: c.flagConsulDatacenter,
+			Log:        hclog.Default().Named("to-k8s/source"),
 		}
 		go source.Run(ctx)
 

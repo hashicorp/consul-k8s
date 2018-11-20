@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestSource_initServices(t *testing.T) {
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
 	require.NoError(err)
 
-	_, sink, closer := testSource(t, client)
+	_, sink, closer := testSource(t, client, "")
 	defer closer()
 
 	var actual map[string]string
@@ -53,6 +54,61 @@ func TestSource_initServices(t *testing.T) {
 	require.Equal(expected, actual)
 }
 
+// Test that the source works with services registered from the non-default
+// datacenter
+func TestSource_initServicesNonDefaultDatacenter(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a1 := agent.NewTestAgent(t.Name(), `
+		datacenter = "dc1"	
+	`)
+	defer a1.Shutdown()
+	testrpc.WaitForTestAgent(t, a1.RPC, "dc1")
+	client1 := a1.Client()
+
+	a2 := agent.NewTestAgent(t.Name(), `
+		datacenter = "dc2"	
+	`)
+	defer a2.Shutdown()
+	testrpc.WaitForTestAgent(t, a2.RPC, "dc2")
+	client2 := a2.Client()
+
+	addr := fmt.Sprintf("127.0.0.1:%d", a1.Config.SerfPortWAN)
+	if _, err := a2.JoinWAN([]string{addr}); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	testrpc.WaitForLeader(t, a1.RPC, "dc1")
+	testrpc.WaitForLeader(t, a2.RPC, "dc2")
+
+	// Create services before the source is running
+	_, err := client1.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	require.NoError(err)
+	_, err = client2.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
+	require.NoError(err)
+
+	// configure source to only query for services in dc2
+	_, sink, closer := testSource(t, client1, "dc2")
+	defer closer()
+
+	var actual map[string]string
+	retry.Run(t, func(r *retry.R) {
+		sink.Lock()
+		defer sink.Unlock()
+		actual = sink.Services
+		if len(actual) == 0 {
+			r.Fatal("services not found")
+		}
+	})
+
+	// Only dc2 services should be present
+	expected := map[string]string{
+		"consul": "consul.service.test",
+		"svcB":   "svcB.service.test",
+	}
+	require.Equal(expected, actual)
+}
+
 // Test that we can specify a prefix to prepend to all destination services.
 func TestSource_prefix(t *testing.T) {
 	t.Parallel()
@@ -63,7 +119,7 @@ func TestSource_prefix(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	src, sink, closer := testSource(t, client)
+	src, sink, closer := testSource(t, client, "")
 	src.Prefix = "foo-" // This is a race, we should fix this, but test only
 	defer closer()
 
@@ -111,7 +167,7 @@ func TestSource_ignoreK8S(t *testing.T) {
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{fromk8s.ConsulK8STag}), nil)
 	require.NoError(err)
 
-	_, sink, closer := testSource(t, client)
+	_, sink, closer := testSource(t, client, "")
 	defer closer()
 
 	var actual map[string]string
@@ -149,7 +205,7 @@ func TestSource_deleteService(t *testing.T) {
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
 	require.NoError(err)
 
-	_, sink, closer := testSource(t, client)
+	_, sink, closer := testSource(t, client, "")
 	defer closer()
 
 	var actual map[string]string
@@ -205,7 +261,7 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", nil), nil)
 	require.NoError(err)
 
-	_, sink, closer := testSource(t, client)
+	_, sink, closer := testSource(t, client, "")
 	defer closer()
 
 	var actual map[string]string
@@ -246,13 +302,14 @@ func testRegistration(node, service string, tags []string) *api.CatalogRegistrat
 }
 
 // testSource creates a Source and Sink for testing.
-func testSource(t *testing.T, client *api.Client) (*Source, *TestSink, func()) {
+func testSource(t *testing.T, client *api.Client, datacenter string) (*Source, *TestSink, func()) {
 	sink := &TestSink{}
 	s := &Source{
-		Client: client,
-		Domain: "test",
-		Sink:   sink,
-		Log:    hclog.Default(),
+		Client:     client,
+		Datacenter: datacenter,
+		Domain:     "test",
+		Sink:       sink,
+		Log:        hclog.Default(),
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())
