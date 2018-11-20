@@ -42,6 +42,9 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+#--------------------------------------------------------------------
+# image
+
 @test "server/StatefulSet: image defaults to global.image" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -64,7 +67,29 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# updateStrategy
+# resources
+
+@test "server/StatefulSet: no resources defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: resources can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.resources=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+}
+
+#--------------------------------------------------------------------
+# updateStrategy (derived from updatePartition)
 
 @test "server/StatefulSet: no updateStrategy when not updating" {
   cd `chart_dir`
@@ -93,25 +118,25 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# affinity
+# storageClass
 
-@test "server/StatefulSet: affinity not set with server.affinity" {
+@test "server/StatefulSet: no storageClass on claim by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
-      --set 'server.affinity=null' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.spec.volumeClaimTemplates[0].spec.storageClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
-@test "server/StatefulSet: affinity set by default" {
+@test "server/StatefulSet: can set storageClass" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
+      --set 'server.storageClass=foo' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.affinity | .podAntiAffinity? != null' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      yq -r '.spec.volumeClaimTemplates[0].spec.storageClassName' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
 }
 
 #--------------------------------------------------------------------
@@ -220,25 +245,23 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# updateStrategy
+# affinity
 
-@test "server/StatefulSet: no storageClass on claim by default" {
+@test "server/StatefulSet: affinity not set with server.affinity=null" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.affinity=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: affinity set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.volumeClaimTemplates[0].spec.storageClassName' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq '.spec.template.spec.affinity | .podAntiAffinity? != null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
-
-
-@test "server/StatefulSet: can set storageClass" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-statefulset.yaml  \
-      --set 'server.storageClass=foo' \
-      . | tee /dev/stderr |
-      yq -r '.spec.volumeClaimTemplates[0].spec.storageClassName' | tee /dev/stderr)
-  [ "${actual}" = "foo" ]
-}
-

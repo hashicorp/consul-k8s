@@ -146,8 +146,10 @@ spec:
             periodSeconds: 3
             successThreshold: 1
             timeoutSeconds: 5
+          {{- if .Values.server.resources }}
           resources:
-{{ toYaml .Values.server.resources | indent 12 }}
+            {{ tpl .Values.server.resources . | nindent 12 | trim }}
+          {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data
