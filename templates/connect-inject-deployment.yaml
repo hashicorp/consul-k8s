@@ -57,8 +57,10 @@ spec:
                 -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc
 {{- end }}
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health/ready
               port: 8080
+              scheme: HTTPS
             failureThreshold: 2
             initialDelaySeconds: 1
             periodSeconds: 2
