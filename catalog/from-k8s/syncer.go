@@ -213,7 +213,6 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 
 		// Wait for our poll period
 		case <-time.After(s.SyncPeriod):
-		default:
 		}
 
 		// Wait for service changes
