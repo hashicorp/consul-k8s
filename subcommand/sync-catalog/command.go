@@ -44,6 +44,7 @@ type Command struct {
 	flagConsulWritePeriod     flags.DurationValue
 	flagSyncClusterIPServices bool
 	flagNodePortSyncType      string
+	flagLogLevel              string
 
 	consulClient *api.Client
 
@@ -86,6 +87,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagNodePortSyncType, "node-port-sync-type", "ExternalOnly",
 		"Defines the type of sync for NodePort services. Valid options are ExternalOnly, "+
 			"InternalOnly and ExternalFirst.")
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -125,6 +129,16 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	level := hclog.LevelFromString(c.flagLogLevel)
+	if level == hclog.NoLevel {
+		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+		return 1
+	}
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level:  level,
+		Output: os.Stderr,
+	})
+
 	// Get the sync interval
 	var syncInterval time.Duration
 	c.flagConsulWritePeriod.Merge(&syncInterval)
@@ -138,7 +152,7 @@ func (c *Command) Run(args []string) int {
 		// Build the Consul sync and start it
 		syncer := &catalogFromK8S.ConsulSyncer{
 			Client:            c.consulClient,
-			Log:               hclog.Default().Named("to-consul/sink"),
+			Log:               logger.Named("to-consul/sink"),
 			Namespace:         c.flagK8SSourceNamespace,
 			SyncPeriod:        syncInterval,
 			ServicePollPeriod: syncInterval * 2,
@@ -148,9 +162,9 @@ func (c *Command) Run(args []string) int {
 
 		// Build the controller and start it
 		ctl := &controller.Controller{
-			Log: hclog.Default().Named("to-consul/controller"),
+			Log: logger.Named("to-consul/controller"),
 			Resource: &catalogFromK8S.ServiceResource{
-				Log:            hclog.Default().Named("to-consul/source"),
+				Log:            logger.Named("to-consul/source"),
 				Client:         clientset,
 				Syncer:         syncer,
 				Namespace:      c.flagK8SSourceNamespace,
@@ -174,7 +188,7 @@ func (c *Command) Run(args []string) int {
 		sink := &catalogFromConsul.K8SSink{
 			Client:    clientset,
 			Namespace: c.flagK8SWriteNamespace,
-			Log:       hclog.Default().Named("to-k8s/sink"),
+			Log:       logger.Named("to-k8s/sink"),
 		}
 
 		source := &catalogFromConsul.Source{
@@ -182,14 +196,14 @@ func (c *Command) Run(args []string) int {
 			Domain:       c.flagConsulDomain,
 			Sink:         sink,
 			Prefix:       c.flagK8SServicePrefix,
-			Log:          hclog.Default().Named("to-k8s/source"),
+			Log:          logger.Named("to-k8s/source"),
 			ConsulK8STag: c.flagConsulK8STag,
 		}
 		go source.Run(ctx)
 
 		// Build the controller and start it
 		ctl := &controller.Controller{
-			Log:      hclog.Default().Named("to-k8s/controller"),
+			Log:      logger.Named("to-k8s/controller"),
 			Resource: sink,
 		}
 
