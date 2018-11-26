@@ -19,13 +19,14 @@ type Source struct {
 	Sink   Sink         // Sink is the sink to update with services
 	Prefix string       // Prefix is a prefix to prepend to services
 	Log    hclog.Logger // Logger
+	Stale  bool         // Stale enables stale reads from Consul servers
 }
 
 // Run is the long-running runloop for watching Consul services and
 // updating the Sink.
 func (s *Source) Run(ctx context.Context) {
 	opts := (&api.QueryOptions{
-		AllowStale: true,
+		AllowStale: s.Stale,
 		WaitIndex:  1,
 		WaitTime:   1 * time.Minute,
 	}).WithContext(ctx)

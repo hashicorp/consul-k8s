@@ -59,6 +59,9 @@ type ConsulSyncer struct {
 	SyncPeriod        time.Duration
 	ServicePollPeriod time.Duration
 
+	// Stale enables stale reads from Consul servers
+	Stale bool
+
 	lock     sync.Mutex
 	once     sync.Once
 	services map[string]struct{} // set of valid service names
@@ -131,7 +134,7 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 // deletion.
 func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 	opts := api.QueryOptions{
-		AllowStale: true,
+		AllowStale: s.Stale,
 		WaitIndex:  1,
 		WaitTime:   1 * time.Minute,
 	}
@@ -221,7 +224,7 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		err := backoff.Retry(func() error {
 			var err error
 			services, _, err = s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
-				AllowStale: true,
+				AllowStale: s.Stale,
 			})
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
@@ -270,7 +273,7 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 // Precondition: lock must be held
 func (s *ConsulSyncer) scheduleReapServiceLocked(name string) error {
 	services, _, err := s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
-		AllowStale: true,
+		AllowStale: s.Stale,
 	})
 	if err != nil {
 		return err

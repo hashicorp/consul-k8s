@@ -125,6 +125,7 @@ func (c *Command) Run(args []string) int {
 			Namespace:         c.flagK8SSourceNamespace,
 			SyncPeriod:        syncInterval,
 			ServicePollPeriod: syncInterval * 2,
+			Stale:             c.http.Stale(),
 		}
 		go syncer.Run(ctx)
 
@@ -162,6 +163,7 @@ func (c *Command) Run(args []string) int {
 			Sink:   sink,
 			Prefix: c.flagK8SServicePrefix,
 			Log:    hclog.Default().Named("to-k8s/source"),
+			Stale:  c.http.Stale(),
 		}
 		go source.Run(ctx)
 
