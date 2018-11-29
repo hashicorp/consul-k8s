@@ -6,6 +6,10 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
+const (
+	TestConsulK8STag = "k8s"
+)
+
 // TestSyncer implements Syncer for tests, giving easy access to the
 // set of registrations.
 type TestSyncer struct {
