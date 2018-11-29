@@ -25,9 +25,6 @@ const (
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
 	ConsulK8SNS = "external-k8s-ns"
-
-	// ConsulK8STag is the tag value for services registered.
-	ConsulK8STag = "k8s"
 )
 
 type NodePortSyncType string
@@ -52,6 +49,9 @@ type ServiceResource struct {
 	Client    kubernetes.Interface
 	Syncer    Syncer
 	Namespace string // K8S namespace to watch
+
+	// ConsulK8STag is the tag value for services registered.
+	ConsulK8STag string
 
 	// ExplictEnable should be set to true to require explicit enabling
 	// using annotations. If this is false, then services are implicitly
@@ -260,7 +260,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	baseService := consulapi.AgentService{
 		Service: svc.Name,
-		Tags:    []string{ConsulK8STag},
+		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
 			ConsulK8SNS:     t.namespace(),

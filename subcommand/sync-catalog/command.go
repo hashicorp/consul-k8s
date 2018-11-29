@@ -33,6 +33,7 @@ type Command struct {
 	flagToConsul              bool
 	flagToK8S                 bool
 	flagConsulDomain          string
+	flagConsulK8STag          string
 	flagK8SDefault            bool
 	flagK8SServicePrefix      string
 	flagK8SSourceNamespace    string
@@ -67,6 +68,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagConsulDomain, "consul-domain", "consul",
 		"The domain for Consul services to use when writing services to "+
 			"Kubernetes. Defaults to consul.")
+	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
+		"Tag value for K8S services registered in Consul")
 	c.flags.Var(&c.flagConsulWritePeriod, "consul-write-interval",
 		"The interval to perform syncing operations creating Consul services. "+
 			"All changes are merged and write calls are only made on this "+
@@ -133,6 +136,7 @@ func (c *Command) Run(args []string) int {
 			Namespace:         c.flagK8SSourceNamespace,
 			SyncPeriod:        syncInterval,
 			ServicePollPeriod: syncInterval * 2,
+			ConsulK8STag:      c.flagConsulK8STag,
 		}
 		go syncer.Run(ctx)
 
@@ -147,6 +151,7 @@ func (c *Command) Run(args []string) int {
 				ExplicitEnable: !c.flagK8SDefault,
 				ClusterIPSync:  c.flagSyncClusterIPServices,
 				NodePortSync:   catalogFromK8S.NodePortSyncType(c.flagNodePortSyncType),
+				ConsulK8STag:   c.flagConsulK8STag,
 			},
 		}
 
@@ -167,11 +172,12 @@ func (c *Command) Run(args []string) int {
 		}
 
 		source := &catalogFromConsul.Source{
-			Client: consulClient,
-			Domain: c.flagConsulDomain,
-			Sink:   sink,
-			Prefix: c.flagK8SServicePrefix,
-			Log:    hclog.Default().Named("to-k8s/source"),
+			Client:       consulClient,
+			Domain:       c.flagConsulDomain,
+			Sink:         sink,
+			Prefix:       c.flagK8SServicePrefix,
+			Log:          hclog.Default().Named("to-k8s/source"),
+			ConsulK8STag: c.flagConsulK8STag,
 		}
 		go source.Run(ctx)
 
