@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	fromk8s "github.com/hashicorp/consul-k8s/catalog/from-k8s"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
@@ -14,11 +13,12 @@ import (
 // Source is the source for the sync that watches Consul services and
 // updates a Sink whenever the set of services to register changes.
 type Source struct {
-	Client *api.Client  // Consul API client
-	Domain string       // Consul DNS domain
-	Sink   Sink         // Sink is the sink to update with services
-	Prefix string       // Prefix is a prefix to prepend to services
-	Log    hclog.Logger // Logger
+	Client       *api.Client  // Consul API client
+	Domain       string       // Consul DNS domain
+	Sink         Sink         // Sink is the sink to update with services
+	Prefix       string       // Prefix is a prefix to prepend to services
+	Log          hclog.Logger // Logger
+	ConsulK8STag string       // The tag value for services registered
 }
 
 // Run is the long-running runloop for watching Consul services and
@@ -62,7 +62,7 @@ func (s *Source) Run(ctx context.Context) {
 			// check here.
 			k8s := false
 			for _, t := range tags {
-				if t == fromk8s.ConsulK8STag {
+				if t == s.ConsulK8STag {
 					k8s = true
 					break
 				}

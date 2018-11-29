@@ -59,6 +59,9 @@ type ConsulSyncer struct {
 	SyncPeriod        time.Duration
 	ServicePollPeriod time.Duration
 
+	// ConsulK8STag is the tag value for services registered.
+	ConsulK8STag string
+
 	lock     sync.Mutex
 	once     sync.Once
 	services map[string]struct{} // set of valid service names
@@ -175,7 +178,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		// Go through the service map and find services that should be reaped
 		for name, tags := range serviceMap {
 			for _, tag := range tags {
-				if tag == ConsulK8STag {
+				if tag == s.ConsulK8STag {
 					// We only care if we don't know about this service at all.
 					if _, ok := s.services[name]; ok {
 						continue
@@ -220,7 +223,7 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		var services []*api.CatalogService
 		err := backoff.Retry(func() error {
 			var err error
-			services, _, err = s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
+			services, _, err = s.Client.Catalog().Service(name, s.ConsulK8STag, &api.QueryOptions{
 				AllowStale: true,
 			})
 			return err
@@ -269,7 +272,7 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 //
 // Precondition: lock must be held
 func (s *ConsulSyncer) scheduleReapServiceLocked(name string) error {
-	services, _, err := s.Client.Catalog().Service(name, ConsulK8STag, &api.QueryOptions{
+	services, _, err := s.Client.Catalog().Service(name, s.ConsulK8STag, &api.QueryOptions{
 		AllowStale: true,
 	})
 	if err != nil {

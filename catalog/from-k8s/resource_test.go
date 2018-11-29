@@ -463,9 +463,10 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		ConsulK8STag: TestConsulK8STag,
 	})
 	defer closer()
 
