@@ -33,9 +33,7 @@ spec:
         {{- end }}
     spec:
       terminationGracePeriodSeconds: 10
-      serviceAccount: {{ template "consul.fullname" . }}
-      serviceAccountName: {{ template "consul.fullname" . }}
-      securityContext: {}
+      serviceAccountName: {{ template "consul.fullname" . }}-client
 
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}

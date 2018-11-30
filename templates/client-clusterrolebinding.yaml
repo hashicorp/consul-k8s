@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ template "consul.fullname" . }}
+  name: {{ template "consul.fullname" . }}-client
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -11,9 +11,9 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ template "consul.fullname" . }}
+  name: {{ template "consul.fullname" . }}-client
 subjects:
   - kind: ServiceAccount
-    name: {{ template "consul.fullname" . }}
+    name: {{ template "consul.fullname" . }}-client
     namespace: {{ .Release.Namespace }}
 {{- end }}
