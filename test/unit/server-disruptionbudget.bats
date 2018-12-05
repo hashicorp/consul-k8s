@@ -55,16 +55,6 @@ load _helpers
 #--------------------------------------------------------------------
 # maxUnavailable
 
-@test "server/DisruptionBudget: correct maxUnavailable with replicas=3" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-disruptionbudget.yaml  \
-      --set 'server.replicas=3' \
-      . | tee /dev/stderr |
-      yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "0" ]
-}
-
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=1" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -75,7 +65,63 @@ load _helpers
   [ "${actual}" = "0" ]
 }
 
-# Note: It is not possible to test anything but the default behavior of the
-# maxUnavailable definition in the _helpers.tpl with the current test setup
-# because the `--set` flag overrides values AFTER they're been run through
-# the helper functions.
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=3" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=4" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=4' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=5" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=5' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=6" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=6' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "2" ]
+}
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=7" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=7' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "2" ]
+}
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=8" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=8' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "3" ]
+}
