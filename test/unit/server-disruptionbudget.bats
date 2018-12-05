@@ -75,7 +75,7 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=4" {
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=4" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -86,7 +86,7 @@ load _helpers
 }
 
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=5" {
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=5" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -96,7 +96,7 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=6" {
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=6" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -106,7 +106,7 @@ load _helpers
   [ "${actual}" = "2" ]
 }
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=7" {
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=7" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -116,7 +116,7 @@ load _helpers
   [ "${actual}" = "2" ]
 }
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=8" {
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=8" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
