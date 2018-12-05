@@ -89,7 +89,7 @@ spec:
                 -data-dir=/consul/data \
                 {{- if (.Values.client.join) and (gt (len .Values.client.join) 0) }}
                 {{- range $value := .Values.client.join }}
-                -retry-join={{ $value }} \
+                -retry-join="{{ $value }}" \
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
@@ -145,6 +145,8 @@ spec:
                 - |
                   curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | \
                   grep -E '".+"'
+          {{- if .Values.client.resources }}
           resources:
-{{ toYaml .Values.client.resources | indent 12 }}
+            {{ tpl .Values.client.resources . | nindent 12 | trim }}
+          {{- end }}
 {{- end }}

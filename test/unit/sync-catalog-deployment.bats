@@ -177,12 +177,11 @@ load _helpers
 #--------------------------------------------------------------------
 # serviceAccount
 
-@test "syncCatalog/Deployment: serviceAccount set with rbac.enabled" {
+@test "syncCatalog/Deployment: serviceAccount set when sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
-      --set 'syncCatalog.rbac.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.serviceAccountName | contains("sync-catalog")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
