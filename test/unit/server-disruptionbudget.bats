@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/DisruptionBudget: enable with global.enabled false" {
+@test "server/DisruptionBudget: enabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/DisruptionBudget: disable with server.enabled" {
+@test "server/DisruptionBudget: disabled with server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -32,7 +32,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/DisruptionBudget: disable with server.disruptionBudget.enabled" {
+@test "server/DisruptionBudget: disabled with server.disruptionBudget.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -42,7 +42,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/DisruptionBudget: disable with global.enabled" {
+@test "server/DisruptionBudget: disabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \
@@ -52,7 +52,20 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/DisruptionBudget: correct maxUnavailable with n=3" {
+#--------------------------------------------------------------------
+# maxUnavailable
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=1" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=1' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=3" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-disruptionbudget.yaml  \

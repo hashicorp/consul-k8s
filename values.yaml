@@ -48,9 +48,10 @@ server:
   connect: true
 
   # Resource requests, limits, etc. for the server cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec.
-  # By default no direct resource request is made.
-  resources: {}
+  # should map directly to the value of the resources field for a PodSpec,
+  # formatted as a multi-line string. By default no direct resource request
+  # is made.
+  resources: null
 
   # updatePartition is used to control a careful rolling update of Consul
   # servers. This should be done particularly when changing the version
@@ -105,9 +106,10 @@ client:
   grpc: false
 
   # Resource requests, limits, etc. for the client cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec.
-  # By default no direct resource request is made.
-  resources: {}
+  # should map directly to the value of the resources field for a PodSpec,
+  # formatted as a multi-line string. By default no direct resource request
+  # is made.
+  resources: null
 
   # extraConfig is a raw string of extra configuration to set with the
   # server. This should be JSON.
@@ -160,12 +162,6 @@ syncCatalog:
   enabled: false
   image: null
   default: true # true will sync by default, otherwise requires annotation
-
-  # Enabling rbac will create cluster roles and cluster role bindings to
-  # allow the syncCatalog service to communicate with the kubernetes api
-  # to get/create services.
-  rbac:
-    enabled: true
 
   # toConsul and toK8S control whether syncing is enabled to Consul or K8S
   # as a destination. If both of these are disabled, the sync will do nothing.
