@@ -9,12 +9,12 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 rules:
-- apiGroups:
-  - policy
-  resources:
-  - podsecuritypolicies
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
   resourceNames:
   - {{ template "consul.fullname" . }}-client
   verbs:
   - use
+{{- end }}
 {{- end }}

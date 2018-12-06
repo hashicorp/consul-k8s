@@ -32,6 +32,11 @@ global:
   # currently: https://github.com/hashicorp/consul/issues/1858
   datacenter: dc1
 
+  # enablePodSecurityPolicies is a boolean flag that controls whether pod
+  # security policies are created for the consul components created by this
+  # chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+  enablePodSecurityPolicies: false
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
