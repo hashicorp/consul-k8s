@@ -11,6 +11,8 @@ IMPROVEMENTS:
   * Server affinity is now configurable. This makes it easier to run an entire
     Consul cluster on Minikube. [GH-13]
   * Liveness probes are now http calls, reducing errors in the logs.
+  * All namespaced resources now specify the namespace metadata, making `helm template` usage in 
+    a non-default namespace easier. [GH-66]
 
 BUG FIXES:
 
