@@ -43,6 +43,10 @@ type ServiceResource struct {
 	// enabled (aka default enabled).
 	ExplicitEnable bool
 
+	// ClusterIPSync set to true (the default) syncs ClusterIP-type services.
+	// Setting this to false will ignore ClusterIP services during the sync.
+	ClusterIPSync bool
+
 	// serviceMap is a mapping of unique key (given by controller) to
 	// the service structure. endpointsMap is the mapping of the same
 	// uniqueKey to a set of endpoints.
@@ -157,6 +161,11 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 		return false
 	}
 
+	// Ignore ClusterIP services if ClusterIP sync is disabled
+	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+		return false
+	}
+
 	raw, ok := svc.Annotations[annotationServiceSync]
 	if !ok {
 		// If there is no explicit value, then set it to our current default.
@@ -193,7 +202,7 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -343,7 +352,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For NodePort services, we create a service instance for each
 	// endpoint of the service. This way we don't register _every_ K8S
 	// node as part of the service.
-	case apiv1.ServiceTypeNodePort:
+	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
 		}

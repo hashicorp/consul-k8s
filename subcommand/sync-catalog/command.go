@@ -27,17 +27,18 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                  *flag.FlagSet
-	http                   *flags.HTTPFlags
-	k8s                    *k8sflags.K8SFlags
-	flagToConsul           bool
-	flagToK8S              bool
-	flagConsulDomain       string
-	flagK8SDefault         bool
-	flagK8SServicePrefix   string
-	flagK8SSourceNamespace string
-	flagK8SWriteNamespace  string
-	flagConsulWritePeriod  flags.DurationValue
+	flags                     *flag.FlagSet
+	http                      *flags.HTTPFlags
+	k8s                       *k8sflags.K8SFlags
+	flagToConsul              bool
+	flagToK8S                 bool
+	flagConsulDomain          string
+	flagK8SDefault            bool
+	flagK8SServicePrefix      string
+	flagK8SSourceNamespace    string
+	flagK8SWriteNamespace     string
+	flagConsulWritePeriod     flags.DurationValue
+	flagSyncClusterIPServices bool
 
 	once sync.Once
 	help string
@@ -69,6 +70,9 @@ func (c *Command) init() {
 		"The interval to perform syncing operations creating Consul services. "+
 			"All changes are merged and write calls are only made on this "+
 			"interval. Defaults to 30 seconds.")
+	c.flags.BoolVar(&c.flagSyncClusterIPServices, "sync-clusterip-services", true,
+		"If true, all valid ClusterIP services in K8S are synced by default. If false, "+
+			"ClusterIP services are not synced to Consul.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -137,6 +141,7 @@ func (c *Command) Run(args []string) int {
 				Syncer:         syncer,
 				Namespace:      c.flagK8SSourceNamespace,
 				ExplicitEnable: !c.flagK8SDefault,
+				ClusterIPSync:  c.flagSyncClusterIPServices,
 			},
 		}
 
