@@ -58,5 +58,8 @@ spec:
                 {{- if .Values.syncCatalog.k8sPrefix }}
                 -k8s-service-prefix="{{ .Values.syncCatalog.k8sPrefix}}" \
                 {{- end }}
-                -k8s-write-namespace=${NAMESPACE}
+                -k8s-write-namespace=${NAMESPACE} \
+                {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
+                -sync-clusterip-services=false
+                {{- end }}
 {{- end }}

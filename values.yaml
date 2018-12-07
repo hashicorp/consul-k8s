@@ -173,6 +173,11 @@ syncCatalog:
   # prepended with "consul-".
   k8sPrefix: null
 
+  # syncClusterIPServices syncs services of the ClusterIP type, which may
+  # or may not be broadly accessible depending on your Kubernetes cluster.
+  # Set this to false to skip syncing ClusterIP services.
+  syncClusterIPServices: true
+
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
   enabled: false
