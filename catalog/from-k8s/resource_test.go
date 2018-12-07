@@ -1,11 +1,9 @@
 package catalog
 
 import (
-	"io/ioutil"
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -16,7 +14,6 @@ import (
 )
 
 func init() {
-	logrus.SetOutput(ioutil.Discard)
 	hclog.DefaultOptions.Level = hclog.Debug
 }
 
@@ -704,7 +701,7 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	// Insert the service
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name:        "foo",
 			Annotations: map[string]string{annotationServicePort: "rpc"},
 		},
 
@@ -781,9 +778,10 @@ func TestServiceResource_clusterIP(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: true,
 	})
 	defer closer()
 
@@ -859,9 +857,10 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: true,
 	})
 	defer closer()
 
@@ -940,9 +939,10 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: true,
 	})
 	defer closer()
 
@@ -1011,6 +1011,79 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(2000, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test that the ClusterIP services aren't synced when ClusterIPSync
+// is disabled.
+func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: false,
+	})
+	defer closer()
+
+	// Insert the service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeClusterIP,
+			Ports: []apiv1.ServicePort{
+				apiv1.ServicePort{Port: 80, TargetPort: intstr.FromInt(8080)},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Insert the endpoints
+	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Subsets: []apiv1.EndpointSubset{
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{IP: "1.2.3.4"},
+				},
+				Ports: []apiv1.EndpointPort{
+					apiv1.EndpointPort{Port: 8080},
+				},
+			},
+
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					apiv1.EndpointPort{Port: 8080},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 0)
 }
 
 // testService returns a service that will result in a registration.
