@@ -1,4 +1,7 @@
 ## UNRELEASED
+Improvements:
+
+* Support syncing ClusterIP services [GH 4]
 
 Bug fixes:
 
