@@ -590,11 +590,11 @@ func TestServiceResource_nodePort(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
+	require.Equal(30000, actual[0].Service.Port)
 	require.Equal(node1, actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
+	require.Equal(30000, actual[1].Service.Port)
 	require.Equal(node2, actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
@@ -675,11 +675,11 @@ func TestServiceResource_nodePortInitial(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
+	require.Equal(30000, actual[0].Service.Port)
 	require.Equal(node1, actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
+	require.Equal(30000, actual[1].Service.Port)
 	require.Equal(node2, actual[1].Node)
 }
 
@@ -760,11 +760,14 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(2000, actual[0].Service.Port)
+
+	// This is an odd case-- currently if there are multiple NodePorts configured
+	// for a service, we'll take the last one.
+	require.Equal(30001, actual[0].Service.Port)
 	require.Equal(node1, actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(2000, actual[1].Service.Port)
+	require.Equal(30001, actual[1].Service.Port)
 	require.Equal(node2, actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
@@ -814,17 +817,11 @@ func TestServiceResource_clusterIP(t *testing.T) {
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
 				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Port: 8080},
-				},
 			},
 
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Port: 8080},
 				},
 			},
 		},
@@ -841,10 +838,10 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
+	require.Equal(80, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
+	require.Equal(80, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -894,19 +891,11 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
 				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
 			},
 
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
 				},
 			},
 		},
@@ -923,10 +912,10 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
+	require.Equal(80, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
+	require.Equal(80, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -977,19 +966,11 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
 				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
 			},
 
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
 				},
 			},
 		},
@@ -1006,10 +987,10 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(2000, actual[0].Service.Port)
+	require.Equal(8500, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(2000, actual[1].Service.Port)
+	require.Equal(8500, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1059,17 +1040,11 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
 				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Port: 8080},
-				},
 			},
 
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Port: 8080},
 				},
 			},
 		},
