@@ -2,49 +2,49 @@
 
 load _helpers
 
-@test "sync/ClusterRole: disabled by default" {
+@test "syncCatalog/ClusterRole: disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-cluster-role.yaml  \
+      -x templates/sync-catalog-clusterrole.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: disabled with global.enabled=false" {
+@test "syncCatalog/ClusterRole: disabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-cluster-role.yaml  \
+      -x templates/sync-catalog-clusterrole.yaml  \
       --set 'global.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: disabled with sync disabled" {
+@test "syncCatalog/ClusterRole: disabled with sync disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-cluster-role.yaml  \
+      -x templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "sync/ClusterRole: enabled with sync enabled" {
+@test "syncCatalog/ClusterRole: enabled with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-cluster-role.yaml  \
+      -x templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "sync/ClusterRole: enabled with sync enabled and global.enabled=false" {
+@test "syncCatalog/ClusterRole: enabled with sync enabled and global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-cluster-role.yaml  \
+      -x templates/sync-catalog-clusterrole.yaml  \
       --set 'global.enabled=false' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |

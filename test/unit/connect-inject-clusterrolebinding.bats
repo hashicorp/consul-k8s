@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 load _helpers
+
 @test "connectInject/ClusterRoleBinding: disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
