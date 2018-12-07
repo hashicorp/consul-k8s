@@ -162,10 +162,8 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	}
 
 	// Ignore ClusterIP services if ClusterIP sync is disabled
-	if svc.Spec.Type == apiv1.ServiceTypeClusterIP {
-		if !t.ClusterIPSync {
-			return false
-		}
+	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+		return false
 	}
 
 	raw, ok := svc.Annotations[annotationServiceSync]
