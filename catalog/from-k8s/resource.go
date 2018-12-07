@@ -254,10 +254,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		baseService.Service = strings.TrimSpace(v)
 	}
 
-	var main string
 	// Determine the default port
 	if len(svc.Spec.Ports) > 0 {
-		main = svc.Spec.Ports[0].Name
+		nodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
+		main := svc.Spec.Ports[0].Name
 
 		// If a specific port is specified, then use that port value
 		if target, ok := svc.Annotations[annotationServicePort]; ok {
@@ -271,6 +271,9 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		// also use this opportunity to find our default port.
 		for _, p := range svc.Spec.Ports {
 			target := p.Port
+			if nodePort && p.NodePort > 0 {
+				target = p.NodePort
+			}
 
 			// Set the tag
 			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(target), 10)
@@ -379,13 +382,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					continue
 				}
 				seen[addr] = struct{}{}
-
-				for _, port := range subset.Ports {
-					if port.Name == main {
-						baseService.Port = int(port.Port)
-						break
-					}
-				}
 
 				r := baseNode
 				rs := baseService
