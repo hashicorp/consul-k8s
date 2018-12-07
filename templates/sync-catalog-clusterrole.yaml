@@ -27,15 +27,12 @@ rules:
       - nodes
     verbs:
       - get
-  - apiGroups: ["policy"]
-    resources:
-      - podsecuritypolicies
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
-    resourceNames:
-      - {{ template "consul.fullname" . }}-sync-catalog
     verbs:
       - use
+    resourceNames:
+      - {{ template "consul.fullname" . }}-sync-catalog
 {{- end }}
 {{- end }}
