@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 0.4.0 (December 7, 2018)
+
 IMPROVEMENTS:
 
   * RBAC support for `syncCatalog`. This will create the `ClusterRole`, `ClusterRoleBinding`
