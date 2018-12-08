@@ -13,6 +13,7 @@ IMPROVEMENTS:
   * Liveness probes are now http calls, reducing errors in the logs.
   * All namespaced resources now specify the namespace metadata, making `helm template` usage in 
     a non-default namespace easier. [GH-66]
+  * Add support for ClusterIP service syncing.
 
 BUG FIXES:
 
