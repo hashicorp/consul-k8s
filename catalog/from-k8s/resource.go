@@ -349,10 +349,37 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 
-	// For NodePort services, we create a service instance for each
-	// endpoint of the service. This way we don't register _every_ K8S
+	// For NodePort services, we register each K8S
 	// node as part of the service.
-	case apiv1.ServiceTypeNodePort, apiv1.ServiceTypeClusterIP:
+	case apiv1.ServiceTypeNodePort:
+		// Get all nodes to be able to reference their ip addresses
+		nodes, err := t.Client.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil || len(nodes.Items) == 0 {
+			t.Log.Warn("error getting nodes", "error", err)
+			return
+		}
+
+		// Create a service instance for each node
+		for _, node := range nodes.Items {
+			for _, address := range node.Status.Addresses {
+				if address.Type == apiv1.NodeExternalIP {
+					r := baseNode
+					rs := baseService
+					r.Service = &rs
+					r.Service.ID = serviceID(r.Service.Service, address.Address)
+					r.Service.Address = address.Address
+					r.Address = address.Address
+
+					if node.Name != "" {
+						r.Node = node.Name
+					}
+
+					t.consulMap[key] = append(t.consulMap[key], &r)
+				}
+			}
+		}
+
+	case apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
 		}
