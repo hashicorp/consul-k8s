@@ -529,8 +529,41 @@ func TestServiceResource_nodePort(t *testing.T) {
 	})
 	defer closer()
 
+	node1 := "ip-10-11-12-13.ec2.internal"
+	node2 := "ip-10-11-12-14.ec2.internal"
+	// Insert the nodes
+	_, err := client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node1,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "1.2.3.4"},
+			},
+		},
+	})
+	require.NoError(err)
+
+	_, err = client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node2,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
+			},
+		},
+	})
+	require.NoError(err)
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
@@ -540,41 +573,6 @@ func TestServiceResource_nodePort(t *testing.T) {
 			Ports: []apiv1.ServicePort{
 				apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
 				apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
-			},
-		},
-	})
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
-	node1 := "ip-10-11-12-13.ec2.internal"
-	node2 := "ip-10-11-12-14.ec2.internal"
-	// Insert the endpoints
-	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-
-		Subsets: []apiv1.EndpointSubset{
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node1, IP: "1.2.3.4"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node2, IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
 			},
 		},
 	})
@@ -618,31 +616,28 @@ func TestServiceResource_nodePortInitial(t *testing.T) {
 
 	node1 := "ip-10-11-12-13.ec2.internal"
 	node2 := "ip-10-11-12-14.ec2.internal"
-	// Insert the endpoints
-	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+	// Insert the nodes
+	_, err := client.CoreV1().Nodes().Create(&apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name: node1,
 		},
 
-		Subsets: []apiv1.EndpointSubset{
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node1, IP: "1.2.3.4"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "1.2.3.4"},
 			},
+		},
+	})
+	require.NoError(err)
 
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node2, IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
+	_, err = client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node2,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
 			},
 		},
 	})
@@ -698,8 +693,40 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	})
 	defer closer()
 
+	node1 := "ip-10-11-12-13.ec2.internal"
+	node2 := "ip-10-11-12-14.ec2.internal"
+	// Insert the nodes
+	_, err := client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node1,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "1.2.3.4"},
+			},
+		},
+	})
+	require.NoError(err)
+
+	_, err = client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node2,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "foo",
 			Annotations: map[string]string{annotationServicePort: "rpc"},
@@ -710,41 +737,6 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 			Ports: []apiv1.ServicePort{
 				apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
 				apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
-			},
-		},
-	})
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
-	node1 := "ip-10-11-12-13.ec2.internal"
-	node2 := "ip-10-11-12-14.ec2.internal"
-	// Insert the endpoints
-	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-
-		Subsets: []apiv1.EndpointSubset{
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node1, IP: "1.2.3.4"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
-					apiv1.EndpointAddress{NodeName: &node2, IP: "2.3.4.5"},
-				},
-				Ports: []apiv1.EndpointPort{
-					apiv1.EndpointPort{Name: "http", Port: 8080},
-					apiv1.EndpointPort{Name: "rpc", Port: 2000},
-				},
 			},
 		},
 	})
