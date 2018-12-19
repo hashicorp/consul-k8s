@@ -349,36 +349,55 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 
-	// For NodePort services, we register each K8S
+	// For NodePort services, we create a service instance for each
+	// endpoint of the service, which corresponds to the nodes the service's
+	// pods are running on. This way we don't register _every_ K8S
 	// node as part of the service.
 	case apiv1.ServiceTypeNodePort:
-		// Get all nodes to be able to reference their ip addresses
-		nodes, err := t.Client.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil || len(nodes.Items) == 0 {
-			t.Log.Warn("error getting nodes", "error", err)
+		if t.endpointsMap == nil {
 			return
 		}
 
-		// Create a service instance for each node
-		for _, node := range nodes.Items {
-			for _, address := range node.Status.Addresses {
-				if address.Type == apiv1.NodeExternalIP {
-					r := baseNode
-					rs := baseService
-					r.Service = &rs
-					r.Service.ID = serviceID(r.Service.Service, address.Address)
-					r.Service.Address = address.Address
-					r.Address = address.Address
+		endpoints := t.endpointsMap[key]
+		if endpoints == nil {
+			return
+		}
 
-					if node.Name != "" {
-						r.Node = node.Name
+		for _, subset := range endpoints.Subsets {
+			for _, subsetAddr := range subset.Addresses {
+				// Check that the node name exists
+				// subsetAddr.NodeName is of type *string
+				if subsetAddr.NodeName == nil {
+					continue
+				}
+
+				// Look up the node's ip address by getting node info
+				node, err := t.Client.CoreV1().Nodes().Get(*subsetAddr.NodeName, metav1.GetOptions{})
+				if err != nil {
+					t.Log.Warn("error getting node info", "error", err)
+					continue
+				}
+
+				// Find the external ip address for the node and
+				// create the Consul service using it
+				for _, address := range node.Status.Addresses {
+					if address.Type == apiv1.NodeExternalIP {
+						r := baseNode
+						rs := baseService
+						r.Service = &rs
+						r.Service.ID = serviceID(r.Service.Service, address.Address)
+						r.Service.Address = address.Address
+						r.Node = *subsetAddr.NodeName
+						r.Address = address.Address
+
+						t.consulMap[key] = append(t.consulMap[key], &r)
 					}
-
-					t.consulMap[key] = append(t.consulMap[key], &r)
 				}
 			}
 		}
 
+	// For ClusterIP services, we register a service instance
+	// for each pod.
 	case apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
