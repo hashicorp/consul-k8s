@@ -252,34 +252,59 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		baseService.Service = strings.TrimSpace(v)
 	}
 
-	// Determine the default port
+	// Determine the default port and set port annotations
 	if len(svc.Spec.Ports) > 0 {
-		nodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
-		main := svc.Spec.Ports[0].Name
+		// Create port variable, defaults to 0
+		var port int
+
+		// Flag identifying whether the service is of NodePort type
+		isNodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
-		if target, ok := svc.Annotations[annotationServicePort]; ok {
-			main = target
+		target, ok := svc.Annotations[annotationServicePort]
+		if ok {
 			if v, err := strconv.ParseInt(target, 0, 0); err == nil {
-				baseService.Port = int(v)
+				port = int(v)
 			}
 		}
 
-		// Go through the ports so we can add them to the service meta. We
-		// also use this opportunity to find our default port.
+		// For when the port was a name instead of an int
+		if port == 0 && target != "" {
+			// Find the named port
+			for _, p := range svc.Spec.Ports {
+				if p.Name == target {
+					// Pick the right port based on the type of service
+					if isNodePort && p.NodePort > 0 {
+						port = int(p.NodePort)
+					} else {
+						port = int(p.Port)
+					}
+				}
+			}
+		}
+
+		// If the port was not set above, set it with the first port
+		// based on the service type
+		if port == 0 && isNodePort {
+			// Find first defined NodePort
+			for _, p := range svc.Spec.Ports {
+				if p.NodePort > 0 {
+					port = int(p.NodePort)
+					break
+				}
+			}
+		}
+		if port == 0 && !isNodePort {
+			port = int(svc.Spec.Ports[0].Port)
+		}
+
+		// Set service port based on defined port
+		baseService.Port = port
+
+		// Add all the ports as annotations
 		for _, p := range svc.Spec.Ports {
-			target := p.Port
-			if nodePort && p.NodePort > 0 {
-				target = p.NodePort
-			}
-
 			// Set the tag
-			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(target), 10)
-
-			// If the name matches our main port, set our main port
-			if p.Name == main {
-				baseService.Port = int(target)
-			}
+			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(p.Port), 10)
 		}
 	}
 
