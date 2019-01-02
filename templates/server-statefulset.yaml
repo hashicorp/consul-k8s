@@ -58,6 +58,9 @@ spec:
             secretName: {{ .name }}
             {{- end }}
         {{- end }}
+      {{- if .Values.server.priorityClassName }}
+      priorityClassName: "{{ .Values.server.priorityClassName }}"
+      {{- end }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
