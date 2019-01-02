@@ -106,6 +106,10 @@ server:
               component: server
           topologyKey: kubernetes.io/hostname
 
+  # used to assign priority to server pods
+  # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
+  priorityClassName: ""
+
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
 # DC where a single agent is deployed per node.
@@ -136,6 +140,10 @@ client:
     # - type: secret (or "configMap")
     #   name: my-secret
     #   load: false # if true, will add to `-config-dir` to load by Consul
+
+  # used to assign priority to client pods
+  # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
+  priorityClassName: ""
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)

@@ -31,6 +31,10 @@ spec:
     spec:
       terminationGracePeriodSeconds: 10
 
+      {{- if .Values.client.priorityClassName }}
+      priorityClassName: "{{ .Values.client.priorityClassName }}"
+      {{- end }}
+
       # Consul agents require a directory for data, even clients. The data
       # is okay to be wiped though if the Pod is removed, so just use an
       # emptyDir volume.
