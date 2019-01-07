@@ -47,6 +47,11 @@ type ServiceResource struct {
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
 
+	// NodeExternalIPSync set to true (the default) syncs NodePort services
+	// using the node's external ip address. When false, the node's internal
+	// ip address will be used instead.
+	NodeExternalIPSync bool
+
 	// serviceMap is a mapping of unique key (given by controller) to
 	// the service structure. endpointsMap is the mapping of the same
 	// uniqueKey to a set of endpoints.
@@ -403,10 +408,18 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					continue
 				}
 
-				// Find the external ip address for the node and
+				// Set the expected node address type
+				var expectedType apiv1.NodeAddressType
+				if t.NodeExternalIPSync {
+					expectedType = apiv1.NodeExternalIP
+				} else {
+					expectedType = apiv1.NodeInternalIP
+				}
+
+				// Find the ip address for the node and
 				// create the Consul service using it
 				for _, address := range node.Status.Addresses {
-					if address.Type == apiv1.NodeExternalIP {
+					if address.Type == expectedType {
 						r := baseNode
 						rs := baseService
 						r.Service = &rs
