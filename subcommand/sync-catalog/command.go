@@ -39,6 +39,7 @@ type Command struct {
 	flagK8SWriteNamespace     string
 	flagConsulWritePeriod     flags.DurationValue
 	flagSyncClusterIPServices bool
+	flagSyncNodeExternalIP    bool
 
 	once sync.Once
 	help string
@@ -73,6 +74,9 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagSyncClusterIPServices, "sync-clusterip-services", true,
 		"If true, all valid ClusterIP services in K8S are synced by default. If false, "+
 			"ClusterIP services are not synced to Consul.")
+	c.flags.BoolVar(&c.flagSyncNodeExternalIP, "sync-node-external-ip", true,
+		"If true, NodePort services will be synced using the node's external ip address. "+
+			"If false, NodePort services will be synced with the node's internal ip address.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -136,12 +140,13 @@ func (c *Command) Run(args []string) int {
 		ctl := &controller.Controller{
 			Log: hclog.Default().Named("to-consul/controller"),
 			Resource: &catalogFromK8S.ServiceResource{
-				Log:            hclog.Default().Named("to-consul/source"),
-				Client:         clientset,
-				Syncer:         syncer,
-				Namespace:      c.flagK8SSourceNamespace,
-				ExplicitEnable: !c.flagK8SDefault,
-				ClusterIPSync:  c.flagSyncClusterIPServices,
+				Log:                hclog.Default().Named("to-consul/source"),
+				Client:             clientset,
+				Syncer:             syncer,
+				Namespace:          c.flagK8SSourceNamespace,
+				ExplicitEnable:     !c.flagK8SDefault,
+				ClusterIPSync:      c.flagSyncClusterIPServices,
+				NodeExternalIPSync: c.flagSyncNodeExternalIP,
 			},
 		}
 
