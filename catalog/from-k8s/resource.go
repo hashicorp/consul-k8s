@@ -30,6 +30,21 @@ const (
 	ConsulK8STag = "k8s"
 )
 
+type NodePortSyncType string
+
+const (
+	// Only sync NodePort services with a node's ExternalIP address.
+	// Doesn't sync if an ExternalIP doesn't exist
+	ExternalOnly NodePortSyncType = "ExternalOnly"
+
+	// Sync with an ExternalIP first, if it doesn't exist, use the
+	// node's InternalIP address instead
+	ExternalFirst NodePortSyncType = "ExternalFirst"
+
+	// Sync NodePort services using
+	InternalOnly NodePortSyncType = "InternalOnly"
+)
+
 // ServiceResource implements controller.Resource to sync Service resource
 // types from K8S.
 type ServiceResource struct {
@@ -50,7 +65,7 @@ type ServiceResource struct {
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
 	// ip address will be used instead.
-	NodeExternalIPSync bool
+	NodePortSync NodePortSyncType
 
 	// serviceMap is a mapping of unique key (given by controller) to
 	// the service structure. endpointsMap is the mapping of the same
@@ -410,16 +425,18 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 				// Set the expected node address type
 				var expectedType apiv1.NodeAddressType
-				if t.NodeExternalIPSync {
-					expectedType = apiv1.NodeExternalIP
-				} else {
+				if t.NodePortSync == InternalOnly {
 					expectedType = apiv1.NodeInternalIP
+				} else {
+					expectedType = apiv1.NodeExternalIP
 				}
 
 				// Find the ip address for the node and
 				// create the Consul service using it
+				var found bool
 				for _, address := range node.Status.Addresses {
 					if address.Type == expectedType {
+						found = true
 						r := baseNode
 						rs := baseService
 						r.Service = &rs
@@ -429,6 +446,24 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						r.Address = address.Address
 
 						t.consulMap[key] = append(t.consulMap[key], &r)
+					}
+				}
+
+				// If an ExternalIP wasn't found, and ExternalFirst is set,
+				// use an InternalIP
+				if t.NodePortSync == ExternalFirst && !found {
+					for _, address := range node.Status.Addresses {
+						if address.Type == apiv1.NodeInternalIP {
+							r := baseNode
+							rs := baseService
+							r.Service = &rs
+							r.Service.ID = serviceID(r.Service.Service, address.Address)
+							r.Service.Address = address.Address
+							r.Node = *subsetAddr.NodeName
+							r.Address = address.Address
+
+							t.consulMap[key] = append(t.consulMap[key], &r)
+						}
 					}
 				}
 			}

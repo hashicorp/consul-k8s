@@ -523,10 +523,10 @@ func TestServiceResource_nodePort(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: true,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalOnly,
 	})
 	defer closer()
 
@@ -639,10 +639,10 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: true,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalOnly,
 	})
 	defer closer()
 
@@ -739,10 +739,10 @@ func TestServiceResource_nodePortInitial(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: true,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalOnly,
 	})
 	defer closer()
 	time.Sleep(100 * time.Millisecond)
@@ -853,10 +853,10 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: true,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalOnly,
 	})
 	defer closer()
 
@@ -970,10 +970,10 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: true,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalOnly,
 	})
 	defer closer()
 
@@ -1078,7 +1078,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 }
 
 // Test that the proper registrations are generated for a NodePort type.
-func TestServiceResource_nodePort_internalIP(t *testing.T) {
+func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
@@ -1086,10 +1086,10 @@ func TestServiceResource_nodePort_internalIP(t *testing.T) {
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                hclog.Default(),
-		Client:             client,
-		Syncer:             syncer,
-		NodeExternalIPSync: false,
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: InternalOnly,
 	})
 	defer closer()
 
@@ -1188,6 +1188,121 @@ func TestServiceResource_nodePort_internalIP(t *testing.T) {
 	require.Equal(node1, actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("3.4.5.6", actual[1].Service.Address)
+	require.Equal(30000, actual[1].Service.Port)
+	require.Equal(node2, actual[1].Node)
+	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test that the proper registrations are generated for a NodePort type.
+func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:          hclog.Default(),
+		Client:       client,
+		Syncer:       syncer,
+		NodePortSync: ExternalFirst,
+	})
+	defer closer()
+
+	node1 := "ip-10-11-12-13.ec2.internal"
+	node2 := "ip-10-11-12-14.ec2.internal"
+	// Insert the nodes
+	_, err := client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node1,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeInternalIP, Address: "4.5.6.7"},
+			},
+		},
+	})
+	require.NoError(err)
+
+	_, err = client.CoreV1().Nodes().Create(&apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: node2,
+		},
+
+		Status: apiv1.NodeStatus{
+			Addresses: []apiv1.NodeAddress{
+				apiv1.NodeAddress{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
+				apiv1.NodeAddress{Type: apiv1.NodeInternalIP, Address: "3.4.5.6"},
+			},
+		},
+	})
+	require.NoError(err)
+	time.Sleep(200 * time.Millisecond)
+
+	// Insert the endpoints
+	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Subsets: []apiv1.EndpointSubset{
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{NodeName: &node1, IP: "1.2.3.4"},
+				},
+				Ports: []apiv1.EndpointPort{
+					apiv1.EndpointPort{Name: "http", Port: 8080},
+					apiv1.EndpointPort{Name: "rpc", Port: 2000},
+				},
+			},
+
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{NodeName: &node2, IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					apiv1.EndpointPort{Name: "http", Port: 8080},
+					apiv1.EndpointPort{Name: "rpc", Port: 2000},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Insert the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeNodePort,
+			Ports: []apiv1.ServicePort{
+				apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
+				apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("4.5.6.7", actual[0].Service.Address)
+	require.Equal(30000, actual[0].Service.Port)
+	require.Equal(node1, actual[0].Node)
+	require.Equal("foo", actual[1].Service.Service)
+	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
 	require.Equal(node2, actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
