@@ -108,7 +108,7 @@ func TestSource_ignoreK8S(t *testing.T) {
 	require.NoError(err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
 	require.NoError(err)
-	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{fromk8s.ConsulK8STag}), nil)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{fromk8s.TestConsulK8STag}), nil)
 	require.NoError(err)
 
 	_, sink, closer := testSource(t, client)
@@ -249,10 +249,11 @@ func testRegistration(node, service string, tags []string) *api.CatalogRegistrat
 func testSource(t *testing.T, client *api.Client) (*Source, *TestSink, func()) {
 	sink := &TestSink{}
 	s := &Source{
-		Client: client,
-		Domain: "test",
-		Sink:   sink,
-		Log:    hclog.Default(),
+		Client:       client,
+		Domain:       "test",
+		Sink:         sink,
+		Log:          hclog.Default(),
+		ConsulK8STag: fromk8s.TestConsulK8STag,
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())

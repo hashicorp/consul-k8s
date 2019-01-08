@@ -247,14 +247,14 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 	return &api.CatalogRegistration{
 		Node:           node,
 		Address:        "127.0.0.1",
-		NodeMeta:       map[string]string{ConsulSourceKey: ConsulK8STag},
+		NodeMeta:       map[string]string{ConsulSourceKey: TestConsulK8STag},
 		SkipNodeUpdate: true,
 		Service: &api.AgentService{
 			ID:      serviceID(node, service),
 			Service: service,
-			Tags:    []string{ConsulK8STag},
+			Tags:    []string{TestConsulK8STag},
 			Meta: map[string]string{
-				ConsulSourceKey: ConsulK8STag,
+				ConsulSourceKey: TestConsulK8STag,
 				ConsulK8SNS:     "default",
 			},
 		},
@@ -268,6 +268,7 @@ func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) 
 		SyncPeriod:        200 * time.Millisecond,
 		ServicePollPeriod: 50 * time.Millisecond,
 		Namespace:         "default",
+		ConsulK8STag:      TestConsulK8STag,
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())
