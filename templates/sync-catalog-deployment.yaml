@@ -62,4 +62,7 @@ spec:
                 {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
                 -sync-clusterip-services=false
                 {{- end }}
+                {{- if .Values.syncCatalog.nodePortSyncType }}
+                -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }}
+                {{- end }}
 {{- end }}
