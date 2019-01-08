@@ -406,7 +406,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				// Find the external ip address for the node and
 				// create the Consul service using it
 				for _, address := range node.Status.Addresses {
-					if address.Type == apiv1.NodeExternalIP {
+					if address.Type == apiv1.NodeExternalIP || address.Type == apiv1.NodeInternalIP {
 						r := baseNode
 						rs := baseService
 						r.Service = &rs
