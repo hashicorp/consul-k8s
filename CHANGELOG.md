@@ -1,4 +1,8 @@
 ## UNRELEASED
+Improvements:
+
+* Supports a configurable tag for the k8s -> Consul sync [GH 42]
+
 Bug fixes:
 
 * Register NodePort services with the node's ip address [GH 8]
