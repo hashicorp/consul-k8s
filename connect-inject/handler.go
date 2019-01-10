@@ -138,9 +138,12 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		UID:     req.UID,
 	}
 
+	// Accumulate any patches here
+	var patches []jsonpatch.JsonPatchOperation
+
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since k.
-	if err := h.defaultAnnotations(&pod); err != nil {
+	if err := h.defaultAnnotations(&pod, &patches); err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
@@ -159,9 +162,6 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	} else if !shouldInject {
 		return resp
 	}
-
-	// Accumulate any patches here
-	var patches []jsonpatch.JsonPatchOperation
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
@@ -263,7 +263,7 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 	return !h.RequireAnnotation, nil
 }
 
-func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
+func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonPatchOperation) error {
 	if pod.ObjectMeta.Annotations == nil {
 		pod.ObjectMeta.Annotations = make(map[string]string)
 	}
@@ -271,6 +271,13 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 	// Default service name is the name of the first container.
 	if _, ok := pod.ObjectMeta.Annotations[annotationService]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
+			// Create the patch for this first, so that the Annotation
+			// object will be created if necessary
+			*patches = append(*patches, updateAnnotation(
+				pod.Annotations,
+				map[string]string{annotationService: cs[0].Name})...)
+
+			// Set the annotation for checking in shouldInject
 			pod.ObjectMeta.Annotations[annotationService] = cs[0].Name
 		}
 	}
@@ -280,8 +287,20 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
 				if ps[0].Name != "" {
+					// Create the patch for this first, so that the Annotation
+					// object will be created if necessary
+					*patches = append(*patches, updateAnnotation(
+						pod.Annotations,
+						map[string]string{annotationPort: ps[0].Name})...)
+
 					pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
 				} else {
+					// Create the patch for this first, so that the Annotation
+					// object will be created if necessary
+					*patches = append(*patches, updateAnnotation(
+						pod.Annotations,
+						map[string]string{annotationPort: strconv.Itoa(int(ps[0].ContainerPort))})...)
+
 					pod.ObjectMeta.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
 			}
