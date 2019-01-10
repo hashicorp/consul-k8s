@@ -7,16 +7,15 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/gorilla/handlers"
 	"github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -105,12 +104,12 @@ func (c *Command) Run(args []string) int {
 		ImageConsul:       c.flagConsulImage,
 		ImageEnvoy:        c.flagEnvoyImage,
 		RequireAnnotation: !c.flagDefaultInject,
+		Log:               hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
 	mux.HandleFunc("/health/ready", c.handleReady)
 	var handler http.Handler = mux
-	handler = handlers.LoggingHandler(os.Stdout, handler)
 	server := &http.Server{
 		Addr:      c.flagListen,
 		Handler:   handler,

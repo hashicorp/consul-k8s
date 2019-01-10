@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
@@ -32,7 +33,7 @@ func TestHandlerHandle(t *testing.T) {
 	}{
 		{
 			"kube-system namespace",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -46,7 +47,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"already injected",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +65,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -97,7 +98,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with upstreams specified",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +153,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection disabled",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -170,7 +171,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection truthy",
-			Handler{},
+			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -238,7 +239,7 @@ func TestHandlerHandle_badContentType(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "text/plain")
 
-	var h Handler
+	h := Handler{Log: hclog.Default().Named("handler")}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -251,7 +252,7 @@ func TestHandlerHandle_noBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	var h Handler
+	h := Handler{Log: hclog.Default().Named("handler")}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
