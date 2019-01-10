@@ -74,6 +74,10 @@ func TestHandlerHandle(t *testing.T) {
 			[]jsonpatch.JsonPatchOperation{
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
 					Path:      "/spec/volumes",
 				},
 				{
@@ -107,6 +111,10 @@ func TestHandlerHandle(t *testing.T) {
 			},
 			"",
 			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
+				},
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -176,6 +184,10 @@ func TestHandlerHandle(t *testing.T) {
 			},
 			"",
 			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
+				},
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -369,7 +381,8 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			require := require.New(t)
 
 			var h Handler
-			err := h.defaultAnnotations(tt.Pod)
+			var patches []jsonpatch.JsonPatchOperation
+			err := h.defaultAnnotations(tt.Pod, &patches)
 			if (tt.Err != "") != (err != nil) {
 				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
 			}
