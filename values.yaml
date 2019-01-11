@@ -170,8 +170,13 @@ syncCatalog:
 
   # k8sPrefix is the service prefix to prepend to services before registering
   # with Kubernetes. For example "consul-" will register all services
-  # prepended with "consul-".
+  # prepended with "consul-". (Consul -> Kubernetes sync)
   k8sPrefix: null
+
+  # k8sTag is an optional tag that is applied to all of the Kubernetes services
+  # that are synced into Consul. If nothing is set, defaults to "k8s".
+  # (Kubernetes -> Consul sync)
+  k8sTag: null
 
   # syncClusterIPServices syncs services of the ClusterIP type, which may
   # or may not be broadly accessible depending on your Kubernetes cluster.
