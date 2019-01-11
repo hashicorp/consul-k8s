@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+## 0.5.0 (January 11, 2019)
+
+IMPROVEMENTS:
+
+  * Supports new NodePort syncing style that uses the node ip address
+  * Adds a configurable tab to the Kubernetes -> Consul sync
+
 ## 0.4.0 (December 7, 2018)
 
 IMPROVEMENTS:
