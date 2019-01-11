@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.4.0 (January 11, 2019)
 Improvements:
 
 * Supports a configurable tag for the k8s -> Consul sync [GH 42]
