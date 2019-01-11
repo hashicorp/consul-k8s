@@ -14,7 +14,6 @@ rules:
     resources:
       - services
       - endpoints
-      - nodes
     verbs:
       - get
       - list
@@ -23,4 +22,9 @@ rules:
       - patch
       - delete
       - create
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs:
+      - get
 {{- end }}
