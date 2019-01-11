@@ -6,6 +6,7 @@ Improvements:
 Bug fixes:
 
 * Register NodePort services with the node's ip address [GH 8]
+* Add the metadata/annotations field if needed before patching annotations [GH 20]
 
 ## 0.3.0 (December 7, 2018)
 Improvements:
