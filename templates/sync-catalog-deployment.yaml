@@ -60,6 +60,12 @@ spec:
                 {{- end }}
                 -k8s-write-namespace=${NAMESPACE} \
                 {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
-                -sync-clusterip-services=false
+                -sync-clusterip-services=false \
+                {{- end }}
+                {{- if .Values.syncCatalog.nodePortSyncType }}
+                -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }} \
+                {{- end }}
+                {{- if .Values.syncCatalog.k8sTag }}
+                -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }}
                 {{- end }}
 {{- end }}

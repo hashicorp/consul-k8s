@@ -22,4 +22,9 @@ rules:
       - patch
       - delete
       - create
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs:
+      - get
 {{- end }}

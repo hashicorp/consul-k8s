@@ -21,7 +21,7 @@ global:
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
   # per component below.
-  imageK8S: "hashicorp/consul-k8s:0.3.0"
+  imageK8S: "hashicorp/consul-k8s:0.4.0"
 
   # Datacenter is the name of the datacenter that the agents should register
   # as. This shouldn't be changed once the Consul cluster is up and running
@@ -170,13 +170,26 @@ syncCatalog:
 
   # k8sPrefix is the service prefix to prepend to services before registering
   # with Kubernetes. For example "consul-" will register all services
-  # prepended with "consul-".
+  # prepended with "consul-". (Consul -> Kubernetes sync)
   k8sPrefix: null
+
+  # k8sTag is an optional tag that is applied to all of the Kubernetes services
+  # that are synced into Consul. If nothing is set, defaults to "k8s".
+  # (Kubernetes -> Consul sync)
+  k8sTag: null
 
   # syncClusterIPServices syncs services of the ClusterIP type, which may
   # or may not be broadly accessible depending on your Kubernetes cluster.
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
+
+  # nodePortSyncType configures the type of syncing that happens for NodePort
+  # services. The valid options are: ExternalOnly, InternalOnly, ExternalFirst.
+  # - ExternalOnly will only use a node's ExternalIP address for the sync
+  # - InternalOnly use's the node's InternalIP address
+  # - ExternalFirst will preferentially use the node's ExternalIP address, but
+  #   if it doesn't exist, it will use the node's InternalIP address instead.
+  nodePortSyncType: ExternalFirst
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
