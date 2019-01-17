@@ -4,3 +4,4 @@
 terraform.tfstate*
 terraform.tfvars
 values.dev.yaml
+*.code-workspace

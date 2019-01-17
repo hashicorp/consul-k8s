@@ -1,9 +1,5 @@
 # Available parameters and their default values for the Consul chart.
 
-# Server, when enabled, configures a server cluster to run. This should
-# be disabled if you plan on connecting to a Consul cluster external to
-# the Kube cluster.
-
 global:
   # enabled is the master enabled switch. Setting this to true or false
   # will enable or disable all the components within this chart by default.
@@ -16,7 +12,12 @@ global:
 
   # Image is the name (and tag) of the Consul Docker image for clients and
   # servers below. This can be overridden per component.
-  image: "consul:1.3.1"
+  #
+  # Examples:
+  #   image: "consul:latest"
+  #   image: "consul:1.4.0"
+  #   image: "consul:1.4.0-ent"
+  image: "tradel/consul-enterprise:1.4.0"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
@@ -29,11 +30,45 @@ global:
   # currently: https://github.com/hashicorp/consul/issues/1858
   datacenter: dc1
 
+# If you are using a custom Docker image, you may need to provide credentials 
+# to download the image from a private registry or a private account on
+# DockerHub. 
+#
+# Example using Docker Hub:
+#   registry: https://index.docker.io/v1/
+#   username: someone
+#   password: sillyness
+# 
+# Example using a private registry:
+#   registry: https://artifactory.example.com/
+#   username: someone
+#   password: sillyness
+imageCredentials:
+  name: consul-registry-key
+  registry: https://index.docker.io/v1/
+  username: someone
+  password: sillyness
+
+# Server, when enabled, configures a server cluster to run. This should
+# be disabled if you plan on connecting to a Consul cluster external to
+# the Kube cluster.
+
 server:
   enabled: "-"
   image: null
   replicas: 3
   bootstrapExpect: 3 # Should <= replicas count
+  replicas: 1
+  bootstrapExpect: 1 # Should <= replicas count
+
+  # If you are using an enterprise Consul image, you need to license it, or
+  # it will stop working in 30 minutes or less. If you paste your license key
+  # here, it will be applied to your cluster as soon as it elects a leader.
+  # If you are not using an enterprise image, or if you plan to introduce the
+  # license key via another route, then set the key to null.
+  license:
+    # key: "01MV4U...5EEQJ5HU"
+    key: null
 
   # storage and storageClass are the settings for configuring stateful
   # storage for the server pods. storage should be set to the disk size of

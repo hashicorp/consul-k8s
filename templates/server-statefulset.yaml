@@ -58,6 +58,8 @@ spec:
             secretName: {{ .name }}
             {{- end }}
         {{- end }}
+      imagePullSecrets:
+        - name: {{ .Values.imageCredentials.name }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
