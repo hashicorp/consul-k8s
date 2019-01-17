@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-license
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-license
+      labels:
+        app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+        app.kubernetes.io/instance: {{.Release.Name | quote }}
+        helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: license
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: post-install-job
+          image: "appropriate/curl"
+          command: 
+            - "curl"
+            - "-fsSL"
+            {{- if .Values.server.license.key }} 
+            - "-X"
+            - "PUT"
+            - "http://{{ .Release.Name }}-consul-server:8500/v1/operator/license"
+            - "--data" 
+            - "{{ .Values.server.license.key }}"
+            {{- else }}
+            - "http://{{ .Release.Name }}-consul-server:8500/v1/status/leader"
+            {{- end }}
