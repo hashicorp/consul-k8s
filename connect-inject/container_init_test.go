@@ -44,7 +44,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			`service = "web"`,
+			`alias_service = "web"`,
 			`upstreams`,
 		},
 
@@ -55,7 +55,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationPort] = "1234"
 				return pod
 			},
-			"port = 1234",
+			"local_service_port = 1234",
 			"",
 		},
 
@@ -69,6 +69,28 @@ func TestHandlerContainerInit(t *testing.T) {
 			`destination_name = "db"`,
 			"",
 		},
+
+		{
+			"Service ID set to POD_NAME env var",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			`id   = "${POD_NAME}-web-proxy"`,
+			"",
+		},
+
+		{
+			"Proxy ID set to POD_NAME env var",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			`-proxy-id="${POD_NAME}-web-proxy"`,
+			"",
+		},
 	}
 
 	for _, tt := range cases {
@@ -79,6 +101,8 @@ func TestHandlerContainerInit(t *testing.T) {
 			container, err := h.containerInit(tt.Pod(minimal()))
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
+			//fmt.Println(actual)
+			//fmt.Println(tt.Cmd)
 			require.Contains(actual, tt.Cmd)
 			if tt.CmdNot != "" {
 				require.NotContains(actual, tt.CmdNot)
