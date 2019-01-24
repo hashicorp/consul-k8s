@@ -9,7 +9,6 @@ import (
 )
 
 type initContainerCommandData struct {
-	PodName     string
 	ServiceName string
 	ServicePort int32
 	Upstreams   []initContainerCommandUpstreamData
@@ -24,7 +23,6 @@ type initContainerCommandUpstreamData struct {
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	data := initContainerCommandData{
-		PodName:     pod.Name,
 		ServiceName: pod.Annotations[annotationService],
 	}
 	if data.ServiceName == "" {
@@ -80,6 +78,12 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
 				},
 			},
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			corev1.VolumeMount{
@@ -101,7 +105,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "{{ .PodName }}-{{ .ServiceName }}-proxy"
+  id   = "${POD_NAME}-{{ .ServiceName }}-proxy"
   name = "{{ .ServiceName }}-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -142,7 +146,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="{{ .PodName }}-{{ .ServiceName }}-proxy" \
+  -proxy-id="${POD_NAME}-{{ .ServiceName }}-proxy" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
