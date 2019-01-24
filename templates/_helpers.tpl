@@ -51,7 +51,3 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- end -}}
 {{- end -}}
 {{- end -}}
-
-{{- define "imagePullSecret" }}
-{{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" (default .Values.imageCredentials.registry "https://index.docker.io/v1/") (printf "%s:%s" .Values.imageCredentials.username .Values.imageCredentials.password | b64enc) | b64enc }}
-{{- end }}
