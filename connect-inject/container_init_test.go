@@ -101,8 +101,6 @@ func TestHandlerContainerInit(t *testing.T) {
 			container, err := h.containerInit(tt.Pod(minimal()))
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
-			//fmt.Println(actual)
-			//fmt.Println(tt.Cmd)
 			require.Contains(actual, tt.Cmd)
 			if tt.CmdNot != "" {
 				require.NotContains(actual, tt.CmdNot)
