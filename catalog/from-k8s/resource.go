@@ -122,7 +122,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
-			Endpoints(t.namespace()).
+			Endpoints(service.Namespace)).
 			Get(service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
