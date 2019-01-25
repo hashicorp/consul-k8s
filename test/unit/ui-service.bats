@@ -92,3 +92,47 @@ load _helpers
       yq -r '.spec.type' | tee /dev/stderr)
   [ "${actual}" = "LoadBalancer" ]
 }
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "ui/Service: no annotations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ui/Service: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'ui.service.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# additionalSpec
+
+@test "ui/Service: no additionalSpec by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.loadBalancerIP' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ui/Service: additionalSpec can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'ui.service.additionalSpec=loadBalancerIP: 1.2.3.4' \
+      . | tee /dev/stderr |
+      yq -r '.spec.loadBalancerIP' | tee /dev/stderr)
+  [ "${actual}" = "1.2.3.4" ]
+}

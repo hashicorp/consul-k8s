@@ -169,6 +169,13 @@ ui:
   service:
     enabled: true
     type: null
+    # This should be a multi-line string mapping directly to the a map of
+    # the annotations to apply to the UI service
+    annotations: null
+    # Additional ServiceSpec values
+    # This should be a multi-line string mapping directly to a Kubernetes
+    # ServiceSpec object.
+    additionalSpec: null
 
 # syncCatalog will run the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
