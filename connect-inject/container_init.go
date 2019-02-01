@@ -134,7 +134,7 @@ services {
       destination_name = "{{ .Name }}"
       local_bind_port = {{ .LocalPort }}
 			{{ if .Datacenter }}
-			datacenter = {{ .Datacenter }}
+			datacenter = "{{ .Datacenter }}"
 			{{ end }}
     }
     {{ end }}

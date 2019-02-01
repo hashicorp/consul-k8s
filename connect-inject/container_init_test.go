@@ -77,7 +77,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
 				return pod
 			},
-			"datacenter = dc1",
+			`datacenter = "dc1"`,
 			"",
 		},
 
@@ -89,7 +89,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			"",
-			"datacenter = dc1",
+			`datacenter = "dc1"`,
 		},
 
 		{
