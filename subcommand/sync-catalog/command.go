@@ -71,9 +71,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
 		"Tag value for K8S services registered in Consul")
 	c.flags.Var(&c.flagConsulWritePeriod, "consul-write-interval",
-		"The interval to perform syncing operations creating Consul services. "+
-			"All changes are merged and write calls are only made on this "+
-			"interval. Defaults to 30 seconds.")
+		"The interval to perform syncing operations creating Consul services, formatted "+
+			"as a time.Duration. All changes are merged and write calls are only made "+
+			"on this interval. Defaults to 30 seconds (30s).")
 	c.flags.BoolVar(&c.flagSyncClusterIPServices, "sync-clusterip-services", true,
 		"If true, all valid ClusterIP services in K8S are synced by default. If false, "+
 			"ClusterIP services are not synced to Consul.")
