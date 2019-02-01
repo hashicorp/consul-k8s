@@ -623,11 +623,11 @@ func TestServiceResource_nodePort(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -727,7 +727,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 }
 
 // Test that a NodePort created earlier works (doesn't require an Endpoints
@@ -838,11 +838,11 @@ func TestServiceResource_nodePortInitial(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 }
 
 // Test that the proper registrations are generated for a NodePort with annotated port.
@@ -954,11 +954,11 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal(30001, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30001, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1070,11 +1070,11 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1186,11 +1186,11 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("4.5.6.7", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("3.4.5.6", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1301,11 +1301,11 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("4.5.6.7", actual[0].Service.Address)
 	require.Equal(30000, actual[0].Service.Port)
-	require.Equal(node1, actual[0].Node)
+	require.Equal("k8s-sync", actual[0].Node)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
 	require.Equal(30000, actual[1].Service.Port)
-	require.Equal(node2, actual[1].Node)
+	require.Equal("k8s-sync", actual[1].Node)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
