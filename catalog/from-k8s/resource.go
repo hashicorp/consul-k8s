@@ -442,8 +442,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						r.Service = &rs
 						r.Service.ID = serviceID(r.Service.Service, address.Address)
 						r.Service.Address = address.Address
-						r.Node = *subsetAddr.NodeName
-						r.Address = address.Address
 
 						t.consulMap[key] = append(t.consulMap[key], &r)
 					}
@@ -459,8 +457,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, address.Address)
 							r.Service.Address = address.Address
-							r.Node = *subsetAddr.NodeName
-							r.Address = address.Address
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
 						}
@@ -505,10 +501,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
-				if subsetAddr.NodeName != nil {
-					r.Node = *subsetAddr.NodeName
-					r.Address = addr
-				}
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
