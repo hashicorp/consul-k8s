@@ -133,9 +133,9 @@ services {
     upstreams {
       destination_name = "{{ .Name }}"
       local_bind_port = {{ .LocalPort }}
-			{{ if .Datacenter }}
-			datacenter = "{{ .Datacenter }}"
-			{{ end }}
+			{{- if .Datacenter }}
+      datacenter = "{{ .Datacenter }}"
+			{{- end}}
     }
     {{ end }}
   }
