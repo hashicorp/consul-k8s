@@ -71,6 +71,28 @@ func TestHandlerContainerInit(t *testing.T) {
 		},
 
 		{
+			"Upstream datacenter specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
+				return pod
+			},
+			`datacenter = "dc1"`,
+			"",
+		},
+
+		{
+			"No Upstream datacenter specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			"",
+			`datacenter`,
+		},
+
+		{
 			"Service ID set to POD_NAME env var",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
