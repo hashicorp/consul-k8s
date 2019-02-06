@@ -1,0 +1,48 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-license
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-license
+      labels:
+        app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+        app.kubernetes.io/instance: {{.Release.Name | quote }}
+        helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: license
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: post-install-job
+          image: "appropriate/curl"
+          env:
+            - name: ENTERPRISE_LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.server.enterpriseLicense.secretName }}
+                  key: {{ .Values.server.enterpriseLicense.secretKey }}
+          command: 
+            - |
+              curl -fsSL -X PUT http://{{ template "consul.fullname" . }}-server:8500/v1/operator/license \
+                --data {$ENTERPRISE_LICENSE}
+{{- end }}
+{{- end }}

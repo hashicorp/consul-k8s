@@ -1,9 +1,5 @@
 # Available parameters and their default values for the Consul chart.
 
-# Server, when enabled, configures a server cluster to run. This should
-# be disabled if you plan on connecting to a Consul cluster external to
-# the Kube cluster.
-
 global:
   # enabled is the master enabled switch. Setting this to true or false
   # will enable or disable all the components within this chart by default.
@@ -16,6 +12,10 @@ global:
 
   # Image is the name (and tag) of the Consul Docker image for clients and
   # servers below. This can be overridden per component.
+  #
+  # Examples:
+  #   image: "consul:1.4.0"
+  #   image: "consul:1.4.0-ent"   # Enterprise Consul image
   image: "consul:1.3.1"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
@@ -29,11 +29,24 @@ global:
   # currently: https://github.com/hashicorp/consul/issues/1858
   datacenter: dc1
 
+# Server, when enabled, configures a server cluster to run. This should
+# be disabled if you plan on connecting to a Consul cluster external to
+# the Kube cluster.
 server:
   enabled: "-"
   image: null
   replicas: 3
   bootstrapExpect: 3 # Should <= replicas count
+
+  # enterpriseLicense refers to a Kubernetes secret that you have created that
+  # contains your enterprise license. It is required if you are using an
+  # enterprise binary. Defining it here applies it to your cluster once a leader
+  # has been elected. If you are not using an enterprise image
+  # or if you plan to introduce the license key via another route, then set
+  # these fields to null.
+  enterpriseLicense:
+    secretName: null
+    secretKey: null
 
   # storage and storageClass are the settings for configuring stateful
   # storage for the server pods. storage should be set to the disk size of
