@@ -1,7 +1,6 @@
 package connectinject
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -90,7 +89,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			"",
-			`datacenter"`,
+			`datacenter`,
 		},
 
 		{
@@ -124,7 +123,6 @@ func TestHandlerContainerInit(t *testing.T) {
 			container, err := h.containerInit(tt.Pod(minimal()))
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
-			fmt.Println(actual)
 			require.Contains(actual, tt.Cmd)
 			if tt.CmdNot != "" {
 				require.NotContains(actual, tt.CmdNot)
