@@ -204,6 +204,13 @@ syncCatalog:
   #   if it doesn't exist, it will use the node's InternalIP address instead.
   nodePortSyncType: ExternalFirst
 
+  # aclSyncToken refers to a Kubernetes secret that you have created that contains
+  # an ACL token for your Consul cluster which allows the sync process the correct
+  # permissions. This is only needed if ACLs are enabled on the Consul cluster.
+  aclSyncToken:
+    secretName: null
+    secretKey: null
+
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
   enabled: false

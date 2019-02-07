@@ -41,6 +41,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
+                  key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
