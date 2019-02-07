@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+  * Supports applying a Consul Enterprise License to the cluster through the Helm chart
+  
 ## 0.5.0 (January 11, 2019)
 
 IMPROVEMENTS:
