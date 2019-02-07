@@ -245,3 +245,40 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-node-port-sync-type=ExternalOnly"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# aclSyncToken
+
+@test "syncCatalog/Deployment: aclSyncToken disabled when secretName is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.aclSyncToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: aclSyncToken disabled when secretKey is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.aclSyncToken.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: aclSyncToken enabled when secretName and secretKey is provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.aclSyncToken.secretName=foo' \
+      --set 'syncCatalog.aclSyncToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
