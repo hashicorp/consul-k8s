@@ -62,6 +62,7 @@ server:
   # to null (the Kube cluster will pick the default).
   storage: 10Gi
   storageClass: null
+  storageClaimName: "data"
 
   # connect will enable Connect on all the servers, initializing a CA
   # for Connect-related connections. Other customizations can be done
