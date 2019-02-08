@@ -4,6 +4,7 @@ IMPROVEMENTS:
 
   * Supports applying a Consul Enterprise License to the cluster through the Helm chart
   * Support assigning an ACL token to the catalog sync process [[GH 26](https://github.com/hashicorp/consul-k8s/issues/26)]
+  * Updates default `consul` version to `1.4.2` and `consul-k8s` version to `0.5.0`
   
 BUG FIXES:
 
