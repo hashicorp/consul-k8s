@@ -4,6 +4,7 @@ Improvements:
 
 * Clarify the format of the `consul-write-interval` flag for `consul-k8s` [[GH 61](https://github.com/hashicorp/consul-k8s/issues/61)]
 * Add datacenter support to inject annotation
+* Update connect injector logging to remove healthcheck log spam and make important messages more visible
 
 Bug fixes:
 
