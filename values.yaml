@@ -21,7 +21,10 @@ global:
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
   # per component below.
-  imageK8S: "hashicorp/consul-k8s:0.5.0"
+  # Note: support for the catalog sync's liveness and readiness probes was added
+  # to consul-k8s v0.6.0. If using an older consul-k8s version, you may need to
+  # remove these checks to make the sync work.
+  imageK8S: "hashicorp/consul-k8s:0.6.0"
 
   # Datacenter is the name of the datacenter that the agents should register
   # as. This shouldn't be changed once the Consul cluster is up and running

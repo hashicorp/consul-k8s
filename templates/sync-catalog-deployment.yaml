@@ -75,4 +75,24 @@ spec:
                 {{- if .Values.syncCatalog.k8sTag }}
                 -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }}
                 {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+              scheme: HTTP
+            failureThreshold: 5
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 5
 {{- end }}
