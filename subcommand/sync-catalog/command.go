@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -30,6 +32,7 @@ type Command struct {
 	flags                     *flag.FlagSet
 	http                      *flags.HTTPFlags
 	k8s                       *k8sflags.K8SFlags
+	flagListen                string
 	flagToConsul              bool
 	flagToK8S                 bool
 	flagConsulDomain          string
@@ -42,12 +45,15 @@ type Command struct {
 	flagSyncClusterIPServices bool
 	flagNodePortSyncType      string
 
+	consulClient *api.Client
+
 	once sync.Once
 	help string
 }
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+	c.flags.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
 	c.flags.BoolVar(&c.flagToConsul, "to-consul", true,
 		"If true, K8S services will be synced to Consul.")
 	c.flags.BoolVar(&c.flagToK8S, "to-k8s", true,
@@ -113,7 +119,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Setup Consul client
-	consulClient, err := c.http.APIClient()
+	c.consulClient, err = c.http.APIClient()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 		return 1
@@ -131,7 +137,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagToConsul {
 		// Build the Consul sync and start it
 		syncer := &catalogFromK8S.ConsulSyncer{
-			Client:            consulClient,
+			Client:            c.consulClient,
 			Log:               hclog.Default().Named("to-consul/sink"),
 			Namespace:         c.flagK8SSourceNamespace,
 			SyncPeriod:        syncInterval,
@@ -172,7 +178,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		source := &catalogFromConsul.Source{
-			Client:       consulClient,
+			Client:       c.consulClient,
 			Domain:       c.flagConsulDomain,
 			Sink:         sink,
 			Prefix:       c.flagK8SServicePrefix,
@@ -193,6 +199,18 @@ func (c *Command) Run(args []string) int {
 			ctl.Run(ctx.Done())
 		}()
 	}
+
+	// Start healthcheck handler
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health/ready", c.handleReady)
+		var handler http.Handler = mux
+
+		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
+		if err := http.ListenAndServe(c.flagListen, handler); err != nil {
+			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+		}
+	}()
 
 	// Wait on an interrupt to exit
 	sigCh := make(chan os.Signal, 1)
@@ -225,6 +243,18 @@ func (c *Command) Run(args []string) int {
 		}
 		return 0
 	}
+}
+
+func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
+	// The main readiness check is whether sync can talk to
+	// the consul cluster, in this case querying for the leader
+	_, err := c.consulClient.Status().Leader()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("[GET /health/ready] Error getting leader status: %s", err))
+		rw.WriteHeader(500)
+		return
+	}
+	rw.WriteHeader(204)
 }
 
 func (c *Command) Synopsis() string { return synopsis }
