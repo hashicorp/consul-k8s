@@ -220,3 +220,25 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].command | map(select(test("/consul/userconfig/foo"))) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
+
+#--------------------------------------------------------------------
+# priorityClassName
+
+@test "client/DaemonSet: priorityClassName is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "client/DaemonSet: specified priorityClassName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.priorityClassName=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}

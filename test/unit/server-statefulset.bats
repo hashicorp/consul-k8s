@@ -265,3 +265,26 @@ load _helpers
       yq '.spec.template.spec.affinity | .podAntiAffinity? != null' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+
+#--------------------------------------------------------------------
+# priorityClassName
+
+@test "server/StatefulSet: priorityClassName is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: specified priorityClassName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml \
+      --set 'server.priorityClassName=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
