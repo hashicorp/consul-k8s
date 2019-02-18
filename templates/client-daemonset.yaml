@@ -28,6 +28,9 @@ spec:
         hasDNS: "true"
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if .Values.client.annotations }}
+{{ toYaml .Values.client.annotations | indent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: 10
 

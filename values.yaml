@@ -112,6 +112,9 @@ server:
   # used to assign priority to server pods
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
+  
+  # Extra annotations to attach to the server pods
+  annotations: {}
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
@@ -147,6 +150,9 @@ client:
   # used to assign priority to client pods
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
+ 
+  # Extra annotations to attach to the client pods
+  annotations: {}
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
