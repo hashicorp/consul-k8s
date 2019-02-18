@@ -59,7 +59,7 @@ spec:
             {{- end }}
         {{- end }}
       {{- if .Values.server.priorityClassName }}
-      priorityClassName: "{{ .Values.server.priorityClassName }}"
+      priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
       containers:
         - name: consul

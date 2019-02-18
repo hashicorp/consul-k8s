@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 10
 
       {{- if .Values.client.priorityClassName }}
-      priorityClassName: "{{ .Values.client.priorityClassName }}"
+      priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
 
       # Consul agents require a directory for data, even clients. The data
