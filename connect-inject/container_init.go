@@ -18,6 +18,7 @@ type initContainerCommandUpstreamData struct {
 	Name       string
 	LocalPort  int32
 	Datacenter string
+	Query	   string
 }
 
 // containerInit returns the init container spec for registering the Consul
@@ -44,19 +45,28 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
 			parts := strings.SplitN(raw, ":", 3)
-			port, _ := portValue(pod, strings.TrimSpace(parts[1]))
 
-			// parse the optional datacenter
-			datacenter := ""
-			if len(parts) > 2 {
-				datacenter = strings.TrimSpace(parts[2])
-			}
+			var datacenter, service_name, prepared_query string
+			var port int32
+			if parts[0] == "prepared_query" {
+				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
+				prepared_query = strings.TrimSpace(parts[1])
+			} else {
+				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
+				service_name = strings.TrimSpace(parts[0])
+
+				// parse the optional datacenter
+				if len(parts) > 2 {
+					datacenter = strings.TrimSpace(parts[2])
+				}
+			} 
 
 			if port > 0 {
 				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
-					Name:       strings.TrimSpace(parts[0]),
+					Name:       service_name,
 					LocalPort:  port,
 					Datacenter: datacenter,
+					Query: 	prepared_query,
 				})
 			}
 		}
@@ -131,7 +141,14 @@ services {
 
     {{ range .Upstreams -}}
     upstreams {
+		{{- if .Name }}
+      destination_type = "service" 
       destination_name = "{{ .Name }}"
+      {{- end}}
+      {{- if .Query }}
+      destination_type = "prepared_query" 
+      destination_name = "{{ .Query}}"
+      {{- end}}
       local_bind_port = {{ .LocalPort }}
       {{- if .Datacenter }}
       datacenter = "{{ .Datacenter }}"
