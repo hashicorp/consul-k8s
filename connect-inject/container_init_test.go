@@ -91,6 +91,27 @@ func TestHandlerContainerInit(t *testing.T) {
 			"",
 			`datacenter`,
 		},
+		{
+			"Prepared Query specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
+				return pod
+			},
+			`destination_type = "prepared_query"`,
+			"",
+		},
+
+		{
+			"Prepared Query specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
+				return pod
+			},
+			`destination_name = "handle"`,
+			"",
+		},
 
 		{
 			"Service ID set to POD_NAME env var",
