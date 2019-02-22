@@ -92,7 +92,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			`datacenter`,
 		},
 		{
-			"Prepared Query specified",
+			"Check Destination Type Query Annotation",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
@@ -103,7 +103,7 @@ func TestHandlerContainerInit(t *testing.T) {
 		},
 
 		{
-			"Prepared Query specified",
+			"Check Destination Name Query Annotation",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
