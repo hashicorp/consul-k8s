@@ -99,7 +99,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			`destination_type = "prepared_query"`,
-			"",
+			`destination_type = "service"`,
 		},
 
 		{
