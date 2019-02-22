@@ -141,7 +141,7 @@ services {
 
     {{ range .Upstreams -}}
     upstreams {
-		{{- if .Name }}
+      {{- if .Name }}
       destination_type = "service" 
       destination_name = "{{ .Name }}"
       {{- end}}
