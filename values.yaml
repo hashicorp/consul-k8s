@@ -112,7 +112,7 @@ server:
   # used to assign priority to server pods
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
-  
+
   # Extra annotations to attach to the server pods
   annotations: {}
 
@@ -150,7 +150,7 @@ client:
   # used to assign priority to client pods
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
- 
+
   # Extra annotations to attach to the client pods
   annotations: {}
 
