@@ -242,3 +242,25 @@ load _helpers
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
   [ "${actual}" = "testing" ]
 }
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "client/DaemonSet: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "client/DaemonSet: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
