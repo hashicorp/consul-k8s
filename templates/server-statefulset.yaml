@@ -38,7 +38,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.server.annotations }}
-{{ toYaml .Values.server.annotations | indent 8 }}
+          {{- toYaml .Values.server.annotations | nindent 8 }}
         {{- end }}
     spec:
     {{- if .Values.server.affinity }}
