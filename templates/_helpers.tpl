@@ -51,3 +51,15 @@ Add a special case for replicas=1, where it should default to 0 as well.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Inject extra environment vars in the format key:value, if populated
+*/}}
+{{- define "consul.extraEnvironmentVars" -}}
+{{- if .extraEnvironmentVars -}}
+{{- range $key, $value := .extraEnvironmentVars }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
