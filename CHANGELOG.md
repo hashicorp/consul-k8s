@@ -3,6 +3,7 @@
 IMPROVEMENTS:
 
   * Support pod priority classes for Consul servers and clients
+  * Add annotation and additional spec values for the UI service
 
 ## 0.6.0 (February 8, 2019)
 
