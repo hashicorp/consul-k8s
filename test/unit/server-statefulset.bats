@@ -266,7 +266,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-
 #--------------------------------------------------------------------
 # priorityClassName
 
@@ -414,3 +413,31 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# extraEnvironmentVariables
+
+@test "server/StatefulSet: custom environment variables" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.extraEnvironmentVars.custom_proxy=fakeproxy' \
+      --set 'server.extraEnvironmentVars.no_proxy=custom_no_proxy' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.[2].name' | tee /dev/stderr)
+  [ "${actual}" = "custom_proxy" ]
+
+  local actual=$(echo $object |
+      yq -r '.[2].value' | tee /dev/stderr)
+  [ "${actual}" = "fakeproxy" ]
+
+  local actual=$(echo $object |
+      yq -r '.[3].name' | tee /dev/stderr)
+  [ "${actual}" = "no_proxy" ]
+
+  local actual=$(echo $object |
+      yq -r '.[3].value' | tee /dev/stderr)
+  [ "${actual}" = "custom_no_proxy" ]
+}
