@@ -305,7 +305,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
-      --set 'server.annotations.foo=bar' \
+      --set 'server.annotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
