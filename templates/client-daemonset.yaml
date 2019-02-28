@@ -29,7 +29,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if .Values.client.annotations }}
-          {{- toYaml .Values.client.annotations | nindent 8 }}
+          {{- tpl .Values.client.annotations . | nindent 8 }}
         {{- end }}
     spec:
       terminationGracePeriodSeconds: 10

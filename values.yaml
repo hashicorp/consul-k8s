@@ -114,7 +114,9 @@ server:
   priorityClassName: ""
 
   # Extra annotations to attach to the server pods
-  annotations: {}
+  # This should be a multi-line string mapping directly to the a map of
+  # the annotations to apply to the server pods
+  annotations: null
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
@@ -152,7 +154,9 @@ client:
   priorityClassName: ""
 
   # Extra annotations to attach to the client pods
-  annotations: {}
+  # This should be a multi-line string mapping directly to the a map of
+  # the annotations to apply to the client pods
+  annotations: null
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
