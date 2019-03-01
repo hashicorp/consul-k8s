@@ -29,6 +29,8 @@ type Notify struct {
 // be called. In either case, Stop will block until the notifier is stopped.
 func (n *Notify) Start(ctx context.Context) {
 	ctx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
+
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
