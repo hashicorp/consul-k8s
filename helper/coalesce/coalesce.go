@@ -33,35 +33,22 @@ func Coalesce(ctx context.Context, quiet, max time.Duration, f func(context.Cont
 	ctx, maxCloser := context.WithTimeout(ctx, max)
 	defer maxCloser()
 
-	// Setup the variables to store the context and cancellation function
-	// for each iteration. We do this outside of the loop so that we can
-	// setup a defer to ensure we cleanup any resources associated with the
-	// context.
-	var curCtx context.Context
-	var curCancel context.CancelFunc = func() {}
-	defer func() {
-		// Defer has to be wrapped in a func() so we don't dereferene the
-		// wrong curCancel. The function call is deferred but curCancel is
-		// dereferenced immediately.
-		curCancel()
-	}()
-
 	for {
-		// Cancel the previous context
-		curCancel()
-
-		// Create a context with our quiet period
-		curCtx, curCancel = context.WithTimeout(ctx, quiet)
-		defer curCancel()
-
-		// Call the function
-		f(curCtx)
-
-		// If the context ended, then we're also done. If the context didn't
-		// end, then the function processed successfully and we continue.
-		err := curCtx.Err()
+		err := doCoalesce(ctx, quiet, f)
 		if err != nil {
 			return
 		}
 	}
+}
+
+func doCoalesce(ctx context.Context, quiet time.Duration, f func(context.Context)) error {
+	// Create a context with our quiet period
+	curCtx, curCancel := context.WithTimeout(ctx, quiet)
+	defer curCancel()
+	// Call the function
+	f(curCtx)
+
+	// If the context ended, then we're also done. If the context didn't
+	// end, then the function processed successfully and we continue.
+	return curCtx.Err()
 }
