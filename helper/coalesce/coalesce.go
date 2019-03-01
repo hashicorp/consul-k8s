@@ -52,6 +52,7 @@ func Coalesce(ctx context.Context, quiet, max time.Duration, f func(context.Cont
 
 		// Create a context with our quiet period
 		curCtx, curCancel = context.WithTimeout(ctx, quiet)
+		defer curCancel()
 
 		// Call the function
 		f(curCtx)
