@@ -9,22 +9,22 @@ import (
 )
 
 type initContainerCommandData struct {
-	PodName     string
 	ServiceName string
 	ServicePort int32
 	Upstreams   []initContainerCommandUpstreamData
 }
 
 type initContainerCommandUpstreamData struct {
-	Name      string
-	LocalPort int32
+	Name       string
+	LocalPort  int32
+	Datacenter string
+	Query	   string
 }
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	data := initContainerCommandData{
-		PodName:     pod.Name,
 		ServiceName: pod.Annotations[annotationService],
 	}
 	if data.ServiceName == "" {
@@ -44,12 +44,29 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	// If upstreams are specified, configure those
 	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
-			parts := strings.SplitN(raw, ":", 2)
-			port, _ := portValue(pod, strings.TrimSpace(parts[1]))
+			parts := strings.SplitN(raw, ":", 3)
+
+			var datacenter, service_name, prepared_query string
+			var port int32
+			if parts[0] == "prepared_query" {
+				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
+				prepared_query = strings.TrimSpace(parts[1])
+			} else {
+				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
+				service_name = strings.TrimSpace(parts[0])
+
+				// parse the optional datacenter
+				if len(parts) > 2 {
+					datacenter = strings.TrimSpace(parts[2])
+				}
+			} 
+
 			if port > 0 {
 				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
-					Name:      strings.TrimSpace(parts[0]),
-					LocalPort: port,
+					Name:       service_name,
+					LocalPort:  port,
+					Datacenter: datacenter,
+					Query: 	prepared_query,
 				})
 			}
 		}
@@ -80,6 +97,12 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
 				},
 			},
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			corev1.VolumeMount{
@@ -101,7 +124,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "{{ .PodName }}-{{ .ServiceName }}-proxy"
+  id   = "${POD_NAME}-{{ .ServiceName }}-proxy"
   name = "{{ .ServiceName }}-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -118,8 +141,18 @@ services {
 
     {{ range .Upstreams -}}
     upstreams {
+      {{- if .Name }}
+      destination_type = "service" 
       destination_name = "{{ .Name }}"
+      {{- end}}
+      {{- if .Query }}
+      destination_type = "prepared_query" 
+      destination_name = "{{ .Query}}"
+      {{- end}}
       local_bind_port = {{ .LocalPort }}
+      {{- if .Datacenter }}
+      datacenter = "{{ .Datacenter }}"
+      {{- end}}
     }
     {{ end }}
   }
@@ -142,7 +175,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="{{ .PodName }}-{{ .ServiceName }}-proxy" \
+  -proxy-id="${POD_NAME}-{{ .ServiceName }}-proxy" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary

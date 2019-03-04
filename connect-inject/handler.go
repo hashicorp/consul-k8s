@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -71,14 +72,21 @@ type Handler struct {
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.
 	RequireAnnotation bool
+
+	// Log
+	Log hclog.Logger
 }
 
 // Handle is the http.HandlerFunc implementation that actually handles the
 // webhook request for admission control. This should be registered or
 // served via an HTTP server.
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+	h.Log.Info("Request received", "Method", r.Method, "URL", r.URL)
+
 	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		http.Error(w, fmt.Sprintf("Invalid content-type: %q", ct), http.StatusBadRequest)
+		msg := fmt.Sprintf("Invalid content-type: %q", ct)
+		http.Error(w, msg, http.StatusBadRequest)
+		h.Log.Error("Error on request", "Error", msg, "Code", http.StatusBadRequest)
 		return
 	}
 
@@ -86,20 +94,23 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Body != nil {
 		var err error
 		if body, err = ioutil.ReadAll(r.Body); err != nil {
-			http.Error(w, fmt.Sprintf(
-				"Error reading request body: %s", err), http.StatusBadRequest)
+			msg := fmt.Sprintf("Error reading request body: %s", err)
+			http.Error(w, msg, http.StatusBadRequest)
+			h.Log.Error("Error on request", "Error", msg, "Code", http.StatusBadRequest)
 			return
 		}
 	}
 	if len(body) == 0 {
-		http.Error(w, "Empty request body", http.StatusBadRequest)
+		msg := "Empty request body"
+		http.Error(w, msg, http.StatusBadRequest)
+		h.Log.Error("Error on request", "Error", msg, "Code", http.StatusBadRequest)
 		return
 	}
 
 	var admReq v1beta1.AdmissionReview
 	var admResp v1beta1.AdmissionReview
 	if _, _, err := deserializer.Decode(body, nil, &admReq); err != nil {
-		log.Printf("Could not decode admission request: %s", err)
+		h.Log.Error("Could not decode admission request", "Error", err)
 		admResp.Response = admissionError(err)
 	} else {
 		admResp.Response = h.Mutate(admReq.Request)
@@ -107,14 +118,14 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := json.Marshal(&admResp)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(
-			"Error marshalling admission response: %s", err),
-			http.StatusInternalServerError)
+		msg := fmt.Sprintf("Error marshalling admission response: %s", err)
+		http.Error(w, msg, http.StatusInternalServerError)
+		h.Log.Error("Error on request", "Error", msg, "Code", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := w.Write(resp); err != nil {
-		log.Printf("error writing response: %s", err)
+		h.Log.Error("Error writing response", "Error", err)
 	}
 }
 
@@ -138,9 +149,12 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		UID:     req.UID,
 	}
 
+	// Accumulate any patches here
+	var patches []jsonpatch.JsonPatchOperation
+
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since k.
-	if err := h.defaultAnnotations(&pod); err != nil {
+	if err := h.defaultAnnotations(&pod, &patches); err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
@@ -159,9 +173,6 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	} else if !shouldInject {
 		return resp
 	}
-
-	// Accumulate any patches here
-	var patches []jsonpatch.JsonPatchOperation
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
@@ -263,7 +274,7 @@ func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
 	return !h.RequireAnnotation, nil
 }
 
-func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
+func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonPatchOperation) error {
 	if pod.ObjectMeta.Annotations == nil {
 		pod.ObjectMeta.Annotations = make(map[string]string)
 	}
@@ -271,6 +282,13 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 	// Default service name is the name of the first container.
 	if _, ok := pod.ObjectMeta.Annotations[annotationService]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
+			// Create the patch for this first, so that the Annotation
+			// object will be created if necessary
+			*patches = append(*patches, updateAnnotation(
+				pod.Annotations,
+				map[string]string{annotationService: cs[0].Name})...)
+
+			// Set the annotation for checking in shouldInject
 			pod.ObjectMeta.Annotations[annotationService] = cs[0].Name
 		}
 	}
@@ -280,8 +298,20 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
 				if ps[0].Name != "" {
+					// Create the patch for this first, so that the Annotation
+					// object will be created if necessary
+					*patches = append(*patches, updateAnnotation(
+						pod.Annotations,
+						map[string]string{annotationPort: ps[0].Name})...)
+
 					pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
 				} else {
+					// Create the patch for this first, so that the Annotation
+					// object will be created if necessary
+					*patches = append(*patches, updateAnnotation(
+						pod.Annotations,
+						map[string]string{annotationPort: strconv.Itoa(int(ps[0].ContainerPort))})...)
+
 					pod.ObjectMeta.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
 			}

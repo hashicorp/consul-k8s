@@ -44,7 +44,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			`service = "web"`,
+			`alias_service = "web"`,
 			`upstreams`,
 		},
 
@@ -55,7 +55,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationPort] = "1234"
 				return pod
 			},
-			"port = 1234",
+			"local_service_port = 1234",
 			"",
 		},
 
@@ -67,6 +67,71 @@ func TestHandlerContainerInit(t *testing.T) {
 				return pod
 			},
 			`destination_name = "db"`,
+			"",
+		},
+
+		{
+			"Upstream datacenter specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
+				return pod
+			},
+			`datacenter = "dc1"`,
+			"",
+		},
+
+		{
+			"No Upstream datacenter specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			"",
+			`datacenter`,
+		},
+		{
+			"Check Destination Type Query Annotation",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
+				return pod
+			},
+			`destination_type = "prepared_query"`,
+			`destination_type = "service"`,
+		},
+
+		{
+			"Check Destination Name Query Annotation",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "prepared_query:handle:1234"
+				return pod
+			},
+			`destination_name = "handle"`,
+			"",
+		},
+
+		{
+			"Service ID set to POD_NAME env var",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			`id   = "${POD_NAME}-web-proxy"`,
+			"",
+		},
+
+		{
+			"Proxy ID set to POD_NAME env var",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			`-proxy-id="${POD_NAME}-web-proxy"`,
 			"",
 		},
 	}
