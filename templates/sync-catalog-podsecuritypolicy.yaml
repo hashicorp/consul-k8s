@@ -30,7 +30,6 @@ spec:
     # Require the container to run without root privileges.
     rule: 'RunAsAny'
   seLinux:
-    # This policy assumes the nodes are using AppArmor rather than SELinux.
     rule: 'RunAsAny'
   supplementalGroups:
     rule: 'RunAsAny'
