@@ -13,5 +13,5 @@ metadata:
     release: {{ .Release.Name }}
 data:
   extra-from-values.json: |-
-{{ tpl .Values.client.extraConfig . | indent 4 }}
+{{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
 {{- end }}
