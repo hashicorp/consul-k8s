@@ -41,6 +41,8 @@ spec:
                   name: {{ .Values.server.enterpriseLicense.secretName }}
                   key: {{ .Values.server.enterpriseLicense.secretKey }}
           command: 
+            - "/bin/sh"
+            - "-ec"
             - |
               curl -fsSL -X PUT http://{{ template "consul.fullname" . }}-server:8500/v1/operator/license \
                 --data {$ENTERPRISE_LICENSE}
