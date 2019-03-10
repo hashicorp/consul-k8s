@@ -1,0 +1,31 @@
+{{- if (and (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.enabled | toString) "-") .Values.ui.enabled) (and (eq (.Values.ui.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.ingress.enabled | toString) "-") .Values.ui.ingress.enabled) (and (eq (.Values.ui.ingress.enabled | toString) "-") .Values.global.enabled))) }}
+{{- $serviceName := printf "%s-%s" (include "consul.fullname" .) "ui" -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "consul.fullname" . }}-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  {{- if .Values.ui.ingress.annotations }}
+  annotations:
+    {{ tpl (toYaml .Values.ui.ingress.annotations) . | nindent 4 | trim }}
+  {{- end}}
+spec:
+  rules:
+  {{- range .Values.ui.ingress.hosts }}
+    - host: {{ . }}
+      http:
+        paths:
+          - backend:
+              serviceName: {{ $serviceName }}
+              servicePort: 80
+  {{- end -}}
+  {{- if .Values.ui.ingress.tls }}
+  tls:
+    {{ tpl (toYaml .Values.ui.ingress.tls) . | nindent 4 | trim }}
+  {{- end }}
+{{- end }}
