@@ -941,6 +941,27 @@ ui:
     # @type: string
     additionalSpec: null
 
+  ## True if you want to create an Ingress for the Consul UI.
+  ingress:
+    enabled: false
+
+    # hosts is a list of host name to create Ingress rules.
+    # The value below is an array of objects, examples are shown below.
+    hosts: []
+    # - sslexample.foo.com
+
+    # tls is a list of hosts and secret name in an Ingress
+    # which tells the Ingress controller to secure the channel.
+    # The value below is an array of objects, examples are shown below.
+    tls: []
+      # - hosts:
+      #   - sslexample.foo.com
+    #   secretName: testsecret-tls
+
+    # This should be a multi-line string mapping directly to the a map of
+    # the annotations to configure some options depending on the Ingress controller
+    annotations: null
+
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
 # to K8S or K8S to Consul only).
