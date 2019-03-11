@@ -6,6 +6,10 @@ IMPROVEMENTS:
   * Add annotation and additional spec values for the UI service
   * Add liveness and readiness checks to the catalog sync pod [[consul-k8s GH 57](https://github.com/hashicorp/consul-k8s/issues/57)]
   * Support custom annotations for Consul clients and servers
+  
+BUG FIXES:
+
+  * Allow setting `extraConfig` variables using Helm's `--set` flag [[GH 74](https://github.com/hashicorp/consul-helm/issues/74)]
 
 ## 0.6.0 (February 8, 2019)
 
