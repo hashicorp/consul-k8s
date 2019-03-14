@@ -6,6 +6,7 @@ Improvements:
 
 * Add support for prepared queries in the Connect upstream annotation
 * Add a health endpoint to the catalog sync process that can be used for Kubernetes health and readiness checks
+* Use service's namespace when registering endpoints
 
 ## 0.5.0 (February 8, 2019)
 
