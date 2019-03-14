@@ -6,6 +6,8 @@ IMPROVEMENTS:
   * Add annotation and additional spec values for the UI service
   * Add liveness and readiness checks to the catalog sync pod [[consul-k8s GH 57](https://github.com/hashicorp/consul-k8s/issues/57)]
   * Support custom annotations for Consul clients and servers
+  * Support PodSecurityPolicies for Consul components
+  * Add service accounts and cluster roles/role bindings for each Consul component
   
 BUG FIXES:
 
