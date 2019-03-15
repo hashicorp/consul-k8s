@@ -267,6 +267,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# nodeSelector
+
+@test "server/StatefulSet: nodeSelector is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: specified nodeSelector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml \
+      --set 'server.nodeSelector=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "server/StatefulSet: priorityClassName is not set by default" {
