@@ -97,6 +97,9 @@ spec:
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.global.domain }} \
+                {{- if .Values.global.gossipKey }}
+                -encrypt="{{ .Values.global.gossipKey }}" \
+                {{- end }}
                 {{- if .Values.server.connect }}
                 -hcl="connect { enabled = true }" \
                 {{- end }}
