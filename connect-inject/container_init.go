@@ -169,6 +169,13 @@ services {
     alias_service = "{{ .ServiceName }}"
   }
 }
+
+services {
+  id   = "${POD_NAME}-{{ .ServiceName }}"
+  name = "{{ .ServiceName }}"
+  address = "${POD_IP}"
+  port = {{ .ServicePort }}
+}
 EOF
 
 /bin/consul services register /consul/connect-inject/service.hcl
