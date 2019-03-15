@@ -222,6 +222,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# nodeSelector
+
+@test "client/DaemonSet: nodeSelector is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "client/DaemonSet: specified nodeSelector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      --set 'client.nodeSelector=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "client/DaemonSet: priorityClassName is not set by default" {
