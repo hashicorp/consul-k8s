@@ -18,7 +18,7 @@ type initContainerCommandUpstreamData struct {
 	Name       string
 	LocalPort  int32
 	Datacenter string
-	Query	   string
+	Query      string
 }
 
 // containerInit returns the init container spec for registering the Consul
@@ -59,14 +59,14 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 				if len(parts) > 2 {
 					datacenter = strings.TrimSpace(parts[2])
 				}
-			} 
+			}
 
 			if port > 0 {
 				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
 					Name:       service_name,
 					LocalPort:  port,
 					Datacenter: datacenter,
-					Query: 	prepared_query,
+					Query:      prepared_query,
 				})
 			}
 		}
@@ -168,6 +168,13 @@ services {
     name = "Destination Alias"
     alias_service = "{{ .ServiceName }}"
   }
+}
+
+services {
+  id   = "${POD_NAME}-{{ .ServiceName }}"
+  name = "{{ .ServiceName }}"
+  address = "${POD_IP}"
+  port = {{ .ServicePort }}
 }
 EOF
 
