@@ -37,10 +37,14 @@ global:
   # chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/
   enablePodSecurityPolicies: false
 
-  # Gossip encryption key. To disable gossip encryption, set this to null.
-  # Note: DO NOT use the provided key in production. Generate your own with
-  # "consul keygen" and paste it here.
-  gossipKey: cg8StVXbQJ0gPvMd9o7yrg==
+  # Gossip encryption key. To enable gossip encryption, provide the name of
+  # a Kubernetes secret that contains a gossip key. You can create a gossip
+  # key with the "consul keygen" command. 
+  # See https://www.consul.io/docs/commands/keygen.html 
+  gossipEncryption:
+    enabled: false
+    secretName: null
+    secretKey: null
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
