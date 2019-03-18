@@ -370,7 +370,17 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/StatefulSet: gossip CLI option present in server StatefulSet when all config is provided" {
+@test "server/StatefulSet: encrypt CLI option not present in server StatefulSet when encryption disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.gossipEncryption.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | join(" ") | contains("encrypt")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: encrypt CLI option present in server StatefulSet when all config is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
