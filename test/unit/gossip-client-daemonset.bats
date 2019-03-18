@@ -14,7 +14,7 @@ load _helpers
 @test "global/gossipEncryption: disabled in client DaemonSet when servers are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/client-daemonset.yaml  \
       --set 'server.enabled=false' \
       --set 'global.gossipEncryption.enabled=true' \
       --set 'global.gossipEncryption.secretName=foo' \
