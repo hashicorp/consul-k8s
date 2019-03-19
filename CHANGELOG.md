@@ -8,6 +8,7 @@ IMPROVEMENTS:
   * Support custom annotations for Consul clients and servers
   * Support PodSecurityPolicies for Consul components
   * Add service accounts and cluster roles/role bindings for each Consul component
+  * Support tolerations on Consul client and server pods
   
 BUG FIXES:
 
