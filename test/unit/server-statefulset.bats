@@ -312,6 +312,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# tolerations
+
+@test "server/StatefulSet: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .tolerations? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.tolerations=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # gossip encryption
 
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet by default" {
@@ -391,3 +413,4 @@ load _helpers
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | join(" ") | contains("encrypt")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+

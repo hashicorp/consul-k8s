@@ -266,6 +266,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# tolerations
+
+@test "client/DaemonSet: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .tolerations? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.tolerations=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # gossip encryption
 
 @test "client/DaemonSet: gossip encryption disabled in client DaemonSet by default" {
