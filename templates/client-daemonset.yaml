@@ -78,6 +78,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            {{- if (and .Values.global.gossipEncryption.enabled .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+            - name: GOSSIP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.gossipEncryption.secretName }}
+                  key: {{ .Values.global.gossipEncryption.secretKey }}
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -100,6 +107,9 @@ spec:
                 {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
+                {{- if (and .Values.global.gossipEncryption.enabled .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                -encrypt="${GOSSIP_KEY}" \
+                {{- end }}
                 {{- if (.Values.client.join) and (gt (len .Values.client.join) 0) }}
                 {{- range $value := .Values.client.join }}
                 -retry-join="{{ $value }}" \
