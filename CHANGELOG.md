@@ -1,14 +1,17 @@
 ## UNRELEASED
 
+Improvements:
+
+* Use service's namespace when registering endpoints
+* Updates the Coalesce method to pass go vet tests
+* Register Connect services along with the proxy. This allows the services to appear in the intention dropdown in the UI.[[GH 77](https://github.com/hashicorp/consul-helm/issues/77)]
+
 ## 0.6.0 (February 22, 2019)
 
 Improvements:
 
 * Add support for prepared queries in the Connect upstream annotation
 * Add a health endpoint to the catalog sync process that can be used for Kubernetes health and readiness checks
-* Use service's namespace when registering endpoints
-* Updates the Coalesce method to pass go vet tests
-* Register Connect services along with the proxy. This allows the services to appear in the intention dropdown in the UI.[[GH 77](https://github.com/hashicorp/consul-helm/issues/77)]
 
 ## 0.5.0 (February 8, 2019)
 
