@@ -2,12 +2,13 @@
 
 IMPROVEMENTS:
 
-  * Support pod priority classes for Consul servers and clients
+  * Support pod PriorityClasses for Consul servers and clients
   * Add annotation and additional spec values for the UI service
   * Add liveness and readiness checks to the catalog sync pod [[consul-k8s GH 57](https://github.com/hashicorp/consul-k8s/issues/57)]
   * Support custom annotations for Consul clients and servers
   * Support PodSecurityPolicies for Consul components
   * Add service accounts and cluster roles/role bindings for each Consul component
+  * Add the namespace to the metadata volume name
   * Support tolerations on Consul client and server pods
   * Support gossip protocol encryption
   * Allows custom environment variables for Consul client and server pods
@@ -16,6 +17,7 @@ IMPROVEMENTS:
 BUG FIXES:
 
   * Allow setting `extraConfig` variables using Helm's `--set` flag [[GH 74](https://github.com/hashicorp/consul-helm/issues/74)]
+  * Fix a formatting bug in the enterprise license command
 
 ## 0.6.0 (February 8, 2019)
 
