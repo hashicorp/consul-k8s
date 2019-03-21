@@ -355,6 +355,7 @@ load _helpers
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | join(" ") | contains("encrypt")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
 @test "client/DaemonSet: encrypt CLI option present in client DaemonSet when all config is provided" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -365,6 +366,7 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | join(" ") | contains("encrypt")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
 
 #--------------------------------------------------------------------
 # extraEnvironmentVariables
