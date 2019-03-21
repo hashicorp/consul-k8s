@@ -181,7 +181,8 @@ function build_consul_local {
    #   If the XC_OS or the XC_ARCH environment vars are present then only those platforms/architectures
    #   will be built. Otherwise all supported platform/architectures are built
    #   The NOGOX environment variable will be used if present. This will prevent using gox and instead
-   #   build with go install
+   #   build with go install.
+   #   The GOXPARALLEL environment variable is used if set
 
    if ! test -d "$1"
    then
@@ -241,6 +242,7 @@ function build_consul_local {
          -arch="${build_arch}" \
          -osarch="!darwin/arm !darwin/arm64" \
          -ldflags="${GOLDFLAGS}" \
+         -parallel="${GOXPARALLEL:-"-1"}" \
          -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/consul-k8s" \
          -tags="${GOTAGS}" \
          .
@@ -278,7 +280,7 @@ function build_consul_local {
             then
                GOBIN_EXTRA="${os}_${arch}/"
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}consul-k8s" "${outdir}/consul-k8s"
+            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"* "${outdir}/consul-k8s"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"
