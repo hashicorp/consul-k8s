@@ -142,8 +142,8 @@ server:
   # in case kubernetes cluster is behind egress http proxies. Additionally, it could be used to configure
   # custom consul parameters.
   extraEnvironmentVars: {}
-    # http_proxy: http://localhost:3128
-    # https_proxy: http://localhost:3128
+    # http_proxy: http://localhost:3128,
+    # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
 
 # Client, when enabled, configures Consul clients to run on every node
