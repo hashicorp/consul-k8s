@@ -1672,8 +1672,6 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	require.Len(actual, 0)
 }
 
-
-
 // Test that the ClusterIP services are synced when watching all namespaces
 func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	t.Parallel()
@@ -1691,7 +1689,6 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 		ClusterIPSync: true,
 	})
 	defer closer()
-
 
 	// Insert the service
 	_, err := client.CoreV1().Services(testNamespace).Create(&apiv1.Service{
