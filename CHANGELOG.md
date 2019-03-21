@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 0.7.0 (March 21, 2019)
+
 IMPROVEMENTS:
 
   * Support pod PriorityClasses for Consul servers and clients
