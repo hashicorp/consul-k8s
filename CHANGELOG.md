@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.7.0 (March 21, 2019)
 
 Improvements:
 
