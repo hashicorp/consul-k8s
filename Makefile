@@ -8,9 +8,7 @@ GOTOOLS = \
 	github.com/magiconair/vendorfmt/cmd/vendorfmt \
 	github.com/mitchellh/gox \
 	golang.org/x/tools/cmd/cover \
-	golang.org/x/tools/cmd/stringer \
-	github.com/axw/gocov/gocov \
-	gopkg.in/matm/v1/gocov-html
+	golang.org/x/tools/cmd/stringer
 
 DEV_IMAGE?=consul-k8s-dev
 GO_BUILD_TAG?=consul-k8s-build-go
