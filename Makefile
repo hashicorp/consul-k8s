@@ -85,6 +85,10 @@ dev-tree:
 test:
 	go test ./...
 
+cov:
+	go test ./... -coverprofile=coverage.out
+	go tool cover -html=coverage.out
+
 tools:
 	go get -u -v $(GOTOOLS)
 
