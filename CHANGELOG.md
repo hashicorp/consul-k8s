@@ -11,6 +11,7 @@ IMPROVEMENTS:
   * Support tolerations on Consul client and server pods
   * Support gossip protocol encryption
   * Allows custom environment variables for Consul client and server pods
+  * Support nodeSelectors for all components
   
 BUG FIXES:
 
