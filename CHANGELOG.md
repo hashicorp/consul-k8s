@@ -3,8 +3,9 @@
 Improvements:
 
 * Use service's namespace when registering endpoints
-* Updates the Coalesce method to pass go vet tests
+* Update the Coalesce method to pass go vet tests
 * Register Connect services along with the proxy. This allows the services to appear in the intention dropdown in the UI.[[GH 77](https://github.com/hashicorp/consul-helm/issues/77)]
+* Add `-log-level` CLI flag for catalog sync
 
 ## 0.6.0 (February 22, 2019)
 
