@@ -10,6 +10,7 @@ IMPROVEMENTS:
   * Add service accounts and cluster roles/role bindings for each Consul component
   * Support tolerations on Consul client and server pods
   * Support gossip protocol encryption
+  * Allows custom environment variables for Consul client and server pods
   
 BUG FIXES:
 
