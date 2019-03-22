@@ -52,29 +52,10 @@ jobs:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
 
-      # Use CircleCI test splitting by classname. Since there are no classes in go,
-      # we fake it by taking everything after github.com/hashicorp/consul-k8s/ and setting
-      # it as the classname.
-
-      # This first loop writes go test results to <reportname>.xml per go package
+      # run go tests with gotestsum
       - run: |
-          for pkg in $(go list ./... | tr '\n' ' '); do
-            reportname=$(echo $pkg | cut -d '/' -f3- | sed "s#/#_#g")
-            gotestsum --format=short-verbose --junitfile $TEST_RESULTS/$reportname.xml -- $pkg
-          done
-
-      # This loop goes through all the test result files and renames classname for
-      # CircleCI's test metadata according to the filename (package) the test was in.
-      - run:
-          command: |
-            for file in $(ls $TEST_RESULTS/*.xml); do
-              classname=$(basename $file | cut -f 1 -d '.' | sed "s#_#/#g")
-              sed -i "s#classname=\"[^\"]*\"#classname=\"github.com/hashicorp/$classname\"#g" $file
-            done
-          when: always
-
-      # remove all test results files that are empty
-      - run: find $TEST_RESULTS -empty -type f -delete
+          PACKAGE_NAMES=$(go list ./...)
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
