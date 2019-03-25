@@ -15,7 +15,7 @@ global:
   #
   # Examples:
   #   image: "consul:1.4.2"
-  #   image: "consul:1.4.2-ent"   # Enterprise Consul image
+  #   image: "hashicorp/consul-enterprise:1.4.2-ent"   # Enterprise Consul image
   image: "consul:1.4.4"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
