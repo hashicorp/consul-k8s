@@ -164,7 +164,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
-	if shouldInject, err := h.shouldInject(&pod); err != nil {
+	if shouldInject, err := h.shouldInject(&pod, req.Namespace); err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error checking if should inject: %s", err),
@@ -244,10 +244,11 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	return resp
 }
 
-func (h *Handler) shouldInject(pod *corev1.Pod) (bool, error) {
+func (h *Handler) shouldInject(pod *corev1.Pod, namespace string) (bool, error) {
+
 	// Don't inject in the Kubernetes system namespaces
 	for _, ns := range kubeSystemNamespaces {
-		if pod.ObjectMeta.Namespace == ns {
+		if namespace == ns {
 			return false, nil
 		}
 	}
