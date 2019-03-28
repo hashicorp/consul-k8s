@@ -35,10 +35,9 @@ func TestHandlerHandle(t *testing.T) {
 			"kube-system namespace",
 			Handler{Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
+				Namespace: metav1.NamespaceSystem,
 				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceSystem,
-					},
+					Spec: basicSpec,
 				}),
 			},
 			"",
@@ -228,7 +227,7 @@ func TestHandlerHandle(t *testing.T) {
 					actual[i].Value = nil
 				}
 			}
-			require.Equal(actual, tt.Patches)
+			require.Equal(tt.Patches, actual)
 		})
 	}
 }
