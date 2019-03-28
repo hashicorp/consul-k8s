@@ -575,3 +575,6 @@ meshGateway:
 
   # Optional YAML string for additional annotations.
   annotations: null
+
+tests:
+  enabled: true
