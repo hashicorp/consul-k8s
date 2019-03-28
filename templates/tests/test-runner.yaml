@@ -1,3 +1,4 @@
+{{- if (.Values.tests.enabled) }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -29,3 +30,4 @@ spec:
             [ `consul kv get _consul_helm_test` = "$VALUE" ]
             consul kv delete _consul_helm_test
   restartPolicy: Never
+{{- end }}
