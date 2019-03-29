@@ -4,6 +4,10 @@ Improvements:
 
 * Use the endpoint IP address when generating a service id for NodePort services to prevent possible overlap of what are supposed to be unique ids
 
+Bug fixes:
+
+* Exclude Kubernetes system namespaces from Connect injection
+
 ## 0.7.0 (March 21, 2019)
 
 Improvements:
