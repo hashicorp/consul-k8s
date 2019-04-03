@@ -25,6 +25,8 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: connect-injector
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
     spec:
   {{- if not .Values.connectInject.certs.secretName }}
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account

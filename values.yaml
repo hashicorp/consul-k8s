@@ -46,6 +46,12 @@ global:
     secretName: null
     secretKey: null
 
+  # bootstrapACLs will automatically create and assign ACL tokens within 
+  # the Consul cluster. This currently requires enabling both servers and
+  # clients within Kubernetes. Additionally requires Consul v1.4+ and
+  # consul-k8s v0.8.0+.
+  bootstrapACLs: false
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.

@@ -61,6 +61,10 @@ spec:
             secretName: {{ .name }}
             {{- end }}
         {{- end }}
+        {{- if .Values.global.bootstrapACLs }}
+        - name: aclconfig
+          emptyDir: {}
+        {{- end }}
 
       containers:
         - name: consul
@@ -106,6 +110,9 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
+                {{- if .Values.global.bootstrapACLs}}
+                -config-dir=/consul/aclconfig \
+                {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 {{- if (and .Values.global.gossipEncryption.enabled .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
@@ -132,6 +139,10 @@ spec:
             - name: userconfig-{{ .name }}
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if .Values.global.bootstrapACLs}}
+            - name: aclconfig
+              mountPath: /consul/aclconfig
             {{- end }}
           lifecycle:
             preStop:
@@ -173,6 +184,22 @@ spec:
           resources:
             {{ tpl .Values.client.resources . | nindent 12 | trim }}
           {{- end }}
+      {{- if .Values.global.bootstrapACLs }}
+      initContainers:
+      - name: client-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ .Release.Name }}-consul-client-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }} \
+              -init-type="client"
+        volumeMounts:
+          - name: aclconfig
+            mountPath: /consul/aclconfig
+      {{- end }}
       {{- if .Values.client.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.client.nodeSelector . | indent 8 | trim }}

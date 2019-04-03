@@ -13,4 +13,15 @@ metadata:
 data:
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
+  {{- if .Values.global.bootstrapACLs }}
+  acl-config.json: |
+    {
+      "acl": {
+        "enabled": true,
+        "default_policy": "deny",
+        "down_policy": "extend-cache",
+        "enable_token_persistence": true
+      }
+    }
+  {{- end }}
 {{- end }}
