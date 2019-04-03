@@ -48,6 +48,13 @@ spec:
                   name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
                   key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
             {{- end }}
+            {{- if .Values.global.bootstrapACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-consul-catalog-sync-acl-token"
+                  key: "token"
+            {{- end}}
           command:
             - "/bin/sh"
             - "-ec"
@@ -98,6 +105,19 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 5
+      {{- if .Values.global.bootstrapACLs }}
+      initContainers:
+      - name: sync-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ .Release.Name }}-consul-catalog-sync-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }} \
+              -init-type="sync"
+      {{- end }}
       {{- if .Values.syncCatalog.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.syncCatalog.nodeSelector . | indent 8 | trim }}

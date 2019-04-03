@@ -51,3 +51,43 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.enablePodSecurityPolicies
+
+@test "client/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[0].resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "podsecuritypolicies" ]
+}
+
+#--------------------------------------------------------------------
+# global.bootstrapACLs
+
+@test "client/ClusterRole: allows secret access with global.bootsrapACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[0].resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "secrets" ]
+}
+
+@test "client/ClusterRole: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[1].resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "secrets" ]
+}

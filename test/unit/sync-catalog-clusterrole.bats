@@ -51,3 +51,31 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.enablePodSecurityPolicies
+
+@test "syncCatalog/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-clusterrole.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "podsecuritypolicies" ]
+}
+
+#--------------------------------------------------------------------
+# global.bootstrapACLs
+
+@test "syncCatalog/ClusterRole: allows secret access with global.bootsrapACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-clusterrole.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
+  [ "${actual}" = "secrets" ]
+}

@@ -51,3 +51,13 @@ load _helpers
       yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
   [ ! -z "${actual}" ]
 }
+
+@test "server/ConfigMap: creates acl config with .global.bootstrapACLs enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-config-configmap.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq '.data["acl-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
