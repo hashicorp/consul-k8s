@@ -8,8 +8,8 @@ import (
 	fromk8s "github.com/hashicorp/consul-k8s/catalog/from-k8s"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/consul/testrpc"
-	"github.com/hashicorp/consul/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestSource_initServices(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -58,7 +58,7 @@ func TestSource_prefix(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -98,7 +98,7 @@ func TestSource_ignoreK8S(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -136,7 +136,7 @@ func TestSource_deleteService(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -192,7 +192,7 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()

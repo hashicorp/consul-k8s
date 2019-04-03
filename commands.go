@@ -3,7 +3,9 @@ package main
 import (
 	"os"
 
+	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
+	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
 	"github.com/hashicorp/consul-k8s/version"
@@ -17,8 +19,16 @@ func init() {
 	ui := &cli.BasicUi{Writer: os.Stdout, ErrorWriter: os.Stderr}
 
 	Commands = map[string]cli.CommandFactory{
+		"acl-init": func() (cli.Command, error) {
+			return &cmdACLInit.Command{UI: ui}, nil
+		},
+
 		"inject-connect": func() (cli.Command, error) {
 			return &cmdInjectConnect.Command{UI: ui}, nil
+		},
+
+		"server-acl-init": func() (cli.Command, error) {
+			return &cmdServerACLInit.Command{UI: ui}, nil
 		},
 
 		"sync-catalog": func() (cli.Command, error) {

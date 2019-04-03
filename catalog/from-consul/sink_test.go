@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
-	"github.com/hashicorp/consul/testutil/retry"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"

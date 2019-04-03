@@ -7,8 +7,8 @@ import (
 
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/consul/testrpc"
-	"github.com/hashicorp/consul/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestConsulSyncer_register(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -54,7 +54,7 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -106,7 +106,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -161,7 +161,7 @@ func TestConsulSyncer_reapServiceOtherNamespace(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
@@ -194,7 +194,7 @@ func TestConsulSyncer_reapServiceSameNamespace(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t.Name(), ``)
+	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
