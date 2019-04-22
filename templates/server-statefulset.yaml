@@ -81,7 +81,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            {{- if (and .Values.global.gossipEncryption.enabled .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+            {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
             - name: GOSSIP_KEY
               valueFrom:
                 secretKeyRef:
@@ -109,7 +109,7 @@ spec:
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.global.domain }} \
-                {{- if (and .Values.global.gossipEncryption.enabled .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
                 {{- if .Values.server.connect }}

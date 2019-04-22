@@ -42,7 +42,6 @@ global:
   # key with the "consul keygen" command. 
   # See https://www.consul.io/docs/commands/keygen.html 
   gossipEncryption:
-    enabled: false
     secretName: null
     secretKey: null
 
