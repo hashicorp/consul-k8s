@@ -22,6 +22,18 @@ rules:
     verbs:
       - create
       - get
+{{- if .Values.connectInject.enabled }}
+  - apiGroups: [""]
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+  - apiGroups: [""]
+    resources:
+      - services
+    verbs:
+      - get
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -52,8 +52,11 @@ spec:
                 -envoy-image="{{ .Values.connectInject.imageEnvoy }}" \
                 {{ end -}}
                 -listen=:8080 \
+                {{- if .Values.global.bootstrapACLs }}
+                -acl-auth-method="{{ .Release.Name }}-consul-k8s-auth-method" \
+                {{- end }}
 {{- if .Values.connectInject.certs.secretName }}
-                -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }}
+                -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
                 -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
 {{- else }}
                 -tls-auto=${CONSUL_FULLNAME}-connect-injector-cfg \

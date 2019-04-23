@@ -1,6 +1,6 @@
 # The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
 {{- if and (not .Values.connectInject.certs.secretName) (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ template "consul.fullname" . }}-connect-injector-webhook

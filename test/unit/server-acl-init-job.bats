@@ -77,3 +77,28 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+#--------------------------------------------------------------------
+# aclBindingRuleSelector/global.bootstrapACLs
+
+@test "serverACLInit/Job: no acl-binding-rule-selector flag by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml \
+      --set 'connectInject.aclBindingRuleSlector=foo' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: can specify acl-binding-rule-selector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      --set 'connectInject.aclBindingRuleSelector="foo"' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

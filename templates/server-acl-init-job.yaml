@@ -49,7 +49,13 @@ spec:
                 -create-sync-token=true \
                 {{- end }}
                 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
-                -allow-dns=true
+                -allow-dns=true \
+                {{- end }}
+                {{- if .Values.connectInject.enabled }}
+                -create-inject-token=true \
+                {{- end }}
+                {{- if .Values.connectInject.aclBindingRuleSelector }}
+                -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }}
                 {{- end }}
 {{- end }}
 {{- end }}
