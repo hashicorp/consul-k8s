@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +53,9 @@ type ServiceResource struct {
 
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
+
+	//ConsulServicePrefix prepends K8s services in Consul with a prefix
+	ConsulServicePrefix string
 
 	// ExplictEnable should be set to true to require explicit enabling
 	// using annotations. If this is false, then services are implicitly
@@ -177,7 +181,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	// a sync for that namespace.
 	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
 		t.Log.Debug("ignoring system service since we're listening on all namespaces",
-			"service-name", svc.Name)
+			"service-name", t.prefixServiceName(svc.Name))
 		return false
 	}
 
@@ -195,7 +199,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	v, err := strconv.ParseBool(raw)
 	if err != nil {
 		t.Log.Warn("error parsing service-sync annotation",
-			"service-name", svc.Name,
+			"service-name", t.prefixServiceName(svc.Name),
 			"err", err)
 
 		// Fallback to default
@@ -259,7 +263,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	baseService := consulapi.AgentService{
-		Service: svc.Name,
+		Service: t.prefixServiceName(svc.Name),
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
@@ -608,4 +612,11 @@ func (t *serviceEndpointsResource) Delete(key string) error {
 
 	t.Service.Log.Info("delete endpoint", "key", key)
 	return nil
+}
+
+func (t *ServiceResource) prefixServiceName(name string) string {
+	if t.ConsulServicePrefix != "" {
+		return fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
+	}
+	return name
 }
