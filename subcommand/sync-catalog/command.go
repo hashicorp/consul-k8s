@@ -39,6 +39,7 @@ type Command struct {
 	flagConsulK8STag          string
 	flagK8SDefault            bool
 	flagK8SServicePrefix      string
+	flagConsulServicePrefix   string
 	flagK8SSourceNamespace    string
 	flagK8SWriteNamespace     string
 	flagConsulWritePeriod     flags.DurationValue
@@ -65,6 +66,9 @@ func (c *Command) init() {
 			"an annotation can override the default")
 	c.flags.StringVar(&c.flagK8SServicePrefix, "k8s-service-prefix", "",
 		"A prefix to prepend to all services written to Kubernetes from Consul. "+
+			"If this is not set then services will have no prefix.")
+	c.flags.StringVar(&c.flagConsulServicePrefix, "consul-service-prefix", "",
+		"A prefix to prepend to all services written to Consul from Kubernetes. "+
 			"If this is not set then services will have no prefix.")
 	c.flags.StringVar(&c.flagK8SSourceNamespace, "k8s-source-namespace", metav1.NamespaceAll,
 		"The Kubernetes namespace to watch for service changes and sync to Consul. "+
@@ -164,14 +168,15 @@ func (c *Command) Run(args []string) int {
 		ctl := &controller.Controller{
 			Log: logger.Named("to-consul/controller"),
 			Resource: &catalogFromK8S.ServiceResource{
-				Log:            logger.Named("to-consul/source"),
-				Client:         clientset,
-				Syncer:         syncer,
-				Namespace:      c.flagK8SSourceNamespace,
-				ExplicitEnable: !c.flagK8SDefault,
-				ClusterIPSync:  c.flagSyncClusterIPServices,
-				NodePortSync:   catalogFromK8S.NodePortSyncType(c.flagNodePortSyncType),
-				ConsulK8STag:   c.flagConsulK8STag,
+				Log:                 logger.Named("to-consul/source"),
+				Client:              clientset,
+				Syncer:              syncer,
+				Namespace:           c.flagK8SSourceNamespace,
+				ExplicitEnable:      !c.flagK8SDefault,
+				ClusterIPSync:       c.flagSyncClusterIPServices,
+				NodePortSync:        catalogFromK8S.NodePortSyncType(c.flagNodePortSyncType),
+				ConsulK8STag:        c.flagConsulK8STag,
+				ConsulServicePrefix: c.flagConsulServicePrefix,
 			},
 		}
 
