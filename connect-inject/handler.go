@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -72,6 +73,10 @@ type Handler struct {
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.
 	RequireAnnotation bool
+
+	// AuthMethod is the name of the Kubernetes Auth Method to
+	// use for identity with connectInjection if ACLs are enabled
+	AuthMethod string
 
 	// Log
 	Log hclog.Logger
@@ -212,9 +217,17 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		"/spec/initContainers")...)
 
 	// Add the Envoy sidecar
+	esContainer, err := h.containerSidecar(&pod)
+	if err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring injection sidecar container: %s", err),
+			},
+		}
+	}
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
-		[]corev1.Container{h.containerSidecar(&pod)},
+		[]corev1.Container{esContainer},
 		"/spec/containers")...)
 
 	// Add annotations so that we know we're injected
@@ -343,4 +356,25 @@ func admissionError(err error) *v1beta1.AdmissionResponse {
 			Message: err.Error(),
 		},
 	}
+}
+
+func findServiceAccountVolumeMount(pod *corev1.Pod) (corev1.VolumeMount, error) {
+	// Find the volume mount that is mounted at the known
+	// service account token location
+	var volumeMount corev1.VolumeMount
+	for _, container := range pod.Spec.Containers {
+		for _, vm := range container.VolumeMounts {
+			if vm.MountPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
+				volumeMount = vm
+				break
+			}
+		}
+	}
+
+	// Return an error if volumeMount is still empty
+	if (corev1.VolumeMount{}) == volumeMount {
+		return volumeMount, errors.New("Unable to find service account token volumeMount")
+	}
+
+	return volumeMount, nil
 }

@@ -120,7 +120,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationUpstreams] = "db:1234"
 				return pod
 			},
-			`id   = "${POD_NAME}-web-proxy"`,
+			`id   = "${POD_NAME}-web-sidecar-proxy"`,
 			"",
 		},
 
@@ -131,7 +131,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationUpstreams] = "db:1234"
 				return pod
 			},
-			`-proxy-id="${POD_NAME}-web-proxy"`,
+			`-proxy-id="${POD_NAME}-web-sidecar-proxy"`,
 			"",
 		},
 	}
