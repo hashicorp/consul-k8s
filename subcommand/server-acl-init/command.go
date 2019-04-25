@@ -20,14 +20,16 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags               *flag.FlagSet
-	k8s                 *k8sflags.K8SFlags
-	flagReleaseName     string
-	flagReplicas        int
-	flagNamespace       string
-	flagAllowDNS        bool
-	flagCreateSyncToken bool
-	flagLogLevel        string
+	flags                      *flag.FlagSet
+	k8s                        *k8sflags.K8SFlags
+	flagReleaseName            string
+	flagReplicas               int
+	flagNamespace              string
+	flagAllowDNS               bool
+	flagCreateSyncToken        bool
+	flagCreateInjectAuthMethod bool
+	flagBindingRuleSelector    string
+	flagLogLevel               string
 
 	once sync.Once
 	help string
@@ -45,6 +47,10 @@ func (c *Command) init() {
 		"Toggle for updating the anonymous token to allow DNS queries to work")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token")
+	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
+		"Toggle for creating a connect inject token")
+	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
+		"Selector string for connectInject ACL Binding Rule")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -328,6 +334,66 @@ service_prefix "" {
 		})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error creating catalog sync token secret: %s", err))
+			return 1
+		}
+	}
+
+	// Support ConnectInject using Kubernetes as an auth method
+	if c.flagCreateInjectAuthMethod {
+		// Get the Kubernetes service IP address
+		k8sService, err := clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error getting kubernetes service: %s", err))
+			return 1
+		}
+
+		// Pull the CACert out of the kubeconfig we use to set up the k8s client
+
+		// Get auth method service account JWT
+		saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
+		amServiceAccount, err := clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error getting service account: %s", err))
+			return 1
+		}
+
+		// Assume the jwt is the first secret attached to the service account
+		saSecret, err := clientset.CoreV1().Secrets(c.flagNamespace).Get(amServiceAccount.Secrets[0].Name, metav1.GetOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error getting service account JWT secret: %s", err))
+			return 1
+		}
+
+		// Set up auth method
+		aam := api.ACLAuthMethod{
+			Name:        fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName),
+			Description: fmt.Sprintf("Consul %s default Kubernetes AuthMethod", c.flagReleaseName),
+			Type:        "kubernetes",
+			Config: map[string]interface{}{
+				"Host":              fmt.Sprintf("https://%s:443", k8sService.Spec.ClusterIP),
+				"CACert":            string(saSecret.Data["ca.crt"]),
+				"ServiceAccountJWT": string(saSecret.Data["token"]),
+			},
+		}
+
+		authMethod, _, err := consulClient.ACL().AuthMethodCreate(&aam, &api.WriteOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating auth method: %s", err))
+			return 1
+		}
+
+		// Register binding rule
+		abr := api.ACLBindingRule{
+			Description: fmt.Sprintf("Consul %s default binding rule", c.flagReleaseName),
+			AuthMethod:  authMethod.Name,
+			BindType:    api.BindingRuleBindTypeService,
+			BindName:    "${serviceaccount.name}",
+			Selector:    c.flagBindingRuleSelector,
+		}
+
+		_, _, err = consulClient.ACL().BindingRuleCreate(&abr, nil)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating binding rule: %s", err))
 			return 1
 		}
 	}
