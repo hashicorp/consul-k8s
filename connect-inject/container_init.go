@@ -11,6 +11,7 @@ import (
 type initContainerCommandData struct {
 	ServiceName string
 	ServicePort int32
+	AuthMethod  string
 	Upstreams   []initContainerCommandUpstreamData
 }
 
@@ -26,6 +27,7 @@ type initContainerCommandUpstreamData struct {
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	data := initContainerCommandData{
 		ServiceName: pod.Annotations[annotationService],
+		AuthMethod:  h.AuthMethod,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -72,6 +74,25 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		}
 	}
 
+	// Create expected volume mounts
+	volMounts := []corev1.VolumeMount{
+		corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: "/consul/connect-inject",
+		},
+	}
+
+	if h.AuthMethod != "" {
+		// Extract the service account token's volume mount
+		saTokenVolumeMount, err := findServiceAccountVolumeMount(pod)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+
+		// Append to volume mounts
+		volMounts = append(volMounts, saTokenVolumeMount)
+	}
+
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
@@ -103,14 +124,15 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
 				},
 			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			corev1.VolumeMount{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
 			},
 		},
-		Command: []string{"/bin/sh", "-ec", buf.String()},
+		VolumeMounts: volMounts,
+		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}, nil
 }
 
@@ -124,8 +146,8 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "${POD_NAME}-{{ .ServiceName }}-proxy"
-  name = "{{ .ServiceName }}-proxy"
+  id   = "${POD_NAME}-{{ .ServiceName }}-sidecar-proxy"
+  name = "{{ .ServiceName }}-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
@@ -178,11 +200,25 @@ services {
 }
 EOF
 
-/bin/consul services register /consul/connect-inject/service.hcl
+{{- if .AuthMethod }}
+/bin/consul login -method="{{ .AuthMethod }}" \
+  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
+  -token-sink-file="/consul/connect-inject/acl-token" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- end }}
+
+/bin/consul services register \
+  {{- if .AuthMethod }}
+  -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-{{ .ServiceName }}-proxy" \
+  -proxy-id="${POD_NAME}-{{ .ServiceName }}-sidecar-proxy" \
+  {{- if .AuthMethod }}
+  -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
