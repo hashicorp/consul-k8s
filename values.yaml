@@ -274,6 +274,12 @@ syncCatalog:
   # prepended with "consul-". (Consul -> Kubernetes sync)
   k8sPrefix: null
 
+  # consulPrefix is the service prefix which preprends itself
+  # to Kubernetes services registered within Consul
+  # For example, "k8s-" will register all services peprended with "k8s-".
+  # (Kubernetes -> Consul sync)
+  consulPrefix: null
+
   # k8sTag is an optional tag that is applied to all of the Kubernetes services
   # that are synced into Consul. If nothing is set, defaults to "k8s".
   # (Kubernetes -> Consul sync)

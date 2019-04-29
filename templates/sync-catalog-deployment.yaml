@@ -73,8 +73,11 @@ spec:
                 -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }} \
                 {{- end }}
                 {{- if .Values.syncCatalog.k8sTag }}
-                -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }}
+                -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \
                 {{- end }}
+                {{- if .Values.syncCatalog.consulPrefix}}
+                -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
+                {{- end}}
           livenessProbe:
             httpGet:
               path: /health/ready
