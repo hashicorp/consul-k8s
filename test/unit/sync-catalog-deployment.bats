@@ -175,6 +175,30 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# consulPrefix
+
+@test "syncCatalog/Deployment: no consulPrefix by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-service-prefix"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: can specify consulPrefix" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.consulPrefix=foo-' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-service-prefix=\"foo-\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # k8sTag
 
 @test "syncCatalog/Deployment: no k8sTag flag by default" {
