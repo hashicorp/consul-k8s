@@ -29,6 +29,7 @@ type Command struct {
 	flagCreateSyncToken        bool
 	flagCreateInjectAuthMethod bool
 	flagBindingRuleSelector    string
+	flagCreateEntLicenseToken  bool
 	flagLogLevel               string
 
 	once sync.Once
@@ -51,6 +52,8 @@ func (c *Command) init() {
 		"Toggle for creating a connect inject token")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule")
+	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
+		"Toggle for creating a token for the enterprise license job")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -319,7 +322,7 @@ service_prefix "" {
 		// Create catalog sync token
 		syncToken, _, err := consulClient.ACL().TokenCreate(&sToken, &api.WriteOptions{})
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating client agent token: %s", err))
+			c.UI.Error(fmt.Sprintf("Error creating catalog sync token: %s", err))
 			return 1
 		}
 
@@ -394,6 +397,50 @@ service_prefix "" {
 		_, _, err = consulClient.ACL().BindingRuleCreate(&abr, nil)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error creating binding rule: %s", err))
+			return 1
+		}
+	}
+
+	// Create enterprise license token if necessary
+	if c.flagCreateEntLicenseToken {
+		// Create enterprise license policy
+		entLicenseRules := `operator = "write"`
+
+		entLicensePolicy := api.ACLPolicy{
+			Name:        "enterprise-license-token",
+			Description: "Enterprise License Token Policy",
+			Rules:       entLicenseRules,
+		}
+
+		aclEntLicensePolicy, _, err := consulClient.ACL().PolicyCreate(&entLicensePolicy, &api.WriteOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating enterprise license policy: %s", err))
+			return 1
+		}
+
+		eToken := api.ACLToken{
+			Description: "Enterprise License Token",
+			Policies:    []*api.ACLTokenPolicyLink{&api.ACLTokenPolicyLink{Name: aclEntLicensePolicy.Name}},
+		}
+
+		// Create catalog sync token
+		entLicenseToken, _, err := consulClient.ACL().TokenCreate(&eToken, &api.WriteOptions{})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating enterprise license token: %s", err))
+			return 1
+		}
+
+		// Write catalog sync token to a Kubernetes secret
+		_, err = clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-consul-enterprise-license-acl-token", c.flagReleaseName),
+			},
+			StringData: map[string]string{
+				"token": entLicenseToken.SecretID,
+			},
+		})
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating enterprise license token secret: %s", err))
 			return 1
 		}
 	}
