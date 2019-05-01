@@ -5,6 +5,7 @@ Improvements:
 * Use the endpoint IP address when generating a service id for NodePort services to prevent possible overlap of what are supposed to be unique ids
 * Support adding a prefix for Kubernetes -> Consul service sync [[GH 140](https://github.com/hashicorp/consul-helm/issues/140)]
 * Support automatic bootstrapping of ACLs in a Consul cluster that is run fully in Kubernetes.
+* Support automatic registration of a Kubernetes AuthMethod for use with Connect (available in Consul 1.5+).
 
 Bug fixes:
 
