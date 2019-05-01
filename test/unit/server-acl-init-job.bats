@@ -46,7 +46,7 @@ load _helpers
 #--------------------------------------------------------------------
 # dns
 
-@test "serverACLInit/Job: dns acl option enabled with with .dns.enabled=-" {
+@test "serverACLInit/Job: dns acl option enabled with .dns.enabled=-" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -56,7 +56,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: dns acl option enabled with with .dns.enabled=true" {
+@test "serverACLInit/Job: dns acl option enabled with .dns.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -67,7 +67,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: dns acl option disabled with with .dns.enabled=false" {
+@test "serverACLInit/Job: dns acl option disabled with .dns.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -101,4 +101,40 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+#--------------------------------------------------------------------
+# enterpriseLicense
+
+@test "serverACLInit/Job: ent license acl option enabled with server.enterpriseLicense.secretName and server.enterpriseLicense.secretKey set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: ent license acl option disabled missing server.enterpriseLicense.secretName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: ent license acl option disabled missing server.enterpriseLicense.secretKey" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }

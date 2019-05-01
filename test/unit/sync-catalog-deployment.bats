@@ -354,17 +354,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: init container is created when global.bootstrapACLs=true" {
+@test "syncCatalog/Deployment: init container is created when global.bootstrapACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/client-daemonset.yaml  \
+      -x templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
       --set 'global.bootstrapACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "client-acl-init" ]
+  [ "${actual}" = "sync-acl-init" ]
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)

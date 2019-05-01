@@ -44,7 +44,6 @@ spec:
               consul-k8s server-acl-init \
                 -release-name={{ .Release.Name }} \
                 -k8s-namespace={{ .Release.Namespace }} \
-                -expected-replicas={{ .Values.server.replicas }} \
                 {{- if .Values.syncCatalog.enabled }}
                 -create-sync-token=true \
                 {{- end }}
@@ -55,8 +54,12 @@ spec:
                 -create-inject-token=true \
                 {{- end }}
                 {{- if .Values.connectInject.aclBindingRuleSelector }}
-                -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }}
+                -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }} \
                 {{- end }}
+                {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey) }}
+                -create-enterprise-license-token=true \
+                {{- end }}
+                -expected-replicas={{ .Values.server.replicas }}
 {{- end }}
 {{- end }}
 {{- end }}

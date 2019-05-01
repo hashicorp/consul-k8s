@@ -53,3 +53,37 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.bootstrapACLs
+
+@test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.bootstrapACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license.yaml \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/EnterpriseLicense: init container is created when global.bootstrapACLs=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/enterprise-license.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "ent-license-acl-init" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

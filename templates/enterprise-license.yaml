@@ -14,7 +14,7 @@ metadata:
     release: {{ .Release.Name }}
   annotations:
     "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-weight": "100"
     "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
@@ -30,21 +30,42 @@ spec:
         component: license
     spec:
       restartPolicy: Never
-
+      serviceAccountName: {{ template "consul.fullname" . }}-enterprise-license
       containers:
-        - name: post-install-job
-          image: "appropriate/curl"
+        - name: apply-enterprise-license
+          image: "{{ default .Values.global.image .Values.server.image }}"
           env:
             - name: ENTERPRISE_LICENSE
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.server.enterpriseLicense.secretName }}
                   key: {{ .Values.server.enterpriseLicense.secretKey }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://{{ template "consul.fullname" . }}-server:8500
+            {{- if .Values.global.bootstrapACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-consul-enterprise-license-acl-token"
+                  key: "token"
+            {{- end}}
           command: 
             - "/bin/sh"
             - "-ec"
             - |
-              curl -fsSL -X PUT http://{{ template "consul.fullname" . }}-server:8500/v1/operator/license \
-                --data ${ENTERPRISE_LICENSE}
+              consul license put "${ENTERPRISE_LICENSE}"
+      {{- if .Values.global.bootstrapACLs }}
+      initContainers:
+      - name: ent-license-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ .Release.Name }}-consul-enterprise-license-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }} \
+              -init-type="sync"
+      {{- end }}
 {{- end }}
 {{- end }}
