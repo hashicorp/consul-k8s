@@ -3,6 +3,7 @@
 Improvements:
 
 * Use the endpoint IP address when generating a service id for NodePort services to prevent possible overlap of what are supposed to be unique ids
+* Support adding a prefix for Kubernetes -> Consul service sync [[GH 140](https://github.com/hashicorp/consul-helm/issues/140)]
 
 Bug fixes:
 
