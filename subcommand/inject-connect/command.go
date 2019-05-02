@@ -25,16 +25,18 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flagListen        string
-	flagAutoName      string // MutatingWebhookConfiguration for updating
-	flagAutoHosts     string // SANs for the auto-generated TLS cert.
-	flagCertFile      string // TLS cert for listening (PEM)
-	flagKeyFile       string // TLS cert private key (PEM)
-	flagDefaultInject bool   // True to inject by default
-	flagConsulImage   string // Docker image for Consul
-	flagEnvoyImage    string // Docker image for Envoy
-	flagACLAuthMethod string // Auth Method to use for ACLs, if enabled
-	flagSet           *flag.FlagSet
+	flagListen          string
+	flagAutoName        string // MutatingWebhookConfiguration for updating
+	flagAutoHosts       string // SANs for the auto-generated TLS cert.
+	flagCertFile        string // TLS cert for listening (PEM)
+	flagKeyFile         string // TLS cert private key (PEM)
+	flagDefaultInject   bool   // True to inject by default
+	flagConsulImage     string // Docker image for Consul
+	flagEnvoyImage      string // Docker image for Envoy
+	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
+	flagCentralConfig   bool   // True to enable central config injection
+	flagDefaultProtocol string // Default protocol for use with central config
+	flagSet             *flag.FlagSet
 
 	once sync.Once
 	help string
@@ -59,6 +61,9 @@ func (c *Command) init() {
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
+	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false, "Enable central config.")
+	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
+		"The default protocol to use in central config registrations.")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -108,6 +113,8 @@ func (c *Command) Run(args []string) int {
 		ImageEnvoy:        c.flagEnvoyImage,
 		RequireAnnotation: !c.flagDefaultInject,
 		AuthMethod:        c.flagACLAuthMethod,
+		CentralConfig:     c.flagCentralConfig,
+		DefaultProtocol:   c.flagDefaultProtocol,
 		Log:               hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()

@@ -19,9 +19,9 @@ require (
 	github.com/go-sql-driver/mysql v1.4.0 // indirect
 	github.com/gocql/gocql v0.0.0-20180828192252-db20ccb04312 // indirect
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
-	github.com/hashicorp/consul v1.4.5-0.20190501151127-69f902608ceb
-	github.com/hashicorp/consul/api v1.0.2-0.20190501151127-69f902608ceb
-	github.com/hashicorp/consul/sdk v0.1.1-0.20190501151127-69f902608ceb
+	github.com/hashicorp/consul v1.4.5-0.20190502204920-c2e6431a2085
+	github.com/hashicorp/consul/api v1.0.2-0.20190502204920-c2e6431a2085
+	github.com/hashicorp/consul/sdk v0.1.1-0.20190502204920-c2e6431a2085
 	github.com/hashicorp/go-hclog v0.0.0-20180828044259-75ecd6e6d645
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/go-plugin v0.0.0-20180814222501-a4620f9913d1 // indirect
@@ -31,7 +31,6 @@ require (
 	github.com/hashicorp/hil v0.0.0-20170627220502-fa9f258a9250 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/hashicorp/vault v0.11.0 // indirect
-	github.com/hashicorp/yamux v0.0.0-20180826203732-cc6d2ea263b2 // indirect
 	github.com/keybase/go-crypto v0.0.0-20180807163025-c84d7cbef16b // indirect
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mattbaird/jsonpatch v0.0.0-20171005235357-81af80346b1a
