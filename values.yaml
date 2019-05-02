@@ -371,3 +371,20 @@ connectInject:
   # default disallows using the default service account for ACl generation.
   # Requires Consul v1.5+ and consul-k8s v0.8.0+.
   aclBindingRuleSelector: "serviceaccount.name!=default"
+
+  # Requires Consul v1.5+ and consul-k8s v0.8.0+
+  centralConfig:
+    enabled: false
+
+    # defaultProtocol allows you to specify a convenience default protocol if
+    # all of your service are of the same protocol type. The individual annotation
+    # on any given pod will override this value. A protocol must be provided,
+    # either through this setting or individual annotation, for a service to be
+    # registered correctly. Valid values are "http", "http2", "grpc" and "tcp".
+    defaultProtocol: null
+
+    # proxyDefaults is a raw json string that will be applied to all Connect
+    # proxy sidecar pods that can include any valid configuration for the
+    # configured proxy.
+    proxyDefaults: |
+      {}

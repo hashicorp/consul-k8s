@@ -51,3 +51,27 @@ load _helpers
       yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
   [ ! -z "${actual}" ]
 }
+
+#--------------------------------------------------------------------
+# connectInject.centralConfig
+
+@test "client/ConfigMap: centralConfig is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-config-configmap.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/ConfigMap: centralConfig can be enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-config-configmap.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["central-config.json"] | contains("enable_central_service_config")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

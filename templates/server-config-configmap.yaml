@@ -14,7 +14,7 @@ data:
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.bootstrapACLs }}
-  acl-config.json: |
+  acl-config.json: |-
     {
       "acl": {
         "enabled": true,
@@ -23,5 +23,26 @@ data:
         "enable_token_persistence": true
       }
     }
+  {{- end }}
+  {{- if (and .Values.connectInject.enabled .Values.connectInject.centralConfig.enabled) }}
+  central-config.json: |-
+    {
+      "enable_central_service_config": true
+    }
+  {{- if gt (len .Values.connectInject.centralConfig.proxyDefaults) 3 }}
+  proxy-defaults-config.json: |-
+    {
+      "config_entries": {
+        "bootstrap": [
+          {
+            "kind": "proxy-defaults",
+            "name": "global",
+            "config":
+{{ tpl .Values.connectInject.centralConfig.proxyDefaults . | trimAll "\"" | indent 14 }}
+          }
+        ]
+      }
+    }
+  {{- end }}
   {{- end }}
 {{- end }}

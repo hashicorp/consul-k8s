@@ -55,6 +55,12 @@ spec:
                 {{- if .Values.global.bootstrapACLs }}
                 -acl-auth-method="{{ .Release.Name }}-consul-k8s-auth-method" \
                 {{- end }}
+                {{- if .Values.connectInject.centralConfig.enabled }}
+                -enable-central-config=true \
+                {{- end }}
+                {{- if (and .Values.connectInject.centralConfig.enabled .Values.connectInject.centralConfig.defaultProtocol) }}
+                -default-protocol="{{ .Values.connectInject.centralConfig.defaultProtocol }}" \
+                {{- end }}
 {{- if .Values.connectInject.certs.secretName }}
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
                 -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
