@@ -162,6 +162,8 @@ github.com/hashicorp/consul v1.4.5-0.20190426204334-2febedd17cc2 h1:/ieetH8/RfuU
 github.com/hashicorp/consul v1.4.5-0.20190426204334-2febedd17cc2/go.mod h1:OWQvDM576zZx7jJ15/+QqYrIR9Sa9rA3waF2EYsYM7Y=
 github.com/hashicorp/consul v1.4.5-0.20190501151127-69f902608ceb h1:9Wg8FQ1MTCqf2pYuIr0fZvaOD997rvZFtbkFedVnN3I=
 github.com/hashicorp/consul v1.4.5-0.20190501151127-69f902608ceb/go.mod h1:pm8NaEkm1MntiJKYawcGeG1COyEqQLexRNKNtrLQJLw=
+github.com/hashicorp/consul v1.4.5-0.20190502204920-c2e6431a2085 h1:DolmGSZJsYmCajm4opcO1Jn2lwtN07xXyNk5ZQf9kWA=
+github.com/hashicorp/consul v1.4.5-0.20190502204920-c2e6431a2085/go.mod h1:GexWuGV81HicA+B+7HUX4ZpEePbLZ5GaJGUBUJv/2Sk=
 github.com/hashicorp/consul/api v1.0.1 h1:LkHu3cLXjya4lgrAyZVe/CUBXgJ7AcDWKSeCjAYN9w0=
 github.com/hashicorp/consul/api v1.0.1/go.mod h1:LQlewHPiuaRhn1mP2XE4RrjnlRgOeWa/ZM0xWLCen2M=
 github.com/hashicorp/consul/api v1.0.2-0.20190408195624-3ce60db0ca47 h1:YMtNC2UWMG5TX13F7wOwWXIL+eQ2hBjVJeG0udmxOpQ=
@@ -172,6 +174,8 @@ github.com/hashicorp/consul/api v1.0.2-0.20190426204334-2febedd17cc2 h1:HAKeuPER
 github.com/hashicorp/consul/api v1.0.2-0.20190426204334-2febedd17cc2/go.mod h1:LQlewHPiuaRhn1mP2XE4RrjnlRgOeWa/ZM0xWLCen2M=
 github.com/hashicorp/consul/api v1.0.2-0.20190501151127-69f902608ceb h1:ReYWMBxi+NWSX7NDe8hyCQrULBEvSguBEymDNFSMMW4=
 github.com/hashicorp/consul/api v1.0.2-0.20190501151127-69f902608ceb/go.mod h1:LQlewHPiuaRhn1mP2XE4RrjnlRgOeWa/ZM0xWLCen2M=
+github.com/hashicorp/consul/api v1.0.2-0.20190502204920-c2e6431a2085 h1:OkFQc3dRz4zINom1EZ+gDmQzNdV4UYBRkAVVDxrgURU=
+github.com/hashicorp/consul/api v1.0.2-0.20190502204920-c2e6431a2085/go.mod h1:LQlewHPiuaRhn1mP2XE4RrjnlRgOeWa/ZM0xWLCen2M=
 github.com/hashicorp/consul/sdk v0.1.0 h1:tTfutTNVUTDXpNM4YCImLfiiY3yCDpfgS6tNlUioIUE=
 github.com/hashicorp/consul/sdk v0.1.0/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.1.1-0.20190408195624-3ce60db0ca47 h1:FcaUhV/NHr3rYK/DSVgTzBQ4XqtQjTMGEu/lUeyqIr8=
@@ -180,6 +184,8 @@ github.com/hashicorp/consul/sdk v0.1.1-0.20190426204334-2febedd17cc2 h1:eaLSukaC
 github.com/hashicorp/consul/sdk v0.1.1-0.20190426204334-2febedd17cc2/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.1.1-0.20190501151127-69f902608ceb h1:thaGd88ZdYyCkRciz5jCc7lNEh2jSFJaSyCZhRO7+tg=
 github.com/hashicorp/consul/sdk v0.1.1-0.20190501151127-69f902608ceb/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
+github.com/hashicorp/consul/sdk v0.1.1-0.20190502204920-c2e6431a2085 h1:7/PHbxZ4+swe5dl5WaYG44KYJDTwgMV4YbRIrVBR2QE=
+github.com/hashicorp/consul/sdk v0.1.1-0.20190502204920-c2e6431a2085/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/errwrap v1.0.0 h1:hLrqtEDnRye3+sgx6z4qVLNuviH3MR5aQ0ykNJa/UYA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/go-bexpr v0.1.0 h1:hA/9CWGPsQ6YZXvPvizD+VEEjBG4V6Un0Qcyav5ghK4=
@@ -260,6 +266,8 @@ github.com/hashicorp/vic v1.5.1-0.20190403131502-bbfe86ec9443/go.mod h1:bEpDU35n
 github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb/go.mod h1:+NfK9FKeTrX5uv1uIXGdwYDTeHna2qgaIlx54MXqjAM=
 github.com/hashicorp/yamux v0.0.0-20180826203732-cc6d2ea263b2 h1:QWdAspPPc/c5mh+D7cedfGmL8cxGXKxUGZiNMduza68=
 github.com/hashicorp/yamux v0.0.0-20180826203732-cc6d2ea263b2/go.mod h1:+NfK9FKeTrX5uv1uIXGdwYDTeHna2qgaIlx54MXqjAM=
+github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d h1:kJCB4vdITiW1eC1vq2e6IsrXKrZit1bv/TDYFGMp4BQ=
+github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d/go.mod h1:+NfK9FKeTrX5uv1uIXGdwYDTeHna2qgaIlx54MXqjAM=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/imdario/mergo v0.3.6 h1:xTNEAn+kxVO7dTZGu0CegyqKZmoWFI0rF8UxjlB2d28=
@@ -320,6 +328,8 @@ github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh
 github.com/mitchellh/reflectwalk v0.0.0-20170726202117-63d60e9d0dbc/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/mitchellh/reflectwalk v1.0.0 h1:9D+8oIskB4VJBN5SFlmc27fSlIBZaov1Wpk/IfikLNY=
 github.com/mitchellh/reflectwalk v1.0.0/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
+github.com/mitchellh/reflectwalk v1.0.1 h1:FVzMWA5RllMAKIdUSC8mdWo3XtwoecrH79BY70sEEpE=
+github.com/mitchellh/reflectwalk v1.0.1/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1 h1:9f412s+6RmYXLWZSEzVVgPGK7C2PphHj5RJrvfx9AWI=

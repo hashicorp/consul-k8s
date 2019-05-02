@@ -9,10 +9,12 @@ import (
 )
 
 type initContainerCommandData struct {
-	ServiceName string
-	ServicePort int32
-	AuthMethod  string
-	Upstreams   []initContainerCommandUpstreamData
+	ServiceName     string
+	ServicePort     int32
+	ServiceProtocol string
+	AuthMethod      string
+	CentralConfig   bool
+	Upstreams       []initContainerCommandUpstreamData
 }
 
 type initContainerCommandUpstreamData struct {
@@ -26,8 +28,10 @@ type initContainerCommandUpstreamData struct {
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	data := initContainerCommandData{
-		ServiceName: pod.Annotations[annotationService],
-		AuthMethod:  h.AuthMethod,
+		ServiceName:     pod.Annotations[annotationService],
+		ServiceProtocol: pod.Annotations[annotationProtocol],
+		AuthMethod:      h.AuthMethod,
+		CentralConfig:   h.CentralConfig,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -200,11 +204,28 @@ services {
 }
 EOF
 
-{{- if .AuthMethod }}
+{{ if .CentralConfig -}}
+# Create the central config's service registration
+cat <<EOF >/consul/connect-inject/central-config.hcl
+kind = "service-defaults"
+name = "{{ .ServiceName }}"
+protocol = "{{ .ServiceProtocol }}"
+EOF
+{{- end }}
+
+{{ if .AuthMethod -}}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- end }}
+
+{{ if .CentralConfig -}}
+/bin/consul config write \
+  {{- if .AuthMethod }}
+  -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  /consul/connect-inject/central-config.hcl
 {{- end }}
 
 /bin/consul services register \
