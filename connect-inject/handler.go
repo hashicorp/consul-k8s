@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	DefaultConsulImage = "consul:1.3.0"
-	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.8.0"
+	DefaultConsulImage = "consul:1.5.0"
+	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.9.1"
 )
 
 const (
@@ -40,6 +40,11 @@ const (
 	// annotationPort is the name or value of the port to proxy incoming
 	// connections to.
 	annotationPort = "consul.hashicorp.com/connect-service-port"
+
+	// annotationProtocol contains the protocol that should be used for
+	// the service that is being injected. Valid values are "http", "http2",
+	// "grpc" and "tcp".
+	annotationProtocol = "consul.hashicorp.com/connect-service-protocol"
 
 	// annotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
@@ -77,6 +82,15 @@ type Handler struct {
 	// AuthMethod is the name of the Kubernetes Auth Method to
 	// use for identity with connectInjection if ACLs are enabled
 	AuthMethod string
+
+	// CentralConfig tracks whether injection should register services
+	// to central config as well as normal service registration.
+	// Requires an additional `protocol` parameter.
+	CentralConfig bool
+
+	// DefaultProtocol is the default protocol to use for central config
+	// registrations. It will be overridden by a specific annotation.
+	DefaultProtocol string
 
 	// Log
 	Log hclog.Logger
@@ -328,6 +342,22 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 
 					pod.ObjectMeta.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
+			}
+		}
+	}
+
+	if h.CentralConfig {
+		// Default protocol is specified by a flag if not explicitly annotated
+		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok {
+			if cs := pod.Spec.Containers; len(cs) > 0 {
+				// Create the patch for this first, so that the Annotation
+				// object will be created if necessary
+				*patches = append(*patches, updateAnnotation(
+					pod.Annotations,
+					map[string]string{annotationProtocol: h.DefaultProtocol})...)
+
+				// Set the annotation for protocol
+				pod.ObjectMeta.Annotations[annotationProtocol] = h.DefaultProtocol
 			}
 		}
 	}

@@ -206,6 +206,81 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"empty pod basic, protocol in annotation",
+			Handler{CentralConfig: true, Log: hclog.Default().Named("handler")},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: basicSpec,
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationService: "foo",
+						},
+					},
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationProtocol),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+			},
+		},
+
+		{
+			"empty pod basic, default protocol specified",
+			Handler{CentralConfig: true, DefaultProtocol: "http", Log: hclog.Default().Named("handler")},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: basicSpec,
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationProtocol),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -371,6 +446,34 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			map[string]string{
 				annotationService: "web",
 				annotationPort:    "8080",
+			},
+			"",
+		},
+
+		{
+			"basic pod, protocol annotated",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationProtocol: "http",
+					},
+				},
+
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: "web",
+						},
+
+						corev1.Container{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				annotationService:  "web",
+				annotationProtocol: "http",
 			},
 			"",
 		},
