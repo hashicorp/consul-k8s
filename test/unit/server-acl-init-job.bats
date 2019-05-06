@@ -101,6 +101,7 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
 
 #--------------------------------------------------------------------
 # enterpriseLicense
