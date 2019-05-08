@@ -19,9 +19,9 @@ require (
 	github.com/go-sql-driver/mysql v1.4.0 // indirect
 	github.com/gocql/gocql v0.0.0-20180828192252-db20ccb04312 // indirect
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
-	github.com/hashicorp/consul v1.4.5-0.20190502204920-c2e6431a2085
-	github.com/hashicorp/consul/api v1.0.2-0.20190502204920-c2e6431a2085
-	github.com/hashicorp/consul/sdk v0.1.1-0.20190502204920-c2e6431a2085
+	github.com/hashicorp/consul v1.5.0
+	github.com/hashicorp/consul/api v1.1.0
+	github.com/hashicorp/consul/sdk v0.1.1
 	github.com/hashicorp/go-hclog v0.0.0-20180828044259-75ecd6e6d645
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/go-plugin v0.0.0-20180814222501-a4620f9913d1 // indirect
