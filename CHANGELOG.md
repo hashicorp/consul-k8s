@@ -1,9 +1,11 @@
 ## UNRELEASED
 
+## 0.8.0 (May 8, 2019)
+
 IMPROVEMENTS:
 
   * Support adding a prefix to Kubernetes services registered in Consul [[GH 140](https://github.com/hashicorp/consul-helm/issues/140)]
-  * Support an option for automatically bootstrapping ACLs in a Consul cluster that is run fully in Kubernetes.
+  * Support an option for automatically bootstrapping ACLs in a Consul cluster that is run fully in Kubernetes. If connectInject is enabled with this option on, this also automatically configures a new Kubernetes AuthMethod so that injected services are automatically granted ACL tokens based on their Kubernetes service account.
   * Support central service configuration including proxy defaults in Connect (available in Consul 1.5+).
   * Remove the `gossipEncryption.enabled` option and instead have the implementation based on the existence of the secretName and secretKey.
 
