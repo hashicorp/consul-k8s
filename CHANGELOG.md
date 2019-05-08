@@ -5,6 +5,7 @@ IMPROVEMENTS:
   * Support adding a prefix to Kubernetes services registered in Consul [[GH 140](https://github.com/hashicorp/consul-helm/issues/140)]
   * Support an option for automatically bootstrapping ACLs in a Consul cluster that is run fully in Kubernetes.
   * Support central service configuration including proxy defaults in Connect (available in Consul 1.5+).
+  * Remove the `gossipEncryption.enabled` option and instead have the implementation based on the existence of the secretName and secretKey.
 
 ## 0.7.0 (March 21, 2019)
 
