@@ -221,7 +221,7 @@ EOF
 {{- end }}
 
 {{ if .CentralConfig -}}
-/bin/consul config write \
+/bin/consul config write -cas -modify-index 0 \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
