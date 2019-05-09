@@ -1,5 +1,11 @@
 ## UNRELEASED
 
+## 0.8.1 (May 9, 2019)
+
+IMPROVEMENTS:
+
+  * Update default consul-k8s version to 0.8.1 for a central config bug fix
+
 ## 0.8.0 (May 8, 2019)
 
 IMPROVEMENTS:
