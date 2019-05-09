@@ -32,6 +32,10 @@ spec:
           {{- tpl .Values.client.annotations . | nindent 8 }}
         {{- end }}
     spec:
+    {{- if .Values.client.affinity }}
+      affinity:
+        {{ tpl .Values.client.affinity . | nindent 8 | trim }}
+    {{- end }}
     {{- if .Values.client.tolerations }}
       tolerations:
         {{ tpl .Values.client.tolerations . | nindent 8 | trim }}

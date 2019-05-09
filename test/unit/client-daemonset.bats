@@ -244,6 +244,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# affinity
+
+@test "client/DaemonSet: affinity not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: specified affinity" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.affinity=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "client/DaemonSet: priorityClassName is not set by default" {
