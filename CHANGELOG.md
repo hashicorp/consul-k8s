@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+Bug fixes:
+
+* Fix central configuration write command to handle the case where the service already exists
+
 ## 0.8.0 (May 8, 2019)
 
 Improvements:
