@@ -225,7 +225,7 @@ EOF
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
-  /consul/connect-inject/central-config.hcl
+  /consul/connect-inject/central-config.hcl || true
 {{- end }}
 
 /bin/consul services register \
