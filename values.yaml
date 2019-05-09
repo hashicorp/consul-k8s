@@ -206,6 +206,18 @@ client:
   #   beta.kubernetes.io/arch: amd64
   nodeSelector: null
 
+  # Affinity Settings for Client pods
+  # ref https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  # Example:
+  # affinity:
+  #   nodeAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       nodeSelectorTerms:
+  #       - matchExpressions:
+  #         - key: node-role.kubernetes.io/master
+  #           operator: DoesNotExist
+  affinity: {}
+
   # used to assign priority to client pods
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
