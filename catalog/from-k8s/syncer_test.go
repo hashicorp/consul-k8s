@@ -159,7 +159,6 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 // Test that the syncer does not reap services in another NS.
 func TestConsulSyncer_reapServiceOtherNamespace(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	a := agent.NewTestAgent(t, t.Name(), ``)
 	defer a.Shutdown()
@@ -178,15 +177,14 @@ func TestConsulSyncer_reapServiceOtherNamespace(t *testing.T) {
 	svc := testRegistration("foo", "baz")
 	svc.Service.Meta[ConsulK8SNS] = "other"
 	_, err := client.Catalog().Register(svc, nil)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	// Sleep for a bit
-	time.Sleep(500 * time.Millisecond)
-
-	// Valid service should exist
-	services, _, err := client.Catalog().Service("baz", "", nil)
-	require.NoError(err)
-	require.Len(services, 1)
+	retry.Run(t, func(r *retry.R) {
+		// Valid service should exist
+		services, _, err := client.Catalog().Service("baz", "", nil)
+		require.NoError(r, err)
+		require.Len(r, services, 1)
+	})
 }
 
 // Test that the syncer reaps services with no NS set.
