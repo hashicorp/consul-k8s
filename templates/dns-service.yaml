@@ -15,6 +15,9 @@ metadata:
     {{ tpl .Values.dns.annotations . | nindent 4 | trim }}
   {{- end }}
 spec:
+{{- if .Values.dns.clusterIP }}
+  clusterIP: {{ .Values.dns.clusterIP }}
+{{- end }}
   ports:
     - name: dns-tcp
       port: 53

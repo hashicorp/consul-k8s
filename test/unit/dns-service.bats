@@ -65,3 +65,25 @@ load _helpers
       yq -r '.metadata.annotations.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
+
+#--------------------------------------------------------------------
+# clusterIP
+
+@test "dns/Service: clusterIP not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/dns-service.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec | .clusterIP? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dns/Service: specified clusterIP" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/dns-service.yaml  \
+      --set 'dns.clusterIP=192.168.1.1' \
+      . | tee /dev/stderr |
+      yq '.spec | .clusterIP == "192.168.1.1"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
