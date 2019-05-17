@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+
+  * Fix enterprise license application when ACLs are turned off
+
 ## 0.8.1 (May 9, 2019)
 
 IMPROVEMENTS:
