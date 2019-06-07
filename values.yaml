@@ -223,6 +223,27 @@ client:
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
 
+  # snaphotAgent contains settings for setting up and running snapshot agents
+  # within the Consul clusters. They are required to be co-located with Consul
+  # clients, so will inherit the clients' nodeSelector, tolerations and affinity.
+  # This is an Enterprise feature only.
+  snapshotAgent:
+    enabled: false
+
+    # replicas determines how many snapshot agent pods are created
+    replicas: 2
+
+    # configSecret references a Kubernetes secret that should be manually created to
+    # contain the entire config to be used on the snapshot agent. This is the preferred
+    # method of configuration since there are usually storage credentials present.
+    # Snapshot agent config details:
+    # https://www.consul.io/docs/commands/snapshot/agent.html#config-file-options-
+    # To create a secret:
+    # https://kubernetes.io/docs/concepts/configuration/secret/#creating-a-secret-using-kubectl-create-secret
+    configSecret:
+      secretName: null
+      secretKey: null
+
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns

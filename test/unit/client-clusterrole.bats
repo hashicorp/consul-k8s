@@ -102,3 +102,31 @@ load _helpers
       yq -r '.rules[1].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
 }
+
+#--------------------------------------------------------------------
+# client.snapshotAgent
+
+@test "client/ClusterRole: allows snapshot agent secret access with global.bootsrapACLs=true and client.snapshotAgent.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      --set 'client.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[0].resourceNames | any(contains("-consul-client-snapshot-agent-acl-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/ClusterRole: allows snapshot agent secret access with global.bootsrapACLs=true, global.enablePodSecurityPolicies=true and client.snapshotAgent.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'client.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[1].resourceNames | any(contains("-consul-client-snapshot-agent-acl-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
