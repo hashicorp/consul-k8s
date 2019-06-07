@@ -52,6 +52,17 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+# The rules key must always be set (#178).
+@test "client/ClusterRole: rules empty with client.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-clusterrole.yaml  \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.rules' | tee /dev/stderr)
+  [ "${actual}" = "[]" ]
+}
+
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 

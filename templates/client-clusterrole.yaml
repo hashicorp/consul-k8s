@@ -10,7 +10,6 @@ metadata:
     release: {{ .Release.Name }}
 {{- if (or .Values.global.enablePodSecurityPolicies .Values.global.bootstrapACLs) }}
 rules:
-{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
@@ -27,5 +26,8 @@ rules:
       - {{ .Release.Name }}-consul-client-acl-token
     verbs:
       - get
+{{- end }}
+{{- else}}
+rules: []
 {{- end }}
 {{- end }}

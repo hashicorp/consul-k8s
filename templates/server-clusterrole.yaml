@@ -16,5 +16,7 @@ rules:
   - {{ template "consul.fullname" . }}-server
   verbs:
   - use
+{{- else }}
+rules: []
 {{- end }}
 {{- end }}
