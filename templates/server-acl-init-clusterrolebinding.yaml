@@ -1,5 +1,4 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if .Values.global.bootstrapACLs }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -18,6 +17,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" . }}-server-acl-init
     namespace: {{ .Release.Namespace }}
-{{- end }}
 {{- end }}
 {{- end }}

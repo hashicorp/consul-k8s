@@ -11,36 +11,56 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: enabled with global.bootstrapACLs=true" {
+@test "serverACLInit/Job: enabled server & client acls with global.bootstrapACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local actual="$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.bootstrapACLs=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+      . | tee /dev/stderr)"
+  local actual_enabled=$(echo "$actual" | yq 'length > 0' | tee /dev/stderr)
+  local actual_client_acl_disabled=$(echo "$actual" | grep "create-client-token=false" >/dev/null && echo "true" || echo "false" | tee /dev/stderr )
+  [ "${actual_enabled}" = "true" ]
+  [ "${actual_client_acl_disabled}" = "false" ]
 }
 
-@test "serverACLInit/Job: disabled with server=false and global.bootstrapACLs=true" {
+@test "serverACLInit/Job: disabled server & client acls with server=false and global.bootstrapACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local actual="$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.bootstrapACLs=true' \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      . | tee /dev/stderr)"
+  local actual_enabled=$(echo "$actual" | yq 'length > 0' | tee /dev/stderr)
+  local actual_client_acl_disabled=$(echo "$actual" | grep "create-client-token=false" >/dev/null && echo "true" || echo "false" | tee /dev/stderr )
+  [ "${actual_enabled}" = "false" ]
+  [ "${actual_client_acl_disabled}" = "false" ]
 }
 
-@test "serverACLInit/Job: disabled with client=false and global.bootstrapACLs=true" {
+@test "serverACLInit/Job: enabled server acls, disabled client acls with server=true, client=false and global.bootstrapACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local actual="$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=false' \
+      . | tee /dev/stderr)"
+  local actual_enabled=$(echo "$actual" | yq 'length > 0' | tee /dev/stderr)
+  local actual_client_acl_disabled=$(echo "$actual" | grep "create-client-token=false" >/dev/null && echo "true" || echo "false" | tee /dev/stderr )
+  [ "${actual_enabled}" = "true" ]
+  [ "${actual_client_acl_disabled}" = "true" ]
+}
+
+@test "serverACLInit/Job: enabled server acls, disabled client acls with client=false and global.bootstrapACLs=true" {
+  cd `chart_dir`
+  local actual="$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.bootstrapACLs=true' \
       --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      . | tee /dev/stderr)"
+  local actual_enabled=$(echo "$actual" | yq 'length > 0' | tee /dev/stderr)
+  local actual_client_acl_disabled=$(echo "$actual" | grep "create-client-token=false" >/dev/null && echo "true" || echo "false" | tee /dev/stderr )
+  [ "${actual_enabled}" = "true" ]
+  [ "${actual_client_acl_disabled}" = "true" ]
 }
 
 #--------------------------------------------------------------------
