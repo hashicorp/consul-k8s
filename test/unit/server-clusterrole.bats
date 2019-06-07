@@ -51,3 +51,14 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+# The rules key must always be set (#178).
+@test "server/ClusterRole: rules empty with server.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-clusterrole.yaml  \
+      --set 'server.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.rules' | tee /dev/stderr)
+  [ "${actual}" = "[]" ]
+}
