@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -20,17 +21,21 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                      *flag.FlagSet
-	k8s                        *k8sflags.K8SFlags
-	flagReleaseName            string
-	flagReplicas               int
-	flagNamespace              string
-	flagAllowDNS               bool
-	flagCreateSyncToken        bool
-	flagCreateInjectAuthMethod bool
-	flagBindingRuleSelector    string
-	flagCreateEntLicenseToken  bool
-	flagLogLevel               string
+	flags                        *flag.FlagSet
+	k8s                          *k8sflags.K8SFlags
+	flagReleaseName              string
+	flagReplicas                 int
+	flagNamespace                string
+	flagAllowDNS                 bool
+	flagCreateClientToken        bool
+	flagCreateSyncToken          bool
+	flagCreateInjectAuthMethod   bool
+	flagBindingRuleSelector      string
+	flagCreateEntLicenseToken    bool
+	flagCreateSnapshotAgentToken bool
+	flagLogLevel                 string
+
+	clientset *kubernetes.Clientset
 
 	once sync.Once
 	help string
@@ -46,6 +51,8 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
+	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
+		"Toggle for creating a client agent token")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
@@ -54,6 +61,8 @@ func (c *Command) init() {
 		"Selector string for connectInject ACL Binding Rule")
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job")
+	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,
+		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -80,7 +89,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create the Kubernetes clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	c.clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
 		return 1
@@ -100,7 +109,7 @@ func (c *Command) Run(args []string) int {
 	// Use the client to get statefulset pods
 	labelSelector := fmt.Sprintf("component=server, app=consul, release=%s", c.flagReleaseName)
 
-	serverPods, err := clientset.CoreV1().Pods(c.flagNamespace).List(metav1.ListOptions{LabelSelector: labelSelector})
+	serverPods, err := c.clientset.CoreV1().Pods(c.flagNamespace).List(metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		logger.Error(err.Error())
 		return 1
@@ -146,7 +155,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write bootstrap token to a Kubernetes secret
-	_, err = clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
+	_, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName),
 		},
@@ -160,13 +169,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create agent policy
-	agentRules := `node_prefix "" {
-   policy = "write"
-}
-service_prefix "" {
-   policy = "read"
-}`
-
 	agentPolicy := api.ACLPolicy{
 		Name:        "agent-token",
 		Description: "Agent Token Policy",
@@ -179,7 +181,7 @@ service_prefix "" {
 		return 1
 	}
 
-	// Create agent token for each agent
+	// Create agent token for each server agent
 	var serverTokens []api.ACLToken
 
 	for i := 0; i < len(podAddresses); i++ {
@@ -228,41 +230,16 @@ service_prefix "" {
 	}
 
 	// Create client agent token
-	token := api.ACLToken{
-		Description: "Client Agent Token",
-		Policies:    []*api.ACLTokenPolicyLink{&api.ACLTokenPolicyLink{Name: aclAgentPolicy.Name}},
-	}
-
-	clientToken, _, err := consulClient.ACL().TokenCreate(&token, &api.WriteOptions{Token: bootstrapToken.SecretID})
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating client agent token: %s", err))
-		return 1
-	}
-
-	// Write client agent token to a Kubernetes secret
-	_, err = clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-consul-client-acl-token", c.flagReleaseName),
-		},
-		StringData: map[string]string{
-			"token": clientToken.SecretID,
-		},
-	})
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating client token secret: %s", err))
-		return 1
+	if c.flagCreateClientToken {
+		if err := c.createACL("client", agentRules, consulClient); err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	// Update anonymous token to allow DNS to work
 	if c.flagAllowDNS {
 		// Create policy for the anonymous token
-		dnsRules := `node_prefix "" {
-   policy = "read"
-}
-service_prefix "" {
-   policy = "read"
-}`
-
 		dnsPolicy := api.ACLPolicy{
 			Name:        "dns-policy",
 			Description: "DNS Policy",
@@ -291,52 +268,24 @@ service_prefix "" {
 
 	// Create catalog sync token if necessary
 	if c.flagCreateSyncToken {
-		// Create agent policy
-		syncRules := `node_prefix "" {
-   policy = "read"
-}
-node "k8s-sync" {
-	policy = "write"
-}
-service_prefix "" {
-   policy = "write"
-}`
-
-		syncPolicy := api.ACLPolicy{
-			Name:        "catalog-sync-token",
-			Description: "Catalog Sync Token Policy",
-			Rules:       syncRules,
-		}
-
-		aclSyncPolicy, _, err := consulClient.ACL().PolicyCreate(&syncPolicy, &api.WriteOptions{})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating catalog sync policy: %s", err))
+		if err := c.createACL("catalog-sync", syncRules, consulClient); err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
+	}
 
-		sToken := api.ACLToken{
-			Description: "Catalog Sync Token",
-			Policies:    []*api.ACLTokenPolicyLink{&api.ACLTokenPolicyLink{Name: aclSyncPolicy.Name}},
-		}
-
-		// Create catalog sync token
-		syncToken, _, err := consulClient.ACL().TokenCreate(&sToken, &api.WriteOptions{})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating catalog sync token: %s", err))
+	// Create enterprise license token if necessary
+	if c.flagCreateEntLicenseToken {
+		if err := c.createACL("enterprise-license", entLicenseRules, consulClient); err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
+	}
 
-		// Write catalog sync token to a Kubernetes secret
-		_, err = clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-consul-catalog-sync-acl-token", c.flagReleaseName),
-			},
-			StringData: map[string]string{
-				"token": syncToken.SecretID,
-			},
-		})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating catalog sync token secret: %s", err))
+	// Create snapshot agent token if necessary
+	if c.flagCreateSnapshotAgentToken {
+		if err := c.createACL("client-snapshot-agent", snapshotAgentRules, consulClient); err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
 	}
@@ -344,24 +293,22 @@ service_prefix "" {
 	// Support ConnectInject using Kubernetes as an auth method
 	if c.flagCreateInjectAuthMethod {
 		// Get the Kubernetes service IP address
-		k8sService, err := clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
+		k8sService, err := c.clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting kubernetes service: %s", err))
 			return 1
 		}
 
-		// Pull the CACert out of the kubeconfig we use to set up the k8s client
-
 		// Get auth method service account JWT
 		saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
-		amServiceAccount, err := clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
+		amServiceAccount, err := c.clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting service account: %s", err))
 			return 1
 		}
 
 		// Assume the jwt is the first secret attached to the service account
-		saSecret, err := clientset.CoreV1().Secrets(c.flagNamespace).Get(amServiceAccount.Secrets[0].Name, metav1.GetOptions{})
+		saSecret, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(amServiceAccount.Secrets[0].Name, metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting service account JWT secret: %s", err))
 			return 1
@@ -401,51 +348,47 @@ service_prefix "" {
 		}
 	}
 
-	// Create enterprise license token if necessary
-	if c.flagCreateEntLicenseToken {
-		// Create enterprise license policy
-		entLicenseRules := `operator = "write"`
+	return 0
+}
 
-		entLicensePolicy := api.ACLPolicy{
-			Name:        "enterprise-license-token",
-			Description: "Enterprise License Token Policy",
-			Rules:       entLicenseRules,
-		}
-
-		aclEntLicensePolicy, _, err := consulClient.ACL().PolicyCreate(&entLicensePolicy, &api.WriteOptions{})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating enterprise license policy: %s", err))
-			return 1
-		}
-
-		eToken := api.ACLToken{
-			Description: "Enterprise License Token",
-			Policies:    []*api.ACLTokenPolicyLink{&api.ACLTokenPolicyLink{Name: aclEntLicensePolicy.Name}},
-		}
-
-		// Create catalog sync token
-		entLicenseToken, _, err := consulClient.ACL().TokenCreate(&eToken, &api.WriteOptions{})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating enterprise license token: %s", err))
-			return 1
-		}
-
-		// Write catalog sync token to a Kubernetes secret
-		_, err = clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-consul-enterprise-license-acl-token", c.flagReleaseName),
-			},
-			StringData: map[string]string{
-				"token": entLicenseToken.SecretID,
-			},
-		})
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating enterprise license token secret: %s", err))
-			return 1
-		}
+func (c *Command) createACL(name, rules string, consulClient *api.Client) error {
+	// Create policy
+	policy := api.ACLPolicy{
+		Name:        fmt.Sprintf("%s-token", name),
+		Description: fmt.Sprintf("%s Token Policy", name),
+		Rules:       rules,
 	}
 
-	return 0
+	createdPolicy, _, err := consulClient.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+	if err != nil {
+		return fmt.Errorf("Error creating %s policy: %s", name, err)
+	}
+
+	token := api.ACLToken{
+		Description: fmt.Sprintf("%s Token", name),
+		Policies:    []*api.ACLTokenPolicyLink{&api.ACLTokenPolicyLink{Name: createdPolicy.Name}},
+	}
+
+	// Create token
+	createdToken, _, err := consulClient.ACL().TokenCreate(&token, &api.WriteOptions{})
+	if err != nil {
+		return fmt.Errorf("Error creating %s token: %s", name, err)
+	}
+
+	// Write token to a Kubernetes secret
+	_, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Create(&apiv1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name),
+		},
+		StringData: map[string]string{
+			"token": createdToken.SecretID,
+		},
+	})
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error creating %s token secret: %s", name, err))
+	}
+
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }
@@ -461,3 +404,41 @@ Usage: consul-k8s server-acl-init [options]
   Bootstraps servers with ACLs
 
 `
+
+// ACL rules
+const agentRules = `node_prefix "" {
+   policy = "write"
+}
+service_prefix "" {
+   policy = "read"
+}`
+
+const dnsRules = `node_prefix "" {
+   policy = "read"
+}
+service_prefix "" {
+   policy = "read"
+}`
+
+const syncRules = `node_prefix "" {
+   policy = "read"
+}
+node "k8s-sync" {
+	policy = "write"
+}
+service_prefix "" {
+   policy = "write"
+}`
+
+const snapshotAgentRules = `acl = "write"
+key "consul-snapshot/lock" {
+   policy = "write"
+}
+session_prefix "" {
+   policy = "write"
+}
+service "consul-snapshot" {
+   policy = "write"
+}`
+
+const entLicenseRules = `operator = "write"`
