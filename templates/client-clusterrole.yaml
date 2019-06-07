@@ -24,6 +24,9 @@ rules:
       - secrets
     resourceNames:
       - {{ .Release.Name }}-consul-client-acl-token
+      {{- if .Values.client.snapshotAgent.enabled }}
+      - {{ .Release.Name }}-consul-client-snapshot-agent-acl-token
+      {{- end }}
     verbs:
       - get
 {{- end }}
