@@ -32,6 +32,7 @@ const (
 type Syncer interface {
 	// Sync is called to sync the full set of registrations.
 	Sync([]*api.CatalogRegistration)
+	Node() string
 }
 
 // ConsulSyncer is a Syncer that takes the set of registrations and
@@ -69,6 +70,9 @@ type ConsulSyncer struct {
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
 
+	// The Consul node name to register for this syncer.
+	NodeName string
+
 	// ConsulNodeServicesClient is used to list services for a node. We use a
 	// separate client for this API call that handles older version of Consul.
 	ConsulNodeServicesClient ConsulNodeServicesClient
@@ -96,6 +100,10 @@ type ConsulSyncer struct {
 	// watchers is all namespaces mapped to a map of Consul service
 	// names mapped to a cancel function for watcher routines
 	watchers map[string]map[string]context.CancelFunc
+}
+
+func (s *ConsulSyncer) Node() string {
+	return s.NodeName
 }
 
 // Sync implements Syncer

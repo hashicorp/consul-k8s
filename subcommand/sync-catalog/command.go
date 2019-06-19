@@ -48,6 +48,7 @@ type Command struct {
 	flagNodePortSyncType      string
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
+	flagNodeName              string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -131,6 +132,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+	c.flags.StringVar(&c.flagNodeName, "node-name", "k8s-sync",
+		"The Consul node name to register for k8s-sync. Defaults to k8s-sync.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &flags.K8SFlags{}
@@ -244,6 +247,7 @@ func (c *Command) Run(args []string) int {
 			ServicePollPeriod:        c.flagConsulWritePeriod * 2,
 			ConsulK8STag:             c.flagConsulK8STag,
 			ConsulNodeServicesClient: svcsClient,
+			NodeName:                 c.flagNodeName,
 		}
 		go syncer.Run(ctx)
 
