@@ -27,7 +27,7 @@ func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -58,7 +58,7 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -85,7 +85,7 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -114,7 +114,7 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -143,7 +143,7 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -173,7 +173,7 @@ func TestServiceResource_system(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -201,7 +201,7 @@ func TestServiceResource_externalIP(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -253,7 +253,7 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -306,7 +306,7 @@ func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -355,7 +355,7 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -406,7 +406,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -461,7 +461,7 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -491,7 +491,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -526,7 +526,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -562,7 +562,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -593,7 +593,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -623,7 +623,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -739,7 +739,7 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -856,7 +856,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -956,7 +956,7 @@ func TestServiceResource_nodePortInitial(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1070,7 +1070,7 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1187,7 +1187,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1303,7 +1303,7 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1419,7 +1419,7 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1534,7 +1534,7 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1607,7 +1607,7 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1681,7 +1681,7 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1755,7 +1755,7 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1830,7 +1830,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1905,7 +1905,7 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 
 	// Start the controller
 	closer := controller.TestControllerRun(&ServiceResource{
@@ -1971,7 +1971,7 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
+	syncer := NewTestSyncer()
 	testNamespace := "test_namespace"
 
 	// Start the controller

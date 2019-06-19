@@ -46,6 +46,7 @@ type Command struct {
 	flagSyncClusterIPServices bool
 	flagNodePortSyncType      string
 	flagLogLevel              string
+	flagNodeName              string
 
 	consulClient *api.Client
 
@@ -94,6 +95,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.StringVar(&c.flagNodeName, "node-name", "k8s-sync",
+		"The Consul node name to register for k8s-sync. Defaults to k8s-sync.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
@@ -161,6 +164,7 @@ func (c *Command) Run(args []string) int {
 			SyncPeriod:        syncInterval,
 			ServicePollPeriod: syncInterval * 2,
 			ConsulK8STag:      c.flagConsulK8STag,
+			NodeName:          c.flagNodeName,
 		}
 		go syncer.Run(ctx)
 

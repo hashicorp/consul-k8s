@@ -15,6 +15,12 @@ const (
 type TestSyncer struct {
 	sync.Mutex    // Lock should be held while accessing Registrations
 	Registrations []*api.CatalogRegistration
+	// The Consul node name to register for this syncer.
+	NodeName string
+}
+
+func (s *TestSyncer) Node() string {
+	return s.NodeName
 }
 
 // Sync implements Syncer
@@ -22,4 +28,8 @@ func (s *TestSyncer) Sync(rs []*api.CatalogRegistration) {
 	s.Lock()
 	defer s.Unlock()
 	s.Registrations = rs
+}
+
+func NewTestSyncer() *TestSyncer {
+	return &TestSyncer{NodeName: "k8s-sync"}
 }
