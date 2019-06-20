@@ -344,7 +344,7 @@ service_prefix "" {
 	// Support ConnectInject using Kubernetes as an auth method
 	if c.flagCreateInjectAuthMethod {
 		// Get the Kubernetes service IP address
-		k8sService, err := clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
+		k8sService, err := clientset.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting kubernetes service: %s", err))
 			return 1
@@ -353,7 +353,7 @@ service_prefix "" {
 		// Pull the CACert out of the kubeconfig we use to set up the k8s client
 
 		// Get auth method service account JWT
-		saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
+		saName := fmt.Sprintf("%s-connect-injector-authmethod-svc-account", c.flagReleaseName)
 		amServiceAccount, err := clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting service account: %s", err))
