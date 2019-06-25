@@ -337,6 +337,39 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"enable resources",
+			Handler{Resources: true, CPULimit: "1", MemoryLimit: "100Mi", CPURequest: "1", MemoryRequest: "100Mi", Log: hclog.Default().Named("handler")},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: basicSpec,
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {

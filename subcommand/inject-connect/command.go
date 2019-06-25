@@ -49,6 +49,12 @@ type Command struct {
 	flagDefaultProtocol      string // Default protocol for use with central config
 	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 
+	flagResources       bool   // True to enable resources for init and sidecar pods
+	flagCPULimit        string // CPU Limits
+	flagMemoryLimit     string // Memory Limits
+	flagCPURequest      string // CPU Requests
+	flagMemoryRequest   string // Memory Limits
+
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
 	flagConsulDestinationNamespace string   // Consul namespace to register everything if not mirroring
@@ -116,6 +122,12 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, c.http.ClientFlags())
 	flags.Merge(c.flagSet, c.http.ServerFlags())
 
+	c.flagSet.BoolVar(&c.flagResources, "enable-resources", false,
+		"Enable to set custom resources for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagCPULimit, "cpu-limit", "", "CPU Limits for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagMemoryLimit, "memory-limit", "", "Memory Limits for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagCPURequest, "cpu-request", "", "CPU Requests for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagMemoryRequest, "memory-request", "", "Memory Requests for init and sidecar pods")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -216,6 +228,10 @@ func (c *Command) Run(args []string) int {
 		WriteServiceDefaults:       c.flagWriteServiceDefaults,
 		DefaultProtocol:            c.flagDefaultProtocol,
 		ConsulCACert:               string(consulCACert),
+		CPULimit:          c.flagCPULimit,
+		MemoryLimit:       c.flagMemoryLimit,
+		CPURequest:        c.flagCPURequest,
+		MemoryRequest:     c.flagMemoryRequest,
 		EnableNamespaces:           c.flagEnableNamespaces,
 		AllowK8sNamespacesSet:      allowSet,
 		DenyK8sNamespacesSet:       denySet,
