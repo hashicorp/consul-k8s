@@ -6,17 +6,32 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type sidecarContainerCommandData struct {
 	AuthMethod      string
 	ConsulNamespace string
+	Resources corev1.ResourceRequirements
 }
 
 func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	templateData := sidecarContainerCommandData{
 		AuthMethod:      h.AuthMethod,
 		ConsulNamespace: h.consulNamespace(k8sNamespace),
+	}
+
+	if h.Resources {
+		templateData.Resources = corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
+				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
+				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
+			},
+		}
 	}
 
 	// Render the command
@@ -39,6 +54,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 				},
 			},
 		},
+		Resources: templateData.Resources,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,

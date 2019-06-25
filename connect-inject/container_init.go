@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type initContainerCommandData struct {
@@ -33,6 +34,10 @@ type initContainerCommandData struct {
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
 	ConsulCACert string
+}
+
+type initContainerResources struct {
+	Resources corev1.ResourceRequirements
 }
 
 type initContainerCommandUpstreamData struct {
@@ -71,6 +76,20 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		// Assertion, since we call defaultAnnotations above and do
 		// not mutate pods without a service specified.
 		panic("No service found. This should be impossible since we default it.")
+	}
+
+	icr := initContainerResources{}
+	if h.Resources {
+		icr.Resources = corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
+				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
+				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
+			},
+		}
 	}
 
 	// If a port is specified, then we determine the value of that port
@@ -223,6 +242,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
 			},
 		},
+		Resources:    icr.Resources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}, nil
