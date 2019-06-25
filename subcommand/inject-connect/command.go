@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/connect-inject"
+	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
@@ -37,6 +37,11 @@ type Command struct {
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
 	flagSet             *flag.FlagSet
+	flagResources       bool   // True to enable resources for init and sidecar pods
+	flagCPULimit        string // CPU Limits
+	flagMemoryLimit     string // Memory Limits
+	flagCPURequest      string // CPU Requests
+	flagMemoryRequest   string // Memory Limits
 
 	once sync.Once
 	help string
@@ -64,6 +69,12 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false, "Enable central config.")
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
+	c.flagSet.BoolVar(&c.flagResources, "enable-resources", false,
+		"Enable to set custom resources for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagCPULimit, "cpu-limit", "", "CPU Limits for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagMemoryLimit, "memory-limit", "", "Memory Limits for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagCPURequest, "cpu-request", "", "CPU Requests for init and sidecar pods")
+	c.flagSet.StringVar(&c.flagMemoryRequest, "memory-request", "", "Memory Requests for init and sidecar pods")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -115,6 +126,11 @@ func (c *Command) Run(args []string) int {
 		AuthMethod:        c.flagACLAuthMethod,
 		CentralConfig:     c.flagCentralConfig,
 		DefaultProtocol:   c.flagDefaultProtocol,
+		Resources:         c.flagResources,
+		CPULimit:          c.flagCPULimit,
+		MemoryLimit:       c.flagMemoryLimit,
+		CPURequest:        c.flagCPURequest,
+		MemoryRequest:     c.flagMemoryRequest,
 		Log:               hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()

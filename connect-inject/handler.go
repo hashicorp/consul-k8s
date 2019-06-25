@@ -92,6 +92,19 @@ type Handler struct {
 	// registrations. It will be overridden by a specific annotation.
 	DefaultProtocol string
 
+	// Resources checks if cpu and memory resources for sidecar pods and
+	// init containers should be set. If this is false, no resources
+	// will be set.
+	Resources bool
+	// CPULimit sets cpu limit for pods
+	CPULimit string
+	// MemoryLimit sets memory limit for pods
+	MemoryLimit string
+	// CPURequest sets cpu requests for pods
+	CPURequest string
+	// MemoryRequest sets memory requests for pods
+	MemoryRequest string
+
 	// Log
 	Log hclog.Logger
 }
