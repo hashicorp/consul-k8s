@@ -302,8 +302,8 @@ func (c *Command) Run(args []string) int {
 
 	// Support ConnectInject using Kubernetes as an auth method
 	if c.flagCreateInjectAuthMethod {
-		// Get the Kubernetes service IP address
-		k8sService, err := c.clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
+		// Get the Kubernetes service IP address - kubernetes.default.svc
+		k8sService, err := c.clientset.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting kubernetes service: %s", err))
 			return 1
