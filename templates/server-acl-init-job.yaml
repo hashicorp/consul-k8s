@@ -53,6 +53,9 @@ spec:
                 {{- if .Values.connectInject.enabled }}
                 -create-inject-token=true \
                 {{- end }}
+                {{- if .Values.meshGateway.enabled }}
+                -create-mesh-gateway-token=true \
+                {{- end }}
                 {{- if .Values.connectInject.aclBindingRuleSelector }}
                 -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }} \
                 {{- end }}
