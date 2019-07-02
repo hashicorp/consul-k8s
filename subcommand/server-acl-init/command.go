@@ -33,6 +33,7 @@ type Command struct {
 	flagBindingRuleSelector      string
 	flagCreateEntLicenseToken    bool
 	flagCreateSnapshotAgentToken bool
+	flagCreateMeshGatewayToken   bool
 	flagLogLevel                 string
 
 	clientset *kubernetes.Clientset
@@ -63,6 +64,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for the enterprise license job")
 	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
+	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
+		"Toggle for creating a token for a Connect mesh gateway")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -290,6 +293,13 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagCreateMeshGatewayToken {
+		if err := c.createACL("mesh-gateway", meshGatewayRules, consulClient); err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
+	}
+
 	// Support ConnectInject using Kubernetes as an auth method
 	if c.flagCreateInjectAuthMethod {
 		// Get the Kubernetes service IP address
@@ -438,6 +448,16 @@ session_prefix "" {
    policy = "write"
 }
 service "consul-snapshot" {
+   policy = "write"
+}`
+
+// This assumes users are using the default name for the service, i.e.
+// "mesh-gateway".
+const meshGatewayRules = `service_prefix "" {
+   policy = "read"
+}
+
+service "mesh-gateway" {
    policy = "write"
 }`
 
