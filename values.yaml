@@ -24,7 +24,8 @@ global:
   # Note: support for the catalog sync's liveness and readiness probes was added
   # to consul-k8s v0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
-  imageK8S: "hashicorp/consul-k8s:0.8.1"
+  # If using mesh gateways and bootstrapACLs then must be >= 0.9.0.
+  imageK8S: "hashicorp/consul-k8s:0.9.0"
 
   # Datacenter is the name of the datacenter that the agents should register
   # as. This shouldn't be changed once the Consul cluster is up and running
@@ -167,7 +168,7 @@ client:
   join: null
 
   # grpc should be set to true if the gRPC listener should be enabled.
-  # This should be set to true if connectInject is enabled.
+  # This should be set to true if connectInject or meshGateway is enabled.
   grpc: false
 
   # Resource requests, limits, etc. for the client cluster placement. This
@@ -408,3 +409,134 @@ connectInject:
     # configured proxy.
     proxyDefaults: |
       {}
+
+# Mesh Gateways enable Consul Connect to work across Consul datacenters.
+meshGateway:
+  # If mesh gateways are enabled, a Deployment will be created that runs
+  # gateways and Consul Connect will be configured to use gateways.
+  # See https://www.consul.io/docs/connect/mesh_gateway.html
+  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.8.2 if using global.bootstrapACLs.
+  enabled: false
+
+  # Globally configure which mode the gateway should run in.
+  # Can be set to either "remote", "local", "none" or "".
+  # See https://consul.io/docs/connect/mesh_gateway.html#modes-of-operation for
+  # a description of each mode.
+  # If set, connectInject.centralConfig.enabled should be set to true so that
+  # the global config will actually be used.
+  # If set to the empty string, no global default will be set and the gateway mode
+  # will need to be set individually for each service.
+  globalMode: local
+
+  # Number of replicas for the Deployment.
+  replicas: 2
+
+  # What gets registered as wan address for the gateway.
+  wanAddress:
+    # Port that gets registered.
+    port: 443
+
+    # If true, each Gateway Pod will advertise its NodeIP
+    # (as provided by the Kubernetes downward API) as the wan address.
+    # This is useful if the node IPs are routable from other DCs.
+    # useNodeName and host must be false and "" respectively.
+    useNodeIP: true
+
+    # If true, each Gateway Pod will advertise its NodeName
+    # (as provided by the Kubernetes downward API) as the wan address.
+    # This is useful if the node names are DNS entries that are
+    # routable from other DCs.
+    # meshGateway.wanAddress.port will be used as the port for the wan address.
+    # useNodeIP and host must be false and "" respectively.
+    useNodeName: false
+
+    # If set, each gateway Pod will use this host as its wan address.
+    # Users must ensure that this address routes to the Gateway pods,
+    # for example via a DNS entry that routes to the Service fronting the Deployment.
+    # meshGateway.wanAddress.port will be used as the port for the wan address.
+    # useNodeIP and useNodeName must be false.
+    host: ""
+
+  # The service option configures the Service that fronts the Gateway Deployment.
+  service:
+    # Whether to create a Service or not.
+    enabled: false
+
+    # Type of service, ex. LoadBalancer, ClusterIP.
+    type: ClusterIP
+
+    # Port that the service will be exposed on.
+    # The targetPort will be set to meshGateway.containerPort.
+    port: 443
+
+    # Optional nodePort of the service. Can be used in conjunction with
+    # type: NodePort.
+    nodePort: null
+
+    # Optional YAML string for additional annotations.
+    annotations: null
+
+    # Optional YAML string that will be appended to the Service spec.
+    additionalSpec: null
+
+  # Envoy image to use.
+  imageEnvoy: envoyproxy/envoy:v1.10.0
+
+  # If set to true, gateway Pods will run on the host network.
+  hostNetwork: false
+
+  # dnsPolicy to use.
+  dnsPolicy: null
+
+  # Override the default 'mesh-gateway' service name registered in Consul.
+  # Cannot be used if bootstrapACLs is true since the ACL token generated
+  # is only for the name 'mesh-gateway'.
+  consulServiceName: ""
+
+  # Port that the gateway will run on inside the container.
+  containerPort: 443
+
+  # Optional hostPort for the gateway to be exposed on.
+  # This can be used with wanAddress.port and wanAddress.useNodeIP
+  # to expose the gateways directly from the node.
+  # If hostNetwork is true, this must be null or set to the same port as
+  # containerPort.
+  hostPort: null
+
+  # If there are no connect-enabled services running, then the gateway
+  # will fail health checks. You may disable health checks as a temporary
+  # workaround.
+  enableHealthChecks: true
+
+  resources: |
+    requests:
+      memory: "128Mi"
+      cpu: "250m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  # By default, we set an anti affinity so that two gateway pods won't be
+  # on the same node. NOTE: Gateways require that Consul client agents are
+  # also running on the nodes alongside each gateway Pod.
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: {{ template "consul.name" . }}
+              release: "{{ .Release.Name }}"
+              component: mesh-gateway
+          topologyKey: kubernetes.io/hostname
+
+  # Optional YAML string to specify tolerations.
+  tolerations: null
+
+  # Optional YAML string to specify a nodeSelector config.
+  nodeSelector: null
+
+  # Optional priorityClassName.
+  priorityClassName: ""
+
+  # Optional YAML string for additional annotations.
+  annotations: null
