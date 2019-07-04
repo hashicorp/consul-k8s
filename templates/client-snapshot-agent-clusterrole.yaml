@@ -1,20 +1,24 @@
 {{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if .Values.client.snapshotAgent.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-client
+  name: {{ template "consul.fullname" . }}-snapshot-agent
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-{{- if (or .Values.global.enablePodSecurityPolicies .Values.global.bootstrapACLs) }}
+{{- if not (or .Values.global.enablePodSecurityPolicies .Values.global.bootstrapACLs) }}
+rules: []
+{{- else }}
 rules:
+{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
-    - {{ template "consul.fullname" . }}-client
+    - {{ template "consul.fullname" . }}-snapshot-agent
     verbs:
     - use
 {{- end }}
@@ -23,11 +27,10 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ .Release.Name }}-consul-client-acl-token
+      - {{ .Release.Name }}-consul-client-snapshot-agent-acl-token
     verbs:
       - get
 {{- end }}
-{{- else}}
-rules: []
+{{- else }}
 {{- end }}
 {{- end }}
