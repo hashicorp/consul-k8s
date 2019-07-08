@@ -52,6 +52,10 @@ const (
 	// is the local port in the pod that the listener will bind to. It can
 	// be a named port.
 	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
+
+	// annotationTags is a list of tags to register with the service
+	// this is specified as a comma separated list e.g. abc,123
+	annotationTags = "consul.hashicorp.com/connect-service-tags"
 )
 
 var (
