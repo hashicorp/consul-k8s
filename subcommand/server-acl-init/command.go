@@ -25,6 +25,7 @@ type Command struct {
 	flagReleaseName            string
 	flagReplicas               int
 	flagNamespace              string
+	flagK8sServiceNamespace    string
 	flagAllowDNS               bool
 	flagCreateSyncToken        bool
 	flagCreateInjectAuthMethod bool
@@ -44,6 +45,8 @@ func (c *Command) init() {
 		"Number of expected Consul server replicas")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
+	c.flags.StringVar(&c.flagK8sServiceNamespace, "k8s-service-namespace", "default",
+		"Name of Kubernetes namespace where the `kubernetes` service/endpoint is deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
@@ -343,8 +346,8 @@ service_prefix "" {
 
 	// Support ConnectInject using Kubernetes as an auth method
 	if c.flagCreateInjectAuthMethod {
-		// Get the Kubernetes service IP address
-		k8sService, err := clientset.CoreV1().Services(c.flagNamespace).Get("kubernetes", metav1.GetOptions{})
+		// Get the Kubernetes service IP address - defaults to 'default'
+		k8sService, err := clientset.CoreV1().Services(c.flagK8sServiceNamespace).Get("kubernetes", metav1.GetOptions{})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting kubernetes service: %s", err))
 			return 1
