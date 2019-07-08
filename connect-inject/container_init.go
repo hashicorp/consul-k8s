@@ -55,7 +55,10 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		tags := strings.Split(raw, ",")
 
 		// Create json array from the annotations
-		jsonTags, _ := json.Marshal(tags)
+		jsonTags, err := json.Marshal(tags)
+		if err != nil {
+			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
+		}
 
 		data.Tags = string(jsonTags)
 	}
