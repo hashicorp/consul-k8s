@@ -134,6 +134,28 @@ func TestHandlerContainerInit(t *testing.T) {
 			`-proxy-id="${POD_NAME}-web-sidecar-proxy"`,
 			"",
 		},
+
+		{
+			"Tags specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
+				pod.Annotations[annotationTags] = "abc,123"
+				return pod
+			},
+			`tags = ["abc","123"]`,
+			"",
+		},
+
+		{
+			"No Tags specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			"",
+			`tags`,
+		},
 	}
 
 	for _, tt := range cases {

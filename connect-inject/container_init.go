@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"text/template"
 
@@ -15,6 +16,7 @@ type initContainerCommandData struct {
 	AuthMethod      string
 	CentralConfig   bool
 	Upstreams       []initContainerCommandUpstreamData
+	Tags            string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -45,6 +47,17 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		if port, _ := portValue(pod, raw); port > 0 {
 			data.ServicePort = port
 		}
+	}
+
+	// If tags are specified split the string into an array and create
+	// the tags string
+	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
+		tags := strings.Split(raw, ",")
+
+		// Create json array from the annotations
+		jsonTags, _ := json.Marshal(tags)
+
+		data.Tags = string(jsonTags)
 	}
 
 	// If upstreams are specified, configure those
@@ -201,6 +214,9 @@ services {
   name = "{{ .ServiceName }}"
   address = "${POD_IP}"
   port = {{ .ServicePort }}
+  {{- if .Tags}}
+  tags = {{.Tags}}
+  {{- end}}
 }
 EOF
 
