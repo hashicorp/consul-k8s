@@ -46,7 +46,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.StringVar(&c.flagK8sServiceNamespace, "k8s-service-namespace", "default",
-		"Name of Kubernetes namespace where the `kubernetes` service/endpoint is deployed")
+		"Name of Kubernetes namespace where the 'kubernetes' service/endpoint is deployed. It defaults to 'default'")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
