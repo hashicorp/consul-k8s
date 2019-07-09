@@ -1,5 +1,13 @@
 ## 0.8.1-dev (July 09, 2019)
 
+## 0.9.0 (July 8, 2019)
+
+Improvements:
+
+* Allow creation of ACL token for Snapshot Agents
+* Allow creation of ACL token for Mesh Gateways
+* Allows client ACL token creation to be optional
+
 ## 0.8.1 (May 9, 2019)
 
 Bug fixes:
