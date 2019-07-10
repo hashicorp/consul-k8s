@@ -11,39 +11,14 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "ui/Ingress: enable with global.enabled false" {
+@test "ui/Ingress: enable with ui.ingress.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/ui-ingress.yaml  \
-      --set 'global.enabled=false' \
-      --set 'server.enabled=true' \
-      --set 'ui.enabled=true' \
       --set 'ui.ingress.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "ui/Ingress: disable with server.enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ui-ingress.yaml  \
-      --set 'server.enabled=false' \
-      --set 'ui.ingress.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "ui/Ingress: disable with ui.enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ui-ingress.yaml  \
-      --set 'ui.enabled=false' \
-      --set 'ui.ingress.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 }
 
 @test "ui/Ingress: disable with ui.ingress.enabled" {
@@ -56,24 +31,11 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "ui/Ingress: disable with global.enabled" {
+@test "ui/Ingress: disable with ui.ingress.enabled dash string" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/ui-ingress.yaml  \
-      --set 'global.enabled=false' \
-      --set 'ui.ingress.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "ui/Ingress: disable with global.enabled and server.enabled on" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ui-service.yaml  \
-      --set 'global.enabled=false' \
-      --set 'server.enabled=true' \
-      --set 'ui.ingress.enabled=true' \
+      --set 'ui.ingress.enabled=-' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -132,7 +94,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
-      --set 'ui.ingress.tls[0].hosts[0]=foo.com' \
+      --set 'ui.ingress.tls[0].hosts[0]=sslexample.foo.com' \
       --set 'ui.ingress.tls[0].secretName=testsecret-tls' \
       . | tee /dev/stderr |
       yq -r '.spec.tls[0].secretName' | tee /dev/stderr)
@@ -157,7 +119,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
-      --set 'ui.ingress.annotations.foo=bar' \
+      --set 'ui.ingress.annotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
