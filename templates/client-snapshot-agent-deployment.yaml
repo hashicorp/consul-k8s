@@ -33,7 +33,7 @@ spec:
         {{ tpl .Values.client.tolerations . | nindent 8 | trim }}
       {{- end }}
       terminationGracePeriodSeconds: 10
-      serviceAccountName: {{ template "consul.fullname" . }}-client
+      serviceAccountName: {{ template "consul.fullname" . }}-snapshot-agent
 
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
