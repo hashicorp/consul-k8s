@@ -56,6 +56,10 @@ const (
 	// annotationTags is a list of tags to register with the service
 	// this is specified as a comma separated list e.g. abc,123
 	annotationTags = "consul.hashicorp.com/connect-service-tags"
+
+	// annotationMeta is a list of metadata key/value pairs to add to the service
+	// registration. This is specified in the format `<key>:<value>,...`
+	annotationMeta = "consul.hashicorp.com/connect-service-meta"
 )
 
 var (

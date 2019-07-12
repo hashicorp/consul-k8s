@@ -17,6 +17,7 @@ type initContainerCommandData struct {
 	CentralConfig   bool
 	Upstreams       []initContainerCommandUpstreamData
 	Tags            string
+	Meta            map[string]string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -61,6 +62,21 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		}
 
 		data.Tags = string(jsonTags)
+	}
+
+	// If there is metadata specified split into a map and create
+	if raw, ok := pod.Annotations[annotationMeta]; ok && raw != "" {
+		meta := strings.Split(raw, ",")
+		metaMap := map[string]string{}
+
+		for _, m := range meta {
+			parts := strings.Split(m, ":")
+			if len(parts) == 2 {
+				metaMap[strings.Trim(parts[0], " ")] = strings.Trim(parts[1], " ")
+			}
+		}
+
+		data.Meta = metaMap
 	}
 
 	// If upstreams are specified, configure those
@@ -219,6 +235,13 @@ services {
   port = {{ .ServicePort }}
   {{- if .Tags}}
   tags = {{.Tags}}
+  {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
   {{- end}}
 }
 EOF
