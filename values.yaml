@@ -415,15 +415,15 @@ meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
   # See https://www.consul.io/docs/connect/mesh_gateway.html
-  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.8.2 if using global.bootstrapACLs.
+  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using global.bootstrapACLs.
   enabled: false
 
   # Globally configure which mode the gateway should run in.
-  # Can be set to either "remote", "local", "none" or "".
+  # Can be set to either "remote", "local", "none" or empty string or null.
   # See https://consul.io/docs/connect/mesh_gateway.html#modes-of-operation for
   # a description of each mode.
-  # If set, connectInject.centralConfig.enabled should be set to true so that
-  # the global config will actually be used.
+  # If set to anything other than "" or null, connectInject.centralConfig.enabled
+  # should be set to true so that the global config will actually be used.
   # If set to the empty string, no global default will be set and the gateway mode
   # will need to be set individually for each service.
   globalMode: local
@@ -501,6 +501,8 @@ meshGateway:
   # to expose the gateways directly from the node.
   # If hostNetwork is true, this must be null or set to the same port as
   # containerPort.
+  # NOTE: Cannot set to 8500 or 8502 because those are reserved for the Consul
+  # agent.
   hostPort: null
 
   # If there are no connect-enabled services running, then the gateway

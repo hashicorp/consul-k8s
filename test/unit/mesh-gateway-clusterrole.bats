@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/ClusterRole: enabled with meshGateway.enabled=true" {
+@test "meshGateway/ClusterRole: enabled with meshGateway, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-clusterrole.yaml  \
@@ -35,7 +35,6 @@ load _helpers
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "podsecuritypolicies" ]
 }
-
 
 @test "meshGateway/ClusterRole: rules for global.bootstrapACLs=true" {
   cd `chart_dir`

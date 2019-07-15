@@ -11,13 +11,11 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/Deployment: enabled with meshGateway.enabled true" {
+@test "meshGateway/Deployment: enabled with meshGateway, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       . | tee /dev/stderr |
@@ -25,13 +23,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# prerequisites
+
 @test "meshGateway/Deployment: fails if connectInject.enabled=false" {
   cd `chart_dir`
   run helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=false' \
-      --set 'client.grpc=true' \
       --set 'client.grpc=true' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "connectInject.enabled must be true" ]]
@@ -42,7 +42,6 @@ load _helpers
   run helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
       --set 'client.grpc=false' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.centralConfig.enabled=true' .
@@ -50,30 +49,64 @@ load _helpers
   [[ "$output" =~ "client.grpc must be true" ]]
 }
 
-@test "meshGateway/Deployment: no annotations by default" {
+@test "meshGateway/Deployment: fails if global.enabled is false and clients are not explicitly enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      . | tee /dev/stderr |
-      yq -r '.metadata.annotations' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=true' \
+      --set 'global.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "clients must be enabled" ]]
 }
 
-@test "meshGateway/Deployment: annotations can be set" {
+@test "meshGateway/Deployment: fails if global.enabled is true but clients are explicitly disabled" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'client.grpc=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=true' \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "clients must be enabled" ]]
+}
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "meshGateway/Deployment: no extra annotations by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'meshGateway.annotations=key: value' \
       . | tee /dev/stderr |
-      yq -r '.metadata.annotations.key' | tee /dev/stderr)
-  [ "${actual}" = "value" ]
+      yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
 }
+
+@test "meshGateway/Deployment: extra annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'client.grpc=true' \
+      --set 'meshGateway.annotations=key1: value1
+key2: value2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
+  [ "${actual}" = "3" ]
+}
+
+#--------------------------------------------------------------------
+# replicas
 
 @test "meshGateway/Deployment: replicas defaults to 2" {
   cd `chart_dir`
@@ -100,6 +133,9 @@ load _helpers
   [ "${actual}" = "3" ]
 }
 
+#--------------------------------------------------------------------
+# affinity
+
 @test "meshGateway/Deployment: affinity defaults to one per node" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -124,6 +160,9 @@ load _helpers
       yq -r '.spec.template.spec.affinity.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
+
+#--------------------------------------------------------------------
+# tolerations
 
 @test "meshGateway/Deployment: no tolerations by default" {
   cd `chart_dir`
@@ -150,6 +189,22 @@ load _helpers
   [ "${actual}" = "value" ]
 }
 
+#--------------------------------------------------------------------
+# hostNetwork
+
+
+@test "meshGateway/Deployment: hostNetwork is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'client.grpc=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.hostNetwork' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
 @test "meshGateway/Deployment: hostNetwork can be set" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -162,6 +217,9 @@ load _helpers
       yq -r '.spec.template.spec.hostNetwork' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# dnsPolicy
 
 @test "meshGateway/Deployment: no dnsPolicy by default" {
   cd `chart_dir`
@@ -188,7 +246,10 @@ load _helpers
   [ "${actual}" = "ClusterFirst" ]
 }
 
-@test "meshGateway/Deployment: global.BootstrapACLs enabled" {
+#--------------------------------------------------------------------
+# BootstrapACLs
+
+@test "meshGateway/Deployment: global.BootstrapACLs enabled creates init container and secret" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -200,9 +261,12 @@ load _helpers
   local init_container=$(echo "${actual}" | yq -r '.spec.template.spec.initContainers[1].name' | tee /dev/stderr)
   [ "${init_container}" = "mesh-gateway-acl-init" ]
 
-  local secret=$(echo "${actual}" | yq -r '.spec.template.spec.containers[0].env[3].name' | tee /dev/stderr)
+  local secret=$(echo "${actual}" | yq -r '.spec.template.spec.containers[0].env[2].name' | tee /dev/stderr)
   [ "${secret}" = "CONSUL_HTTP_TOKEN" ]
 }
+
+#--------------------------------------------------------------------
+# envoyImage
 
 @test "meshGateway/Deployment: envoy image has default" {
   cd `chart_dir`
@@ -228,6 +292,9 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
   [ "${actual}" = "new/image" ]
 }
+
+#--------------------------------------------------------------------
+# resources
 
 @test "meshGateway/Deployment: resources has default" {
   cd `chart_dir`
@@ -257,6 +324,9 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].resources.requests' | tee /dev/stderr)
   [ "${actual}" = "yadayada" ]
 }
+
+#--------------------------------------------------------------------
+# containerPort
 
 @test "meshGateway/Deployment: containerPort defaults to 443" {
   cd `chart_dir`
@@ -290,6 +360,9 @@ load _helpers
   [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "8443" ]
   [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "8443" ]
 }
+
+#--------------------------------------------------------------------
+# wanAddress
 
 @test "meshGateway/Deployment: wanAddress.port defaults to 443" {
   cd `chart_dir`
@@ -361,6 +434,9 @@ load _helpers
   [[ "${actual}" =~ '-wan-address="myhost:4444"' ]]
 }
 
+#--------------------------------------------------------------------
+# consulServiceName
+
 @test "meshGateway/Deployment: fails if consulServiceName is set and bootstrapACLs is true" {
   cd `chart_dir`
   run helm template \
@@ -373,6 +449,22 @@ load _helpers
       .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "if global.bootstrapACLs is true, meshGateway.consulServiceName cannot be set" ]]
+}
+
+@test "meshGateway/Deployment: does not fail if consulServiceName is set to mesh-gateway and bootstrapACLs is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'client.grpc=true' \
+      --set 'meshGateway.consulServiceName=mesh-gateway' \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr \
+      | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
+
+  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="mesh-gateway"' ]]
+  [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"mesh-gateway\"' ]]
 }
 
 @test "meshGateway/Deployment: consulServiceName can be set" {
@@ -389,6 +481,9 @@ load _helpers
   [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="overridden"' ]]
   [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"overridden\"' ]]
 }
+
+#--------------------------------------------------------------------
+# healthchecks
 
 @test "meshGateway/Deployment: healthchecks are on by default" {
   cd `chart_dir`
@@ -423,6 +518,9 @@ load _helpers
   [ "${readiness}" = "false" ]
 }
 
+#--------------------------------------------------------------------
+# hostPort
+
 @test "meshGateway/Deployment: no hostPort by default" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -450,6 +548,9 @@ load _helpers
   [ "${actual}" = "443" ]
 }
 
+#--------------------------------------------------------------------
+# priorityClassName
+
 @test "meshGateway/Deployment: no priorityClassName by default" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -476,6 +577,9 @@ load _helpers
 
   [ "${actual}" = "name" ]
 }
+
+#--------------------------------------------------------------------
+# nodeSelector
 
 @test "meshGateway/Deployment: no nodeSelector by default" {
   cd `chart_dir`

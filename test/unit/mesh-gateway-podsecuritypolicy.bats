@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/PodSecurityPolicy: enabled with meshGateway.enabled and global.enablePodSecurityPolicies=true" {
+@test "meshGateway/PodSecurityPolicy: enabled with meshGateway, connectInject and client.grpc enabled and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-podsecuritypolicy.yaml  \
