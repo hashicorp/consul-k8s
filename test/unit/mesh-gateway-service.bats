@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/Service: disabled with meshGateway.enabled=true" {
+@test "meshGateway/Service: disabled by default with meshGateway, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-service.yaml  \
@@ -35,6 +35,9 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# annotations
 
 @test "meshGateway/Service: no annotations by default" {
   cd `chart_dir`
@@ -63,6 +66,9 @@ load _helpers
   [ "${actual}" = "value" ]
 }
 
+#--------------------------------------------------------------------
+# port
+
 @test "meshGateway/Service: has default port" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -89,6 +95,9 @@ load _helpers
       yq -r '.spec.ports[0].port' | tee /dev/stderr)
   [ "${actual}" = "8443" ]
 }
+
+#--------------------------------------------------------------------
+# targetPort
 
 @test "meshGateway/Service: has default targetPort" {
   cd `chart_dir`
@@ -117,6 +126,9 @@ load _helpers
   [ "${actual}" = "8443" ]
 }
 
+#--------------------------------------------------------------------
+# nodePort
+
 @test "meshGateway/Service: no nodePort by default" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -144,6 +156,9 @@ load _helpers
   [ "${actual}" = "8443" ]
 }
 
+#--------------------------------------------------------------------
+# Service type
+
 @test "meshGateway/Service: defaults to type ClusterIP" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -170,6 +185,9 @@ load _helpers
       yq -r '.spec.type' | tee /dev/stderr)
   [ "${actual}" = "LoadBalancer" ]
 }
+
+#--------------------------------------------------------------------
+# additionalSpec
 
 @test "meshGateway/Service: can add additionalSpec" {
   cd `chart_dir`

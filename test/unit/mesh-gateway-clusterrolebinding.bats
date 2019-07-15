@@ -11,7 +11,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/ClusterRoleBinding: enabled with meshGateway.enabled=true" {
+@test "meshGateway/ClusterRoleBinding: enabled with meshGateway, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-clusterrolebinding.yaml  \
@@ -30,6 +30,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
+      --name 'release-name' \
       . | tee /dev/stderr |
       yq -r '.subjects[0].name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-mesh-gateway" ]

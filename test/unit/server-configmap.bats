@@ -127,7 +127,7 @@ load _helpers
   [ "${actual}" = "remote" ]
 }
 
-@test "server/ConfigMap: proxyDefaults should have no gateway mode if disabled" {
+@test "server/ConfigMap: proxyDefaults should have no gateway mode if set to empty string" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
@@ -136,6 +136,21 @@ load _helpers
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=' \
+      --set 'client.grpc=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: proxyDefaults should have no gateway mode if set to null" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-config-configmap.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=true' \
+      --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
+      --set 'meshGateway.enabled=true' \
+      --set 'meshGateway.globalMode=null' \
       --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
