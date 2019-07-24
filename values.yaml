@@ -254,6 +254,11 @@ client:
 dns:
   enabled: "-"
 
+  # Extra annotations to attach to the dns service
+  # This should be a multi-line string of
+  # annotations to apply to the dns Service
+  annotations: null
+
 ui:
   # True if you want to enable the Consul UI. The UI will run only
   # on the server nodes. This makes UI access via the service below (if

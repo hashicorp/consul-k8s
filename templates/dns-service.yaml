@@ -10,6 +10,10 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+  {{- if .Values.dns.annotations }}
+  annotations:
+    {{ tpl .Values.dns.annotations . | nindent 4 | trim }}
+  {{- end }}
 spec:
   ports:
     - name: dns-tcp
