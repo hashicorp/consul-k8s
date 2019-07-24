@@ -150,7 +150,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	})
 
 	// Verify the settings
-	require.Equal(serviceID("foo", "bar"), service.ServiceID)
+	//require.Equal(serviceID("foo", "bar"), service.ServiceID) //Removed this check, because now it random
 	require.Equal("foo", service.Node)
 	require.Equal("bar", service.ServiceName)
 	require.Equal("127.0.0.1", service.Address)
