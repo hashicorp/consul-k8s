@@ -22,7 +22,7 @@ func TestConsulSyncer_register(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	s, closer := testConsulSyncer(t, client)
+	s, closer := testConsulSyncer(t, client, 200*time.Millisecond)
 	defer closer()
 
 	// Sync
@@ -49,6 +49,39 @@ func TestConsulSyncer_register(t *testing.T) {
 	require.Equal("127.0.0.1", service.Address)
 }
 
+func TestConsulSyncer_registerImmediate(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t, t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	s, closer := testConsulSyncer(t, client, 10*time.Second)
+	defer closer()
+
+	// Sync
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("foo", "bar"),
+	})
+
+	// Read the service back out
+	services, _, err := client.Catalog().Service("bar", "", nil)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	if len(services) == 0 {
+		t.Fatal("service not found")
+	}
+	service := services[0]
+
+	// Verify the settings
+	require.Equal("foo", service.Node)
+	require.Equal("bar", service.ServiceName)
+	require.Equal("127.0.0.1", service.Address)
+}
+
 // Test that the syncer reaps invalid services
 func TestConsulSyncer_reapService(t *testing.T) {
 	t.Parallel()
@@ -59,7 +92,7 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	s, closer := testConsulSyncer(t, client)
+	s, closer := testConsulSyncer(t, client, 200*time.Millisecond)
 	defer closer()
 
 	// Sync
@@ -111,7 +144,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	s, closer := testConsulSyncer(t, client)
+	s, closer := testConsulSyncer(t, client, 200*time.Millisecond)
 	defer closer()
 
 	// Sync
@@ -166,7 +199,7 @@ func TestConsulSyncer_reapServiceOtherNamespace(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	s, closer := testConsulSyncer(t, client)
+	s, closer := testConsulSyncer(t, client, 200*time.Millisecond)
 	defer closer()
 
 	// Sync
@@ -199,7 +232,7 @@ func TestConsulSyncer_reapServiceSameNamespace(t *testing.T) {
 	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
 	client := a.Client()
 
-	s, closer := testConsulSyncer(t, client)
+	s, closer := testConsulSyncer(t, client, 200*time.Millisecond)
 	defer closer()
 
 	// Sync
@@ -261,11 +294,11 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 	}
 }
 
-func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) {
+func testConsulSyncer(t *testing.T, client *api.Client, syncPeriod time.Duration) (*ConsulSyncer, func()) {
 	s := &ConsulSyncer{
 		Client:            client,
 		Log:               hclog.Default(),
-		SyncPeriod:        200 * time.Millisecond,
+		SyncPeriod:        syncPeriod,
 		ServicePollPeriod: 50 * time.Millisecond,
 		Namespace:         "default",
 		ConsulK8STag:      TestConsulK8STag,

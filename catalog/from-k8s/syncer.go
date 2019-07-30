@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 const (
 	// ConsulSyncPeriod is how often the syncer will attempt to
 	// reconcile the expected service states with the remote Consul server.
-	ConsulSyncPeriod = 30 * time.Second
+	ConsulSyncPeriod = 2 * time.Minute
 
 	// ConsulServicePollPeriod is how often a service is checked for
 	// whether it has instances to reap.
@@ -82,25 +83,66 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.services = make(map[string]struct{})
-	s.nodes = make(map[string]*consulSyncState)
+	type nodeService struct {
+		Node      string
+		ServiceID string
+	}
+
+	nodeServices := make(map[nodeService]struct{})
+	services := make(map[string]struct{})
+	nodes := make(map[string]*consulSyncState)
 	for _, r := range rs {
 		// Mark this as a valid service
-		s.services[r.Service.Service] = struct{}{}
+		services[r.Service.Service] = struct{}{}
+		nodeServices[nodeService{
+			Node:      r.Node,
+			ServiceID: r.Service.ID,
+		}] = struct{}{}
 
 		// Initialize the state if we don't have it
-		state, ok := s.nodes[r.Node]
+		state, ok := nodes[r.Node]
 		if !ok {
 			state = &consulSyncState{
 				Services: make(map[string]*api.CatalogRegistration),
 			}
 
-			s.nodes[r.Node] = state
+			nodes[r.Node] = state
+		}
+
+		// if the registration is new or changed sync it immediatly
+		if s.shouldSync(r) {
+			s.Log.Info("syncing service",
+				"node-name", r.Node,
+				"service-name", r.Service.Service)
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			s.syncOne(ctx, r)
 		}
 
 		// Add our registration
 		state.Services[r.Service.ID] = r
 	}
+	for _, node := range s.nodes {
+		for _, r := range node.Services {
+			if _, ok := nodeServices[nodeService{
+				Node:      r.Node,
+				ServiceID: r.Service.ID,
+			}]; ok {
+				continue
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			s.deregOne(ctx, &api.CatalogDeregistration{
+				Node:      r.Node,
+				ServiceID: r.Service.ID,
+			})
+		}
+	}
+
+	s.nodes = nodes
+	s.services = services
 }
 
 // Run is the long-running runloop for reconciling the local set of
@@ -323,16 +365,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 
 	// Do all deregistrations first
 	for _, r := range s.deregs {
-		s.Log.Info("deregistering service",
-			"node-name", r.Node,
-			"service-id", r.ServiceID)
-		_, err := s.Client.Catalog().Deregister(r, nil)
-		if err != nil {
-			s.Log.Warn("error deregistering service",
-				"node-name", r.Node,
-				"service-id", r.ServiceID,
-				"err", err)
-		}
+		s.deregOne(ctx, r)
 	}
 
 	// Always clear deregistrations, they'll repopulate if we had errors
@@ -342,20 +375,51 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 	// may have been made to the registered services.
 	for _, state := range s.nodes {
 		for _, r := range state.Services {
-			_, err := s.Client.Catalog().Register(r, nil)
-			if err != nil {
-				s.Log.Warn("error registering service",
-					"node-name", r.Node,
-					"service-name", r.Service.Service,
-					"err", err)
-				continue
-			}
-
-			s.Log.Debug("registered service instance",
-				"node-name", r.Node,
-				"service-name", r.Service.Service)
+			s.syncOne(ctx, r)
 		}
 	}
+}
+
+func (s *ConsulSyncer) syncOne(ctx context.Context, r *api.CatalogRegistration) {
+	wopt := (&api.WriteOptions{}).WithContext(ctx)
+	_, err := s.Client.Catalog().Register(r, wopt)
+	if err != nil {
+		s.Log.Warn("error registering service",
+			"node-name", r.Node,
+			"service-name", r.Service.Service,
+			"err", err)
+		return
+	}
+
+	s.Log.Debug("registered service instance",
+		"node-name", r.Node,
+		"service-name", r.Service.Service)
+}
+
+func (s *ConsulSyncer) deregOne(ctx context.Context, r *api.CatalogDeregistration) {
+	s.Log.Info("deregistering service",
+		"node-name", r.Node,
+		"service-id", r.ServiceID)
+	_, err := s.Client.Catalog().Deregister(r, nil)
+	if err != nil {
+		s.Log.Warn("error deregistering service",
+			"node-name", r.Node,
+			"service-id", r.ServiceID,
+			"err", err)
+	}
+}
+
+func (s *ConsulSyncer) shouldSync(r *api.CatalogRegistration) bool {
+	node, ok := s.nodes[r.Node]
+	if !ok {
+		return true
+	}
+	reg, ok := node.Services[r.Service.ID]
+	if !ok {
+		return true
+	}
+
+	return !reflect.DeepEqual(reg, r)
 }
 
 func (s *ConsulSyncer) init() {
