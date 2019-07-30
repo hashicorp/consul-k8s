@@ -22,17 +22,23 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags          *flag.FlagSet
-	k8s            *k8sflags.K8SFlags
-	flagSecretName string
-	flagInitType   string
-	flagNamespace  string
-	flagACLDir     string
+	flags             *flag.FlagSet
+	k8s               *k8sflags.K8SFlags
+	flagSecretName    string
+	flagInitType      string
+	flagNamespace     string
+	flagACLDir        string
+	flagDefaultPolicy string
 
 	k8sClient *kubernetes.Clientset
 
 	once sync.Once
 	help string
+}
+
+type clientConfig struct {
+	Secret        string
+	DefaultPolicy string
 }
 
 func (c *Command) init() {
@@ -45,7 +51,8 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.StringVar(&c.flagACLDir, "acl-dir", "/consul/aclconfig",
 		"Directory name of shared volume where acl config will be output")
-
+	c.flags.StringVar(&c.flagDefaultPolicy, "default-policy", "deny",
+		"Default policy for ACLs. Supported values are \"deny\" (default) and \"allow\"")
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -58,6 +65,11 @@ func (c *Command) Run(args []string) int {
 	}
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		return 1
+	}
+
+	if c.flagDefaultPolicy != "allow" && c.flagDefaultPolicy != "deny" {
+		c.UI.Error(fmt.Sprintf("\"%s\" is not a support default policy", c.flagDefaultPolicy))
 		return 1
 	}
 
@@ -91,9 +103,10 @@ func (c *Command) Run(args []string) int {
 	if c.flagInitType == "client" {
 		// Construct extra client config json with acl details
 		// This will be mounted as a volume for the client to use
-		var buf bytes.Buffer
-		tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
-		err = tpl.Execute(&buf, secret)
+		buf, err := renderClientACLConfig(&clientConfig{
+			Secret:        secret,
+			DefaultPolicy: c.flagDefaultPolicy,
+		})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error creating template: %s", err))
 			return 1
@@ -126,6 +139,19 @@ func (c *Command) Help() string {
 	return c.help
 }
 
+func renderClientACLConfig(config *clientConfig) (bytes.Buffer, error) {
+	// Construct extra client config json with acl details
+	// This will be mounted as a volume for the client to use
+	var buf bytes.Buffer
+	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
+	err := tpl.Execute(&buf, config)
+	if err != nil {
+		return buf, err
+	}
+
+	return buf, nil
+}
+
 const synopsis = "Initialize ACLs on Consul servers."
 const help = `
 Usage: consul-k8s acl-init [options]
@@ -139,10 +165,10 @@ const clientACLConfigTpl = `
 {
   "acl": {
     "enabled": true,
-    "default_policy": "deny",
+    "default_policy": "{{ .DefaultPolicy }}",
     "down_policy": "extend-cache",
     "tokens": {
-      "agent": "{{ . }}"
+      "agent": "{{ .Secret }}"
     }
   }
 }
