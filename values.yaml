@@ -311,6 +311,11 @@ syncCatalog:
   # prepended with "consul-". (Consul -> Kubernetes sync)
   k8sPrefix: null
 
+  # k8sSourceNamespace is the Kubernetes namespace to watch for service
+  # changes and sync to Consul. If this is not set then it will default
+  # to all namespaces.
+  k8sSourceNamespace: null
+
   # consulPrefix is the service prefix which preprends itself
   # to Kubernetes services registered within Consul
   # For example, "k8s-" will register all services peprended with "k8s-".
