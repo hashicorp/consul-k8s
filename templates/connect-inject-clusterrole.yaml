@@ -20,7 +20,7 @@ rules:
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
-  resourcesName:
+  resourceNames:
   - {{ template "consul.fullname" . }}-connect-injector-webhook
   verbs:
   - use
