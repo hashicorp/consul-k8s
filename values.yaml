@@ -344,12 +344,11 @@ syncCatalog:
   #   beta.kubernetes.io/arch: amd64
   nodeSelector: null
 
-  #Log verbosity level. Supported values (in order of detail) are \"trace\", "+
-  #"\"debug\", \"info\", \"warn\", and \"error\".")
+  # Log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   logLevel: info
 
-  # The interval to perform syncing operations creating Consul services
-  consulWriteInterval: 30s
+  # Override the default interval to perform syncing operations creating Consul services.
+  consulWriteInterval: null
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
