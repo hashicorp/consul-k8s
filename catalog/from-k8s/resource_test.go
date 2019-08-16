@@ -22,6 +22,56 @@ func TestServiceResource_impl(t *testing.T) {
 	var _ controller.Backgrounder = &ServiceResource{}
 }
 
+func TestServiceResource_externalIPOnClusterIPAllowed(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: false,
+	})
+	defer closer()
+
+	// Insert an LB service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type:        apiv1.ServiceTypeClusterIP,
+			ExternalIPs: []string{"a", "b"},
+		},
+
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{
+					apiv1.LoadBalancerIngress{
+						IP: "1.2.3.4",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("a", actual[0].Service.Address)
+	require.Equal("b", actual[1].Service.Address)
+}
+
 // Test that deleting a service properly deletes the registration.
 func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()

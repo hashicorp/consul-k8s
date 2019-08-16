@@ -185,8 +185,8 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 		return false
 	}
 
-	// Ignore ClusterIP services if ClusterIP sync is disabled
-	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+	// Ignore ClusterIP services if ClusterIP sync is disabled unless it has ExternalIPs
+	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync && len(svc.Spec.ExternalIPs) == 0 {
 		return false
 	}
 
