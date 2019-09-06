@@ -1,8 +1,21 @@
 ## UNRELEASED
 
+## 0.9.0 (Sep 6, 2019)
+
+IMPROVEMENTS:
+
+  * Support running the consul snapshot agent
+  * Support mesh gateways
+  * Allow setting annotations for the DNS service
+  * Allow setting `-consul-write-interval`, `-log-level` and `-k8s-source-namespace` flags for consul-k8s sync
+  * Allow setting DNS service IP
+  * Fix issues where acl-init job would fail repeatedly and ACLs would not be
+    bootstrapped
+
 BUG FIXES:
 
   * Fix enterprise license application when ACLs are turned off
+  * `rules` key must always be set (fixes https://github.com/hashicorp/consul-helm/issues/178)
 
 ## 0.8.1 (May 9, 2019)
 
