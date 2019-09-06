@@ -11,10 +11,6 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-  annotations:
-    "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
     metadata:
@@ -29,6 +25,22 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
+      initContainers:
+        - name: wait-for-leader
+          image: bitnami/kubectl:1.13
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              echo "Waiting for {{ .Values.server.replicas }} server pods to be running"
+              COUNT=0;
+              while [[ $COUNT -lt {{ .Values.server.replicas }} ]]; do
+                sleep 5s;
+                COUNT=$(kubectl get pods -n {{ .Release.Namespace }} -l "app=consul,component=server,release={{.Release.Name}}" | grep 'Running' | wc -l);
+                echo "Current count: $COUNT";
+              done;
+              # Sleep for 10 to allow for leader election.
+              sleep 10s;
       containers:
         - name: post-install-job
           image: {{ .Values.global.imageK8S }}
