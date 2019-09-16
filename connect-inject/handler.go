@@ -55,7 +55,7 @@ const (
 
 	// annotationTags is a list of tags to register with the service
 	// this is specified as a comma separated list e.g. abc,123
-	annotationTags = "consul.hashicorp.com/connect-service-tags"
+	annotationTags = "consul.hashicorp.com/service-tags"
 )
 
 var (
