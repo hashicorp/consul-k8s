@@ -65,18 +65,12 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	}
 
 	// If there is metadata specified split into a map and create
-	if raw, ok := pod.Annotations[annotationMeta]; ok && raw != "" {
-		meta := strings.Split(raw, ",")
-		metaMap := map[string]string{}
-
-		for _, m := range meta {
-			parts := strings.Split(m, ":")
-			if len(parts) == 2 {
-				metaMap[strings.Trim(parts[0], " ")] = strings.Trim(parts[1], " ")
-			}
+	data.Meta = make(map[string]string)
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, annotationMeta) && v != "" {
+			md := strings.Split(k, annotationMeta)
+			data.Meta[md[1]] = v
 		}
-
-		data.Meta = metaMap
 	}
 
 	// If upstreams are specified, configure those
