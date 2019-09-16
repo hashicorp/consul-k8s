@@ -58,8 +58,9 @@ const (
 	annotationTags = "consul.hashicorp.com/connect-service-tags"
 
 	// annotationMeta is a list of metadata key/value pairs to add to the service
-	// registration. This is specified in the format `<key>:<value>,...`
-	annotationMeta = "consul.hashicorp.com/connect-service-meta"
+	// registration. This is specified in the format `<key>:<value>`
+	// e.g. consul.hashicorp.com/service-meta-foo:bar
+	annotationMeta = "consul.hashicorp.com/service-meta-"
 )
 
 var (
