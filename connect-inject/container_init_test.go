@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -193,7 +194,8 @@ func TestHandlerContainerInit(t *testing.T) {
 			"Metadata specified",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
-				pod.Annotations[annotationMeta] = "name:abc, version:2"
+				pod.Annotations[fmt.Sprintf("%sname", annotationMeta)] = "abc"
+				pod.Annotations[fmt.Sprintf("%sversion", annotationMeta)] = "2"
 				return pod
 			},
 			`meta = {
