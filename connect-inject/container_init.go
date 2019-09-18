@@ -181,6 +181,16 @@ services {
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  {{- if .Tags}}
+  tags = {{.Tags}}
+  {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
+  {{- end}}
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
