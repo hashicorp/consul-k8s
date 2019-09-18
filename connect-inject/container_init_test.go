@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -155,6 +156,63 @@ func TestHandlerContainerInit(t *testing.T) {
 			},
 			"",
 			`tags`,
+		},
+
+		/*
+			{
+			          "services": [{
+			            "name": "api",
+			            "ID": "api-{{ env "NOMAD_ALLOC_ID" }}",
+			            "port": {{ env "NOMAD_PORT_postie_http" }},
+			            "meta": {
+			              "version": "2"
+			            },
+			            "tags":["v2"],
+			            "connect": {
+			              "sidecar_service": {
+			                "port": {{ env "NOMAD_PORT_sidecar_ingress" }},
+			                "proxy": {
+			                  "local_service_address": "127.0.0.1",
+			                  "config": {
+			                    "protocol": "http",
+			                    "envoy_prometheus_bind_addr": "0.0.0.0:{{ env "NOMAD_PORT_sidecar_metrics" }}"
+			                  }
+			                }
+			              }
+			            }
+			          },
+			          {
+			            "name": "metrics",
+			            "ID": "metrics-{{ env "NOMAD_ALLOC_ID" }}",
+			            "port": {{ env "NOMAD_PORT_sidecar_metrics" }},
+			            "tags":["v2"]
+			          }]
+			        }
+		*/
+
+		{
+			"Metadata specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[fmt.Sprintf("%sname", annotationMeta)] = "abc"
+				pod.Annotations[fmt.Sprintf("%sversion", annotationMeta)] = "2"
+				return pod
+			},
+			`meta = {
+    name = "abc"
+    version = "2"
+  }`,
+			"",
+		},
+
+		{
+			"No Metadata specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			"",
+			`meta`,
 		},
 	}
 
