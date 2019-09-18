@@ -137,7 +137,19 @@ func TestHandlerContainerInit(t *testing.T) {
 		},
 
 		{
-			"Tags specified",
+			"Single Tag specified",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
+				pod.Annotations[annotationTags] = "abc"
+				return pod
+			},
+			`tags = ["abc"]`,
+			"",
+		},
+
+		{
+			"Multiple Tags specified",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				pod.Annotations[annotationUpstreams] = "db:1234:dc1"
