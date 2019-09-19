@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+## 0.10.0 (Sep 19, 2019)
+
+IMPROVEMENTS:
+
+  * Use latest version of Consul (1.6.0) and consul-k8s (0.9.1)
+  * Remove random value from `helm test` to enable helmfile use [[GH-143](https://github.com/hashicorp/consul-helm/pull/143)]
+
 ## 0.9.0 (Sep 6, 2019)
 
 IMPROVEMENTS:
