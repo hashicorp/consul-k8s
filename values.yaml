@@ -16,7 +16,7 @@ global:
   # Examples:
   #   image: "consul:1.5.0"
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"   # Enterprise Consul image
-  image: "consul:1.5.0"
+  image: "consul:1.6.0"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
@@ -25,7 +25,7 @@ global:
   # to consul-k8s v0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
   # If using mesh gateways and bootstrapACLs then must be >= 0.9.0.
-  imageK8S: "hashicorp/consul-k8s:0.9.0"
+  imageK8S: "hashicorp/consul-k8s:0.9.1"
 
   # Datacenter is the name of the datacenter that the agents should register
   # as. This shouldn't be changed once the Consul cluster is up and running
