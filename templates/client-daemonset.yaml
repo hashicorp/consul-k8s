@@ -11,6 +11,10 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 spec:
+  {{- if .Values.client.updateStrategy }}
+  updateStrategy:
+    {{ toYaml .Values.client.updateStrategy | nindent 4 | trim }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
@@ -47,12 +51,23 @@ spec:
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
 
+      {{- if .Values.client.dnsPolicy }}
+      dnsPolicy: {{ .Values.client.dnsPolicy }}
+      {{- end }}
+
       # Consul agents require a directory for data, even clients. The data
       # is okay to be wiped though if the Pod is removed, so just use an
       # emptyDir volume.
       volumes:
         - name: data
+        {{- if .Values.client.hostPath }}
+          hostPath:
+            # directory location on host
+            path: {{ .Values.client.hostPath }}
+            type: DirectoryOrCreate
+        {{- else }}
           emptyDir: {}
+        {{- end }}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-client-config

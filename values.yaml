@@ -263,6 +263,25 @@ client:
       secretName: null
       secretKey: null
 
+    # updateStrategy for the DaemonSet.
+    # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+    # This should be a multi-line string mapping directly to the updateStrategy
+    # Example:
+    #  updateStrategy:
+    #    rollingUpdate:
+    #      maxUnavailable: 5
+    #    type: RollingUpdate
+    updateStrategy: null
+
+    # hostPath is fullpath to folder on host machine to mount as /consul/data folder. consul agent stores
+    # its configuration in this folder. By default its created as emptyDir: {}. To save data between pod restarts
+    # specify folder name on host machine to be mounted as /consul/data.
+    # Example:
+    # hostPath: '/var/consul-data'
+    hostPath: null
+
+    dnsPolicy: null
+
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns
