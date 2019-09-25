@@ -216,8 +216,8 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	// The service must be one we care about for us to watch the endpoints.
 	// We care about a service that exists in our service map (is enabled
-	// for syncing) and is a NodePort type. Only NodePort type services
-	// use the endpoints at all.
+	// for syncing) and is a NodePort or ClusterIP type since only those
+	// types use endpoints.
 	if t.serviceMap == nil {
 		return false
 	}
@@ -277,52 +277,58 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	// Determine the default port and set port annotations
+	var overridePortName string
+	var overridePortNumber int
 	if len(svc.Spec.Ports) > 0 {
-		// Create port variable, defaults to 0
 		var port int
-
-		// Flag identifying whether the service is of NodePort type
 		isNodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
-		target, ok := svc.Annotations[annotationServicePort]
+		portAnnotation, ok := svc.Annotations[annotationServicePort]
 		if ok {
-			if v, err := strconv.ParseInt(target, 0, 0); err == nil {
+			if v, err := strconv.ParseInt(portAnnotation, 0, 0); err == nil {
 				port = int(v)
+				overridePortNumber = port
+			} else {
+				overridePortName = portAnnotation
 			}
 		}
 
 		// For when the port was a name instead of an int
-		if port == 0 && target != "" {
+		if overridePortName != "" {
 			// Find the named port
 			for _, p := range svc.Spec.Ports {
-				if p.Name == target {
-					// Pick the right port based on the type of service
+				if p.Name == overridePortName {
 					if isNodePort && p.NodePort > 0 {
 						port = int(p.NodePort)
 					} else {
 						port = int(p.Port)
+						// NOTE: for cluster IP services we always use the endpoint
+						// ports so this will be overridden.
 					}
+					break
 				}
 			}
 		}
 
 		// If the port was not set above, set it with the first port
-		// based on the service type
-		if port == 0 && isNodePort {
-			// Find first defined NodePort
-			for _, p := range svc.Spec.Ports {
-				if p.NodePort > 0 {
-					port = int(p.NodePort)
-					break
+		// based on the service type.
+		if port == 0 {
+			if isNodePort {
+				// Find first defined NodePort
+				for _, p := range svc.Spec.Ports {
+					if p.NodePort > 0 {
+						port = int(p.NodePort)
+						break
+					}
 				}
+			} else {
+				port = int(svc.Spec.Ports[0].Port)
+				// NOTE: for cluster IP services we always use the endpoint
+				// ports so this will be overridden.
 			}
 		}
-		if port == 0 && !isNodePort {
-			port = int(svc.Spec.Ports[0].Port)
-		}
 
-		// Set service port based on defined port
 		baseService.Port = port
 
 		// Add all the ports as annotations
@@ -470,7 +476,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 
 	// For ClusterIP services, we register a service instance
-	// for each pod.
+	// for each endpoint.
 	case apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
@@ -483,6 +489,26 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 		seen := map[string]struct{}{}
 		for _, subset := range endpoints.Subsets {
+			// For ClusterIP services, we use the endpoint port instead
+			// of the service port because we're registering each endpoint
+			// as a separate service instance.
+			epPort := baseService.Port
+			if overridePortName != "" {
+				// If we're supposed to use a specific named port, find it.
+				for _, p := range subset.Ports {
+					if overridePortName == p.Name {
+						epPort = int(p.Port)
+						break
+					}
+				}
+			} else if overridePortNumber == 0 {
+				// Otherwise we'll just use the first port in the list
+				// (unless the port number was overridden by an annotation).
+				for _, p := range subset.Ports {
+					epPort = int(p.Port)
+					break
+				}
+			}
 			for _, subsetAddr := range subset.Addresses {
 				addr := subsetAddr.IP
 				if addr == "" {
@@ -505,6 +531,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
+				r.Service.Port = epPort
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}

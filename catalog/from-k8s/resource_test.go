@@ -1623,12 +1623,13 @@ func TestServiceResource_clusterIP(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+					},
 				},
 			},
 		},
@@ -1645,10 +1646,10 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(80, actual[0].Service.Port)
+	require.Equal(8080, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(80, actual[1].Service.Port)
+	require.Equal(8080, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1697,12 +1698,13 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+					},
 				},
 			},
 		},
@@ -1719,10 +1721,10 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("prefixfoo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(80, actual[0].Service.Port)
+	require.Equal(8080, actual[0].Service.Port)
 	require.Equal("prefixfoo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(80, actual[1].Service.Port)
+	require.Equal(8080, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1771,12 +1773,19 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+						Name:     "http",
+					},
+					{
+						Port:     2000,
+						Protocol: "TCP",
+						Name:     "rpc",
+					},
 				},
 			},
 		},
@@ -1793,14 +1802,15 @@ func TestServiceResource_clusterIPMultiEndpoint(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(80, actual[0].Service.Port)
+	require.Equal(8080, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(80, actual[1].Service.Port)
+	require.Equal(8080, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
-// Test that the proper registrations are generated for a ClusterIP type with annotated override.
+// Test that the proper registrations are generated for a ClusterIP type with
+// annotated port name override.
 func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -1846,12 +1856,19 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+						Name:     "http",
+					},
+					{
+						Port:     2000,
+						Protocol: "TCP",
+						Name:     "rpc",
+					},
 				},
 			},
 		},
@@ -1868,10 +1885,93 @@ func TestServiceResource_clusterIPAnnotatedPort(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(8500, actual[0].Service.Port)
+	require.Equal(2000, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(8500, actual[1].Service.Port)
+	require.Equal(2000, actual[1].Service.Port)
+	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test that the proper registrations are generated for a ClusterIP type with
+// annotated port number override.
+func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: true,
+	})
+	defer closer()
+
+	// Insert the service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "foo",
+			Annotations: map[string]string{annotationServicePort: "4141"},
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeClusterIP,
+			Ports: []apiv1.ServicePort{
+				apiv1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
+				apiv1.ServicePort{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Insert the endpoints
+	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Subsets: []apiv1.EndpointSubset{
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{IP: "1.2.3.4"},
+					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+						Name:     "http",
+					},
+					{
+						Port:     2000,
+						Protocol: "TCP",
+						Name:     "rpc",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("1.2.3.4", actual[0].Service.Address)
+	require.Equal(4141, actual[0].Service.Port)
+	require.Equal("foo", actual[1].Service.Service)
+	require.Equal("2.3.4.5", actual[1].Service.Address)
+	require.Equal(4141, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1920,12 +2020,19 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+						Name:     "http",
+					},
+					{
+						Port:     2000,
+						Protocol: "TCP",
+						Name:     "rpc",
+					},
 				},
 			},
 		},
@@ -1942,10 +2049,10 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(80, actual[0].Service.Port)
+	require.Equal(8080, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(80, actual[1].Service.Port)
+	require.Equal(8080, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
@@ -1994,12 +2101,13 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+					},
 				},
 			},
 		},
@@ -2062,12 +2170,13 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 			apiv1.EndpointSubset{
 				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "1.2.3.4"},
-				},
-			},
-
-			apiv1.EndpointSubset{
-				Addresses: []apiv1.EndpointAddress{
 					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+					},
 				},
 			},
 		},
@@ -2084,10 +2193,92 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
 	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(80, actual[0].Service.Port)
+	require.Equal(8080, actual[0].Service.Port)
 	require.Equal("foo", actual[1].Service.Service)
 	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(80, actual[1].Service.Port)
+	require.Equal(8080, actual[1].Service.Port)
+	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test using a port name annotation when the targetPort is a named port.
+func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:           hclog.Default(),
+		Client:        client,
+		Syncer:        syncer,
+		ClusterIPSync: true,
+	})
+	defer closer()
+
+	// Insert the service
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(&apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "foo",
+			Annotations: map[string]string{annotationServicePort: "name2"},
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeClusterIP,
+			Ports: []apiv1.ServicePort{
+				apiv1.ServicePort{Port: 80, TargetPort: intstr.FromString("target1"), Name: "name1"},
+				apiv1.ServicePort{Port: 8500, TargetPort: intstr.FromString("target2"), Name: "name2"},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Insert the endpoints
+	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Subsets: []apiv1.EndpointSubset{
+			apiv1.EndpointSubset{
+				Addresses: []apiv1.EndpointAddress{
+					apiv1.EndpointAddress{IP: "1.2.3.4"},
+					apiv1.EndpointAddress{IP: "2.3.4.5"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{
+						Port:     8080,
+						Protocol: "TCP",
+						Name:     "name1",
+					},
+					{
+						Port:     2000,
+						Protocol: "TCP",
+						Name:     "name2",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 2)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("1.2.3.4", actual[0].Service.Address)
+	require.Equal(2000, actual[0].Service.Port)
+	require.Equal("foo", actual[1].Service.Service)
+	require.Equal("2.3.4.5", actual[1].Service.Address)
+	require.Equal(2000, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
