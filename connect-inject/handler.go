@@ -53,14 +53,23 @@ const (
 	// be a named port.
 	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
 
+	// annotationTags is a list of tags to register with the service
+	// this is specified as a comma separated list e.g. abc,123
+	annotationTags = "consul.hashicorp.com/service-tags"
+
+	// annotationConnectTags is a list of tags to register with the service
+	// this is specified as a comma separated list e.g. abc,123
+	//
+	// Deprecated: 'consul.hashicorp.com/service-tags' is the new annotation
+	// and should be used instead. We made this change because the tagging is
+	// not specific to connect as both the connect proxy *and* the Consul
+	// service that gets registered is tagged.
+	annotationConnectTags = "consul.hashicorp.com/connect-service-tags"
+
 	// annotationMeta is a list of metadata key/value pairs to add to the service
 	// registration. This is specified in the format `<key>:<value>`
 	// e.g. consul.hashicorp.com/service-meta-foo:bar
 	annotationMeta = "consul.hashicorp.com/service-meta-"
-
-	// annotationTags is a list of tags to register with the service
-	// this is specified as a comma separated list e.g. abc,123
-	annotationTags = "consul.hashicorp.com/service-tags"
 )
 
 var (
