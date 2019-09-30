@@ -126,7 +126,7 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Initialize ACLs on Consul servers."
+const synopsis = "Initialize ACLs on non-server components."
 const help = `
 Usage: consul-k8s acl-init [options]
 
