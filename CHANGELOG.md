@@ -1,5 +1,31 @@
 ## UNRELEASED
 
+Improvements:
+
+* Allow users to set annotations on their Kubernetes services that get synced into
+  Consul meta when using the Connect Inject functionality.
+  To use, set one or more `consul.hashicorp.com/service-meta-<key>: <value>` annotations
+  which will result in Consul meta `<key>: <value>`
+  [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+Bug Fixes:
+
+* Fix bug during connect-inject where the `-default-protocol` flag was being
+  ignored [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+* Fix bug during connect-inject where service-tag annotations were
+  being ignored [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+* Fix bug during `server-acl-init` where if any step errored then the command
+  would exit and subsequent commands would fail. Now this command runs until
+  completion, i.e. it retries failed steps indefinitely and is idempotent
+  [[GH-138](https://github.com/hashicorp/consul-k8s/issues/138)]
+
+Deprecations:
+
+* The `consul.hashicorp.com/connect-service-tags` annotation is deprecated.
+  Use `consul.hashicorp.com/service-tags` instead.
+
 ## 0.9.1 (September 18, 2019)
 
 Improvements:
