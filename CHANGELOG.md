@@ -1,11 +1,16 @@
 ## UNRELEASED
 
-## 0.10.0 (Sep 19, 2019)
+## 0.10.0 (Oct 4, 2019)
 
 IMPROVEMENTS:
 
-  * Use latest version of Consul (1.6.0) and consul-k8s (0.9.1)
+  * Use latest version of Consul (1.6.0) and consul-k8s (0.9.2)
   * Remove random value from `helm test` to enable helmfile use [[GH-143](https://github.com/hashicorp/consul-helm/pull/143)]
+  
+BUG FIXES:
+  
+  * The latest version of `consul-k8s` fixes issues with the `server-acl-init`
+    job failing repeatedly.
 
 ## 0.9.0 (Sep 6, 2019)
 
