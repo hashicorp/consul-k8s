@@ -161,7 +161,7 @@ func (c *Command) Run(args []string) int {
 	consulClient, err = api.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  "http",
-		Token:   bootstrapToken,
+		Token:   string(bootstrapToken),
 	})
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", firstServerAddr, err))
@@ -169,7 +169,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(logger, consulClient, serverPods, serverPodAddrs, bootstrapToken); err != nil {
+	if err := c.setServerTokens(logger, consulClient, serverPods, serverPodAddrs, string(bootstrapToken)); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
@@ -247,15 +247,15 @@ func (c *Command) getConsulServers(logger hclog.Logger) *apiv1.PodList {
 	return serverPods
 }
 
-func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) (string, error) {
+func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) ([]byte, error) {
 	// Bootstrap the ACLs unless already bootstrapped.
 	alreadyBootstrapped := false
-	var bootstrapToken string
+	var bootstrapToken []byte
 	c.untilSucceeds("bootstrapping ACLs - PUT /v1/acl/bootstrap",
 		func() error {
 			bootstrapResp, _, err := consulClient.ACL().Bootstrap()
 			if err == nil {
-				bootstrapToken = bootstrapResp.SecretID
+				bootstrapToken = []byte(bootstrapResp.SecretID)
 				return nil
 			}
 
@@ -280,16 +280,16 @@ func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) (
 		secret, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(bootTokenSecretName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				return "", fmt.Errorf("Bootstrap token secret %q was not found."+
+				return nil, fmt.Errorf("Bootstrap token secret %q was not found."+
 					" We can't proceed because the bootstrap token is lost."+
 					" You must reset ACLs.", bootTokenSecretName)
 			}
-			return "", fmt.Errorf("Error getting bootstrap token Secret %q: %s", bootTokenSecretName, err)
+			return nil, fmt.Errorf("Error getting bootstrap token Secret %q: %s", bootTokenSecretName, err)
 		}
 		var ok bool
-		bootstrapToken, ok = secret.StringData["token"]
+		bootstrapToken, ok = secret.Data["token"]
 		if !ok {
-			return "", fmt.Errorf("Secret %q does not have data key 'token'", bootTokenSecretName)
+			return nil, fmt.Errorf("Secret %q does not have data key 'token'", bootTokenSecretName)
 		}
 		logger.Info(fmt.Sprintf("Got bootstrap token from Secret %q", bootTokenSecretName))
 	} else {
@@ -300,7 +300,7 @@ func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) (
 					ObjectMeta: metav1.ObjectMeta{
 						Name: bootTokenSecretName,
 					},
-					StringData: map[string]string{
+					Data: map[string][]byte{
 						"token": bootstrapToken,
 					},
 				}
@@ -417,8 +417,8 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name),
 				},
-				StringData: map[string]string{
-					"token": token,
+				Data: map[string][]byte{
+					"token": []byte(token),
 				},
 			}
 			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
