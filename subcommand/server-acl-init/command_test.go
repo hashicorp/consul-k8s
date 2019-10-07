@@ -187,11 +187,11 @@ func TestRun_Tokens(t *testing.T) {
 			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-consul-%s-acl-token", releaseName, c.TokenName), metav1.GetOptions{})
 			require.NoError(err)
 			require.NotNil(tokenSecret)
-			token, ok := tokenSecret.StringData["token"]
+			token, ok := tokenSecret.Data["token"]
 			require.True(ok)
 
 			// Test that the token has the expected policies in Consul.
-			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: token})
+			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
 			require.NoError(err)
 			require.Equal(c.TokenName+"-token", tokenData.Policies[0].Name)
 		})
@@ -659,8 +659,8 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		ObjectMeta: v12.ObjectMeta{
 			Name: releaseName + "-consul-bootstrap-acl-token",
 		},
-		StringData: map[string]string{
-			"token": "bootstrap-token",
+		Data: map[string][]byte{
+			"token": []byte("bootstrap-token"),
 		},
 	})
 	require.NoError(err)
@@ -894,8 +894,8 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 		ObjectMeta: v12.ObjectMeta{
 			Name: releaseName + "-consul-bootstrap-acl-token",
 		},
-		StringData: map[string]string{
-			"token": "old-token",
+		Data: map[string][]byte{
+			"token": []byte("old-token"),
 		},
 	})
 	require.NoError(err)
@@ -917,8 +917,8 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 	// Test that the Secret was updated.
 	secret, err := k8s.CoreV1().Secrets(ns).Get(releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
 	require.NoError(err)
-	require.Contains(secret.StringData, "token")
-	require.NotEqual("old-token", secret.StringData["token"])
+	require.Contains(secret.Data, "token")
+	require.NotEqual("old-token", string(secret.Data["token"]))
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -955,9 +955,9 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, releaseName string) string 
 	bootstrapSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName), metav1.GetOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, bootstrapSecret)
-	bootToken, ok := bootstrapSecret.StringData["token"]
+	bootToken, ok := bootstrapSecret.Data["token"]
 	require.True(t, ok)
-	return bootToken
+	return string(bootToken)
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
