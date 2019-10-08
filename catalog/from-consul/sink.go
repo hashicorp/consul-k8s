@@ -50,10 +50,28 @@ type K8SSink struct {
 	// done if there are no changes.
 	SyncPeriod time.Duration
 
-	lock             sync.Mutex
-	sourceServices   map[string]string
-	keyToName        map[string]string
-	serviceMap       map[string]struct{}
+	// lock gates concurrent access to all the maps.
+	lock sync.Mutex
+
+	// sourceServices holds Consul services that should be synced to Kube.
+	// It maps from Consul service names to Consul DNS entry, e.g.
+	// foo => foo.service.consul. It's populated from the Consul API.
+	sourceServices map[string]string
+
+	// keyToName maps from Kube controller keys to Kube service names.
+	// Controller keys are in the form <kube namespace>/<kube svc name>
+	// e.g. default/foo, and are the keys Kube uses to inform that something
+	// changed.
+	keyToName map[string]string
+
+	// serviceMap holds all Kubernetes service names in the namespaces
+	// we're watching. The keys are Kubernetes service names and there are no
+	// values.
+	serviceMap map[string]struct{}
+
+	// serviceMapConsul is a subset of serviceMap. It holds all Kube services
+	// that were created by this sync process. Keys are Kube service names.
+	// It's populated from Kubernetes data.
 	serviceMapConsul map[string]*apiv1.Service
 	triggerCh        chan struct{}
 	readyCh          chan struct{}
@@ -68,6 +86,7 @@ func (s *K8SSink) SetServices(svcs map[string]string) {
 }
 
 // Informer implements the controller.Resource interface.
+// It tells Kubernetes that we want to watch for changes to Services.
 func (s *K8SSink) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -262,7 +281,7 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 	}
 
 	// Determine what needs to be deleted
-	for k, _ := range s.serviceMapConsul {
+	for k := range s.serviceMapConsul {
 		if _, ok := s.sourceServices[k]; !ok {
 			delete = append(delete, k)
 		}
