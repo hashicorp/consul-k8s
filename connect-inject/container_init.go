@@ -10,8 +10,9 @@ import (
 )
 
 type initContainerCommandData struct {
-	ServiceName string
-	ServicePort int32
+	ServiceName  string
+	ServicePort  int32
+	ServiceCheck string
 	// ServiceProtocol is the protocol for the service-defaults config
 	// that will be written if CentralConfig is true. If empty, Consul
 	// will default to "tcp".
@@ -39,6 +40,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	}
 	data := initContainerCommandData{
 		ServiceName:     pod.Annotations[annotationService],
+		ServiceCheck:    pod.Annotations[annotationCheck],
 		ServiceProtocol: protocol,
 		AuthMethod:      h.AuthMethod,
 		CentralConfig:   h.CentralConfig,
@@ -255,6 +257,13 @@ services {
     {{- range $key, $value := .Meta }}
     {{$key}} = "{{$value}}"
     {{- end }}
+  }
+  {{- end}}
+  {{- if .ServiceCheck}}
+  checks {
+    name = "{{ .ServiceName }}-check"
+    http = "http://${POD_IP}:{{ .ServicePort }}{{ .ServiceCheck }}"
+    interval = "1s"
   }
   {{- end}}
 }

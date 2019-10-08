@@ -70,6 +70,10 @@ const (
 	// registration. This is specified in the format `<key>:<value>`
 	// e.g. consul.hashicorp.com/service-meta-foo:bar
 	annotationMeta = "consul.hashicorp.com/service-meta-"
+
+	// annotationCheck is the key of the annotation that is added to
+	// http check specified URL. Any 2xx code is considered passing
+	annotationCheck = "consul.hashicorp.com/connect-service-check"
 )
 
 var (
