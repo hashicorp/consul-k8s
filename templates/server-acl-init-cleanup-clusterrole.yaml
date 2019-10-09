@@ -4,41 +4,16 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-server-acl-init
+  name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 rules:
-  - apiGroups: [""]
-    resources:
-      - pods
-    verbs:
-      - list
-  - apiGroups: [""]
-    resources:
-      - secrets
-    verbs:
-      - create
-      - get
-  - apiGroups: ["apps"]
-    resources:
-      - statefulsets
-    verbs:
-      - get
-{{- if .Values.connectInject.enabled }}
-  - apiGroups: [""]
-    resources:
-      - serviceaccounts
-    verbs:
-      - get
-  - apiGroups: [""]
-    resources:
-      - services
-    verbs:
-      - get
-{{- end }}
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "delete"]
 {{- end }}
 {{- end }}
 {{- end }}
