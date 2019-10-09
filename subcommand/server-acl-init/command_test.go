@@ -150,7 +150,7 @@ func TestRun_Tokens(t *testing.T) {
 			require.Equal(c.TokenName+"-token", tokenData.Policies[0].Name)
 
 			// Test that if the same command is run again, it doesn't error.
-			t.Run(name + "-retried", func(t *testing.T) {
+			t.Run(name+"-retried", func(t *testing.T) {
 				ui := cli.NewMockUi()
 				cmd := Command{
 					UI:        ui,
