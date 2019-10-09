@@ -1,0 +1,147 @@
+package deletecompletedjob
+
+import (
+	"flag"
+	"fmt"
+	"github.com/hashicorp/consul-k8s/subcommand"
+	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
+	v1 "k8s.io/api/batch/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"os"
+	"sync"
+	"time"
+)
+
+// Command is the command for deleting completed jobs.
+type Command struct {
+	UI cli.Ui
+
+	flags         *flag.FlagSet
+	k8s           *k8sflags.K8SFlags
+	flagNamespace string
+
+	once      sync.Once
+	help      string
+	k8sClient kubernetes.Interface
+
+	// retryDuration is how often we'll retry deletion.
+	retryDuration time.Duration
+}
+
+func (c *Command) init() {
+	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+
+	c.k8s = &k8sflags.K8SFlags{}
+	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
+		"Name of Kubernetes namespace where the job is deployed")
+	flags.Merge(c.flags, c.k8s.Flags())
+	c.help = flags.Usage(help, c.flags)
+
+	// Default retry to 5s. This is exposed for setting in tests.
+	if c.retryDuration == 0 {
+		c.retryDuration = 5 * time.Second
+	}
+}
+
+// Run will attempt to delete the job once it succeeds. If the job hits its
+// backoff limit, it will give up deleting it.
+func (c *Command) Run(args []string) int {
+	c.once.Do(c.init)
+
+	// Validate command.
+	if err := c.flags.Parse(args); err != nil {
+		return 1
+	}
+	if len(c.flags.Args()) != 1 {
+		c.UI.Error(fmt.Sprintf("Must have one arg: the job name to delete."))
+		return 1
+	}
+	jobName := c.flags.Args()[0]
+
+	// c.k8sclient might already be set in a test.
+	if c.k8sClient == nil {
+		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
+			return 1
+		}
+
+		c.k8sClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
+			return 1
+		}
+	}
+
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level:  hclog.Info,
+		Output: os.Stderr,
+	})
+
+	// Wait for job to complete.
+	logger.Info(fmt.Sprintf("waiting for job %q to complete successfully", jobName))
+	for {
+		job, err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Get(jobName, metav1.GetOptions{})
+		if k8serrors.IsNotFound(err) {
+			logger.Info(fmt.Sprintf("job %q does not exist, no need to delete", jobName))
+			return 0
+		}
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error getting job %q: %s", jobName, err))
+			return 1
+		}
+
+		// If its succeeded we're done.
+		if job.Status.Succeeded > 0 {
+			break
+		}
+
+		// If its reached its backoff limit then it will never complete,
+		// exit and delete ourselves.
+		for _, condition := range job.Status.Conditions {
+			if condition.Type == v1.JobFailed && condition.Reason == "BackoffLimitExceeded" {
+				logger.Warn(fmt.Sprintf("job %q has reached its backoff limit and will never complete", jobName))
+				return 0
+			}
+		}
+
+		logger.Info(fmt.Sprintf("job %q has not yet succeeded, waiting %v", jobName, c.retryDuration))
+		time.Sleep(c.retryDuration)
+	}
+
+	// Here we know the job has succeeded. We can delete it and then delete
+	// ourselves.
+	logger.Info(fmt.Sprintf("job %q has succeeded, deleting", jobName))
+	propagationPolicy := metav1.DeletePropagationForeground
+	err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(jobName, &metav1.DeleteOptions{
+		// Needed so that the underlying pods are also deleted.
+		PropagationPolicy: &propagationPolicy,
+	})
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to delete job %q: %s", jobName, err))
+		return 1
+	}
+
+	logger.Info(fmt.Sprintf("Deleted job %q successfully", jobName))
+	return 0
+}
+
+func (c *Command) Synopsis() string { return synopsis }
+func (c *Command) Help() string {
+	c.once.Do(c.init)
+	return c.help
+}
+
+const synopsis = "Delete Kubernetes Job when complete."
+const help = `
+Usage: consul-k8s delete-completed-job [name] [options]
+
+  Waits for job to complete, then deletes it. If the job reaches its
+  backoff limit then the command will exit.
+`
