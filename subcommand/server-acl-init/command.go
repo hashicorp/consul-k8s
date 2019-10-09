@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"strings"
@@ -117,60 +118,39 @@ func (c *Command) Run(args []string) int {
 		Output: os.Stderr,
 	})
 
-	// Get Consul Server Pods and construct their addresses.
-	serverPods := c.getConsulServers(logger)
-	var serverPodAddrs []string
-	for _, pod := range serverPods.Items {
-		var httpPort int32
-		for _, p := range pod.Spec.Containers[0].Ports {
-			if p.Name == "http" {
-				httpPort = p.ContainerPort
-			}
-		}
-		if httpPort == 0 {
-			c.UI.Error(fmt.Sprintf("pod %s has no port labeled 'http'", pod.Name))
-			return 1
-		}
-		addr := fmt.Sprintf("%s:%d", pod.Status.PodIP, httpPort)
-		serverPodAddrs = append(serverPodAddrs, addr)
-	}
-	logger.Info(fmt.Sprintf("Found %d Consul servers", len(serverPodAddrs)),
-		"addrs", strings.Join(serverPodAddrs, ","))
-
-	// Pick the first pod to connect to for bootstrapping and set up connection.
-	firstServerAddr := serverPodAddrs[0]
-	consulClient, err := api.NewClient(&api.Config{
-		Address: firstServerAddr,
-		Scheme:  "http",
-	})
+	// Check if we've already been bootstrapped.
+	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
+	bootstrapToken, err := c.getBootstrapToken(logger, bootTokenSecretName)
 	if err != nil {
-		// This should not happen but if it does it's likely unrecoverable.
-		c.UI.Error(fmt.Sprintf("Error creating Consul API client: %s", err))
+		c.UI.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
 		return 1
 	}
 
-	// Bootstrap ACLs.
-	bootstrapToken, err := c.bootstrapACLs(logger, consulClient)
+	if bootstrapToken != "" {
+		logger.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
+	} else {
+		logger.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
+	}
+
+	// For all of the next operations we'll need a Consul client.
+	serverPods, err := c.getConsulServers(logger, 1)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
-
-	// Override our original client with a new one that has the bootstrap token
-	// set.
-	consulClient, err = api.NewClient(&api.Config{
-		Address: firstServerAddr,
+	serverAddr := serverPods[0].Addr
+	consulClient, err := api.NewClient(&api.Config{
+		Address: serverAddr,
 		Scheme:  "http",
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", firstServerAddr, err))
-		return 1
-	}
-
-	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(logger, consulClient, serverPods, serverPodAddrs, string(bootstrapToken)); err != nil {
-		c.UI.Error(err.Error())
+		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
 
@@ -206,6 +186,24 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+// getBootstrapToken returns the existing bootstrap token if there is one by
+// reading the Kubernetes Secret with name secretName.
+// If there is no bootstrap token yet, then it returns an empty string (not an error).
+func (c *Command) getBootstrapToken(logger hclog.Logger, secretName string) (string, error) {
+	secret, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	token, ok := secret.Data["token"]
+	if !ok {
+		return "", fmt.Errorf("secret %q does not have data key 'token'", secretName)
+	}
+	return string(token), nil
+}
+
 func (c *Command) configureKubeClient() error {
 	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 	if err != nil {
@@ -218,7 +216,9 @@ func (c *Command) configureKubeClient() error {
 	return nil
 }
 
-func (c *Command) getConsulServers(logger hclog.Logger) *apiv1.PodList {
+// getConsulServers returns n Consul server pods with their http addresses.
+// If there are less server pods than 'n' then the function will wait.
+func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error) {
 	var serverPods *apiv1.PodList
 	c.untilSucceeds("discovering Consul server pods",
 		func() error {
@@ -233,7 +233,7 @@ func (c *Command) getConsulServers(logger hclog.Logger) *apiv1.PodList {
 				return fmt.Errorf("no server pods with labels %q found", labelSelector)
 			}
 
-			if len(serverPods.Items) < c.flagReplicas {
+			if len(serverPods.Items) < n {
 				return fmt.Errorf("found %d servers, require %d", len(serverPods.Items), c.flagReplicas)
 			}
 
@@ -244,13 +244,48 @@ func (c *Command) getConsulServers(logger hclog.Logger) *apiv1.PodList {
 			}
 			return nil
 		}, logger)
-	return serverPods
+
+	var podAddrs []podAddr
+	for _, pod := range serverPods.Items {
+		var httpPort int32
+		for _, p := range pod.Spec.Containers[0].Ports {
+			if p.Name == "http" {
+				httpPort = p.ContainerPort
+			}
+		}
+		if httpPort == 0 {
+			return nil, fmt.Errorf("pod %s has no port labeled 'http'", pod.Name)
+		}
+		addr := fmt.Sprintf("%s:%d", pod.Status.PodIP, httpPort)
+		podAddrs = append(podAddrs, podAddr{
+			Name: pod.Name,
+			Addr: addr,
+		})
+	}
+	return podAddrs, nil
 }
 
-func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) ([]byte, error) {
-	// Bootstrap the ACLs unless already bootstrapped.
-	alreadyBootstrapped := false
+// bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
+func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName string) (string, error) {
+	serverPods, err := c.getConsulServers(logger, c.flagReplicas)
+	if err != nil {
+		return "", err
+	}
+	logger.Info(fmt.Sprintf("Found %d Consul server Pods", len(serverPods)))
+
+	// Pick the first pod to connect to for bootstrapping and set up connection.
+	firstServerAddr := serverPods[0].Addr
+	consulClient, err := api.NewClient(&api.Config{
+		Address: firstServerAddr,
+		Scheme:  "http",
+	})
+	if err != nil {
+		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
+	}
+
+	// Call bootstrap ACLs API.
 	var bootstrapToken []byte
+	var unrecoverableErr error
 	c.untilSucceeds("bootstrapping ACLs - PUT /v1/acl/bootstrap",
 		func() error {
 			bootstrapResp, _, err := consulClient.ACL().Bootstrap()
@@ -261,8 +296,9 @@ func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) (
 
 			// Check if already bootstrapped.
 			if strings.Contains(err.Error(), "Unexpected response code: 403") {
-				alreadyBootstrapped = true
-				logger.Info("ACLs already bootstrapped")
+				unrecoverableErr = errors.New("ACLs already bootstrapped but the ACL token was not written to a Kubernetes secret." +
+					" We can't proceed because the bootstrap token is lost." +
+					" You must reset ACLs.")
 				return nil
 			}
 
@@ -273,52 +309,47 @@ func (c *Command) bootstrapACLs(logger hclog.Logger, consulClient *api.Client) (
 			}
 			return err
 		}, logger)
-
-	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
-	if alreadyBootstrapped {
-		// Retrieve the bootstrap token from the Kubernetes secret.
-		secret, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(bootTokenSecretName, metav1.GetOptions{})
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				return nil, fmt.Errorf("Bootstrap token secret %q was not found."+
-					" We can't proceed because the bootstrap token is lost."+
-					" You must reset ACLs.", bootTokenSecretName)
-			}
-			return nil, fmt.Errorf("Error getting bootstrap token Secret %q: %s", bootTokenSecretName, err)
-		}
-		var ok bool
-		bootstrapToken, ok = secret.Data["token"]
-		if !ok {
-			return nil, fmt.Errorf("Secret %q does not have data key 'token'", bootTokenSecretName)
-		}
-		logger.Info(fmt.Sprintf("Got bootstrap token from Secret %q", bootTokenSecretName))
-	} else {
-		// Write bootstrap token to a Kubernetes secret.
-		c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", bootTokenSecretName),
-			func() error {
-				secret := &apiv1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: bootTokenSecretName,
-					},
-					Data: map[string][]byte{
-						"token": bootstrapToken,
-					},
-				}
-				_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
-				if k8serrors.IsAlreadyExists(err) {
-					// If it already exists, update it.
-					logger.Info(fmt.Sprintf("Secret %q already exists, updating it with new token", bootTokenSecretName))
-					_, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Update(secret)
-					return err
-				}
-				return err
-			}, logger)
+	if unrecoverableErr != nil {
+		return "", unrecoverableErr
 	}
-	return bootstrapToken, nil
+
+	// Write bootstrap token to a Kubernetes secret.
+	c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", bootTokenSecretName),
+		func() error {
+			secret := &apiv1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: bootTokenSecretName,
+				},
+				Data: map[string][]byte{
+					"token": bootstrapToken,
+				},
+			}
+			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
+			return err
+		}, logger)
+
+	// Override our original client with a new one that has the bootstrap token
+	// set.
+	consulClient, err = api.NewClient(&api.Config{
+		Address: firstServerAddr,
+		Scheme:  "http",
+		Token:   string(bootstrapToken),
+	})
+	if err != nil {
+		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
+	}
+
+	// Create new tokens for each server and apply them.
+	if err := c.setServerTokens(logger, consulClient, serverPods, string(bootstrapToken)); err != nil {
+		return "", err
+	}
+	return string(bootstrapToken), nil
 }
 
+// setServerTokens creates policies and associated ACL token for each server
+// and then provides the token to the server.
 func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
-	serverPods *apiv1.PodList, serverPodAddrs []string, bootstrapToken string) error {
+	serverPods []podAddr, bootstrapToken string) error {
 	// Create agent policy.
 	agentPolicy := api.ACLPolicy{
 		Name:        "agent-token",
@@ -337,14 +368,12 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 
 	// Create agent token for each server agent.
 	var serverTokens []api.ACLToken
-	for i := 0; i < len(serverPodAddrs); i++ {
-		podName := serverPods.Items[i].Name
-
+	for _, pod := range serverPods {
 		var token *api.ACLToken
-		c.untilSucceeds(fmt.Sprintf("creating server token for %s - PUT /v1/acl/token", podName),
+		c.untilSucceeds(fmt.Sprintf("creating server token for %s - PUT /v1/acl/token", pod.Name),
 			func() error {
 				tokenReq := api.ACLToken{
-					Description: fmt.Sprintf("Server Token for %s", podName),
+					Description: fmt.Sprintf("Server Token for %s", pod.Name),
 					Policies:    []*api.ACLTokenPolicyLink{{Name: agentPolicy.Name}},
 				}
 				var err error
@@ -355,18 +384,18 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	}
 
 	// Pass out agent tokens to servers.
-	for i := 0; i < len(serverPodAddrs); i++ {
+	for i, pod := range serverPods {
 		// We create a new client for each server because we need to call each
 		// server specifically.
 		serverClient, err := api.NewClient(&api.Config{
-			Address: serverPodAddrs[i],
+			Address: pod.Addr,
 			Scheme:  "http",
 			Token:   bootstrapToken,
 		})
 		if err != nil {
-			return fmt.Errorf("Error creating Consul client for addr %q: %s", serverPodAddrs[i], err)
+			return fmt.Errorf(" creating Consul client for address %q: %s", pod.Addr, err)
 		}
-		podName := serverPods.Items[i].Name
+		podName := pod.Name
 
 		// Update token.
 		c.untilSucceeds(fmt.Sprintf("updating server token for %s - PUT /v1/agent/token/agent", podName),
@@ -378,7 +407,17 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	return nil
 }
 
+// createACL creates a policy with rules and name, creates an ACL token for that
+// policy and then writes the token to a Kubernetes secret.
 func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) {
+	// Check if the secret already exists, if so, we assume the ACL has already been created.
+	secretName := fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name)
+	_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	if err == nil {
+		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
+		return
+	}
+
 	// Create policy with the given rules.
 	policyTmpl := api.ACLPolicy{
 		Name:        fmt.Sprintf("%s-token", name),
@@ -415,22 +454,19 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 		func() error {
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name),
+					Name: secretName,
 				},
 				Data: map[string][]byte{
 					"token": []byte(token),
 				},
 			}
 			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
-			if k8serrors.IsAlreadyExists(err) {
-				// If the secret already exists, update it.
-				_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Update(secret)
-				return err
-			}
 			return err
 		}, logger)
 }
 
+// configureDNSPolicies sets up policies and tokens so that Consul DNS will
+// work.
 func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Client) {
 	// Create policy for the anonymous token
 	dnsPolicy := api.ACLPolicy{
@@ -463,7 +499,24 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 		}, logger)
 }
 
+// configureConnectInject sets up auth methods so that connect injection will
+// work.
 func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.Client) {
+	// First, check if there's already an acl binding rule. If so, then this
+	// work is already done.
+	authMethodName := fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName)
+	var existingRules []*api.ACLBindingRule
+	c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
+		func() error {
+			var err error
+			existingRules, _, err = consulClient.ACL().BindingRuleList(authMethodName, nil)
+			return err
+		}, logger)
+	if len(existingRules) > 0 {
+		logger.Info(fmt.Sprintf("Binding rule for %s already exists", authMethodName))
+		return
+	}
+
 	var kubeSvc *apiv1.Service
 	c.untilSucceeds("getting kubernetes service IP",
 		func() error {
@@ -497,7 +550,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// Now we're ready to set up Consul's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
-		Name:        fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName),
+		Name:        authMethodName,
 		Description: fmt.Sprintf("Consul %s default Kubernetes AuthMethod", c.flagReleaseName),
 		Type:        "kubernetes",
 		Config: map[string]interface{}{
@@ -529,6 +582,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 		}, logger)
 }
 
+// untilSucceeds runs op until it returns a nil error.
 func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Logger) {
 	for {
 		err := op()
@@ -542,22 +596,38 @@ func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Log
 	}
 }
 
+// isNoLeaderErr returns true if err is due to trying to call the
+// bootstrap ACLs API when there is no leader elected.
 func isNoLeaderErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "Unexpected response code: 500") &&
 		strings.Contains(err.Error(), "The ACL system is currently in legacy mode.")
 }
 
+// isPolicyExistsErr returns true if err is due to trying to call the
+// policy create API when the policy already exists.
 func isPolicyExistsErr(err error, policyName string) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "Unexpected response code: 500") &&
 		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
 }
 
-const synopsis = "Initialize ACLs on Consul servers."
+// podAddr is a convenience struct for passing around pod names and
+// addresses for Consul servers.
+type podAddr struct {
+	// Name is the name of the pod.
+	Name string
+	// Addr is in the form "<ip>:<port>".
+	Addr string
+}
+
+const synopsis = "Initialize ACLs on Consul servers and other components."
 const help = `
 Usage: consul-k8s server-acl-init [options]
 
-  Bootstraps servers with ACLs
+  Bootstraps servers with ACLs and creates policies and ACL tokens for other
+  components as Kubernetes Secrets.
+  It will run indefinitely until all tokens have been created. It is idempotent
+  and safe to run multiple times.
 
 `
 
