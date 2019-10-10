@@ -22,6 +22,18 @@ func TestRun_ArgValidation(t *testing.T) {
 			[]string{},
 			"Must have one arg: the job name to delete.",
 		},
+		{
+			[]string{"job-name"},
+			"Must set flag -k8s-namespace",
+		},
+		{
+			[]string{"-k8s-namespace=", "job-name"},
+			"Must set flag -k8s-namespace",
+		},
+		{
+			[]string{"-k8s-namespace=default", "-timeout=10jd", "job-name"},
+			"\"10jd\" is not a valid timeout: time: unknown unit jd in duration 10jd",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -61,8 +73,6 @@ func TestRun_JobDoesNotExist(t *testing.T) {
 // Test when the job condition changes to either success or failed.
 func TestRun_JobConditionChanges(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
-
 	cases := map[string]struct {
 		EventualStatus batch.JobStatus
 		ExpDelete      bool
@@ -101,6 +111,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 			ns := "default"
 			jobName := "job"
 			k8s := fake.NewSimpleClientset()
+			require := require.New(t)
 
 			// Create the job that's not complete.
 			_, err := k8s.BatchV1().Jobs(ns).Create(&batch.Job{
@@ -167,4 +178,55 @@ func TestRun_JobConditionChanges(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test that the job times out after a certain duration.
+func TestRun_Timeout(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	ns := "default"
+	jobName := "job"
+	k8s := fake.NewSimpleClientset()
+
+	// Create the job that's not complete.
+	_, err := k8s.BatchV1().Jobs(ns).Create(&batch.Job{
+		ObjectMeta: meta.ObjectMeta{
+			Name: jobName,
+		},
+		Status: batch.JobStatus{
+			Active: 1,
+		},
+	})
+	require.NoError(err)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: k8s,
+		retryDuration: 100 * time.Millisecond,
+	}
+	cmd.init()
+
+	done := make(chan bool)
+	var responseCode int
+	go func() {
+		responseCode = cmd.Run([]string{
+			"-k8s-namespace", ns,
+			"-timeout=1s",
+			jobName,
+		})
+		close(done)
+	}()
+
+	// Wait for the command to exit.
+	select {
+	case <-done:
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	case <-time.After(2 * time.Second):
+		require.FailNow("command did not exit after 2s")
+	}
+
+	// The job should not have been deleted.
+	_, err = k8s.BatchV1().Jobs(ns).Get(jobName, meta.GetOptions{})
+	require.NoError(err)
 }

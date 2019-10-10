@@ -234,7 +234,7 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 			}
 
 			if len(serverPods.Items) < n {
-				return fmt.Errorf("found %d servers, require %d", len(serverPods.Items), c.flagReplicas)
+				return fmt.Errorf("found %d servers, require %d", len(serverPods.Items), n)
 			}
 
 			for _, pod := range serverPods.Items {

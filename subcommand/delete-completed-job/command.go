@@ -25,6 +25,7 @@ type Command struct {
 	flags         *flag.FlagSet
 	k8s           *k8sflags.K8SFlags
 	flagNamespace string
+	flagTimeout string
 
 	once      sync.Once
 	help      string
@@ -40,6 +41,8 @@ func (c *Command) init() {
 	c.k8s = &k8sflags.K8SFlags{}
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the job is deployed")
+	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
+		"How long we'll wait for the job to complete before timing out, e.g. 1ms, 2s, 3m")
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 
@@ -59,10 +62,20 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flags.Args()) != 1 {
-		c.UI.Error(fmt.Sprintf("Must have one arg: the job name to delete."))
+		c.UI.Error("Must have one arg: the job name to delete.")
 		return 1
 	}
 	jobName := c.flags.Args()[0]
+	if c.flagNamespace == "" {
+		c.UI.Error("Must set flag -k8s-namespace")
+		return 1
+	}
+	timeout, err := time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
+		return 1
+	}
+	start := time.Now()
 
 	// c.k8sclient might already be set in a test.
 	if c.k8sClient == nil {
@@ -102,13 +115,18 @@ func (c *Command) Run(args []string) int {
 			break
 		}
 
-		// If its reached its backoff limit then it will never complete,
-		// exit and delete ourselves.
+		// If its reached its backoff limit then it will never complete.
 		for _, condition := range job.Status.Conditions {
 			if condition.Type == v1.JobFailed && condition.Reason == "BackoffLimitExceeded" {
 				logger.Warn(fmt.Sprintf("job %q has reached its backoff limit and will never complete", jobName))
 				return 0
 			}
+		}
+
+		// If we've reached our timeout, exit.
+		if time.Now().After(start.Add(timeout)) {
+			logger.Warn(fmt.Sprintf("timeout %q has been reached, exiting without deleting job", timeout))
+			return 0
 		}
 
 		logger.Info(fmt.Sprintf("job %q has not yet succeeded, waiting %v", jobName, c.retryDuration))
@@ -119,7 +137,7 @@ func (c *Command) Run(args []string) int {
 	// ourselves.
 	logger.Info(fmt.Sprintf("job %q has succeeded, deleting", jobName))
 	propagationPolicy := metav1.DeletePropagationForeground
-	err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(jobName, &metav1.DeleteOptions{
+	err = c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(jobName, &metav1.DeleteOptions{
 		// Needed so that the underlying pods are also deleted.
 		PropagationPolicy: &propagationPolicy,
 	})
