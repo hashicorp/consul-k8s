@@ -201,8 +201,8 @@ func TestRun_Timeout(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:        ui,
-		k8sClient: k8s,
+		UI:            ui,
+		k8sClient:     k8s,
 		retryDuration: 100 * time.Millisecond,
 	}
 	cmd.init()

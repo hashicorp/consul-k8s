@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"os"
@@ -38,8 +39,12 @@ type Command struct {
 	flagCreateSnapshotAgentToken bool
 	flagCreateMeshGatewayToken   bool
 	flagLogLevel                 string
+	flagTimeout                  string
 
 	clientset kubernetes.Interface
+	// cmdTimeout is cancelled when the command timeout is reached.
+	cmdTimeout    context.Context
+	retryDuration time.Duration
 
 	once sync.Once
 	help string
@@ -69,6 +74,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway")
+	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
+		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -76,6 +83,11 @@ func (c *Command) init() {
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
+
+	// Default retry to 1s. This is exposed for setting in tests.
+	if c.retryDuration == 0 {
+		c.retryDuration = 1 * time.Second
+	}
 }
 
 func (c *Command) Synopsis() string { return synopsis }
@@ -98,6 +110,12 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
 		return 1
 	}
+	timeout, err := time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
+		return 1
+	}
+	c.cmdTimeout, _ = context.WithTimeout(context.Background(), timeout)
 
 	// The ClientSet might already be set if we're in a test.
 	if c.clientset == nil {
@@ -117,6 +135,24 @@ func (c *Command) Run(args []string) int {
 		Level:  level,
 		Output: os.Stderr,
 	})
+
+	// Wait if there's a rollout of servers.
+	ssName := c.flagReleaseName + "-consul-server"
+	err = c.untilSucceeds(fmt.Sprintf("waiting for rollout of statefulset %s", ssName), func() error {
+		ss, err := c.clientset.AppsV1().StatefulSets(c.flagNamespace).Get(ssName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if ss.Status.CurrentRevision == ss.Status.UpdateRevision {
+			return nil
+		}
+		return fmt.Errorf("rollout is in progress (CurrentRevision=%s UpdateRevision=%s)",
+			ss.Status.CurrentRevision, ss.Status.UpdateRevision)
+	}, logger)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	// Check if we've already been bootstrapped.
 	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
@@ -155,31 +191,59 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateClientToken {
-		c.createACL("client", agentRules, consulClient, logger)
+		err := c.createACL("client", agentRules, consulClient, logger)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagAllowDNS {
-		c.configureDNSPolicies(logger, consulClient)
+		err := c.configureDNSPolicies(logger, consulClient)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateSyncToken {
-		c.createACL("catalog-sync", syncRules, consulClient, logger)
+		err := c.createACL("catalog-sync", syncRules, consulClient, logger)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateEntLicenseToken {
-		c.createACL("enterprise-license", entLicenseRules, consulClient, logger)
+		err := c.createACL("enterprise-license", entLicenseRules, consulClient, logger)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateSnapshotAgentToken {
-		c.createACL("client-snapshot-agent", snapshotAgentRules, consulClient, logger)
+		err := c.createACL("client-snapshot-agent", snapshotAgentRules, consulClient, logger)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateMeshGatewayToken {
-		c.createACL("mesh-gateway", meshGatewayRules, consulClient, logger)
+		err := c.createACL("mesh-gateway", meshGatewayRules, consulClient, logger)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if c.flagCreateInjectAuthMethod {
-		c.configureConnectInject(logger, consulClient)
+		err := c.configureConnectInject(logger, consulClient)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	logger.Info("server-acl-init completed successfully")
@@ -220,7 +284,7 @@ func (c *Command) configureKubeClient() error {
 // If there are less server pods than 'n' then the function will wait.
 func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error) {
 	var serverPods *apiv1.PodList
-	c.untilSucceeds("discovering Consul server pods",
+	err := c.untilSucceeds("discovering Consul server pods",
 		func() error {
 			labelSelector := fmt.Sprintf("component=server, app=consul, release=%s", c.flagReleaseName)
 			var err error
@@ -244,6 +308,9 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 			}
 			return nil
 		}, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	var podAddrs []podAddr
 	for _, pod := range serverPods.Items {
@@ -286,7 +353,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	// Call bootstrap ACLs API.
 	var bootstrapToken []byte
 	var unrecoverableErr error
-	c.untilSucceeds("bootstrapping ACLs - PUT /v1/acl/bootstrap",
+	err = c.untilSucceeds("bootstrapping ACLs - PUT /v1/acl/bootstrap",
 		func() error {
 			bootstrapResp, _, err := consulClient.ACL().Bootstrap()
 			if err == nil {
@@ -312,9 +379,12 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	if unrecoverableErr != nil {
 		return "", unrecoverableErr
 	}
+	if err != nil {
+		return "", err
+	}
 
 	// Write bootstrap token to a Kubernetes secret.
-	c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", bootTokenSecretName),
+	err = c.untilSucceeds(fmt.Sprintf("writing bootstrap Secret %q", bootTokenSecretName),
 		func() error {
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -327,6 +397,9 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
 			return err
 		}, logger)
+	if err != nil {
+		return "", err
+	}
 
 	// Override our original client with a new one that has the bootstrap token
 	// set.
@@ -356,7 +429,7 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 		Description: "Agent Token Policy",
 		Rules:       agentRules,
 	}
-	c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
+	err := c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
 		func() error {
 			_, _, err := consulClient.ACL().PolicyCreate(&agentPolicy, nil)
 			if isPolicyExistsErr(err, agentPolicy.Name) {
@@ -365,12 +438,15 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 			}
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Create agent token for each server agent.
 	var serverTokens []api.ACLToken
 	for _, pod := range serverPods {
 		var token *api.ACLToken
-		c.untilSucceeds(fmt.Sprintf("creating server token for %s - PUT /v1/acl/token", pod.Name),
+		err := c.untilSucceeds(fmt.Sprintf("creating server token for %s - PUT /v1/acl/token", pod.Name),
 			func() error {
 				tokenReq := api.ACLToken{
 					Description: fmt.Sprintf("Server Token for %s", pod.Name),
@@ -380,6 +456,9 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 				token, _, err = consulClient.ACL().TokenCreate(&tokenReq, nil)
 				return err
 			}, logger)
+		if err != nil {
+			return err
+		}
 		serverTokens = append(serverTokens, *token)
 	}
 
@@ -398,24 +477,27 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 		podName := pod.Name
 
 		// Update token.
-		c.untilSucceeds(fmt.Sprintf("updating server token for %s - PUT /v1/agent/token/agent", podName),
+		err = c.untilSucceeds(fmt.Sprintf("updating server token for %s - PUT /v1/agent/token/agent", podName),
 			func() error {
 				_, err := serverClient.Agent().UpdateAgentACLToken(serverTokens[i].SecretID, nil)
 				return err
 			}, logger)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // createACL creates a policy with rules and name, creates an ACL token for that
 // policy and then writes the token to a Kubernetes secret.
-func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) {
+func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) error {
 	// Check if the secret already exists, if so, we assume the ACL has already been created.
 	secretName := fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name)
 	_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
 	if err == nil {
 		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
-		return
+		return nil
 	}
 
 	// Create policy with the given rules.
@@ -424,7 +506,7 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 		Description: fmt.Sprintf("%s Token Policy", name),
 		Rules:       rules,
 	}
-	c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+	err = c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 		func() error {
 			_, _, err := consulClient.ACL().PolicyCreate(&policyTmpl, &api.WriteOptions{})
 			if isPolicyExistsErr(err, policyTmpl.Name) {
@@ -433,6 +515,9 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 			}
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Create token for the policy.
 	tokenTmpl := api.ACLToken{
@@ -440,7 +525,7 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 		Policies:    []*api.ACLTokenPolicyLink{{Name: policyTmpl.Name}},
 	}
 	var token string
-	c.untilSucceeds(fmt.Sprintf("creating token for policy %s", policyTmpl.Name),
+	err = c.untilSucceeds(fmt.Sprintf("creating token for policy %s", policyTmpl.Name),
 		func() error {
 			createdToken, _, err := consulClient.ACL().TokenCreate(&tokenTmpl, &api.WriteOptions{})
 			if err == nil {
@@ -448,9 +533,12 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 			}
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Write token to a Kubernetes secret.
-	c.untilSucceeds(fmt.Sprintf("writing Secret for token %s", policyTmpl.Name),
+	return c.untilSucceeds(fmt.Sprintf("writing Secret for token %s", policyTmpl.Name),
 		func() error {
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -467,7 +555,7 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 
 // configureDNSPolicies sets up policies and tokens so that Consul DNS will
 // work.
-func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Client) {
+func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Client) error {
 	// Create policy for the anonymous token
 	dnsPolicy := api.ACLPolicy{
 		Name:        "dns-policy",
@@ -475,7 +563,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 		Rules:       dnsRules,
 	}
 
-	c.untilSucceeds("creating dns policy - PUT /v1/acl/policy",
+	err := c.untilSucceeds("creating dns policy - PUT /v1/acl/policy",
 		func() error {
 			_, _, err := consulClient.ACL().PolicyCreate(&dnsPolicy, nil)
 			if isPolicyExistsErr(err, dnsPolicy.Name) {
@@ -484,6 +572,9 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 			}
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Create token to get sent to TokenUpdate
 	aToken := api.ACLToken{
@@ -492,7 +583,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 	}
 
 	// Update anonymous token to include this policy
-	c.untilSucceeds("updating anonymous token with DNS policy",
+	return c.untilSucceeds("updating anonymous token with DNS policy",
 		func() error {
 			_, _, err := consulClient.ACL().TokenUpdate(&aToken, &api.WriteOptions{})
 			return err
@@ -501,39 +592,48 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 
 // configureConnectInject sets up auth methods so that connect injection will
 // work.
-func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.Client) {
+func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.Client) error {
 	// First, check if there's already an acl binding rule. If so, then this
 	// work is already done.
 	authMethodName := fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName)
 	var existingRules []*api.ACLBindingRule
-	c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
+	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
 		func() error {
 			var err error
 			existingRules, _, err = consulClient.ACL().BindingRuleList(authMethodName, nil)
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 	if len(existingRules) > 0 {
 		logger.Info(fmt.Sprintf("Binding rule for %s already exists", authMethodName))
-		return
+		return nil
 	}
 
 	var kubeSvc *apiv1.Service
-	c.untilSucceeds("getting kubernetes service IP",
+	err = c.untilSucceeds("getting kubernetes service IP",
 		func() error {
 			var err error
 			kubeSvc, err = c.clientset.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
 	saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
-	c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
+	err = c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
 			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// ServiceAccounts always have a secret name. The secret
 	// contains the JWT token.
@@ -541,12 +641,15 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// Get the secret that will contain the ServiceAccount JWT token.
 	var saSecret *apiv1.Secret
-	c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
+	err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
 		func() error {
 			var err error
 			saSecret, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Get(saSecretName, metav1.GetOptions{})
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Now we're ready to set up Consul's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
@@ -560,12 +663,15 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 		},
 	}
 	var authMethod *api.ACLAuthMethod
-	c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
+	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
 			var err error
 			authMethod, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &api.WriteOptions{})
 			return err
 		}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Create the binding rule.
 	abr := api.ACLBindingRule{
@@ -575,7 +681,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 		BindName:    "${serviceaccount.name}",
 		Selector:    c.flagBindingRuleSelector,
 	}
-	c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
+	return c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
 		func() error {
 			_, _, err := consulClient.ACL().BindingRuleCreate(&abr, nil)
 			return err
@@ -583,7 +689,8 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 }
 
 // untilSucceeds runs op until it returns a nil error.
-func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Logger) {
+// If c.cmdTimeout is cancelled it will exit.
+func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Logger) error {
 	for {
 		err := op()
 		if err == nil {
@@ -591,9 +698,17 @@ func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Log
 			break
 		}
 		logger.Error(fmt.Sprintf("Failure: %s", opName), "err", err)
-		logger.Info("Retrying in 1s")
-		time.Sleep(1 * time.Second)
+		logger.Info("Retrying in " + c.retryDuration.String())
+		// Wait on either the retry duration (in which case we continue) or the
+		// overall command timeout.
+		select {
+		case <-time.After(c.retryDuration):
+			continue
+		case <-c.cmdTimeout.Done():
+			return errors.New("reached command timeout")
+		}
 	}
+	return nil
 }
 
 // isNoLeaderErr returns true if err is due to trying to call the
