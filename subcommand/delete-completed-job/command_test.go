@@ -76,6 +76,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 	cases := map[string]struct {
 		EventualStatus batch.JobStatus
 		ExpDelete      bool
+		ExpCode        int
 	}{
 		"job fails": {
 			EventualStatus: batch.JobStatus{
@@ -91,6 +92,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 				},
 			},
 			ExpDelete: false,
+			ExpCode:   1,
 		},
 		"job succeeds": {
 			EventualStatus: batch.JobStatus{
@@ -103,6 +105,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 				},
 			},
 			ExpDelete: true,
+			ExpCode:   0,
 		},
 	}
 
@@ -164,7 +167,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 			// Wait for the command to exit.
 			select {
 			case <-done:
-				require.Equal(0, responseCode, ui.ErrorWriter.String())
+				require.Equal(c.ExpCode, responseCode, ui.ErrorWriter.String())
 			case <-time.After(2 * time.Second):
 				require.FailNow("command did not exit after 2s")
 			}
@@ -221,7 +224,7 @@ func TestRun_Timeout(t *testing.T) {
 	// Wait for the command to exit.
 	select {
 	case <-done:
-		require.Equal(0, responseCode, ui.ErrorWriter.String())
+		require.Equal(1, responseCode, ui.ErrorWriter.String())
 	case <-time.After(2 * time.Second):
 		require.FailNow("command did not exit after 2s")
 	}

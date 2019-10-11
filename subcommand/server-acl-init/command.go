@@ -120,14 +120,6 @@ func (c *Command) Run(args []string) int {
 	// The context will only ever be intentionally ended by the timeout.
 	defer cancel()
 
-	// The ClientSet might already be set if we're in a test.
-	if c.clientset == nil {
-		if err := c.configureKubeClient(); err != nil {
-			c.UI.Error(err.Error())
-			return 1
-		}
-	}
-
 	// Configure our logger.
 	level := hclog.LevelFromString(c.flagLogLevel)
 	if level == hclog.NoLevel {
@@ -138,6 +130,14 @@ func (c *Command) Run(args []string) int {
 		Level:  level,
 		Output: os.Stderr,
 	})
+
+	// The ClientSet might already be set if we're in a test.
+	if c.clientset == nil {
+		if err := c.configureKubeClient(); err != nil {
+			logger.Error(err.Error())
+			return 1
+		}
+	}
 
 	// Wait if there's a rollout of servers.
 	ssName := c.flagReleaseName + "-consul-server"
@@ -153,7 +153,7 @@ func (c *Command) Run(args []string) int {
 			ss.Status.CurrentRevision, ss.Status.UpdateRevision)
 	}, logger)
 	if err != nil {
-		c.UI.Error(err.Error())
+		logger.Error(err.Error())
 		return 1
 	}
 
@@ -161,7 +161,7 @@ func (c *Command) Run(args []string) int {
 	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
 	bootstrapToken, err := c.getBootstrapToken(logger, bootTokenSecretName)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
+		logger.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
 		return 1
 	}
 
@@ -171,7 +171,7 @@ func (c *Command) Run(args []string) int {
 		logger.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
 		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -179,7 +179,7 @@ func (c *Command) Run(args []string) int {
 	// For all of the next operations we'll need a Consul client.
 	serverPods, err := c.getConsulServers(logger, 1)
 	if err != nil {
-		c.UI.Error(err.Error())
+		logger.Error(err.Error())
 		return 1
 	}
 	serverAddr := serverPods[0].Addr
@@ -189,14 +189,14 @@ func (c *Command) Run(args []string) int {
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
+		logger.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
 
 	if c.flagCreateClientToken {
 		err := c.createACL("client", agentRules, consulClient, logger)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -204,7 +204,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagAllowDNS {
 		err := c.configureDNSPolicies(logger, consulClient)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -212,7 +212,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateSyncToken {
 		err := c.createACL("catalog-sync", syncRules, consulClient, logger)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -220,7 +220,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateEntLicenseToken {
 		err := c.createACL("enterprise-license", entLicenseRules, consulClient, logger)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -228,7 +228,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateSnapshotAgentToken {
 		err := c.createACL("client-snapshot-agent", snapshotAgentRules, consulClient, logger)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -236,7 +236,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateMeshGatewayToken {
 		err := c.createACL("mesh-gateway", meshGatewayRules, consulClient, logger)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
@@ -244,7 +244,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateInjectAuthMethod {
 		err := c.configureConnectInject(logger, consulClient)
 		if err != nil {
-			c.UI.Error(err.Error())
+			logger.Error(err.Error())
 			return 1
 		}
 	}
