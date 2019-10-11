@@ -1,6 +1,7 @@
 package deletecompletedjob
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/hashicorp/consul-k8s/subcommand"
@@ -75,7 +76,9 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
 		return 1
 	}
-	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	// The context will only ever be intentionally ended by the timeout.
+	defer cancel()
 
 	// c.k8sclient might already be set in a test.
 	if c.k8sClient == nil {
@@ -119,18 +122,20 @@ func (c *Command) Run(args []string) int {
 		for _, condition := range job.Status.Conditions {
 			if condition.Type == v1.JobFailed && condition.Reason == "BackoffLimitExceeded" {
 				logger.Warn(fmt.Sprintf("job %q has reached its backoff limit and will never complete", jobName))
-				return 0
+				return 1
 			}
 		}
 
-		// If we've reached our timeout, exit.
-		if time.Now().After(start.Add(timeout)) {
-			logger.Warn(fmt.Sprintf("timeout %q has been reached, exiting without deleting job", timeout))
-			return 0
-		}
-
 		logger.Info(fmt.Sprintf("job %q has not yet succeeded, waiting %v", jobName, c.retryDuration))
-		time.Sleep(c.retryDuration)
+		// Wait on either the retry duration (in which case we continue) or the
+		// overall command timeout.
+		select {
+		case <-time.After(c.retryDuration):
+			continue
+		case <-ctx.Done():
+			logger.Warn(fmt.Sprintf("timeout %q has been reached, exiting without deleting job", timeout))
+			return 1
+		}
 	}
 
 	// Here we know the job has succeeded. We can delete it and then delete
