@@ -25,7 +25,7 @@ type Command struct {
 	flags         *flag.FlagSet
 	k8s           *k8sflags.K8SFlags
 	flagNamespace string
-	flagTimeout string
+	flagTimeout   string
 
 	once      sync.Once
 	help      string
