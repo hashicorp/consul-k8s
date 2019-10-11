@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
@@ -194,6 +195,49 @@ func TestServiceResource_system(t *testing.T) {
 	defer syncer.Unlock()
 	actual := syncer.Registrations
 	require.Len(actual, 0)
+}
+
+// Test changing the sync tag to false deletes the service.
+func TestServiceResource_changeSyncToFalse(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:            hclog.Default(),
+		Client:         client,
+		Syncer:         syncer,
+		ExplicitEnable: true,
+	})
+	defer closer()
+
+	// Insert an LB service with the sync=true
+	svc := testService("foo")
+	svc.Annotations[annotationServiceSync] = "true"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(t, err)
+
+	// Verify the service gets registered.
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+	})
+
+	// Update the sync annotation to false.
+	svc.Annotations[annotationServiceSync] = "false"
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Update(svc)
+	require.NoError(t, err)
+
+	// Verify the service gets deregistered.
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 0)
+	})
 }
 
 // Test that external IPs take priority.
