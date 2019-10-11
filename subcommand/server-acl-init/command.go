@@ -115,7 +115,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
 		return 1
 	}
-	c.cmdTimeout, _ = context.WithTimeout(context.Background(), timeout)
+	var cancel context.CancelFunc
+	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), timeout)
+	// The context will only ever be intentionally ended by the timeout.
+	defer cancel()
 
 	// The ClientSet might already be set if we're in a test.
 	if c.clientset == nil {
