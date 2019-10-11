@@ -71,15 +71,21 @@ type ServiceResource struct {
 	// ip address will be used instead.
 	NodePortSync NodePortSyncType
 
-	// serviceMap is a mapping of unique key (given by controller) to
-	// the service structure. endpointsMap is the mapping of the same
-	// uniqueKey to a set of endpoints.
-	//
 	// serviceLock must be held for any read/write to these maps.
-	serviceLock  sync.RWMutex
-	serviceMap   map[string]*apiv1.Service
+	serviceLock sync.RWMutex
+
+	// serviceMap holds services we should sync to Consul. Keys are the
+	// in the form <kube namespace>/<kube svc name>.
+	serviceMap map[string]*apiv1.Service
+
+	// endpointsMap uses the same keys as serviceMap but maps to the endpoints
+	// of each service.
 	endpointsMap map[string]*apiv1.Endpoints
-	consulMap    map[string][]*consulapi.CatalogRegistration
+
+	// consulMap holds the services in Consul that we've registered from kube.
+	// It's populated via Consul's API and lets us diff what is actually in
+	// Consul vs. what we expect to be there.
+	consulMap map[string][]*consulapi.CatalogRegistration
 }
 
 // Informer implements the controller.Resource interface.
@@ -109,18 +115,25 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 		return nil
 	}
 
-	if !t.shouldSync(service) {
-		t.Log.Debug("syncing disabled for service, ignoring", "key", key)
-		return nil
-	}
-
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
 
-	// Syncing is enabled, let's keep track of this service.
 	if t.serviceMap == nil {
 		t.serviceMap = make(map[string]*apiv1.Service)
 	}
+
+	if !t.shouldSync(service) {
+		// Check if its in our map and delete it.
+		if _, ok := t.serviceMap[key]; ok {
+			t.Log.Info("service should no longer be synced", "service", key)
+			t.doDelete(key)
+		} else {
+			t.Log.Debug("syncing disabled for service, ignoring", "key", key)
+		}
+		return nil
+	}
+
+	// Syncing is enabled, let's keep track of this service.
 	t.serviceMap[key] = service
 
 	// If we care about endpoints, we should do the initial endpoints load.
@@ -151,18 +164,23 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 func (t *ServiceResource) Delete(key string) error {
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
+	t.doDelete(key)
+	t.Log.Info("delete", "key", key)
+	return nil
+}
+
+// doDelete is a helper function for deletion.
+//
+// Precondition: assumes t.serviceLock is held
+func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
 	delete(t.endpointsMap, key)
-
 	// If there were registrations related to this service, then
 	// delete them and sync.
 	if _, ok := t.consulMap[key]; ok {
 		delete(t.consulMap, key)
 		t.sync()
 	}
-
-	t.Log.Info("delete", "key", key)
-	return nil
 }
 
 // Run implements the controller.Backgrounder interface.
