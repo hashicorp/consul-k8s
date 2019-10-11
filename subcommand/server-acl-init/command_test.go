@@ -1043,7 +1043,6 @@ func TestRun_Timeout(t *testing.T) {
 		"-timeout=500ms",
 	})
 	require.Equal(1, responseCode, ui.ErrorWriter.String())
-	require.Contains(ui.ErrorWriter.String(), "reached command timeout")
 }
 
 // Set up test consul agent and kubernetes clusters with
