@@ -7,9 +7,9 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"math/rand"
 	"net/http"
@@ -229,7 +229,7 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "1.2.3.4",
 		},
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubernetes",
 		},
 	})
@@ -237,7 +237,7 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 
 	// Create ServiceAccount for the injector that the helm chart creates.
 	_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-connect-injector-authmethod-svc-account",
 		},
 		Secrets: []v1.ObjectReference{
@@ -254,7 +254,7 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 	tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
 	require.NoError(err)
 	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-connect-injector-authmethod-svc-accohndbv",
 		},
 		Data: map[string][]byte{
@@ -374,7 +374,7 @@ func TestRun_DelayedServerPods(t *testing.T) {
 
 		pods := k8s.CoreV1().Pods(ns)
 		_, err = pods.Create(&v1.Pod{
-			ObjectMeta: v12.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: releaseName + "-consul-server-0",
 				Labels: map[string]string{
 					"component": "server",
@@ -397,6 +397,176 @@ func TestRun_DelayedServerPods(t *testing.T) {
 						},
 					},
 				},
+			},
+		})
+		require.NoError(err)
+		_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: releaseName + "-consul-server",
+				Labels: map[string]string{
+					"component": "server",
+					"app":       "consul",
+					"release":   releaseName,
+				},
+			},
+			Status: appv1.StatefulSetStatus{
+				UpdateRevision:  "current",
+				CurrentRevision: "current",
+			},
+		})
+		require.NoError(err)
+	}()
+
+	// Wait for the command to exit.
+	select {
+	case <-done:
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	case <-time.After(2 * time.Second):
+		require.FailNow("command did not exit after 2s")
+	}
+
+	// Test that the bootstrap kube secret is created.
+	getBootToken(t, k8s, releaseName)
+
+	// Test that the expected API calls were made.
+	require.Equal([]APICall{
+		{
+			"PUT",
+			"/v1/acl/bootstrap",
+		},
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/agent",
+		},
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+	}, consulAPICalls)
+}
+
+// Test that if a deployment of the statefulset is in progress we wait.
+func TestRun_InProgressDeployment(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+
+	type APICall struct {
+		Method string
+		Path   string
+	}
+	var consulAPICalls []APICall
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		consulAPICalls = append(consulAPICalls, APICall{
+			Method: r.Method,
+			Path:   r.URL.Path,
+		})
+
+		// Send an empty JSON response with code 200 to all calls.
+		fmt.Fprintln(w, "{}")
+	}))
+	defer consulServer.Close()
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(err)
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(err)
+
+	// The pods and statefulset are created but as an in-progress deployment
+	pods := k8s.CoreV1().Pods(ns)
+	_, err = pods.Create(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server-0",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: v1.PodStatus{
+			PodIP: serverURL.Hostname(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "consul",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: int32(port),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "updated",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+
+	// Start the command before the Pod exist.
+	// Run in a goroutine so we can create the Pods asynchronously
+	done := make(chan bool)
+	var responseCode int
+	go func() {
+		responseCode = cmd.Run([]string{
+			"-release-name=" + releaseName,
+			"-k8s-namespace=" + ns,
+			"-expected-replicas=1",
+		})
+		close(done)
+	}()
+
+	// Asynchronously update the deployment status after a delay.
+	go func() {
+		// Update after a delay between 100 and 500ms.
+		// It's randomized to ensure we're not relying on specific timing.
+		delay := 100 + rand.Intn(400)
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		_, err = k8s.AppsV1().StatefulSets(ns).Update(&appv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: releaseName + "-consul-server",
+				Labels: map[string]string{
+					"component": "server",
+					"app":       "consul",
+					"release":   releaseName,
+				},
+			},
+			Status: appv1.StatefulSetStatus{
+				UpdateRevision:  "updated",
+				CurrentRevision: "updated",
 			},
 		})
 		require.NoError(err)
@@ -487,7 +657,7 @@ func TestRun_NoLeader(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-server-0",
 			Labels: map[string]string{
 				"component": "server",
@@ -513,6 +683,21 @@ func TestRun_NoLeader(t *testing.T) {
 		},
 	})
 	require.NoError(err)
+	// Create Consul server Statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -626,7 +811,7 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-server-0",
 			Labels: map[string]string{
 				"component": "server",
@@ -649,6 +834,22 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 					},
 				},
 			},
+		},
+	})
+	require.NoError(err)
+	// Create the server statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
 		},
 	})
 	require.NoError(err)
@@ -736,7 +937,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-server-0",
 			Labels: map[string]string{
 				"component": "server",
@@ -762,10 +963,26 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		},
 	})
 	require.NoError(err)
+	// Create the server statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
 
 	// Create the bootstrap secret.
 	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-bootstrap-acl-token",
 		},
 		Data: map[string][]byte{
@@ -808,6 +1025,27 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	}, consulAPICalls)
 }
 
+// Test that we exit after timeout.
+func TestRun_Timeout(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	responseCode := cmd.Run([]string{
+		"-release-name=" + releaseName,
+		"-k8s-namespace=" + ns,
+		"-expected-replicas=1",
+		"-timeout=500ms",
+	})
+	require.Equal(1, responseCode, ui.ErrorWriter.String())
+	require.Contains(ui.ErrorWriter.String(), "reached command timeout")
+}
+
 // Set up test consul agent and kubernetes clusters with
 func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
 	require := require.New(t)
@@ -826,7 +1064,7 @@ func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
 
 	// Create Consul server Pod.
 	_, err = k8s.CoreV1().Pods(ns).Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: releaseName + "-consul-server-0",
 			Labels: map[string]string{
 				"component": "server",
@@ -849,6 +1087,23 @@ func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
 					},
 				},
 			},
+		},
+	})
+	require.NoError(err)
+
+	// Create Consul server Statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: releaseName + "-consul-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
 		},
 	})
 	require.NoError(err)
