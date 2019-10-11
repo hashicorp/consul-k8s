@@ -41,14 +41,14 @@ func (c *Command) init() {
 	c.k8s = &k8sflags.K8SFlags{}
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the job is deployed")
-	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
+	c.flags.StringVar(&c.flagTimeout, "timeout", "30m",
 		"How long we'll wait for the job to complete before timing out, e.g. 1ms, 2s, 3m")
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 
-	// Default retry to 5s. This is exposed for setting in tests.
+	// Default retry to 30s. This is exposed for setting in tests.
 	if c.retryDuration == 0 {
-		c.retryDuration = 5 * time.Second
+		c.retryDuration = 30 * time.Second
 	}
 }
 
