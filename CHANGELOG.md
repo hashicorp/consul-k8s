@@ -1,5 +1,13 @@
 ## UNRELEASED
 
+Bug Fixes:
+
+* Add new delete-completed-job command that is used to delete the
+  server-acl-init Kubernetes Job once it's completed. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
+* Fixes a bug where even if the ACL Tokens for the other components existed
+  (e.g. client or sync-catalog) we'd try to generate new tokens and update the secrets. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
 ## 0.9.2 (October 4, 2019)
 
 Improvements:
