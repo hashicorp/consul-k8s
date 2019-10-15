@@ -47,9 +47,9 @@ func (c *Command) init() {
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 
-	// Default retry to 30s. This is exposed for setting in tests.
+	// Default retry to 1s. This is exposed for setting in tests.
 	if c.retryDuration == 0 {
-		c.retryDuration = 30 * time.Second
+		c.retryDuration = 1 * time.Second
 	}
 }
 
