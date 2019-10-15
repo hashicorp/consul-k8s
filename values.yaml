@@ -206,10 +206,10 @@ client:
   #   beta.kubernetes.io/arch: amd64
   nodeSelector: null
 
-  # Affinity Settings for Client pods
-  # ref https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  # Affinity Settings for Client pods, formatted as a multi-line YAML string.
+  # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   # Example:
-  # affinity:
+  # affinity: |
   #   nodeAffinity:
   #     requiredDuringSchedulingIgnoredDuringExecution:
   #       nodeSelectorTerms:
