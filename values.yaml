@@ -576,5 +576,8 @@ meshGateway:
   # Optional YAML string for additional annotations.
   annotations: null
 
+# Control whether a test Pod manifest is generated when running helm template.
+# When using helm install, the test Pod is not submitted to the cluster so this
+# is only useful when running helm template.
 tests:
   enabled: true
