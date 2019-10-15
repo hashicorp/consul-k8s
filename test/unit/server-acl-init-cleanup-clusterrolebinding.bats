@@ -32,7 +32,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/ClusterRoleBinding: disabled with client=false and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/ClusterRoleBinding: enabled with client=false and global.bootstrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-clusterrolebinding.yaml  \
@@ -40,5 +40,5 @@ load _helpers
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }

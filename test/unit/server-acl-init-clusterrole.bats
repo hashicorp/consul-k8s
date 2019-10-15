@@ -32,18 +32,6 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/ClusterRole: enabled with server=true, client=false and global.bootstrapACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-clusterrole.yaml  \
-      --set 'global.bootstrapACLs=true' \
-      --set 'server.enabled=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "serverACLInit/ClusterRole: enabled with client=false and global.bootstrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \

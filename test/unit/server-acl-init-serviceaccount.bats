@@ -32,19 +32,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/ServiceAccount: enabled with server=true, client=false and global.bootstrapACLs=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
-      --set 'global.bootstrapACLs=true' \
-      --set 'server.enabled=true' \
-      --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/ServiceAccount: disabled with client=false and global.bootstrapACLs=true" {
+@test "serverACLInit/ServiceAccount: enabled with client=false and global.bootstrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-serviceaccount.yaml  \
