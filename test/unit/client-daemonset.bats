@@ -232,7 +232,7 @@ load _helpers
       --set 'client.extraVolumes[0].name=foo' \
       --set 'client.extraVolumes[0].load=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command | map(select(test("/consul/userconfig/foo"))) | length' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command | map(select(contains("/consul/userconfig/foo"))) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
 
@@ -505,4 +505,66 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: When Server is enabled, client uses podIP" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
+      tee /dev/stderr)
+  [ "${actual}" = "status.podIP" ]
+}
+
+@test "client/DaemonSet: When Server is not enabled, client uses hostIP" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
+      tee /dev/stderr)
+  [ "${actual}" = "status.hostIP" ]
+}
+
+@test "client/DaemonSet: When Server is not enabled, client uses hostport" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports'  |
+      tee /dev/stderr)
+
+  local actual=$(echo $object |
+           yq -r 'map(select(.containerPort==8301))| .[0].hostPort' | tee /dev/stderr  )
+  [ "${actual}" = "8301" ]
+  local actual=$(echo $object |
+           yq -r 'map(select(.containerPort==8302))| .[0].hostPort' | tee /dev/stderr  )
+  [ "${actual}" = "8302" ]
+
+}
+@test "client/DaemonSet: When Server is enable, client doesnt use hostport" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports'  |
+      tee /dev/stderr)
+
+  local actual=$(echo $object |
+           yq -r 'map(select(.containerPort==8301))| .[0].hostPort' | tee /dev/stderr  )
+  echo "${actual}"           
+  [ "${actual}" = "null" ]
+  local actual=$(echo $object | 
+           yq -r 'map(select(.containerPort==8302))| .[0].hostPort' | tee /dev/stderr  )
+  [ "${actual}" = "null" ]
+
 }
