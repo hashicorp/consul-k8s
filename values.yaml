@@ -16,7 +16,7 @@ global:
   # Examples:
   #   image: "consul:1.5.0"
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"   # Enterprise Consul image
-  image: "consul:1.6.0"
+  image: "consul:1.6.1"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as the catalog sync. This can be overridden
