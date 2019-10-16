@@ -1,5 +1,19 @@
 ## UNRELEASED
 
+## 0.11.0 (Oct 15, 2019)
+
+IMPROVEMENTS:
+
+  * Use the latest version of Consul (1.6.1)
+
+BUG FIXES:
+
+  * Use the latest version of `consul-k8s` (0.9.3) which fixes issues with upgrading between Helm chart
+    versions when `bootstrapACLs` is enabled [[GH-246](https://github.com/hashicorp/consul-helm/pull/246)].
+  * Add `server-acl-init-cleanup` job to clean up the `server-acl-init` job
+    when it completes successfully [[GH-246](https://github.com/hashicorp/consul-helm/pull/246)].
+  * Add the ability to specify Consul client daemonset affinity [[GH-165](https://github.com/hashicorp/consul-helm/pull/165)]
+
 ## 0.10.0 (Oct 4, 2019)
 
 IMPROVEMENTS:
