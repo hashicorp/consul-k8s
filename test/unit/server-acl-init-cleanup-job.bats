@@ -32,7 +32,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/Job: disabled with client=false and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/Job: enabled with client=true and global.bootstrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
@@ -40,7 +40,7 @@ load _helpers
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInitCleanup/Job: consul-k8s delete-completed-job is called with correct arguments" {
