@@ -1,0 +1,51 @@
+version: 2
+jobs:
+  unit:
+    docker:
+      # This image is built from test/docker/Test.dockerfile
+      - image: hashicorpdev/consul-helm-test:0.3.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: Run Unit Tests
+          command: bats ./test/unit
+
+  acceptance:
+    docker:
+      # This image is build from test/docker/Test.dockerfile
+      - image: hashicorpdev/consul-helm-test:0.3.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: terraform init & apply
+          command: |
+            terraform init test/terraform
+            echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
+
+            terraform apply -var project=${CLOUDSDK_CORE_PROJECT} -var init_cli=true -auto-approve test/terraform
+
+      - run:
+          name: Run acceptance tests
+          command: bats ./test/acceptance
+
+      - run:
+          name: terraform destroy
+          command: |
+            terraform destroy -auto-approve
+          when: always
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - unit
+      - acceptance:
+          requires:
+            - unit
+          filters:
+            branches:
+              only: master

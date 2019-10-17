@@ -3,7 +3,7 @@ locals {
 }
 
 provider "google" {
-  project = "${var.project}"
+  project = var.project
 }
 
 resource "random_id" "suffix" {
@@ -11,24 +11,24 @@ resource "random_id" "suffix" {
 }
 
 data "google_container_engine_versions" "main" {
-  zone = "${var.zone}"
+  location = var.zone
 }
 
 resource "google_container_cluster" "cluster" {
   name               = "consul-k8s-${random_id.suffix.dec}"
-  project            = "${var.project}"
+  project            = var.project
   enable_legacy_abac = true
-  initial_node_count = 5
-  zone               = "${var.zone}"
-  min_master_version = "${data.google_container_engine_versions.main.latest_master_version}"
-  node_version       = "${data.google_container_engine_versions.main.latest_node_version}"
+  initial_node_count = 3
+  location           = var.zone
+  min_master_version = data.google_container_engine_versions.main.latest_master_version
+  node_version       = data.google_container_engine_versions.main.latest_node_version
 }
 
 resource "null_resource" "kubectl" {
-  count = "${var.init_cli ? 1 : 0 }"
+  count = var.init_cli ? 1 : 0
 
-  triggers {
-    cluster = "${google_container_cluster.cluster.id}"
+  triggers = {
+    cluster = google_container_cluster.cluster.id
   }
 
   # On creation, we want to setup the kubectl credentials. The easiest way
@@ -55,17 +55,17 @@ resource "null_resource" "kubectl" {
 }
 
 resource "null_resource" "helm" {
-  count = "${var.init_cli ? 1 : 0 }"
+  count = var.init_cli ? 1 : 0
   depends_on = ["null_resource.kubectl"]
 
-  triggers {
-    cluster = "${google_container_cluster.cluster.id}"
+  triggers = {
+    cluster = google_container_cluster.cluster.id
   }
 
   provisioner "local-exec" {
     command = <<EOF
 kubectl apply -f '${local.service_account_path}'
-helm init --service-account helm
+helm init --service-account helm --wait
 EOF
   }
 }
