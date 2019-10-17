@@ -79,3 +79,28 @@ load _helpers
       yq -r '.rules[2].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
 }
+
+#--------------------------------------------------------------------
+# syncCatalog.toK8S={true,false}
+
+@test "syncCatalog/ClusterRole: has reduced permissions if toK8s=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-clusterrole.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.toK8S=false' \
+      . | tee /dev/stderr |
+      yq -c '.rules[0].verbs' | tee /dev/stderr)
+  [ "${actual}" = '["get","list","watch"]' ]
+}
+
+@test "syncCatalog/ClusterRole: has full permissions if toK8s=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/sync-catalog-clusterrole.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.toK8S=true' \
+      . | tee /dev/stderr |
+      yq -c '.rules[0].verbs' | tee /dev/stderr)
+  [ "${actual}" = '["get","list","watch","update","patch","delete","create"]' ]
+}
