@@ -18,10 +18,12 @@ rules:
       - get
       - list
       - watch
+{{- if .Values.syncCatalog.toK8S }}
       - update
       - patch
       - delete
       - create
+{{- end }}
   - apiGroups: [""]
     resources:
       - nodes
