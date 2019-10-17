@@ -12,6 +12,8 @@ load _helpers
       wc -l)
   [ "${server_count}" -eq "3" ]
 
+  helm test consul
+
   # Clean up
   helm_delete
 }
