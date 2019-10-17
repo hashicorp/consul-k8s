@@ -61,6 +61,45 @@ func TestK8SSink_create(t *testing.T) {
 	require.True(found, "found service")
 }
 
+// Test that we lowercase service names.
+func TestK8SSink_createUppercase(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+
+	// Start the controller
+	sink, closer := testSink(t, client)
+	defer closer()
+
+	// Set a service
+	sink.SetServices(map[string]string{"UPPERCASE": "UPPERCASE.service.local."})
+
+	// Verify service gets registered
+	var actual *apiv1.ServiceList
+	retry.Run(t, func(r *retry.R) {
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		if err != nil {
+			r.Fatalf("err: %s", err)
+		}
+		if len(list.Items) == 0 {
+			r.Fatal("no services")
+		}
+
+		actual = list
+	})
+
+	found := false
+	for _, s := range actual.Items {
+		if s.Name == "uppercase" {
+			found = true
+			require.Equal("uppercase.service.local.", s.Spec.ExternalName)
+			break
+		}
+	}
+
+	require.True(found, "found service")
+}
+
 // Test that a service isn't registered if it exists already.
 func TestK8SSink_createExists(t *testing.T) {
 	t.Parallel()
@@ -349,30 +388,6 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 			r.Fatal("services")
 		}
 	})
-}
-
-// testService returns a service that will result in a registration.
-func testService(name string) *apiv1.Service {
-	return &apiv1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Annotations: map[string]string{},
-		},
-
-		Spec: apiv1.ServiceSpec{
-			Type: apiv1.ServiceTypeLoadBalancer,
-		},
-
-		Status: apiv1.ServiceStatus{
-			LoadBalancer: apiv1.LoadBalancerStatus{
-				Ingress: []apiv1.LoadBalancerIngress{
-					apiv1.LoadBalancerIngress{
-						IP: "1.2.3.4",
-					},
-				},
-			},
-		},
-	}
 }
 
 func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
