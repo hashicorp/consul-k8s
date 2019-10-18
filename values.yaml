@@ -420,10 +420,16 @@ connectInject:
   #   beta.kubernetes.io/arch: amd64
   nodeSelector: null
 
-  # aclBindingRuleSelector is a string that defines the automatic binding
-  # rule to control the allowed authentication for Connect injection. The
-  # default disallows using the default service account for ACl generation.
-  # Requires Consul v1.5+ and consul-k8s v0.8.0+.
+  # aclBindingRuleSelector accepts a query that defines which Service Accounts
+  # can authenticate to Consul and receive an ACL token during Connect injection.
+  # The default setting, i.e. serviceaccount.name!=default, prevents the
+  # 'default' Service Account from logging in.
+  # If set to an empty string all service accounts can log in.
+  # This only has effect if ACLs are enabled.
+  #
+  # See https://www.consul.io/docs/acl/acl-auth-methods.html#binding-rules
+  # and https://www.consul.io/docs/acl/auth-methods/kubernetes.html#trusted-identity-attributes
+  # for more details.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
   # Requires Consul v1.5+ and consul-k8s v0.8.1+
