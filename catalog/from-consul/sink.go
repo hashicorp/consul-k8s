@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +57,8 @@ type K8SSink struct {
 	// sourceServices holds Consul services that should be synced to Kube.
 	// It maps from Consul service names to Consul DNS entry, e.g.
 	// foo => foo.service.consul. It's populated from the Consul API.
+	// We lowercase the Consul service names and DNS entries
+	// because Kube names must be lowercase.
 	sourceServices map[string]string
 
 	// keyToName maps from Kube controller keys to Kube service names.
@@ -81,7 +84,19 @@ type K8SSink struct {
 func (s *K8SSink) SetServices(svcs map[string]string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.sourceServices = svcs
+
+	// Kubernetes service names must be lowercase. We also lowercase the
+	// consulDNS entry because it becomes an externalName which also must be
+	// lowercase.
+	// There is no chance of collision here because the Consul catalog is
+	// case insensitive, i.e. there won't be two services with the same name
+	// but different cases, and so svcs will be unique even after lowercasing.
+	lowercasedSvcs := make(map[string]string)
+	for consulName, consulDNS := range svcs {
+		lowercasedSvcs[strings.ToLower(consulName)] = strings.ToLower(consulDNS)
+	}
+
+	s.sourceServices = lowercasedSvcs
 	s.trigger() // Any service change probably requires syncing
 }
 
@@ -237,18 +252,18 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 	var delete []string
 
 	// Determine what needs to be created or updated
-	for k, v := range s.sourceServices {
+	for consulName, consulDNS := range s.sourceServices {
 		// If this is an already registered service, then update it
 		if s.serviceMapConsul != nil {
-			if svc, ok := s.serviceMapConsul[k]; ok {
-				if svc.Spec.ExternalName == v {
+			if svc, ok := s.serviceMapConsul[consulName]; ok {
+				if svc.Spec.ExternalName == consulDNS {
 					// Matching service, no update required.
 					continue
 				}
 
 				svc.Spec = apiv1.ServiceSpec{
 					Type:         apiv1.ServiceTypeExternalName,
-					ExternalName: v,
+					ExternalName: consulDNS,
 				}
 
 				update = append(update, svc)
@@ -257,15 +272,15 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 		}
 
 		// If this is a registered K8S service, ignore.
-		if _, ok := s.serviceMap[k]; ok {
-			s.Log.Warn("service already registered in K8S, not registering", "name", k)
+		if _, ok := s.serviceMap[consulName]; ok {
+			s.Log.Warn("service already registered in K8S, not registering", "name", consulName)
 			continue
 		}
 
 		// Register!
 		create = append(create, &apiv1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   k,
+				Name:   consulName,
 				Labels: map[string]string{"consul": "true"},
 				Annotations: map[string]string{
 					// Ensure we don't sync the service back to Consul
@@ -275,7 +290,7 @@ func (s *K8SSink) crudList() ([]*apiv1.Service, []*apiv1.Service, []string) {
 
 			Spec: apiv1.ServiceSpec{
 				Type:         apiv1.ServiceTypeExternalName,
-				ExternalName: v,
+				ExternalName: consulDNS,
 			},
 		})
 	}
