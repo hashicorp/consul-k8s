@@ -152,7 +152,7 @@ services {
     destination_service_name = "web"
     destination_service_id = "web"
     upstreams {
-      destination_type = "service" 
+      destination_type = "service"
       destination_name = "db"
       local_bind_port = 1234
     }
@@ -171,7 +171,7 @@ services {
     destination_service_name = "web"
     destination_service_id = "web"
     upstreams {
-      destination_type = "service" 
+      destination_type = "service"
       destination_name = "db"
       local_bind_port = 1234
       datacenter = "dc1"
@@ -201,7 +201,7 @@ services {
     destination_service_name = "web"
     destination_service_id = "web"
     upstreams {
-      destination_type = "prepared_query" 
+      destination_type = "prepared_query"
       destination_name = "handle"
       local_bind_port = 1234
     }
@@ -642,5 +642,45 @@ EOF
   -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+`)
+}
+
+func TestHandlerContainerInit_tlsConfig(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		ConsulCACert:        "consul-tls-ca:/consul/tls/ca.crt",
+		ConsulGRPCSSL:       true,
+		ConsulHTTPSSL:       true,
+		ConsulTLSServerName: "consul.us-east-1.consul",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+
+	require.Equal(container.Env[len(container.Env)-1].Name, "CONSUL_CACERT")
+	require.Equal(container.Env[len(container.Env)-1].Value, "/consul/tls/ca.crt")
+
+	require.Equal(container.VolumeMounts[len(container.VolumeMounts)-1].Name, "consul-tls-ca")
+	require.Equal(container.VolumeMounts[len(container.VolumeMounts)-1].MountPath, "/consul/tls")
+
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `/bin/sh -ec export CONSUL_HTTP_ADDR="https://${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+
+export CONSUL_TLS_SERVER_NAME="consul.us-east-1.consul"
 `)
 }

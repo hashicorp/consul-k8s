@@ -112,6 +112,14 @@ type Handler struct {
 
 	// Log
 	Log hclog.Logger
+
+	// Various options for communicating with Consul over HTTP/GRPC. If TLS
+	// is enabled in your cluster, then you will most likely need to also
+	// inject a CA and configure the client.
+	ConsulCACert        string
+	ConsulTLSServerName string
+	ConsulHTTPSSL       bool
+	ConsulGRPCSSL       bool
 }
 
 // Handle is the http.HandlerFunc implementation that actually handles the

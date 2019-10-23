@@ -3,6 +3,7 @@ package connectinject
 import (
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -21,6 +22,9 @@ type initContainerCommandData struct {
 	Upstreams       []initContainerCommandUpstreamData
 	Tags            string
 	Meta            map[string]string
+	HttpTLS         bool
+	GrpcTLS         bool
+	TLSServerName   string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -42,6 +46,9 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		ServiceProtocol: protocol,
 		AuthMethod:      h.AuthMethod,
 		CentralConfig:   h.CentralConfig,
+		HttpTLS:         h.ConsulHTTPSSL,
+		GrpcTLS:         h.ConsulGRPCSSL,
+		TLSServerName:   h.ConsulTLSServerName,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -135,44 +142,56 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		volMounts = append(volMounts, saTokenVolumeMount)
 	}
 
+	envVars := []corev1.EnvVar{
+		{
+			Name: "HOST_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+			},
+		},
+		{
+			Name: "POD_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+			},
+		},
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+			},
+		},
+	}
+
+	if parts := strings.SplitN(h.ConsulCACert, ":", 2); len(parts) == 2 {
+		volMounts = append(volMounts, corev1.VolumeMount{
+			Name:      volumeNameCA,
+			MountPath: filepath.Dir(parts[1]),
+		})
+
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "CONSUL_CACERT",
+			Value: parts[1],
+		})
+	}
+
 	// Render the command
 	var buf bytes.Buffer
-	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
-		initContainerCommandTpl)))
-	err := tpl.Execute(&buf, &data)
-	if err != nil {
+	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
+	if err := tpl.Execute(&buf, &data); err != nil {
 		return corev1.Container{}, err
 	}
 
 	return corev1.Container{
-		Name:  "consul-connect-inject-init",
-		Image: h.ImageConsul,
-		Env: []corev1.EnvVar{
-			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
-			{
-				Name: "POD_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-				},
-			},
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
-				},
-			},
-		},
+		Name:         "consul-connect-inject-init",
+		Image:        h.ImageConsul,
+		Env:          envVars,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}, nil
@@ -181,8 +200,12 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="{{ if .HttpTLS -}}https://{{ end -}}${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="{{ if .GrpcTLS -}}https://{{ end -}}${HOST_IP}:8502"
+
+{{ if .TLSServerName -}}
+export CONSUL_TLS_SERVER_NAME="{{ .TLSServerName }}"
+{{ end -}}
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -214,11 +237,11 @@ services {
     {{- range .Upstreams }}
     upstreams {
       {{- if .Name }}
-      destination_type = "service" 
+      destination_type = "service"
       destination_name = "{{ .Name }}"
       {{- end}}
       {{- if .Query }}
-      destination_type = "prepared_query" 
+      destination_type = "prepared_query"
       destination_name = "{{ .Query}}"
       {{- end}}
       local_bind_port = {{ .LocalPort }}
