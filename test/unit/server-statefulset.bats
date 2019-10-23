@@ -43,6 +43,20 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# retry-join
+
+@test "server/StatefulSet: retry join gets populated" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command | any(contains("-retry-join"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # image
 
 @test "server/StatefulSet: image defaults to global.image" {
