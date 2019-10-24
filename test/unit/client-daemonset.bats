@@ -75,7 +75,7 @@ load _helpers
 #--------------------------------------------------------------------
 # retry-join
 
-@test "server/StatefulSet: retry join gets populated" {
+@test "client/DaemonSet: retry join gets populated" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \

@@ -14,7 +14,7 @@ spec:
   serviceName: {{ template "consul.fullname" . }}-server
   podManagementPolicy: Parallel
   replicas: {{ .Values.server.replicas }}
-  {{- if (gt (int (toString .Values.server.updatePartition)) 0) }}
+  {{- if (gt (int .Values.server.updatePartition) 0) }}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -118,7 +118,7 @@ spec:
                 {{- if .Values.ui.enabled }}
                 -ui \
                 {{- end }}
-                {{- range $index := until (toString (.Values.server.replicas) | int) }}
+                {{- range $index := until (.Values.server.replicas | int) }}
                 -retry-join=${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc \
                 {{- end }}
                 -server

@@ -128,7 +128,7 @@ spec:
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
-                {{- range $index := until (toString (.Values.server.replicas) | int) }}
+                {{- range $index := until (.Values.server.replicas | int) }}
                 -retry-join=${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc \
                 {{- end }}
                 {{- end }}

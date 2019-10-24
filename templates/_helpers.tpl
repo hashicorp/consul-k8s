@@ -35,15 +35,15 @@ use the integer value
 Add a special case for replicas=1, where it should default to 0 as well.
 */}}
 {{- define "consul.pdb.maxUnavailable" -}}
-{{- if eq (int (toString .Values.server.replicas)) 1 -}}
+{{- if eq (int .Values.server.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.server.disruptionBudget.maxUnavailable -}}
 {{ .Values.server.disruptionBudget.maxUnavailable -}}
 {{- else -}}
-{{- if eq (int (toString .Values.server.replicas)) 3 -}}
+{{- if eq (int .Values.server.replicas) 3 -}}
 {{- 1 -}}
 {{- else -}}
-{{- sub (div (int (toString .Values.server.replicas)) 2) 1 -}}
+{{- sub (div (int .Values.server.replicas) 2) 1 -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
