@@ -73,6 +73,21 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# retry-join
+
+@test "client/DaemonSet: retry join gets populated" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command | any(contains("-retry-join"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+
+#--------------------------------------------------------------------
 # grpc
 
 @test "client/DaemonSet: grpc is disabled by default" {
