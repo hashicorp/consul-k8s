@@ -176,7 +176,7 @@ spec:
       {{- if .Values.server.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}
-      {{- end }}    
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data-{{ .Release.Namespace }}
