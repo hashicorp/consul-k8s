@@ -1,5 +1,17 @@
 ## 0.12.0 (Oct 28, 2019)
 
+IMPROVEMENTS:
+
+  * Use the latest version of consul-k8s (0.9.4)
+  * Support `bootstrapACLs` when only servers are enabled (not clients) [[GH-250](https://github.com/hashicorp/consul-helm/pull/250)]
+  * Use less privileges for catalog sync when not syncing to k8s [[GH-248](https://github.com/hashicorp/consul-helm/pull/248)]
+  * Enable disabling tests for users using `helm template` [[GH-249](https://github.com/hashicorp/consul-helm/pull/249)]
+
+BUG FIXES:
+
+  * Fix `missing required field "caBundle"` bug [[GH-213](https://github.com/hashicorp/consul-helm/issues/213)]
+
+
 ## 0.11.0 (Oct 15, 2019)
 
 IMPROVEMENTS:
