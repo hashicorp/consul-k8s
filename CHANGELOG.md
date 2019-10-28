@@ -1,5 +1,13 @@
 ## UNRELEASED
 
+Bug Fixes:
+
+* Sync: Now changing the annotation `consul.hashicorp.com/service-sync` to `false`
+  or deleting the annotation will un-sync the service. [[GH-76](https://github.com/hashicorp/consul-k8s/issues/76)]
+
+* Sync: Rewrite Consul services to lowercase so they're valid Kubernetes services.
+  [[GH-110](https://github.com/hashicorp/consul-k8s/issues/110)]
+
 ## 0.9.3 (October 15, 2019)
 
 Bug Fixes:
