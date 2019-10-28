@@ -430,9 +430,10 @@ connectInject:
   # See https://www.consul.io/docs/acl/acl-auth-methods.html#binding-rules
   # and https://www.consul.io/docs/acl/auth-methods/kubernetes.html#trusted-identity-attributes
   # for more details.
+  # Requires Consul >= v1.5 and consul-k8s >= v0.8.0.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
-  # Requires Consul v1.5+ and consul-k8s v0.8.1+
+  # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
     enabled: false
 
