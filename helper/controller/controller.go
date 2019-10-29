@@ -112,7 +112,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	// Initial sync
 	if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-		utilruntime.HandleError(fmt.Errorf("Error syncing cache"))
+		utilruntime.HandleError(fmt.Errorf("error syncing cache"))
 		return
 	}
 	c.Log.Info("initial cache sync complete")
