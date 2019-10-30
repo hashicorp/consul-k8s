@@ -1266,7 +1266,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
-// testLBService returns a service that will result in a registration.
+// testLBService returns a Kubernetes service of type LoadBalancer.
 func testLBService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
