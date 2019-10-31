@@ -42,7 +42,7 @@ func TestServiceResource_createDelete(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testLBService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo"))
 	require.NoError(err)
 
 	// Delete
@@ -72,7 +72,7 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testLBService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo"))
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
 
@@ -99,7 +99,7 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceSync] = "false"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -129,7 +129,7 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
@@ -158,7 +158,7 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceSync] = "t"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -187,7 +187,7 @@ func TestServiceResource_system(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
@@ -215,7 +215,7 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceSync] = "true"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(t, err)
@@ -258,8 +258,8 @@ func TestServiceResource_externalIP(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
-	svc.Spec.ExternalIPs = []string{"a", "b"}
+	svc := lbService("foo")
+	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
@@ -272,9 +272,9 @@ func TestServiceResource_externalIP(t *testing.T) {
 	actual := syncer.Registrations
 	require.Len(actual, 2)
 	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("a", actual[0].Service.Address)
+	require.Equal("3.3.3.3", actual[0].Service.Address)
 	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("b", actual[1].Service.Address)
+	require.Equal("4.4.4.4", actual[1].Service.Address)
 }
 
 // Test externalIP with Prefix
@@ -294,8 +294,8 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
-	svc.Spec.ExternalIPs = []string{"a", "b"}
+	svc := lbService("foo")
+	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
@@ -308,9 +308,9 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	actual := syncer.Registrations
 	require.Len(actual, 2)
 	require.Equal("prefixfoo", actual[0].Service.Service)
-	require.Equal("a", actual[0].Service.Address)
+	require.Equal("3.3.3.3", actual[0].Service.Address)
 	require.Equal("prefixfoo", actual[1].Service.Service)
-	require.Equal("b", actual[1].Service.Address)
+	require.Equal("4.4.4.4", actual[1].Service.Address)
 }
 
 // Test that the proper registrations are generated for a LoadBalancer.
@@ -329,7 +329,7 @@ func TestServiceResource_lb(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testLBService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -361,7 +361,7 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testLBService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -393,7 +393,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Status.LoadBalancer.Ingress = append(
 		svc.Status.LoadBalancer.Ingress,
 		apiv1.LoadBalancerIngress{IP: "2.3.4.5"},
@@ -432,7 +432,7 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceName] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -462,7 +462,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
@@ -497,7 +497,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServicePort] = "rpc"
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
@@ -534,7 +534,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceTags] = "one, two,three"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -564,7 +564,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testLBService("foo")
+	svc := lbService("foo")
 	svc.Annotations[annotationServiceMetaPrefix+"foo"] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -594,14 +594,12 @@ func TestServiceResource_nodePort(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	createNodes(t, client)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testNodePortService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
 	require.NoError(err)
 
 	time.Sleep(200 * time.Millisecond)
@@ -639,14 +637,12 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	createNodes(t, client)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testNodePortService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -685,12 +681,10 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	node1, _ := createNodes(t, client)
 
-	node1 := nodeName1
 	// Insert the endpoints
-	_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
@@ -698,7 +692,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 		Subsets: []apiv1.EndpointSubset{
 			{
 				Addresses: []apiv1.EndpointAddress{
-					{NodeName: &node1, IP: "1.2.3.4"},
+					{NodeName: &node1.Name, IP: "1.2.3.4"},
 				},
 				Ports: []apiv1.EndpointPort{
 					{Name: "http", Port: 8080},
@@ -710,7 +704,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	require.NoError(err)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testNodePortService("foo"))
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -743,16 +737,14 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	createNodes(t, client)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	svc := testNodePortService("foo")
+	svc := nodePortService("foo")
 	svc.Annotations = map[string]string{annotationServicePort: "rpc"}
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -790,20 +782,18 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	createNodes(t, client)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	svc := testNodePortService("foo")
+	svc := nodePortService("foo")
 	// Override service ports
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
 		{Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
 	}
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -842,14 +832,13 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	})
 	defer closer()
 
-	_, _, err := createNodes(client)
-	require.NoError(err)
+	createNodes(t, client)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testNodePortService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	require.NoError(err)
 
 	// Wait a bit
 	time.Sleep(200 * time.Millisecond)
@@ -887,22 +876,20 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	})
 	defer closer()
 
-	node1, _, err := createNodes(client)
-	require.NoError(err)
+	node1, _ := createNodes(t, client)
 
 	node1.Status = apiv1.NodeStatus{
 		Addresses: []apiv1.NodeAddress{
 			{Type: apiv1.NodeInternalIP, Address: "4.5.6.7"},
 		},
 	}
-	client.CoreV1().Nodes().UpdateStatus(node1)
+	_, err := client.CoreV1().Nodes().UpdateStatus(node1)
 	require.NoError(err)
 
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testNodePortService("foo"))
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -941,12 +928,11 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testClusterIPService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -983,12 +969,11 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testClusterIPService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1025,14 +1010,13 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	svc := testClusterIPService("foo")
+	svc := clusterIPService("foo")
 	svc.Annotations[annotationServicePort] = "rpc"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1069,14 +1053,13 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	svc := testClusterIPService("foo")
+	svc := clusterIPService("foo")
 	svc.Annotations[annotationServicePort] = "4141"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1112,7 +1095,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	svc := testClusterIPService("foo")
+	svc := clusterIPService("foo")
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Port: 8500, TargetPort: intstr.FromInt(2000)},
@@ -1121,8 +1104,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1159,12 +1141,11 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testClusterIPService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1195,12 +1176,11 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(testNamespace).Create(testClusterIPService("foo"))
+	_, err := client.CoreV1().Services(testNamespace).Create(clusterIPService("foo"))
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", testNamespace)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", testNamespace)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1236,7 +1216,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	defer closer()
 
 	// Insert the service
-	svc := testClusterIPService("foo")
+	svc := clusterIPService("foo")
 	svc.Annotations[annotationServicePort] = "rpc"
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromString("httpPort"), Name: "http"},
@@ -1246,8 +1226,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.NoError(err)
 
 	// Insert the endpoints
-	err = createEndpoints(client, "foo", metav1.NamespaceDefault)
-	require.NoError(err)
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Wait a bit
 	time.Sleep(300 * time.Millisecond)
@@ -1266,8 +1245,8 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
-// testLBService returns a Kubernetes service of type LoadBalancer.
-func testLBService(name string) *apiv1.Service {
+// lbService returns a Kubernetes service of type LoadBalancer.
+func lbService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -1290,7 +1269,8 @@ func testLBService(name string) *apiv1.Service {
 	}
 }
 
-func testNodePortService(name string) *apiv1.Service {
+// nodePortService returns a Kubernetes service of type NodePort.
+func nodePortService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -1306,7 +1286,8 @@ func testNodePortService(name string) *apiv1.Service {
 	}
 }
 
-func testClusterIPService(name string) *apiv1.Service {
+// clusterIPService returns a Kubernetes service of type ClusterIP.
+func clusterIPService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -1323,7 +1304,8 @@ func testClusterIPService(name string) *apiv1.Service {
 	}
 }
 
-func createNodes(client *fake.Clientset) (*apiv1.Node, *apiv1.Node, error) {
+// createNodes calls the fake k8s client to create two Kubernetes nodes and returns them.
+func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node) {
 	// Insert the nodes
 	node1 := &apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1338,9 +1320,7 @@ func createNodes(client *fake.Clientset) (*apiv1.Node, *apiv1.Node, error) {
 		},
 	}
 	_, err := client.CoreV1().Nodes().Create(node1)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
 	node2 := &apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1355,14 +1335,13 @@ func createNodes(client *fake.Clientset) (*apiv1.Node, *apiv1.Node, error) {
 		},
 	}
 	_, err = client.CoreV1().Nodes().Create(node2)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
-	return node1, node2, nil
+	return node1, node2
 }
 
-func createEndpoints(client *fake.Clientset, serviceName string, namespace string) error {
+// createEndpoints calls the fake k8s client to create two endpoints on two nodes.
+func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
 	node1 := nodeName1
 	node2 := nodeName2
 	_, err := client.CoreV1().Endpoints(namespace).Create(&apiv1.Endpoints{
@@ -1393,5 +1372,5 @@ func createEndpoints(client *fake.Clientset, serviceName string, namespace strin
 		},
 	})
 
-	return err
+	require.NoError(t, err)
 }
