@@ -52,7 +52,9 @@ spec:
                 -envoy-image="{{ .Values.connectInject.imageEnvoy }}" \
                 {{ end -}}
                 -listen=:8080 \
-                {{- if .Values.global.bootstrapACLs }}
+                {{- if .Values.connectInject.overrideAuthMethodName }}
+                -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
+                {{ else if .Values.global.bootstrapACLs }}
                 -acl-auth-method="{{ .Release.Name }}-consul-k8s-auth-method" \
                 {{- end }}
                 {{- if .Values.connectInject.centralConfig.enabled }}
