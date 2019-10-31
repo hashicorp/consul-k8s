@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	catalogFromConsul "github.com/hashicorp/consul-k8s/catalog/from-consul"
-	catalogFromK8S "github.com/hashicorp/consul-k8s/catalog/from-k8s"
+	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
+	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -154,7 +154,7 @@ func (c *Command) Run(args []string) int {
 	var toConsulCh chan struct{}
 	if c.flagToConsul {
 		// Build the Consul sync and start it
-		syncer := &catalogFromK8S.ConsulSyncer{
+		syncer := &catalogtoconsul.ConsulSyncer{
 			Client:            c.consulClient,
 			Log:               logger.Named("to-consul/sink"),
 			Namespace:         c.flagK8SSourceNamespace,
@@ -167,14 +167,14 @@ func (c *Command) Run(args []string) int {
 		// Build the controller and start it
 		ctl := &controller.Controller{
 			Log: logger.Named("to-consul/controller"),
-			Resource: &catalogFromK8S.ServiceResource{
+			Resource: &catalogtoconsul.ServiceResource{
 				Log:                 logger.Named("to-consul/source"),
 				Client:              clientset,
 				Syncer:              syncer,
 				Namespace:           c.flagK8SSourceNamespace,
 				ExplicitEnable:      !c.flagK8SDefault,
 				ClusterIPSync:       c.flagSyncClusterIPServices,
-				NodePortSync:        catalogFromK8S.NodePortSyncType(c.flagNodePortSyncType),
+				NodePortSync:        catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
 				ConsulK8STag:        c.flagConsulK8STag,
 				ConsulServicePrefix: c.flagConsulServicePrefix,
 			},
@@ -190,13 +190,13 @@ func (c *Command) Run(args []string) int {
 	// Start Consul-to-K8S sync
 	var toK8SCh chan struct{}
 	if c.flagToK8S {
-		sink := &catalogFromConsul.K8SSink{
+		sink := &catalogtok8s.K8SSink{
 			Client:    clientset,
 			Namespace: c.flagK8SWriteNamespace,
 			Log:       logger.Named("to-k8s/sink"),
 		}
 
-		source := &catalogFromConsul.Source{
+		source := &catalogtok8s.Source{
 			Client:       c.consulClient,
 			Domain:       c.flagConsulDomain,
 			Sink:         sink,
