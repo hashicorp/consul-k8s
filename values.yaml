@@ -433,6 +433,10 @@ connectInject:
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.0.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
+  # If not using global.bootstrapACLs and instead manually setting up an auth
+  # method for Connect inject, set this to the name of your auth method.
+  overrideAuthMethodName: ""
+
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
     enabled: false
