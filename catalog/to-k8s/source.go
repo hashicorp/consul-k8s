@@ -74,7 +74,6 @@ func (s *Source) Run(ctx context.Context) {
 		}
 		s.Log.Info("received services from Consul", "count", len(services))
 
-		// Lock so we can modify the
 		s.Sink.SetServices(services)
 	}
 }

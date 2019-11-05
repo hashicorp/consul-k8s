@@ -10,13 +10,17 @@ import (
 )
 
 type initContainerCommandData struct {
-	ServiceName     string
-	ServicePort     int32
+	ServiceName string
+	ServicePort int32
+	// ServiceProtocol is the protocol for the service-defaults config
+	// that will be written if CentralConfig is true. If empty, Consul
+	// will default to "tcp".
 	ServiceProtocol string
 	AuthMethod      string
 	CentralConfig   bool
 	Upstreams       []initContainerCommandUpstreamData
 	Tags            string
+	Meta            map[string]string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -29,9 +33,13 @@ type initContainerCommandUpstreamData struct {
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
+	protocol := h.DefaultProtocol
+	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
+		protocol = annoProtocol
+	}
 	data := initContainerCommandData{
 		ServiceName:     pod.Annotations[annotationService],
-		ServiceProtocol: pod.Annotations[annotationProtocol],
+		ServiceProtocol: protocol,
 		AuthMethod:      h.AuthMethod,
 		CentralConfig:   h.CentralConfig,
 	}
@@ -49,18 +57,32 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		}
 	}
 
-	// If tags are specified split the string into an array and create
-	// the tags string
+	var tags []string
 	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags := strings.Split(raw, ",")
+		tags = strings.Split(raw, ",")
+	}
+	// Get the tags from the deprecated tags annotation and combine.
+	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
+		tags = append(tags, strings.Split(raw, ",")...)
+	}
 
-		// Create json array from the annotations
+	if len(tags) > 0 {
+		// Create json array from the annotations since we're going to output
+		// this in an HCL config file and HCL arrays are json formatted.
 		jsonTags, err := json.Marshal(tags)
 		if err != nil {
 			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
+		} else {
+			data.Tags = string(jsonTags)
 		}
+	}
 
-		data.Tags = string(jsonTags)
+	// If there is metadata specified split into a map and create.
+	data.Meta = make(map[string]string)
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
+			data.Meta[strings.TrimPrefix(k, annotationMeta)] = v
+		}
 	}
 
 	// If upstreams are specified, configure those
@@ -171,17 +193,25 @@ services {
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  {{- if .Tags}}
+  tags = {{.Tags}}
+  {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
+  {{- end}}
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
-    destination_service_id = "{{ .ServiceName}}"
-    {{ if (gt .ServicePort 0) -}}
+    destination_service_id = "{{ .ServiceName }}"
+    {{- if (gt .ServicePort 0) }}
     local_service_address = "127.0.0.1"
     local_service_port = {{ .ServicePort }}
-    {{ end -}}
-
-
-    {{ range .Upstreams -}}
+    {{- end }}
+    {{- range .Upstreams }}
     upstreams {
       {{- if .Name }}
       destination_type = "service" 
@@ -196,7 +226,7 @@ services {
       datacenter = "{{ .Datacenter }}"
       {{- end}}
     }
-    {{ end }}
+    {{- end }}
   }
 
   checks {
@@ -220,10 +250,17 @@ services {
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
+  {{- end}}
 }
 EOF
 
-{{ if .CentralConfig -}}
+{{- if .CentralConfig }}
 # Create the central config's service registration
 cat <<EOF >/consul/connect-inject/central-config.hcl
 kind = "service-defaults"
@@ -231,15 +268,13 @@ name = "{{ .ServiceName }}"
 protocol = "{{ .ServiceProtocol }}"
 EOF
 {{- end }}
-
-{{ if .AuthMethod -}}
+{{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 {{- end }}
-
-{{ if .CentralConfig -}}
+{{- if .CentralConfig }}
 /bin/consul config write -cas -modify-index 0 \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \

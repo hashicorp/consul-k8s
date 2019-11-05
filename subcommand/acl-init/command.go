@@ -152,7 +152,7 @@ func renderClientACLConfig(config *clientConfig) (bytes.Buffer, error) {
 	return buf, nil
 }
 
-const synopsis = "Initialize ACLs on Consul servers."
+const synopsis = "Initialize ACLs on non-server components."
 const help = `
 Usage: consul-k8s acl-init [options]
 

@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
@@ -33,6 +34,10 @@ func init() {
 
 		"sync-catalog": func() (cli.Command, error) {
 			return &cmdSyncCatalog.Command{UI: ui}, nil
+		},
+
+		"delete-completed-job": func() (cli.Command, error) {
+			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
 		},
 
 		"version": func() (cli.Command, error) {
