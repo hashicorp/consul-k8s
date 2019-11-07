@@ -16,6 +16,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/connect-inject-service.yaml  \
       --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)

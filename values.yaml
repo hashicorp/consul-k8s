@@ -167,9 +167,9 @@ client:
   image: null
   join: null
 
-  # grpc should be set to true if the gRPC listener should be enabled.
+  # If true, Consul's gRPC port will be exposed (see https://www.consul.io/docs/agent/options.html#grpc_port).
   # This should be set to true if connectInject or meshGateway is enabled.
-  grpc: false
+  grpc: true
 
   # Resource requests, limits, etc. for the client cluster placement. This
   # should map directly to the value of the resources field for a PodSpec,
@@ -308,7 +308,8 @@ ui:
 # enabled then set the node selection so that it chooses a node with a
 # Consul agent.
 syncCatalog:
-  # True if you want to enable the catalog sync. "-" for default.
+  # True if you want to enable the catalog sync. Set to "-" to inherit from
+  # global.enabled.
   enabled: false
   image: null
   default: true # true will sync by default, otherwise requires annotation
@@ -374,6 +375,8 @@ syncCatalog:
 
 # ConnectInject will enable the automatic Connect sidecar injector.
 connectInject:
+  # True if you want to enable connect injection. Set to "-" to inherit from
+  # global.enabled.
   enabled: false
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation

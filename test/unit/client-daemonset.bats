@@ -90,23 +90,23 @@ load _helpers
 #--------------------------------------------------------------------
 # grpc
 
-@test "client/DaemonSet: grpc is disabled by default" {
+@test "client/DaemonSet: grpc is enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "client/DaemonSet: grpc can be enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/client-daemonset.yaml  \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: grpc can be disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.grpc=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------
