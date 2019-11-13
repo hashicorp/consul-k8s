@@ -53,7 +53,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -61,7 +61,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
   }
 
   checks {
@@ -78,7 +78,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 0
@@ -90,7 +90,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-web-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -106,7 +106,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -114,7 +114,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -133,7 +133,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -150,7 +150,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "service" 
       destination_name = "db"
@@ -169,7 +169,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "service" 
       destination_name = "db"
@@ -199,7 +199,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "prepared_query" 
       destination_name = "handle"
@@ -218,7 +218,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -227,7 +227,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -246,7 +246,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -264,7 +264,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -273,7 +273,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -292,7 +292,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -310,7 +310,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -319,7 +319,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -338,7 +338,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -357,7 +357,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -366,7 +366,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -385,7 +385,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -413,7 +413,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -425,7 +425,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -444,7 +444,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -581,7 +581,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -630,7 +630,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
 }
@@ -688,7 +688,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 `)
