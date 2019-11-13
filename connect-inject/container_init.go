@@ -3,6 +3,7 @@ package connectinject
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"text/template"
 
@@ -10,8 +11,9 @@ import (
 )
 
 type initContainerCommandData struct {
-	ServiceName string
-	ServicePort int32
+	ServiceName      string
+	ProxyServiceName string
+	ServicePort      int32
 	// ServiceProtocol is the protocol for the service-defaults config
 	// that will be written if CentralConfig is true. If empty, Consul
 	// will default to "tcp".
@@ -38,10 +40,11 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		protocol = annoProtocol
 	}
 	data := initContainerCommandData{
-		ServiceName:     pod.Annotations[annotationService],
-		ServiceProtocol: protocol,
-		AuthMethod:      h.AuthMethod,
-		CentralConfig:   h.CentralConfig,
+		ServiceName:      pod.Annotations[annotationService],
+		ProxyServiceName: fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
+		ServiceProtocol:  protocol,
+		AuthMethod:       h.AuthMethod,
+		CentralConfig:    h.CentralConfig,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -172,6 +175,14 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
+			{
+				Name:  "SERVICE_ID",
+				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ServiceName),
+			},
+			{
+				Name:  "PROXY_SERVICE_ID",
+				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
+			},
 		},
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
@@ -188,8 +199,8 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "${POD_NAME}-{{ .ServiceName }}-sidecar-proxy"
-  name = "{{ .ServiceName }}-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
+  name = "{{ .ProxyServiceName }}"
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
@@ -206,7 +217,7 @@ services {
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
-    destination_service_id = "{{ .ServiceName }}"
+    destination_service_id = "${SERVICE_ID}"
     {{- if (gt .ServicePort 0) }}
     local_service_address = "127.0.0.1"
     local_service_port = {{ .ServicePort }}
@@ -243,7 +254,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-{{ .ServiceName }}"
+  id   = "${SERVICE_ID}"
   name = "{{ .ServiceName }}"
   address = "${POD_IP}"
   port = {{ .ServicePort }}
@@ -290,7 +301,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-{{ .ServiceName }}-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
