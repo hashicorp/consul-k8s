@@ -42,7 +42,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 
 // Test that when -add-k8s-namespace-suffix flag is used
 // k8s namespaces are appended to the service names synced to Consul
-func TestCommand_Run_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
+func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	t.Parallel()
 
 	k8s, testAgent := completeSetup(t)
