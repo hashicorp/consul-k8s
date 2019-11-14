@@ -95,7 +95,7 @@ func (c *Command) init() {
 		"Defines the type of sync for NodePort services. Valid options are ExternalOnly, "+
 			"InternalOnly and ExternalFirst.")
 	c.flags.BoolVar(&c.flagAddK8SNamespaceSuffix, "add-k8s-namespace-suffix", false,
-		"If true, Kubernetes namespace will be appended to service names synced to Consul separated by an underscore. "+
+		"If true, Kubernetes namespace will be appended to service names synced to Consul separated by a dash. "+
 			"If false, no suffix will be appended to the service names in Consul. "+
 			"If the service name annotation is provided, the suffix is not appended.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -296,7 +296,7 @@ func (c *Command) Help() string {
 }
 
 // interrupt sends os.Interrupt signal to the command
-// so it can exit gracefully.
+// so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
 	c.sigCh <- os.Interrupt
 }

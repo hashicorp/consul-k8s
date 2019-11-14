@@ -72,7 +72,7 @@ func TestCommand_Run_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 		services, _, err := testAgent.Client().Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
-		require.Contains(r, services, "foo_default")
+		require.Contains(r, services, "foo-default")
 	})
 }
 
@@ -123,7 +123,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 		services, _, err := testAgent.Client().Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
-		require.Contains(r, services, "foo_default")
+		require.Contains(r, services, "foo-default")
 	})
 }
 
@@ -160,11 +160,11 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	// check that the name of the service is namespaced
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		svc, _, err := testAgent.Client().Catalog().Service("foo_bar", "", nil)
+		svc, _, err := testAgent.Client().Catalog().Service("foo-bar", "", nil)
 		require.NoError(r, err)
 		require.Len(r, svc, 1)
 		require.Equal(r, "1.1.1.1", svc[0].ServiceAddress)
-		svc, _, err = testAgent.Client().Catalog().Service("foo_baz", "", nil)
+		svc, _, err = testAgent.Client().Catalog().Service("foo-baz", "", nil)
 		require.NoError(r, err)
 		require.Len(r, svc, 1)
 		require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
@@ -181,6 +181,8 @@ func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
 
 // This function starts the command asynchronously and returns a non-blocking chan.
 // When finished, the command will send its exit code to the channel.
+// Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
+// otherwise it can run forever.
 func runCommandAsynchronously(cmd *Command, args []string) chan int {
 	exitChan := make(chan int, 1)
 

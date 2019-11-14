@@ -72,9 +72,9 @@ type ServiceResource struct {
 	NodePortSync NodePortSyncType
 
 	// AddK8SNamespaceSuffix set to true appends Kubernetes namespace
-	// to the service name being synced to Consul separated by a an underscore.
-	// For example, service 'foo' in the default namespace will be synced
-	// as 'foo_default'. Default is false.
+	// to the service name being synced to Consul separated by a dash.
+	// For example, service 'foo' in the 'default' namespace will be synced
+	// as 'foo-default'. Default is false.
 	AddK8SNamespaceSuffix bool
 
 	// serviceLock must be held for any read/write to these maps.
@@ -672,14 +672,7 @@ func (t *ServiceResource) addPrefixAndK8SNamespace(svc *apiv1.Service) string {
 	}
 
 	if t.AddK8SNamespaceSuffix {
-		// The underscore was chosen as
-		// a delimeter, as opposed to a dash, to avoid name collisions. When
-		// using a dash as a delimiter, both service 'foo' in the namespace 'bar-baz'
-		// and service 'foo-bar' in the namespace 'baz' would be registered as
-		// 'foo-bar-baz'. Because underscore is not a valid character for a
-		// resource name in k8s, but it is in Consul, it's safe to use as a
-		// delimiter.
-		return fmt.Sprintf("%s_%s", name, svc.Namespace)
+		return fmt.Sprintf("%s-%s", name, svc.Namespace)
 	}
 	return name
 }

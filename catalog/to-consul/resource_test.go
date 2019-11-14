@@ -243,7 +243,7 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	})
 }
 
-// Test that the k8s namespace is appended with a '_'
+// Test that the k8s namespace is appended with a '-'
 // when AddK8SNamespaceSuffix is true
 func TestServiceResource_addK8SNamespace(t *testing.T) {
 	t.Parallel()
@@ -261,7 +261,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 
 	// Insert an LB service with the sync=true
 	svc := testutil.LBService("foo", "1.2.3.4")
-	_, err := client.CoreV1().Services("bar").Create(svc)
+	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
 	// Verify that the service name has k8s namespace appended with an '_'
@@ -270,7 +270,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "foo_bar")
+		require.Equal(t, actual[0].Service.Service, "foo-namespace")
 	})
 }
 
@@ -293,7 +293,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 
 	// Insert an LB service with the sync=true
 	svc := testutil.LBService("foo", "1.2.3.4")
-	_, err := client.CoreV1().Services("bar").Create(svc)
+	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
 	// Verify that the service name has k8s namespace appended with an '_'
@@ -302,7 +302,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "prefixfoo_bar")
+		require.Equal(t, actual[0].Service.Service, "prefixfoo-namespace")
 	})
 }
 
