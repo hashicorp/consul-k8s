@@ -96,7 +96,7 @@ func (c *Command) init() {
 			"InternalOnly and ExternalFirst.")
 	c.flags.BoolVar(&c.flagAddK8SNamespaceSuffix, "add-k8s-namespace-suffix", false,
 		"If true, Kubernetes namespace will be appended to service names synced to Consul separated by an underscore. "+
-			"If false, no suffix will be appended to the service names in Consul."+
+			"If false, no suffix will be appended to the service names in Consul. "+
 			"If the service name annotation is provided, the suffix is not appended.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
