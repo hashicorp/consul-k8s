@@ -65,7 +65,6 @@ func TestCommand_Run_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 		"-consul-write-interval", "500ms",
 		"-add-k8s-namespace-suffix",
 	})
-
 	defer stopCommand(t, &cmd, exitChan)
 
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
