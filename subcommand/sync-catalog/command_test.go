@@ -29,7 +29,6 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	exitChan := runCommandAsynchronously(&cmd, []string{
 		"-http-addr", testAgent.HTTPAddr(),
 	})
-
 	defer stopCommand(t, &cmd, exitChan)
 
 	retry.Run(t, func(r *retry.R) {
