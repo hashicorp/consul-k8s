@@ -155,7 +155,6 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 		"-consul-write-interval", "1s",
 		"-add-k8s-namespace-suffix",
 	})
-
 	defer stopCommand(t, &cmd, exitChan)
 
 	// check that the name of the service is namespaced
