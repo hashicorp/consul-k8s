@@ -1,11 +1,11 @@
 package synccatalog
 
 import (
-	"github.com/hashicorp/consul-k8s/helper/testutil"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"testing"
@@ -57,7 +57,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.1.1.1"))
+	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -93,7 +93,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.1.1.1"))
+	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -145,10 +145,10 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	}
 
 	// create two services in k8s
-	_, err := k8s.CoreV1().Services("bar").Create(testutil.LBService("foo", "1.1.1.1"))
+	_, err := k8s.CoreV1().Services("bar").Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
-	_, err = k8s.CoreV1().Services("baz").Create(testutil.LBService("foo", "2.2.2.2"))
+	_, err = k8s.CoreV1().Services("baz").Create(lbService("foo", "2.2.2.2"))
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -200,5 +200,29 @@ func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	select {
 	case c := <-exitChan:
 		require.Equal(t, 0, c, string(cmd.UI.(*cli.MockUi).ErrorWriter.Bytes()))
+	}
+}
+
+// LBService returns a Kubernetes service of type LoadBalancer.
+func lbService(name, lbIP string) *apiv1.Service {
+	return &apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Annotations: map[string]string{},
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeLoadBalancer,
+		},
+
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{
+					{
+						IP: lbIP,
+					},
+				},
+			},
+		},
 	}
 }

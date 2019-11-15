@@ -74,7 +74,7 @@ type ServiceResource struct {
 	// AddK8SNamespaceSuffix set to true appends Kubernetes namespace
 	// to the service name being synced to Consul separated by a dash.
 	// For example, service 'foo' in the 'default' namespace will be synced
-	// as 'foo-default'. Default is false.
+	// as 'foo-default'.
 	AddK8SNamespaceSuffix bool
 
 	// serviceLock must be held for any read/write to these maps.
@@ -667,12 +667,14 @@ func (t *serviceEndpointsResource) Delete(key string) error {
 
 func (t *ServiceResource) addPrefixAndK8SNamespace(svc *apiv1.Service) string {
 	name := svc.Name
+
 	if t.ConsulServicePrefix != "" {
 		name = fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
 	}
 
 	if t.AddK8SNamespaceSuffix {
-		return fmt.Sprintf("%s-%s", name, svc.Namespace)
+		name = fmt.Sprintf("%s-%s", name, svc.Namespace)
 	}
+
 	return name
 }

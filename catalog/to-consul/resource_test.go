@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"github.com/hashicorp/consul-k8s/helper/testutil"
 	"testing"
 	"time"
 
@@ -43,7 +42,7 @@ func TestServiceResource_createDelete(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.2.3.4"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
 	require.NoError(err)
 
 	// Delete
@@ -73,7 +72,7 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.2.3.4"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
 
@@ -100,7 +99,7 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "false"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -130,7 +129,7 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
@@ -159,7 +158,7 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "t"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -188,7 +187,7 @@ func TestServiceResource_system(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
@@ -216,7 +215,7 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "true"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(t, err)
@@ -260,7 +259,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
@@ -292,7 +291,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
@@ -323,7 +322,7 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceName] = "different-service-name"
 	_, err := client.CoreV1().Services("bar").Create(svc)
 	require.NoError(t, err)
@@ -354,7 +353,7 @@ func TestServiceResource_externalIP(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -390,7 +389,7 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -425,7 +424,7 @@ func TestServiceResource_lb(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.2.3.4"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -457,7 +456,7 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testutil.LBService("foo", "1.2.3.4"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
 	require.NoError(err)
 
 	// Wait a bit
@@ -489,7 +488,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Status.LoadBalancer.Ingress = append(
 		svc.Status.LoadBalancer.Ingress,
 		apiv1.LoadBalancerIngress{IP: "2.3.4.5"},
@@ -528,7 +527,7 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceName] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -558,7 +557,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
@@ -593,7 +592,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServicePort] = "rpc"
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
@@ -630,7 +629,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceTags] = "one, two,three"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -660,7 +659,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	defer closer()
 
 	// Insert an LB service
-	svc := testutil.LBService("foo", "1.2.3.4")
+	svc := lbService("foo", "1.2.3.4")
 	svc.Annotations[annotationServiceMetaPrefix+"foo"] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -1339,6 +1338,30 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.Equal("2.2.2.2", actual[1].Service.Address)
 	require.Equal(2000, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// LBService returns a Kubernetes service of type LoadBalancer.
+func lbService(name, lbIP string) *apiv1.Service {
+	return &apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Annotations: map[string]string{},
+		},
+
+		Spec: apiv1.ServiceSpec{
+			Type: apiv1.ServiceTypeLoadBalancer,
+		},
+
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{
+					{
+						IP: lbIP,
+					},
+				},
+			},
+		},
+	}
 }
 
 // nodePortService returns a Kubernetes service of type NodePort.
