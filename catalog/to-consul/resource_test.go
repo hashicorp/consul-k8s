@@ -263,7 +263,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
-	// Verify that the service name has k8s namespace appended with an '_'
+	// Verify that the service name has k8s namespace appended with an '-'
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
