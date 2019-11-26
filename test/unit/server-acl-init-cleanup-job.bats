@@ -43,6 +43,17 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "serverACLInitCleanup/Job: disabled when server.updatePartition > 0" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-cleanup-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.updatePartition=1' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "serverACLInitCleanup/Job: consul-k8s delete-completed-job is called with correct arguments" {
   cd `chart_dir`
   local actual=$(helm template \
