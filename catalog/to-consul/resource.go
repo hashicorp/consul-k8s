@@ -205,7 +205,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	// a sync for that namespace.
 	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
 		t.Log.Debug("ignoring system service since we're listening on all namespaces",
-			"service-name", t.addPrefixAndK8SNamespace(svc))
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace))
 		return false
 	}
 
@@ -223,7 +223,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	v, err := strconv.ParseBool(raw)
 	if err != nil {
 		t.Log.Warn("error parsing service-sync annotation",
-			"service-name", t.addPrefixAndK8SNamespace(svc),
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 			"err", err)
 
 		// Fallback to default
@@ -287,7 +287,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	baseService := consulapi.AgentService{
-		Service: t.addPrefixAndK8SNamespace(svc),
+		Service: t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
@@ -665,15 +665,13 @@ func (t *serviceEndpointsResource) Delete(key string) error {
 	return nil
 }
 
-func (t *ServiceResource) addPrefixAndK8SNamespace(svc *apiv1.Service) string {
-	name := svc.Name
-
+func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) string {
 	if t.ConsulServicePrefix != "" {
 		name = fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
 	}
 
 	if t.AddK8SNamespaceSuffix {
-		name = fmt.Sprintf("%s-%s", name, svc.Namespace)
+		name = fmt.Sprintf("%s-%s", name, namespace)
 	}
 
 	return name
