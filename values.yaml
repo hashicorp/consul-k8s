@@ -171,6 +171,12 @@ client:
   # This should be set to true if connectInject or meshGateway is enabled.
   grpc: true
 
+  # exposeGossipPorts exposes the clients' gossip ports as hostPorts.
+  # This is only necessary if pod IPs in the k8s cluster are not directly
+  # routable and the Consul servers are outside of the k8s cluster. This
+  # also changes the clients' advertised IP to the hostIP rather than podIP.
+  exposeGossipPorts: false
+
   # Resource requests, limits, etc. for the client cluster placement. This
   # should map directly to the value of the resources field for a PodSpec,
   # formatted as a multi-line string. By default no direct resource request

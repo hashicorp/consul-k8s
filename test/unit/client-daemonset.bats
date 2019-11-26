@@ -507,64 +507,53 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: When Server is enabled, client uses podIP" {
+#--------------------------------------------------------------------
+# client.exposeGossipPorts
+
+@test "client/DaemonSet: client uses podIP when client.exposeGossipPorts=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'server.enabled=true' \
       --set 'client.enabled=true' \
+      --set 'client.exposeGossipPorts=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
       tee /dev/stderr)
   [ "${actual}" = "status.podIP" ]
 }
 
-@test "client/DaemonSet: When Server is not enabled, client uses hostIP" {
+@test "client/DaemonSet: client uses hostIP when client.exposeGossipPorts=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'server.enabled=false' \
       --set 'client.enabled=true' \
+      --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers | map(select(.name=="consul")) | .[0].env | map(select(.name=="ADVERTISE_IP")) | .[0] | .valueFrom.fieldRef.fieldPath'  |
       tee /dev/stderr)
   [ "${actual}" = "status.hostIP" ]
 }
 
-@test "client/DaemonSet: When Server is not enabled, client uses hostport" {
+@test "client/DaemonSet: client doesn't expose hostPorts when client.exposeGossipPorts=false" {
   cd `chart_dir`
-  local object=$(helm template \
-      -x templates/client-daemonset.yaml  \
-      --set 'server.enabled=false' \
-      --set 'client.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports'  |
-      tee /dev/stderr)
-
-  local actual=$(echo $object |
-           yq -r 'map(select(.containerPort==8301))| .[0].hostPort' | tee /dev/stderr  )
-  [ "${actual}" = "8301" ]
-  local actual=$(echo $object |
-           yq -r 'map(select(.containerPort==8302))| .[0].hostPort' | tee /dev/stderr  )
-  [ "${actual}" = "8302" ]
-
-}
-@test "client/DaemonSet: When Server is enable, client doesnt use hostport" {
-  cd `chart_dir`
-  local object=$(helm template \
+  local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
       --set 'server.enabled=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports'  |
+      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports | map(select(.containerPort==8301)) | .[0].hostPort'  |
       tee /dev/stderr)
-
-  local actual=$(echo $object |
-           yq -r 'map(select(.containerPort==8301))| .[0].hostPort' | tee /dev/stderr  )
-  echo "${actual}"           
   [ "${actual}" = "null" ]
-  local actual=$(echo $object | 
-           yq -r 'map(select(.containerPort==8302))| .[0].hostPort' | tee /dev/stderr  )
-  [ "${actual}" = "null" ]
+}
 
+@test "client/DaemonSet: client exposes hostPorts when client.exposeGossipPorts=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.exposeGossipPorts=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers  | map(select(.name=="consul")) | .[0].ports | map(select(.containerPort==8301)) | .[0].hostPort'  |
+      tee /dev/stderr)
+  [ "${actual}" = "8301" ]
 }

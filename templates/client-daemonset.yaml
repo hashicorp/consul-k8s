@@ -77,13 +77,11 @@ spec:
             - name: ADVERTISE_IP
               valueFrom:
                 fieldRef:
-                  {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-                  # The server is enabled, which we make the assumption that this is a contained environment and  
-                  # the pods do not need to be exposed, and need to run on Pod IP's to talk to the server (also on pod ips)
+                  {{- if not .Values.client.exposeGossipPorts }}
                   fieldPath: status.podIP
                   {{- else }}
-                  # we are not going to be running a server on this cluster, so have the client listen on NodePorts
-                  # so that it can communicate bidirectionally with servers outside the cluster. 
+                  # Clients will be exposed on their node's hostPort for external-to-k8s communication,
+                  # so they need to advertise their host ip instead of their pod ip.
                   fieldPath: status.hostIP
                   {{- end }}
             - name: NAMESPACE
@@ -171,34 +169,20 @@ spec:
               hostPort: 8502
               name: grpc
             - containerPort: 8301
-              {{- if not (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-              # We are not installing server, take the host port which allows an external server to connect.
+              {{- if .Values.client.exposeGossipPorts }}
               hostPort: 8301
               {{- end }}
               protocol: "TCP"
               name: serflan-tcp
             - containerPort: 8301
-              {{- if not (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+              {{- if .Values.client.exposeGossipPorts }}
               hostPort: 8301
               {{- end }}
               protocol: "UDP"
               name: serflan-udp
             - containerPort: 8302
-              {{- if not (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-              hostPort: 8302
-              {{- end }}
-              protocol: "TCP"
-              name: serfwan-tcp
-            - containerPort: 8302
-              {{- if not (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-              hostPort: 8302
-              {{- end }}
-              protocol: "UDP"
-              name: serfwan-udp
+              name: serfwan
             - containerPort: 8300
-              {{- if not (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-              hostPort: 8300
-              {{- end }}
               name: server
             - containerPort: 8600
               name: dns-tcp
