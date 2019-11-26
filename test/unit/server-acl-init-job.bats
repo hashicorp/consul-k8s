@@ -43,6 +43,17 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "serverACLInit/Job: disabled when server.updatePartition > 0" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'server.updatePartition=1' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "serverACLInit/Job: does not set -create-client-token=false when client is enabled (the default)" {
   cd `chart_dir`
   local actual=$(helm template \
