@@ -1,3 +1,12 @@
+## Unreleased
+
+BREAKING CHANGES
+  * `client.grpc` defaults to `true` now instead of `false`. This is to make it
+     harder to misconfigure Connect [[GH-282](https://github.com/hashicorp/consul-helm/pull/282)]
+     
+     If you do not wish to enable gRPC for clients, set `client.grpc` to
+     `false` in your local values file.
+
 ## 0.12.0 (Oct 28, 2019)
 
 IMPROVEMENTS:

@@ -16,6 +16,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.bootstrapACLs=true' \
       . | tee /dev/stderr |
