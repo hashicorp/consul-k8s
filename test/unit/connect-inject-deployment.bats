@@ -11,11 +11,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: enable with global.enabled false" {
+@test "connectInject/Deployment: enable with global.enabled false, client.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -40,6 +41,48 @@ load _helpers
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: fails if global.enabled=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=false' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "clients must be enabled for connect injection" ]]
+}
+
+@test "connectInject/Deployment: fails if global.enabled=true and client.enabled=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=true' \
+      --set 'client.enabled=false' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "clients must be enabled for connect injection" ]]
+}
+
+@test "connectInject/Deployment: fails if global.enabled=false and client.enabled=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=false' \
+      --set 'client.enabled=false' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "clients must be enabled for connect injection" ]]
+}
+
+@test "connectInject/Deployment: fails if client.grpc=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'client.grpc=false' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "client.grpc must be true for connect injection" ]]
 }
 
 #--------------------------------------------------------------------
