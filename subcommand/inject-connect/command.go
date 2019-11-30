@@ -61,7 +61,8 @@ func (c *Command) init() {
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
-	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false, "Enable central config.")
+	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false,
+		"Write a service-defaults config for every Connect service using protocol from -default-protocol or Pod annotation.")
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
 	c.help = flags.Usage(help, c.flagSet)
@@ -109,13 +110,13 @@ func (c *Command) Run(args []string) int {
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ImageConsul:       c.flagConsulImage,
-		ImageEnvoy:        c.flagEnvoyImage,
-		RequireAnnotation: !c.flagDefaultInject,
-		AuthMethod:        c.flagACLAuthMethod,
-		CentralConfig:     c.flagCentralConfig,
-		DefaultProtocol:   c.flagDefaultProtocol,
-		Log:               hclog.Default().Named("handler"),
+		ImageConsul:          c.flagConsulImage,
+		ImageEnvoy:           c.flagEnvoyImage,
+		RequireAnnotation:    !c.flagDefaultInject,
+		AuthMethod:           c.flagACLAuthMethod,
+		WriteServiceDefaults: c.flagCentralConfig,
+		DefaultProtocol:      c.flagDefaultProtocol,
+		Log:                  hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)

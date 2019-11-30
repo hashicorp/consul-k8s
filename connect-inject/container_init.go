@@ -13,14 +13,15 @@ type initContainerCommandData struct {
 	ServiceName string
 	ServicePort int32
 	// ServiceProtocol is the protocol for the service-defaults config
-	// that will be written if CentralConfig is true. If empty, Consul
-	// will default to "tcp".
+	// that will be written if WriteServiceDefaults is true.
 	ServiceProtocol string
 	AuthMethod      string
-	CentralConfig   bool
-	Upstreams       []initContainerCommandUpstreamData
-	Tags            string
-	Meta            map[string]string
+	// WriteServiceDefaults controls whether a service-defaults config is
+	// written for this service.
+	WriteServiceDefaults bool
+	Upstreams            []initContainerCommandUpstreamData
+	Tags                 string
+	Meta                 map[string]string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -37,11 +38,17 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
 		protocol = annoProtocol
 	}
+	// We only write a service-defaults config if central config is enabled
+	// and a protocol is specified. Previously, we would write a config when
+	// the protocol was empty. This is the same as setting it to tcp. This
+	// would then override any global proxy-defaults config. Now, we only
+	// write the config if a protocol is explicitly set.
+	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
 	data := initContainerCommandData{
-		ServiceName:     pod.Annotations[annotationService],
-		ServiceProtocol: protocol,
-		AuthMethod:      h.AuthMethod,
-		CentralConfig:   h.CentralConfig,
+		ServiceName:          pod.Annotations[annotationService],
+		ServiceProtocol:      protocol,
+		AuthMethod:           h.AuthMethod,
+		WriteServiceDefaults: writeServiceDefaults,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -260,9 +267,9 @@ services {
 }
 EOF
 
-{{- if .CentralConfig }}
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+{{- if .WriteServiceDefaults }}
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "{{ .ServiceName }}"
 protocol = "{{ .ServiceProtocol }}"
@@ -274,12 +281,14 @@ EOF
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 {{- end }}
-{{- if .CentralConfig }}
+{{- if .WriteServiceDefaults }}
+{{- /* We use -cas and -modify-index 0 so that if a service-defaults config
+       already exists for this service, we don't override it */}}
 /bin/consul config write -cas -modify-index 0 \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
 {{- end }}
 
 /bin/consul services register \
