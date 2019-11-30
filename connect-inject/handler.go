@@ -101,10 +101,10 @@ type Handler struct {
 	// use for identity with connectInjection if ACLs are enabled
 	AuthMethod string
 
-	// CentralConfig tracks whether injection should register services
-	// to central config as well as normal service registration.
+	// WriteServiceDefaults controls whether injection should write a
+	// service-defaults config entry for each service.
 	// Requires an additional `protocol` parameter.
-	CentralConfig bool
+	WriteServiceDefaults bool
 
 	// DefaultProtocol is the default protocol to use for central config
 	// registrations. It will be overridden by a specific annotation.
@@ -364,9 +364,9 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 		}
 	}
 
-	if h.CentralConfig {
+	if h.WriteServiceDefaults {
 		// Default protocol is specified by a flag if not explicitly annotated
-		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok {
+		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok && h.DefaultProtocol != "" {
 			if cs := pod.Spec.Containers; len(cs) > 0 {
 				// Create the patch for this first, so that the Annotation
 				// object will be created if necessary
