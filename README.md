@@ -24,6 +24,7 @@ without forcing Consul users to do a full Consul upgrade.
   * [**Consul Service Mesh (Connect)**](https://www.consul.io/docs/platform/k8s/connect.html):
     Run Consul Service Mesh (aka Consul Connect) on Kubernetes. This feature
     injects Envoy sidecars and registers your Pods with Consul.
+    _(Requires Consul 1.3+)_
 
 ## Installation
 
