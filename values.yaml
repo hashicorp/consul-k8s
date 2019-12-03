@@ -167,6 +167,20 @@ client:
   image: null
   join: null
 
+  # dataDirectoryHostPath is an absolute path to a directory on the host machine
+  # to use as the Consul client data directory.
+  # If set to the empty string or null, the Consul agent will store its data
+  # in the Pod's local filesystem (which will be lost if the Pod is deleted).
+  # If using Consul Connect, this directory must be set. Otherwise when the Consul
+  # agent Pod is deleted, e.g. during an upgrade, all the Connect-injected Pods
+  # on that node will be de-registered and will need to be restarted to be
+  # re-registered.
+  # Security Warning: If setting this, Pod Security Policies *must* be enabled on your cluster
+  # and in this Helm chart (via the global.enablePodSecurityPolicies setting)
+  # to prevent other Pods from mounting the same host path and gaining
+  # access to all of Consul's data. Consul's data is not encrypted at rest.
+  dataDirectoryHostPath: null
+
   # If true, Consul's gRPC port will be exposed (see https://www.consul.io/docs/agent/options.html#grpc_port).
   # This should be set to true if connectInject or meshGateway is enabled.
   grpc: true
@@ -242,6 +256,19 @@ client:
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
 
+  # dnsPolicy to use.
+  dnsPolicy: null
+
+  # updateStrategy for the DaemonSet.
+  # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
+  # This should be a multi-line string mapping directly to the updateStrategy
+  # Example:
+  #  updateStrategy: |
+  #    rollingUpdate:
+  #      maxUnavailable: 5
+  #    type: RollingUpdate
+  updateStrategy: null
+
   # snaphotAgent contains settings for setting up and running snapshot agents
   # within the Consul clusters. They are required to be co-located with Consul
   # clients, so will inherit the clients' nodeSelector, tolerations and affinity.
@@ -262,25 +289,6 @@ client:
     configSecret:
       secretName: null
       secretKey: null
-
-    # updateStrategy for the DaemonSet.
-    # See https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy.
-    # This should be a multi-line string mapping directly to the updateStrategy
-    # Example:
-    #  updateStrategy:
-    #    rollingUpdate:
-    #      maxUnavailable: 5
-    #    type: RollingUpdate
-    updateStrategy: null
-
-    # hostPath is fullpath to folder on host machine to mount as /consul/data folder. consul agent stores
-    # its configuration in this folder. By default its created as emptyDir: {}. To save data between pod restarts
-    # specify folder name on host machine to be mounted as /consul/data.
-    # Example:
-    # hostPath: '/var/consul-data'
-    hostPath: null
-
-    dnsPolicy: null
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
