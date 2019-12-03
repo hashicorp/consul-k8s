@@ -390,6 +390,12 @@ connectInject:
 
   # namespaceSelector is the selector for restricting the webhook to only
   # specific namespaces. This should be set to a multiline string.
+  # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
+  # for more details.
+  # Example:
+  # namespaceSelector: |
+  #   matchLabels:
+  #     namespace-label: label-value
   namespaceSelector: null
 
   # The certs section configures how the webhook TLS certs are configured.
