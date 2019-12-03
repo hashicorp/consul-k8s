@@ -23,6 +23,9 @@ spec:
     - 'projected'
     - 'secret'
     - 'downwardAPI'
+    {{- if .Values.client.dataDirectoryHostPath }}
+    - 'hostPath'
+    {{- end }}
   hostNetwork: false
   hostPorts:
   # HTTP Port
@@ -47,4 +50,9 @@ spec:
   fsGroup:
     rule: 'RunAsAny'
   readOnlyRootFilesystem: false
+  {{- if .Values.client.dataDirectoryHostPath }}
+  allowedHostPaths:
+  - pathPrefix: {{ .Values.client.dataDirectoryHostPath | quote }}
+    readOnly: false
+  {{- end }}
 {{- end }}

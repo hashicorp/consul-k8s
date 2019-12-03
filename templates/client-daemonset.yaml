@@ -13,7 +13,7 @@ metadata:
 spec:
   {{- if .Values.client.updateStrategy }}
   updateStrategy:
-    {{ toYaml .Values.client.updateStrategy | nindent 4 | trim }}
+    {{ tpl .Values.client.updateStrategy . | nindent 4 | trim }}
   {{- end }}
   selector:
     matchLabels:
@@ -55,15 +55,15 @@ spec:
       dnsPolicy: {{ .Values.client.dnsPolicy }}
       {{- end }}
 
-      # Consul agents require a directory for data, even clients. The data
-      # is okay to be wiped though if the Pod is removed, so just use an
-      # emptyDir volume.
+      # Consul clients require a directory for data.
+      # We use a hostPath so that if a Pod is restarted it will retain its
+      # service and checks registrations. This is important for Consul Connect
+      # because each Connect Pod registers with the local Consul client.
       volumes:
         - name: data
-        {{- if .Values.client.hostPath }}
+        {{- if .Values.client.dataDirectoryHostPath }}
           hostPath:
-            # directory location on host
-            path: {{ .Values.client.hostPath }}
+            path: {{ .Values.client.dataDirectoryHostPath }}
             type: DirectoryOrCreate
         {{- else }}
           emptyDir: {}
