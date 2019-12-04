@@ -493,11 +493,12 @@ services {
 	}
 }
 
-func TestHandlerContainerInit_centralConfig(t *testing.T) {
+// Test that we write service-defaults config and use the default protocol.
+func TestHandlerContainerInit_writeServiceDefaultsDefaultProtocol(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		CentralConfig:   true,
-		DefaultProtocol: "grpc",
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "grpc",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -518,14 +519,62 @@ func TestHandlerContainerInit_centralConfig(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "foo"
 protocol = "grpc"
 EOF
 /bin/consul config write -cas -modify-index 0 \
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
+
+/bin/consul services register \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`)
+}
+
+// Test that we write service-defaults config and use the protocol from the Pod.
+func TestHandlerContainerInit_writeServiceDefaultsPodProtocol(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "http",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService:  "foo",
+				annotationProtocol: "grpc",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
+kind = "service-defaults"
+name = "foo"
+protocol = "grpc"
+EOF
+/bin/consul config write -cas -modify-index 0 \
+  /consul/connect-inject/service-defaults.hcl || true
 
 /bin/consul services register \
   /consul/connect-inject/service.hcl
@@ -589,9 +638,9 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		AuthMethod:      "release-name-consul-k8s-auth-method",
-		CentralConfig:   true,
-		DefaultProtocol: "grpc",
+		AuthMethod:           "release-name-consul-k8s-auth-method",
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "grpc",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -619,8 +668,8 @@ func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "foo"
 protocol = "grpc"
@@ -631,7 +680,7 @@ EOF
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 /bin/consul config write -cas -modify-index 0 \
   -token-file="/consul/connect-inject/acl-token" \
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
 
 /bin/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
@@ -643,4 +692,43 @@ EOF
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 `)
+}
+
+// If the default protocol is empty and no protocol is set on the Pod,
+// we expect no service-defaults config to be written.
+func TestHandlerContainerInit_noDefaultProtocol(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.NotContains(actual, `
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
+kind = "service-defaults"
+name = "foo"
+protocol = ""
+EOF`)
+	require.NotContains(actual, `
+/bin/consul config write -cas -modify-index 0 \
+  -token-file="/consul/connect-inject/acl-token" \
+  /consul/connect-inject/service-defaults.hcl || true`)
 }
