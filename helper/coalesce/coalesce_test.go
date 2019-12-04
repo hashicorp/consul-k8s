@@ -56,33 +56,38 @@ func TestCoalesce_max(t *testing.T) {
 	}
 }
 
+// Test that if the cancel function is called, Coalesce exits.
+// We test this via having a function that just sleeps and then calling
+// cancel on it. We expect that Coalesce exits
 func TestCoalesce_cancel(t *testing.T) {
 	total := 0
 	deltaCh := make(chan int, 10)
 	go func() {
-		for i := 0; i < 10; i++ {
-			deltaCh <- 1
-			time.Sleep(50 * time.Millisecond)
-		}
+		deltaCh <- 1
+		select {}
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(200*time.Millisecond, cancel)
+	// Cancel is called after only 50ms.
+	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
+	// Coalesce should be exited due to the cancel function because its
+	// other timeouts are much higher.
 	Coalesce(ctx,
-		100*time.Millisecond,
 		500*time.Millisecond,
+		1000*time.Millisecond,
 		testSummer(&total, deltaCh))
 	duration := time.Now().Sub(start)
-	if total < 3 || total > 5 {
-		// 4 to 6 to account for CI weirdness
-		t.Fatalf("total should be 3 to 5: %d", total)
+	// The check on total here isn't super important since it should
+	// never fail but I kept it in to match the rest of the tests.
+	if total != 1 {
+		t.Fatalf("total should be 1 got: %d", total)
 	}
 
-	// We should complete in the max period
-	if duration > 300*time.Millisecond {
-		t.Fatalf("duration should be less than 300ms: %s", duration)
+	// We should complete in ~50ms but add 100 to account for timing.
+	if duration > 150*time.Millisecond {
+		t.Fatalf("duration should be less than 150ms: %s", duration)
 	}
 }
 
