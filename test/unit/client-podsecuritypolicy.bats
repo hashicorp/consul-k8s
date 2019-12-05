@@ -31,3 +31,17 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# client.exposeGossipPorts
+
+@test "client/PodSecurityPolicy: hostPort 8301 allowed when exposeGossipPorts=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'client.exposeGossipPorts=true' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8500,"max":8500},{"min":8502,"max":8502},{"min":8301,"max":8301}]' ]
+}
