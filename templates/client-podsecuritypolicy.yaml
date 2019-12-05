@@ -25,8 +25,16 @@ spec:
     - 'downwardAPI'
   hostNetwork: false
   hostPorts:
+  # HTTP Port
   - min: 8500
+    max: 8500
+  # gRPC Port
+  - min: 8502
     max: 8502
+  {{- if .Values.client.exposeGossipPorts }}
+  - min: 8301
+    max: 8301
+  {{- end }}
   hostIPC: false
   hostPID: false
   runAsUser:
