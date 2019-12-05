@@ -190,6 +190,7 @@ func (c *Command) Run(args []string) int {
 				ConsulK8STag:          c.flagConsulK8STag,
 				ConsulServicePrefix:   c.flagConsulServicePrefix,
 				AddK8SNamespaceSuffix: c.flagAddK8SNamespaceSuffix,
+				SyncCatalogPodName:    c.getHostName(),
 			},
 		}
 
@@ -289,6 +290,14 @@ func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(204)
 }
 
+func (c *Command) getHostName() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Failed to get hostname for sync-catalog pod, setting it to <unknown>: #{err}"))
+		hostname = "<unknown>"
+	}
+	return hostname
+}
 func (c *Command) Synopsis() string { return synopsis }
 func (c *Command) Help() string {
 	c.once.Do(c.init)
