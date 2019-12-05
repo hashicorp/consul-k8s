@@ -71,6 +71,12 @@ type ServiceResource struct {
 	// ip address will be used instead.
 	NodePortSync NodePortSyncType
 
+	// AddK8SNamespaceSuffix set to true appends Kubernetes namespace
+	// to the service name being synced to Consul separated by a dash.
+	// For example, service 'foo' in the 'default' namespace will be synced
+	// as 'foo-default'.
+	AddK8SNamespaceSuffix bool
+
 	// serviceLock must be held for any read/write to these maps.
 	serviceLock sync.RWMutex
 
@@ -199,7 +205,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	// a sync for that namespace.
 	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
 		t.Log.Debug("ignoring system service since we're listening on all namespaces",
-			"service-name", t.prefixServiceName(svc.Name))
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace))
 		return false
 	}
 
@@ -217,7 +223,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	v, err := strconv.ParseBool(raw)
 	if err != nil {
 		t.Log.Warn("error parsing service-sync annotation",
-			"service-name", t.prefixServiceName(svc.Name),
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 			"err", err)
 
 		// Fallback to default
@@ -281,7 +287,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	baseService := consulapi.AgentService{
-		Service: t.prefixServiceName(svc.Name),
+		Service: t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
@@ -659,9 +665,14 @@ func (t *serviceEndpointsResource) Delete(key string) error {
 	return nil
 }
 
-func (t *ServiceResource) prefixServiceName(name string) string {
+func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) string {
 	if t.ConsulServicePrefix != "" {
-		return fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
+		name = fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
 	}
+
+	if t.AddK8SNamespaceSuffix {
+		name = fmt.Sprintf("%s-%s", name, namespace)
+	}
+
 	return name
 }

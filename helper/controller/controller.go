@@ -61,7 +61,8 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 			if err == nil {
 				queue.Add(key)
 			}
-		}, DeleteFunc: func(obj interface{}) {
+		},
+		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			c.Log.Debug("queue", "op", "delete", "key", key)
 			if err == nil {
