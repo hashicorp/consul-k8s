@@ -493,18 +493,17 @@ connectInject:
 
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
-    enabled: false
+    enabled: true
 
     # defaultProtocol allows you to specify a convenience default protocol if
     # most of your services are of the same protocol type. The individual annotation
-    # on any given pod will override this value. A protocol must be provided,
-    # either through this setting or individual annotation, for a service to be
-    # registered correctly. Valid values are "http", "http2", "grpc" and "tcp".
+    # on any given pod will override this value.
+    # Valid values are "http", "http2", "grpc" and "tcp".
     defaultProtocol: null
 
-    # proxyDefaults is a raw json string that will be applied to all Connect
-    # proxy sidecar pods that can include any valid configuration for the
-    # configured proxy.
+    # proxyDefaults is a raw json string that will be written as the value of
+    # the "config" key of the global proxy-defaults config entry.
+    # See: https://www.consul.io/docs/agent/config-entries/proxy-defaults.html
     proxyDefaults: |
       {}
 
