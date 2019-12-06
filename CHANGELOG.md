@@ -10,11 +10,13 @@ BREAKING CHANGES:
     If you do not wish to enable gRPC for clients, set `client.grpc` to
     `false` in your local values file.
 
-  * Add `syncCatalog.addK8SNamespaceSuffix` and default it to `true`. [[GH-280](https://github.com/hashicorp/consul-helm/pull/280)
+  * Add `syncCatalog.addK8SNamespaceSuffix` and default it to `true`. [[GH-280](https://github.com/hashicorp/consul-helm/pull/280)]
     Note: upgrading an existing installation will result in deregistering
     of existing synced services in Consul and registering them with a new name.
     If you would like to avoid this behavior set `syncCatalog.addK8SNamespaceSuffix`
     to `false`.
+    
+    This changes the default service names registered from Kubernetes into Consul. Previously, we would register all Kubernetes services, regardless of namespace, as the same service in Consul. After this change, the default behaviour is to append the Kubernetes namespace to the Consul service name. For example, given a Kubernetes service `foo` in the namespace `namespace`, it would be registered in Consul as `foo-namespace`. The name can also be controlled via the `consul.hashicorp.com/service-name` annotation.
 
 IMPROVEMENTS:
 
@@ -25,7 +27,6 @@ IMPROVEMENTS:
 
 BUG FIXES:
 
-  * Add `connectInject.overrideAuthMethodName` to allow setting the `-acl-auth-method flag` [[GH-278](https://github.com/hashicorp/consul-helm/pull/278)]
   * Do not run `server-acl-init` during server rollout [[GH-292](https://github.com/hashicorp/consul-helm/pull/292)]
 
 ## 0.12.0 (Oct 28, 2019)
