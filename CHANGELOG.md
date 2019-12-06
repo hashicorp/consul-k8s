@@ -9,6 +9,9 @@ Bug Fixes:
   This prevents service name collisions in Consul when there
   are two services with the same name in different
   namespaces in Kubernetes [[GH-139](https://github.com/hashicorp/consul-k8s/issues/139)]
+  
+* Connect: Only write a `service-defaults` config during Connect injection if
+  the protocol is set explicitly [[GH-169](https://github.com/hashicorp/consul-k8s/pull/169)]  
 
 ## 0.9.4 (October 28, 2019)
 
