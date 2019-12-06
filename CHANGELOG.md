@@ -1,11 +1,30 @@
 ## Unreleased
 
-BREAKING CHANGES
+BREAKING CHANGES:
+
   * `client.grpc` defaults to `true` now instead of `false`. This is to make it
-     harder to misconfigure Connect [[GH-282](https://github.com/hashicorp/consul-helm/pull/282)]
+    harder to misconfigure Connect. [[GH-282](https://github.com/hashicorp/consul-helm/pull/282)]
      
-     If you do not wish to enable gRPC for clients, set `client.grpc` to
-     `false` in your local values file.
+    If you do not wish to enable gRPC for clients, set `client.grpc` to
+    `false` in your local values file.
+
+  * Add `syncCatalog.addK8SNamespaceSuffix` and default it to `true`. [[GH-280](https://github.com/hashicorp/consul-helm/pull/280)
+    Note: upgrading an existing installation will result in deregistering
+    of existing synced services in Consul and registering them with a new name.
+    If you would like to avoid this behavior set `syncCatalog.addK8SNamespaceSuffix`
+    to `false`.
+
+IMPROVEMENTS:
+
+  * Use the latest version of consul (1.6.2)
+  * Use the latest version of consul-k8s (0.9.5)
+  * Add `connectInject.overrideAuthMethodName` to allow setting the `-acl-auth-method flag` [[GH-278](https://github.com/hashicorp/consul-helm/pull/278)]
+  * Support external to k8s Consul servers [[GH-289](https://github.com/hashicorp/consul-helm/pull/289)]
+
+BUG FIXES:
+
+  * Add `connectInject.overrideAuthMethodName` to allow setting the `-acl-auth-method flag` [[GH-278](https://github.com/hashicorp/consul-helm/pull/278)]
+  * Do not run `server-acl-init` during server rollout [[GH-292](https://github.com/hashicorp/consul-helm/pull/292)]
 
 ## 0.12.0 (Oct 28, 2019)
 
