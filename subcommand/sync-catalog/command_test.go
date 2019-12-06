@@ -1,6 +1,9 @@
 package synccatalog
 
 import (
+	"testing"
+	"time"
+
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
@@ -8,8 +11,6 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"testing"
-	"time"
 )
 
 // Test that the default consul service is synced to k8s
@@ -203,7 +204,7 @@ func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	}
 }
 
-// LBService returns a Kubernetes service of type LoadBalancer.
+// lbService returns a Kubernetes service of type LoadBalancer.
 func lbService(name, lbIP string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
