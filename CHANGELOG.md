@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.13.0 (Dec 5, 2019)
+
 BREAKING CHANGES:
 
   * `client.grpc` defaults to `true` now instead of `false`. This is to make it
