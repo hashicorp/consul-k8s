@@ -1,6 +1,14 @@
 ## UNRELEASED
 
-## 0.9.3 (October 28, 2019)
+Bug Fixes:
+
+* Sync: Add Kubernetes namespace as a suffix
+  to the service names via `-add-k8s-namespace-suffix` flag.
+  This prevents service name collisions in Consul when there
+  are two services with the same name in different
+  namespaces in Kubernetes [[GH-139](https://github.com/hashicorp/consul-k8s/issues/139)]
+
+## 0.9.4 (October 28, 2019)
 
 Bug Fixes:
 
