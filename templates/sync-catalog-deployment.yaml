@@ -94,6 +94,9 @@ spec:
                 {{- if .Values.syncCatalog.consulPrefix}}
                 -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
                 {{- end}}
+                {{- if .Values.syncCatalog.addK8SNamespaceSuffix}}
+                -add-k8s-namespace-suffix \
+                {{- end}}
           livenessProbe:
             httpGet:
               path: /health/ready
