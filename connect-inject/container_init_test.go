@@ -533,7 +533,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
