@@ -48,7 +48,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
 	data := initContainerCommandData{
 		ServiceName:          pod.Annotations[annotationService],
-		ProxyServiceName: fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
+		ProxyServiceName:     fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
 		ServiceProtocol:      protocol,
 		AuthMethod:           h.AuthMethod,
 		WriteServiceDefaults: writeServiceDefaults,
