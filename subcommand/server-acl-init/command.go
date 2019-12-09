@@ -28,6 +28,7 @@ type Command struct {
 	flags                        *flag.FlagSet
 	k8s                          *k8sflags.K8SFlags
 	flagReleaseName              string
+	flagResourcePrefix           string
 	flagReplicas                 int
 	flagNamespace                string
 	flagAllowDNS                 bool
@@ -54,6 +55,8 @@ func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagReleaseName, "release-name", "",
 		"Name of Consul Helm release")
+	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
+		"Prefix to use for Kubernetes resources. If not set, will default to ${release-name}-consul.")
 	c.flags.IntVar(&c.flagReplicas, "expected-replicas", 1,
 		"Number of expected Consul server replicas")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
@@ -115,6 +118,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
 		return 1
 	}
+	if c.flagReleaseName == "" {
+		c.UI.Error("-release-name must be set")
+		return 1
+	}
 	var cancel context.CancelFunc
 	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), timeout)
 	// The context will only ever be intentionally ended by the timeout.
@@ -140,7 +147,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Wait if there's a rollout of servers.
-	ssName := c.flagReleaseName + "-consul-server"
+	ssName := c.withPrefix("server")
 	err = c.untilSucceeds(fmt.Sprintf("waiting for rollout of statefulset %s", ssName), func() error {
 		ss, err := c.clientset.AppsV1().StatefulSets(c.flagNamespace).Get(ssName, metav1.GetOptions{})
 		if err != nil {
@@ -158,7 +165,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Check if we've already been bootstrapped.
-	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
+	bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
 	bootstrapToken, err := c.getBootstrapToken(logger, bootTokenSecretName)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
@@ -496,7 +503,7 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 // policy and then writes the token to a Kubernetes secret.
 func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) error {
 	// Check if the secret already exists, if so, we assume the ACL has already been created.
-	secretName := fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name)
+	secretName := c.withPrefix(name + "-acl-token")
 	_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
 	if err == nil {
 		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
@@ -598,7 +605,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.Client) error {
 	// First, check if there's already an acl binding rule. If so, then this
 	// work is already done.
-	authMethodName := fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName)
+	authMethodName := c.withPrefix("k8s-auth-method")
 	var existingRules []*api.ACLBindingRule
 	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
 		func() error {
@@ -627,7 +634,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-	saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
+	saName := c.withPrefix("connect-injector-authmethod-svc-account")
 	err = c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
@@ -712,6 +719,15 @@ func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Log
 		}
 	}
 	return nil
+}
+
+// withPrefix returns the name of resource with the correct prefix based
+// on the -release-name or -resource-prefix flags.
+func (c *Command) withPrefix(resource string) string {
+	if c.flagResourcePrefix != "" {
+		return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
+	}
+	return fmt.Sprintf("%s-consul-%s", c.flagReleaseName, resource)
 }
 
 // isNoLeaderErr returns true if err is due to trying to call the
