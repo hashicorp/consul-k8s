@@ -1,5 +1,19 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+  * Consul client DaemonSet can now use a [hostPath mount](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)
+    for its data directory by setting the `client.dataDirectoryHostPath` value.
+    This setting is currently necessary to ensure that when a Consul client Pod is deleted,
+    e.g. during a Consul version upgrade, it does not lose its Connect service
+    registrations. In the next version, we plan to have services automatically
+    re-register which will remove the need for this. [[GH-298](https://github.com/hashicorp/consul-helm/pull/298)]
+    
+    **Security Warning:** If using this setting, Pod Security Policies *must* be enabled on your cluster
+     and in this Helm chart (via the `global.enablePodSecurityPolicies` setting)
+     to prevent other Pods from mounting the same host path and gaining
+     access to all of Consul's data. Consul's data is not encrypted at rest.
+
 ## 0.13.0 (Dec 5, 2019)
 
 BREAKING CHANGES:
