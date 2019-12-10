@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.14.0 (Dec 10, 2019)
+
 IMPROVEMENTS:
 
   * Consul client DaemonSet can now use a [hostPath mount](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)
@@ -13,6 +15,12 @@ IMPROVEMENTS:
      and in this Helm chart (via the `global.enablePodSecurityPolicies` setting)
      to prevent other Pods from mounting the same host path and gaining
      access to all of Consul's data. Consul's data is not encrypted at rest.
+
+  * New configuration option `client.updateStrategy` allows setting the update
+    strategy for the Client DaemonSet. [[GH-298](https://github.com/hashicorp/consul-helm/pull/298)]
+
+  * New configuration option `client.dnsPolicy` allows setting the DNS
+    policy for the Client DaemonSet. [[GH-298](https://github.com/hashicorp/consul-helm/pull/298)]
 
 ## 0.13.0 (Dec 5, 2019)
 
