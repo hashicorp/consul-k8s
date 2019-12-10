@@ -16,7 +16,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ .Release.Name }}-consul-enterprise-license-acl-token
+      - {{ template "consul.fullname" . }}-enterprise-license-acl-token
     verbs:
       - get
 {{- end }}
