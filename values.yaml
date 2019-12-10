@@ -10,6 +10,10 @@ global:
   # opt-in is required, such as by setting `server.enabled` to true.
   enabled: true
 
+  # name sets the prefix used for all resources in the helm chart.
+  # If not set, the prefix will be "<helm release name>-consul".
+  name: null
+
   # domain is the domain Consul will answer DNS queries for
   # (see https://www.consul.io/docs/agent/options.html#_domain) and the domain
   # services synced from Consul into Kubernetes will have,
