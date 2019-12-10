@@ -557,3 +557,81 @@ load _helpers
       tee /dev/stderr)
   [ "${actual}" = "8301" ]
 }
+
+#--------------------------------------------------------------------
+# dataDirectoryHostPath
+
+@test "client/DaemonSet: data directory is emptyDir by defaut" {
+  cd `chart_dir`
+  # Test that hostPath is set to null.
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[0].hostPath == null' | tee /dev/stderr )
+  [ "${actual}" = "true" ]
+
+  # Test that emptyDir is set instead.
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[0].emptyDir == {}' | tee /dev/stderr )
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: hostPath data directory can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.dataDirectoryHostPath=/opt/consul' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[0].hostPath.path == "/opt/consul"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# dnsPolicy
+
+@test "client/DaemonSet: dnsPolicy not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.dnsPolicy == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: dnsPolicy can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      --set 'client.dnsPolicy=ClusterFirstWithHostNet' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.dnsPolicy == "ClusterFirstWithHostNet"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# updateStrategy
+
+@test "client/DaemonSet: updateStrategy not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      . | tee /dev/stderr | \
+      yq '.spec.updateStrategy == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: updateStrategy can be set" {
+  cd `chart_dir`
+  local updateStrategy="type: RollingUpdate
+rollingUpdate:
+  maxUnavailable: 5
+"
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      --set "client.updateStrategy=${updateStrategy}" \
+      . | tee /dev/stderr | \
+      yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":5}}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
