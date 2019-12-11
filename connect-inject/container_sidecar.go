@@ -2,13 +2,15 @@ package connectinject
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) getContainerSidecarCommand() []string {
+func (h *Handler) getContainerSidecarCommand() ([]string, error) {
 	cmd := []string{
 		"envoy",
 		"--max-obj-name-len", "256",
@@ -16,9 +18,18 @@ func (h *Handler) getContainerSidecarCommand() []string {
 	}
 
 	if h.ExtraEnvoyArgs != "" {
-
+		tokens, err := shlex.Split(h.ExtraEnvoyArgs)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, t := range tokens {
+			if strings.Contains(t, " ") {
+				t = strconv.Quote(t)
+			}
+			cmd = append(cmd, t)
+		}
 	}
-	return cmd
+	return cmd, nil
 }
 
 func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
@@ -27,6 +38,11 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
 		sidecarPreStopCommandTpl)))
 	err := tpl.Execute(&buf, h.AuthMethod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	cmd, err := h.getContainerSidecarCommand()
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -59,7 +75,7 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 				},
 			},
 		},
-		Command: h.getContainerSidecarCommand(),
+		Command: cmd,
 	}, nil
 }
 

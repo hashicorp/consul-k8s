@@ -19,6 +19,7 @@ require (
 	github.com/go-sql-driver/mysql v1.4.0 // indirect
 	github.com/gocql/gocql v0.0.0-20180828192252-db20ccb04312 // indirect
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul v1.5.0
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/hashicorp/consul/sdk v0.1.1
