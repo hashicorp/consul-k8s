@@ -114,6 +114,7 @@ func (c *Command) Run(args []string) int {
 	injector := connectinject.Handler{
 		ImageConsul:          c.flagConsulImage,
 		ImageEnvoy:           c.flagEnvoyImage,
+		ExtraEnvoyArgs:       c.flagEnvoyExtraArgs,
 		RequireAnnotation:    !c.flagDefaultInject,
 		AuthMethod:           c.flagACLAuthMethod,
 		WriteServiceDefaults: c.flagCentralConfig,

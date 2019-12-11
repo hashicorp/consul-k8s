@@ -93,6 +93,10 @@ type Handler struct {
 	ImageConsul string
 	ImageEnvoy  string
 
+	// Optional: set when you need extra args to be set when running envoy
+	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
+	ExtraEnvoyArgs string
+
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.
 	RequireAnnotation bool

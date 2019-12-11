@@ -9,7 +9,6 @@ import (
 )
 
 func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
-
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
@@ -51,7 +50,6 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 			"envoy",
 			"--max-obj-name-len", "256",
 			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-			"--log-level", "debug",
 		},
 	}, nil
 }
