@@ -504,6 +504,9 @@ connectInject:
     # proxyDefaults is a raw json string that will be written as the value of
     # the "config" key of the global proxy-defaults config entry.
     # See: https://www.consul.io/docs/agent/config-entries/proxy-defaults.html
+    # NOTE: Changes to this value after the chart is first installed have *no*
+    # effect. In order to change the proxy-defaults config after installation,
+    # you must use the Consul API.
     proxyDefaults: |
       {}
 
