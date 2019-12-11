@@ -28,6 +28,16 @@ func TestContainerSidecarCommand(t *testing.T) {
 				"--log-level", "debug",
 			},
 		},
+		{
+			name:           "extraEnvoyArgs with quotes inside",
+			extraEnvoyArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			expectedContainerCommand: []string{
+				"envoy", "--max-obj-name-len", "256",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--log-level", "debug",
+				"--admin-address-path", "\"/tmp/consul/foo bar\"",
+			},
+		},
 	}
 
 	for _, tc := range cases {

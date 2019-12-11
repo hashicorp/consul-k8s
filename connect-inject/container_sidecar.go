@@ -8,6 +8,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func (h *Handler) getContainerSidecarCommand() []string {
+	cmd := []string{
+		"envoy",
+		"--max-obj-name-len", "256",
+		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+	}
+
+	if h.ExtraEnvoyArgs != "" {
+
+	}
+	return cmd
+}
+
 func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 	// Render the command
 	var buf bytes.Buffer
@@ -46,11 +59,7 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 				},
 			},
 		},
-		Command: []string{
-			"envoy",
-			"--max-obj-name-len", "256",
-			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-		},
+		Command: h.getContainerSidecarCommand(),
 	}, nil
 }
 
