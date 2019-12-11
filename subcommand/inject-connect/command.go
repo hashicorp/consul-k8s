@@ -33,6 +33,7 @@ type Command struct {
 	flagDefaultInject   bool   // True to inject by default
 	flagConsulImage     string // Docker image for Consul
 	flagEnvoyImage      string // Docker image for Envoy
+	flagEnvoyExtraArgs  string // Extra envoy args when starting envoy
 	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
@@ -59,6 +60,7 @@ func (c *Command) init() {
 		"Docker image for Consul. Defaults to an Consul 1.3.0.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
+	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "", "Extra envoy command line args to be set when starting envoy")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false,

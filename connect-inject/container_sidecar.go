@@ -51,6 +51,7 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 			"envoy",
 			"--max-obj-name-len", "256",
 			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+			"--log-level", "debug",
 		},
 	}, nil
 }
