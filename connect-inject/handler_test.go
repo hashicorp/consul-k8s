@@ -90,6 +90,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
@@ -138,6 +142,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
 				},
 				{
 					Operation: "add",
@@ -202,6 +210,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
@@ -229,6 +241,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
 				},
 				{
 					Operation: "add",
@@ -271,6 +287,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
@@ -301,6 +321,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
 				},
 				{
 					Operation: "add",

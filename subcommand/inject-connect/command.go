@@ -33,6 +33,7 @@ type Command struct {
 	flagDefaultInject   bool   // True to inject by default
 	flagConsulImage     string // Docker image for Consul
 	flagEnvoyImage      string // Docker image for Envoy
+	flagConsulK8sImage  string // Docker image for consul-k8s
 	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
@@ -59,6 +60,8 @@ func (c *Command) init() {
 		"Docker image for Consul. Defaults to an Consul 1.3.0.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
+	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
+		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false,
@@ -71,6 +74,12 @@ func (c *Command) init() {
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
+		return 1
+	}
+
+	// Validate flags.
+	if c.flagConsulK8sImage == "" {
+		c.UI.Error("-consul-k8s-image must be set")
 		return 1
 	}
 
@@ -112,6 +121,7 @@ func (c *Command) Run(args []string) int {
 	injector := connectinject.Handler{
 		ImageConsul:          c.flagConsulImage,
 		ImageEnvoy:           c.flagEnvoyImage,
+		ImageConsulK8S:       c.flagConsulK8sImage,
 		RequireAnnotation:    !c.flagDefaultInject,
 		AuthMethod:           c.flagACLAuthMethod,
 		WriteServiceDefaults: c.flagCentralConfig,
