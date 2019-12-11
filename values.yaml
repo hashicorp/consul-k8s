@@ -39,7 +39,8 @@ global:
   # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
   # If using bootstrapACLs then must be >= 0.10.1.
-  imageK8S: "hashicorp/consul-k8s:0.9.5"
+  # If using connect inject then must be >= 0.10.1.
+  imageK8S: "hashicorp/consul-k8s:0.10.1"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -446,6 +447,7 @@ syncCatalog:
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
   # global.enabled.
+  # Requires consul-k8s >= 0.10.1.
   enabled: false
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
