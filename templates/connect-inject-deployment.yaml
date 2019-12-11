@@ -53,6 +53,7 @@ spec:
                 {{ if .Values.connectInject.imageEnvoy -}}
                 -envoy-image="{{ .Values.connectInject.imageEnvoy }}" \
                 {{ end -}}
+                -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -listen=:8080 \
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
