@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) envoySidecar(pod *corev1.Pod) (corev1.Container, error) {
 
 	// Render the command
 	var buf bytes.Buffer
