@@ -493,6 +493,10 @@ connectInject:
 
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
+    # enabled controls whether central config is enabled on all servers and clients.
+    # See https://www.consul.io/docs/agent/options.html#enable_central_service_config.
+    # If changing this after installation, servers and clients must be restarted
+    # for the change to take effect.
     enabled: true
 
     # defaultProtocol allows you to specify a convenience default protocol if
