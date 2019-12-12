@@ -56,7 +56,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagReleaseName, "release-name", "",
 		"Name of Consul Helm release")
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
-		"Prefix to use for Kubernetes resources. If not set, will default to ${release-name}-consul.")
+		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
 	c.flags.IntVar(&c.flagReplicas, "expected-replicas", 1,
 		"Number of expected Consul server replicas")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
