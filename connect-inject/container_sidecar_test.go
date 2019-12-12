@@ -8,20 +8,20 @@ import (
 func TestContainerSidecarCommand(t *testing.T) {
 	cases := []struct {
 		name                     string
-		extraEnvoyArgs           string
+		extraEnvoyOpts           string
 		expectedContainerCommand []string
 	}{
 		{
-			name:           "no extra args provided",
-			extraEnvoyArgs: "",
+			name:           "no extra options provided",
+			extraEnvoyOpts: "",
 			expectedContainerCommand: []string{
 				"envoy", "--max-obj-name-len", "256",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 			},
 		},
 		{
-			name:           "extra loglevel args",
-			extraEnvoyArgs: "--log-level debug",
+			name:           "extra log-level option",
+			extraEnvoyOpts: "--log-level debug",
 			expectedContainerCommand: []string{
 				"envoy", "--max-obj-name-len", "256",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -29,8 +29,8 @@ func TestContainerSidecarCommand(t *testing.T) {
 			},
 		},
 		{
-			name:           "extraEnvoyArgs with quotes inside",
-			extraEnvoyArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			name:           "extraEnvoyOpts with quotes inside",
+			extraEnvoyOpts: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 			expectedContainerCommand: []string{
 				"envoy", "--max-obj-name-len", "256",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -45,7 +45,7 @@ func TestContainerSidecarCommand(t *testing.T) {
 			h := Handler{
 				ImageConsul:    "hashicorp/consul:latest",
 				ImageEnvoy:     "hashicorp/consul-k8s:latest",
-				ExtraEnvoyArgs: tc.extraEnvoyArgs,
+				ExtraEnvoyOpts: tc.extraEnvoyOpts,
 			}
 
 			c, err := h.containerSidecar(nil)
