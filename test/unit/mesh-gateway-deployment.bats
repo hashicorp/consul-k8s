@@ -43,8 +43,7 @@ load _helpers
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'client.grpc=false' \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' .
+      --set 'connectInject.enabled=true' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "client.grpc must be true" ]]
 }
@@ -56,7 +55,6 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'client.grpc=true' \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'global.enabled=false' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "clients must be enabled" ]]
@@ -69,7 +67,6 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'client.grpc=true' \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'global.enabled=true' \
       --set 'client.enabled=false' .
   [ "$status" -eq 1 ]

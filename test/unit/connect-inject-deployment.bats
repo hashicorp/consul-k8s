@@ -270,25 +270,25 @@ load _helpers
 #--------------------------------------------------------------------
 # centralConfig
 
-@test "connectInject/Deployment: centralConfig is disabled by default" {
+@test "connectInject/Deployment: centralConfig is enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: centralConfig can be enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: centralConfig can be disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "connectInject/Deployment: defaultProtocol is disabled by default with centralConfig enabled" {
