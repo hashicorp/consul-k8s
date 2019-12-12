@@ -17,8 +17,8 @@ func (h *Handler) getContainerSidecarCommand() ([]string, error) {
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 	}
 
-	if h.ExtraEnvoyArgs != "" {
-		tokens, err := shlex.Split(h.ExtraEnvoyArgs)
+	if h.ExtraEnvoyOpts != "" {
+		tokens, err := shlex.Split(h.ExtraEnvoyOpts)
 		if err != nil {
 			return []string{}, err
 		}
