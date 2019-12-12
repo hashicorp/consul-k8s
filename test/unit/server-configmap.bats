@@ -68,25 +68,25 @@ load _helpers
 #--------------------------------------------------------------------
 # connectInject.centralConfig
 
-@test "server/ConfigMap: centralConfig is disabled by default" {
+@test "server/ConfigMap: centralConfig is enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: centralConfig can be enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       . | tee /dev/stderr |
       yq '.data["central-config.json"] | contains("enable_central_service_config")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: centralConfig can be disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-config-configmap.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "server/ConfigMap: proxyDefaults disabled by default" {
@@ -94,7 +94,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       . | tee /dev/stderr |
       yq '.data["proxy-defaults-config.json"] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -105,7 +104,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq '.data["proxy-defaults-config.json"] | match("world") | length' | tee /dev/stderr)
@@ -117,7 +115,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=remote' \
@@ -132,7 +129,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=' \
@@ -147,7 +143,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=null' \
@@ -162,7 +157,6 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.proxyDefaults=""' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=remote' \
