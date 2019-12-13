@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
@@ -40,6 +41,7 @@ type Command struct {
 	flagCreateMeshGatewayToken   bool
 	flagLogLevel                 string
 	flagTimeout                  string
+	flagScheme                   string
 
 	clientset kubernetes.Interface
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -79,6 +81,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.StringVar(&c.flagScheme, "scheme", "http",
+		"Consul server protocol (http or https). Default: http")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -183,9 +187,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	serverAddr := serverPods[0].Addr
+	serverScheme := c.flagScheme
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
-		Scheme:  "http",
+		Scheme:  serverScheme,
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
@@ -345,9 +350,10 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 
 	// Pick the first pod to connect to for bootstrapping and set up connection.
 	firstServerAddr := serverPods[0].Addr
+	serverScheme := c.flagScheme
 	consulClient, err := api.NewClient(&api.Config{
 		Address: firstServerAddr,
-		Scheme:  "http",
+		Scheme:  serverScheme,
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
@@ -406,9 +412,10 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 
 	// Override our original client with a new one that has the bootstrap token
 	// set.
+	// serverScheme := c.flagScheme,
 	consulClient, err = api.NewClient(&api.Config{
 		Address: firstServerAddr,
-		Scheme:  "http",
+		Scheme:  serverScheme,
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
@@ -469,9 +476,10 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	for i, pod := range serverPods {
 		// We create a new client for each server because we need to call each
 		// server specifically.
+		serverScheme := c.flagScheme
 		serverClient, err := api.NewClient(&api.Config{
 			Address: pod.Addr,
-			Scheme:  "http",
+			Scheme:  serverScheme,
 			Token:   bootstrapToken,
 		})
 		if err != nil {
