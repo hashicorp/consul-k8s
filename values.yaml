@@ -1,55 +1,75 @@
 # Available parameters and their default values for the Consul chart.
 
+# global holds values that affect multiple components of the chart.
 global:
-  # enabled is the master enabled switch. Setting this to true or false
-  # will enable or disable all the components within this chart by default.
-  # Each component can be overridden using the component-specific "enabled"
-  # value.
+  # enabled is the master enabled/disabled setting.
+  # If true, servers, clients, Consul DNS and the Consul UI will be enabled.
+  # Each component can override this default via its component-specific
+  # "enabled" config.
+  # If false, no components will be installed by default and per-component
+  # opt-in is required, such as by setting `server.enabled` to true.
   enabled: true
 
-  # Domain to register the Consul DNS server to listen for.
+  # domain is the domain Consul will answer DNS queries for
+  # (see https://www.consul.io/docs/agent/options.html#_domain) and the domain
+  # services synced from Consul into Kubernetes will have,
+  # e.g. `service-name.service.consul`.
   domain: consul
 
-  # Image is the name (and tag) of the Consul Docker image for clients and
-  # servers below. This can be overridden per component.
+  # image is the name (and tag) of the Consul Docker image for clients and
+  # servers. This can be overridden per component.
+  # This should be pinned to a specific version tag, otherwise you may
+  # inadvertently upgrade your Consul version.
   #
   # Examples:
+  #   # Consul 1.5.0
   #   image: "consul:1.5.0"
-  #   image: "hashicorp/consul-enterprise:1.5.0-ent"   # Enterprise Consul image
+  #   # Consul Enterprise 1.5.0
+  #   image: "hashicorp/consul-enterprise:1.5.0-ent"
   image: "consul:1.6.2"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
-  # is used for functionality such as the catalog sync. This can be overridden
-  # per component below.
+  # is used for functionality such as catalog sync. This can be overridden
+  # per component.
   # Note: support for the catalog sync's liveness and readiness probes was added
-  # to consul-k8s v0.6.0. If using an older consul-k8s version, you may need to
+  # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
   # If using mesh gateways and bootstrapACLs then must be >= 0.9.0.
   imageK8S: "hashicorp/consul-k8s:0.9.5"
 
-  # Datacenter is the name of the datacenter that the agents should register
-  # as. This shouldn't be changed once the Consul cluster is up and running
+  # datacenter is the name of the datacenter that the agents should register
+  # as. This can't be changed once the Consul cluster is up and running
   # since Consul doesn't support an automatic way to change this value
-  # currently: https://github.com/hashicorp/consul/issues/1858
+  # currently: https://github.com/hashicorp/consul/issues/1858.
   datacenter: dc1
 
-  # enablePodSecurityPolicies is a boolean flag that controls whether pod
-  # security policies are created for the consul components created by this
-  # chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+  # enablePodSecurityPolicies controls whether pod
+  # security policies are created for the Consul components created by this
+  # chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Gossip encryption key. To enable gossip encryption, provide the name of
-  # a Kubernetes secret that contains a gossip key. You can create a gossip
-  # key with the "consul keygen" command.
-  # See https://www.consul.io/docs/commands/keygen.html
+  # gossipEncryption configures which Kubernetes secret to retrieve Consul's
+  # gossip encryption key from (see https://www.consul.io/docs/agent/options.html#_encrypt).
+  # If secretName or secretKey are not set, gossip encryption will not be enabled.
+  # The secret must be in the same namespace that Consul is installed into.
+  #
+  # The secret can be created by running:
+  #    kubectl create secret generic consul-gossip-encryption-key \
+  #      --from-literal=key=$(consul keygen)`.
+  #
+  # In this case, secretName would be "consul-gossip-encryption-key" and
+  # secretKey would be "key".
   gossipEncryption:
-    secretName: null
-    secretKey: null
+    # secretName is the name of the Kubernetes secret that holds the gossip
+    # encryption key. The secret must be in the same namespace that Consul is installed into.
+    secretName: ""
+    # secretKey is the key within the Kubernetes secret that holds the gossip
+    # encryption key.
+    secretKey: ""
 
   # bootstrapACLs will automatically create and assign ACL tokens within
-  # the Consul cluster. This currently requires enabling both servers and
-  # clients within Kubernetes. Additionally requires Consul v1.4+ and
-  # consul-k8s v0.8.0+.
+  # the Consul cluster. This requires servers to be running inside Kubernetes.
+  # Additionally requires Consul >= 1.4 and consul-k8s >= 0.8.0.
   bootstrapACLs: false
 
 # Server, when enabled, configures a server cluster to run. This should
