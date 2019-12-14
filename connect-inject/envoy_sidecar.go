@@ -8,13 +8,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+type sidecarContainerCommandData struct {
+	AuthMethod      string
+	ConsulNamespace string
+}
+
 func (h *Handler) envoySidecar(pod *corev1.Pod) (corev1.Container, error) {
+	templateData := sidecarContainerCommandData{
+		AuthMethod:      h.AuthMethod,
+		ConsulNamespace: h.consulNamespace(pod.Namespace),
+	}
 
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
 		sidecarPreStopCommandTpl)))
-	err := tpl.Execute(&buf, h.AuthMethod)
+	err := tpl.Execute(&buf, &templateData)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -74,11 +83,15 @@ func (h *Handler) envoySidecar(pod *corev1.Pod) (corev1.Container, error) {
 
 const sidecarPreStopCommandTpl = `
 /consul/connect-inject/consul services deregister \
-  {{- if . }}
+  {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
   /consul/connect-inject/service.hcl
-{{- if . }}
+
+{{- if .AuthMethod }}
 && /consul/connect-inject/consul logout \
   -token-file="/consul/connect-inject/acl-token"
 {{- end}}

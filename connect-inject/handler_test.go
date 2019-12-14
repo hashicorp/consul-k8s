@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
@@ -553,7 +554,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(actual, tt.Expected)
+			require.Equal(tt.Expected, actual)
 		})
 	}
 }
@@ -640,7 +641,305 @@ func TestHandlerPortValue(t *testing.T) {
 				return
 			}
 
-			require.Equal(port, tt.Expected)
+			require.Equal(tt.Expected, port)
+		})
+	}
+}
+
+// Test consulNamespace function
+func TestConsulNamespace(t *testing.T) {
+	cases := []struct {
+		Name                string
+		EnableNamespaces    bool
+		ConsulNamespaceName string
+		EnableNSMirroring   bool
+		MirroringPrefix     string
+		K8sNamespace        string
+		Expected            string
+	}{
+		{
+			"namespaces disabled",
+			false,
+			"default",
+			false,
+			"",
+			"namespace",
+			"",
+		},
+
+		{
+			"namespaces disabled, mirroring enabled",
+			false,
+			"default",
+			true,
+			"",
+			"namespace",
+			"",
+		},
+
+		{
+			"namespaces disabled, mirroring enabled, prefix defined",
+			false,
+			"default",
+			true,
+			"test-",
+			"namespace",
+			"",
+		},
+
+		{
+			"namespaces enabled, mirroring diabled",
+			true,
+			"default",
+			false,
+			"",
+			"namespace",
+			"default",
+		},
+
+		{
+			"namespaces enabled, mirroring disabled, prefix defined",
+			true,
+			"default",
+			false,
+			"test-",
+			"namespace",
+			"default",
+		},
+
+		{
+			"namespaces enabled, mirroring enabled",
+			true,
+			"default",
+			true,
+			"",
+			"namespace",
+			"namespace",
+		},
+
+		{
+			"namespaces enabled, mirroring enabled, prefix defined",
+			true,
+			"default",
+			true,
+			"test-",
+			"namespace",
+			"test-namespace",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			h := Handler{
+				EnableNamespaces:    tt.EnableNamespaces,
+				ConsulNamespaceName: tt.ConsulNamespaceName,
+				EnableNSMirroring:   tt.EnableNSMirroring,
+				MirroringPrefix:     tt.MirroringPrefix,
+			}
+
+			ns := h.consulNamespace(tt.K8sNamespace)
+
+			require.Equal(tt.Expected, ns)
+		})
+	}
+}
+
+// Test shouldInject function
+func TestShouldInject(t *testing.T) {
+	cases := []struct {
+		Name                  string
+		Pod                   *corev1.Pod
+		K8sNamespace          string
+		EnableNamespaces      bool
+		AllowK8sNamespacesSet mapset.Set
+		DenyK8sNamespacesSet  mapset.Set
+		Expected              bool
+	}{
+		{
+			"kube-system not injected",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						// Service annotation is required for injection
+						annotationService: "testing",
+					},
+				},
+			},
+			"kube-system",
+			false,
+			mapset.NewSet(),
+			mapset.NewSet(),
+			false,
+		},
+		{
+			"kube-public not injected",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"kube-public",
+			false,
+			mapset.NewSet(),
+			mapset.NewSet(),
+			false,
+		},
+		{
+			"namespaces disabled",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSet(),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces enabled, empty allow/deny lists",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSet(),
+			mapset.NewSet(),
+			false,
+		},
+		{
+			"namespaces enabled, allow *",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("*"),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces enabled, allow default",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("default"),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces enabled, allow * and default",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("*", "default"),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces enabled, allow only non-default",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("ns1", "ns2"),
+			mapset.NewSet(),
+			false,
+		},
+		{
+			"namespaces enabled, deny default ns",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSet(),
+			mapset.NewSetWith("default"),
+			false,
+		},
+		{
+			"namespaces enabled, allow *, deny default ns",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("*"),
+			mapset.NewSetWith("default"),
+			false,
+		},
+		{
+			"namespaces enabled, default ns in both allow and deny lists",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			true,
+			mapset.NewSetWith("default"),
+			mapset.NewSetWith("default"),
+			false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			h := Handler{
+				RequireAnnotation:     false,
+				EnableNamespaces:      tt.EnableNamespaces,
+				AllowK8sNamespacesSet: tt.AllowK8sNamespacesSet,
+				DenyK8sNamespacesSet:  tt.DenyK8sNamespacesSet,
+			}
+
+			injected, err := h.shouldInject(tt.Pod, tt.K8sNamespace)
+
+			require.Equal(nil, err)
+			require.Equal(tt.Expected, injected)
 		})
 	}
 }
