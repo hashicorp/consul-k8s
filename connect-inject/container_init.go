@@ -21,9 +21,13 @@ type initContainerCommandData struct {
 	// WriteServiceDefaults controls whether a service-defaults config is
 	// written for this service.
 	WriteServiceDefaults bool
-	Upstreams            []initContainerCommandUpstreamData
-	Tags                 string
-	Meta                 map[string]string
+	// ConsulNamespace is the Consul namespace to register the service
+	// and proxy in. An empty string indicates namespaces are not
+	// enabled in Consul (necesary for OSS).
+	ConsulNamespace string
+	Upstreams       []initContainerCommandUpstreamData
+	Tags            string
+	Meta            map[string]string
 
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
@@ -50,12 +54,14 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	// would then override any global proxy-defaults config. Now, we only
 	// write the config if a protocol is explicitly set.
 	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
+
 	data := initContainerCommandData{
 		ServiceName:          pod.Annotations[annotationService],
 		ProxyServiceName:     fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
 		ServiceProtocol:      protocol,
 		AuthMethod:           h.AuthMethod,
 		WriteServiceDefaults: writeServiceDefaults,
+		ConsulNamespace:      h.consulNamespace(pod.Namespace),
 		ConsulCACert:         h.ConsulCACert,
 	}
 	if data.ServiceName == "" {
@@ -86,7 +92,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		// this in an HCL config file and HCL arrays are json formatted.
 		jsonTags, err := json.Marshal(tags)
 		if err != nil {
-			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
+			h.Log.Error("Error json marshaling tags", "err", err, "Tags", tags)
 		} else {
 			data.Tags = string(jsonTags)
 		}
@@ -225,6 +231,9 @@ services {
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  {{- if .ConsulNamespace }}
+  namespace = "{{ .ConsulNamespace }}"
+  {{- end }}
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
@@ -279,6 +288,9 @@ services {
   name = "{{ .ServiceName }}"
   address = "${POD_IP}"
   port = {{ .ServicePort }}
+  {{- if .ConsulNamespace }}
+  namespace = "{{ .ConsulNamespace }}"
+  {{- end }}
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
@@ -298,17 +310,25 @@ cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "{{ .ServiceName }}"
 protocol = "{{ .ServiceProtocol }}"
+{{- if .ConsulNamespace }}
+namespace = "{{ .ConsulNamespace }}"
+{{- end }}
 EOF
 {{- end }}
+
 {{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 {{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
        as non-root user consul-k8s. */}}
 chmod 444 /consul/connect-inject/acl-token
 {{- end }}
+
 {{- if .WriteServiceDefaults }}
 {{- /* We use -cas and -modify-index 0 so that if a service-defaults config
        already exists for this service, we don't override it */}}
@@ -316,12 +336,18 @@ chmod 444 /consul/connect-inject/acl-token
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
   /consul/connect-inject/service-defaults.hcl || true
 {{- end }}
 
 /bin/consul services register \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace={{ .ConsulNamespace }} \
   {{- end }}
   /consul/connect-inject/service.hcl
 

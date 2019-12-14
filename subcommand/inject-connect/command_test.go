@@ -1,4 +1,4 @@
-package subcommand
+package connectinject
 
 import (
 	"github.com/mitchellh/cli"
