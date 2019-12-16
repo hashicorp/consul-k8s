@@ -37,10 +37,6 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
 				},
 			},
-			{
-				Name:  "CONSUL_HTTP_ADDR",
-				Value: "$(HOST_IP):8500",
-			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -51,6 +47,7 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 		Command: []string{
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
+			"-http-addr", "${HOST_IP}:8500",
 		},
 	}, container)
 }
@@ -110,4 +107,47 @@ func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 	})
 
 	require.Contains(t, container.Command, "-sync-period=55s")
+}
+
+// Test that the Consul address uses HTTPS
+// and that the CA is provided
+func TestLifecycleSidecar_TLS(t *testing.T) {
+	handler := Handler{
+		Log:            hclog.Default().Named("handler"),
+		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		ConsulCACert:   "consul-ca-cert",
+	}
+	container := handler.lifecycleSidecar(&corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	})
+	require.Equal(t, corev1.Container{
+		Name:  "consul-connect-lifecycle-sidecar",
+		Image: "hashicorp/consul-k8s:9.9.9",
+		Env: []corev1.EnvVar{
+			{
+				Name: "HOST_IP",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			},
+		},
+		Command: []string{
+			"consul-k8s", "lifecycle-sidecar",
+			"-service-config", "/consul/connect-inject/service.hcl",
+			"-http-addr", "https://${HOST_IP}:8501",
+			"-ca-file", "/consul/connect-inject/consul-ca.pem",
+		},
+	}, container)
 }

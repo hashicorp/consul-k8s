@@ -119,6 +119,10 @@ type Handler struct {
 	// registrations. It will be overridden by a specific annotation.
 	DefaultProtocol string
 
+	// The PEM-encoded CA certificate string
+	// to use when communicating with Consul clients
+	ConsulCACert string
+
 	// Log
 	Log hclog.Logger
 }

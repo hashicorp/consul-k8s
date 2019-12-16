@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -37,6 +38,7 @@ type Command struct {
 	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
+	flagConsulCACert    string // CA Certificate to use when communicating with Consul clients
 	flagSet             *flag.FlagSet
 
 	once sync.Once
@@ -68,6 +70,8 @@ func (c *Command) init() {
 		"Write a service-defaults config for every Connect service using protocol from -default-protocol or Pod annotation.")
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
+	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to CA certificate to use when communicating with Consul clients.")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -117,6 +121,16 @@ func (c *Command) Run(args []string) int {
 	defer cancelFunc()
 	go c.certWatcher(ctx, certCh, clientset)
 
+	var consulCACert []byte
+	if c.flagConsulCACert != "" {
+		var err error
+		consulCACert, err = ioutil.ReadFile(c.flagConsulCACert)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file: %s", err))
+			return 1
+		}
+	}
+
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
 		ImageConsul:          c.flagConsulImage,
@@ -126,6 +140,7 @@ func (c *Command) Run(args []string) int {
 		AuthMethod:           c.flagACLAuthMethod,
 		WriteServiceDefaults: c.flagCentralConfig,
 		DefaultProtocol:      c.flagDefaultProtocol,
+		ConsulCACert:         string(consulCACert),
 		Log:                  hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
