@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+## 0.10.1 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix bug where the new lifecycle sidecar didn't have permissions to
+  read the ACL token file. [[GH-182](https://github.com/hashicorp/consul-k8s/pull/182)]  
+
 ## 0.10.0 (December 17, 2019)
 
 Bug Fixes:
