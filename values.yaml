@@ -196,10 +196,6 @@ client:
   # to use as the Consul client data directory.
   # If set to the empty string or null, the Consul agent will store its data
   # in the Pod's local filesystem (which will be lost if the Pod is deleted).
-  # If using Consul Connect, this directory must be set. Otherwise when the Consul
-  # agent Pod is deleted, e.g. during an upgrade, all the Connect-injected Pods
-  # on that node will be de-registered and will need to be restarted to be
-  # re-registered.
   # Security Warning: If setting this, Pod Security Policies *must* be enabled on your cluster
   # and in this Helm chart (via the global.enablePodSecurityPolicies setting)
   # to prevent other Pods from mounting the same host path and gaining
