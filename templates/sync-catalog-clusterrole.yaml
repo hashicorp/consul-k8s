@@ -34,7 +34,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ .Release.Name }}-consul-catalog-sync-acl-token
+      - {{ template "consul.fullname" . }}-catalog-sync-acl-token
     verbs:
       - get
 {{- end }}
