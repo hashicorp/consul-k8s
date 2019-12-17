@@ -39,7 +39,8 @@ global:
   # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
   # If using bootstrapACLs then must be >= 0.10.1.
-  imageK8S: "hashicorp/consul-k8s:0.9.5"
+  # If using connect inject then must be >= 0.10.1.
+  imageK8S: "hashicorp/consul-k8s:0.10.1"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -195,10 +196,6 @@ client:
   # to use as the Consul client data directory.
   # If set to the empty string or null, the Consul agent will store its data
   # in the Pod's local filesystem (which will be lost if the Pod is deleted).
-  # If using Consul Connect, this directory must be set. Otherwise when the Consul
-  # agent Pod is deleted, e.g. during an upgrade, all the Connect-injected Pods
-  # on that node will be de-registered and will need to be restarted to be
-  # re-registered.
   # Security Warning: If setting this, Pod Security Policies *must* be enabled on your cluster
   # and in this Helm chart (via the global.enablePodSecurityPolicies setting)
   # to prevent other Pods from mounting the same host path and gaining
@@ -446,6 +443,7 @@ syncCatalog:
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
   # global.enabled.
+  # Requires consul-k8s >= 0.10.1.
   enabled: false
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
