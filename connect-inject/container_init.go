@@ -291,6 +291,9 @@ EOF
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
+       as non-root user consul-k8s. */}}
+chmod 444 /consul/connect-inject/acl-token
 {{- end }}
 {{- if .WriteServiceDefaults }}
 {{- /* We use -cas and -modify-index 0 so that if a service-defaults config
