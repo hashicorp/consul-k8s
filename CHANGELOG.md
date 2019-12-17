@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.10.1 (December 17, 2019)
 
 ## 0.10.1 (December 17, 2019)
 
