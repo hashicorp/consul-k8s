@@ -1,12 +1,6 @@
 ## Unreleased
 
-IMPROVEMENTS:
-
-  * Use latest version of consul-k8s ([0.10.1](https://github.com/hashicorp/consul-k8s/blob/master/CHANGELOG.md#0101-december-17-2019)).
-    This version fixes a Connect [bug](https://github.com/hashicorp/consul-k8s/issues/161)
-    where service instances on a node would be deregistered when the Consul
-    client pod for that node restarted.
-
+## 0.15.0 (Dec 17, 2019)
 
 BREAKING CHANGES:
 
@@ -22,6 +16,14 @@ BREAKING CHANGES:
   * Connect Inject: If using Connect Inject, you must also upgrade your `consul-k8s` version
     to a version >= 0.10.1. A new flag is being passed in to `consul-k8s` which is not
     supported in earlier versions.
+
+BUG FIXES:
+  * Fix bug with `fullnameOverride` and add new `global.name` setting for changing
+    the default prefix for resources. [[GH-286](https://github.com/hashicorp/consul-helm/issues/286)]
+
+  * Connect Inject: Fix critical bug where Connect-registered services instances would be de-registered
+    when the Consul client on the same node was restarted. This fix adds a new
+    sidecar that ensures the service instance is always registered. [[GH-314](https://github.com/hashicorp/consul-helm/pull/314)]
 
 ## 0.14.0 (Dec 10, 2019)
 
