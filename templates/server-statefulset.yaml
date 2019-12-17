@@ -10,6 +10,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: server
 spec:
   serviceName: {{ template "consul.fullname" . }}-server
   podManagementPolicy: Parallel
