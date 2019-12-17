@@ -623,6 +623,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 
 /bin/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
@@ -678,6 +679,7 @@ EOF
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 /bin/consul config write -cas -modify-index 0 \
   -token-file="/consul/connect-inject/acl-token" \
   /consul/connect-inject/service-defaults.hcl || true
