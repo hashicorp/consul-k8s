@@ -2,6 +2,14 @@
 
 IMPROVEMENTS:
 
+  * Use latest version of consul-k8s ([0.10.1](https://github.com/hashicorp/consul-k8s/blob/master/CHANGELOG.md#0101-december-17-2019)).
+    This version fixes a Connect [bug](https://github.com/hashicorp/consul-k8s/issues/161)
+    where service instances on a node would be deregistered when the Consul
+    client pod for that node restarted.
+
+
+BREAKING CHANGES:
+
   * `connectInject.centralConfig` defaults to `true` now instead of `false`. This is to make it
      easier to configure Connect via `service-defaults` and other routing
      config [[GH-302](https://github.com/hashicorp/consul-helm/pull/302)].
@@ -10,6 +18,10 @@ IMPROVEMENTS:
      If you wish to disable central config, set `connectInject.centralConfig` to
      false in your local values file. NOTE: If `connectInject.enabled` is false,
      then central config is not enabled so this change will not affect you. 
+  
+  * Connect Inject: If using Connect Inject, you must also upgrade your `consul-k8s` version
+    to a version >= 0.10.1. A new flag is being passed in to `consul-k8s` which is not
+    supported in earlier versions.
 
 ## 0.14.0 (Dec 10, 2019)
 
@@ -21,6 +33,7 @@ IMPROVEMENTS:
     e.g. during a Consul version upgrade, it does not lose its Connect service
     registrations. In the next version, we plan to have services automatically
     re-register which will remove the need for this. [[GH-298](https://github.com/hashicorp/consul-helm/pull/298)]
+    (**Update:** 0.15.0 uses a version of consul-k8s that fixes this bug and so hostPath is longer necessary)
     
     **Security Warning:** If using this setting, Pod Security Policies *must* be enabled on your cluster
      and in this Helm chart (via the `global.enablePodSecurityPolicies` setting)
