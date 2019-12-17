@@ -126,7 +126,7 @@ func (c *Command) Run(args []string) int {
 		var err error
 		consulCACert, err = ioutil.ReadFile(c.flagConsulCACert)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file: %s", err))
+			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file %s: %s", c.flagConsulCACert, err))
 			return 1
 		}
 	}
