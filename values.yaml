@@ -38,7 +38,7 @@ global:
   # Note: support for the catalog sync's liveness and readiness probes was added
   # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
-  # If using mesh gateways and bootstrapACLs then must be >= 0.9.0.
+  # If using bootstrapACLs then must be >= 0.10.1.
   imageK8S: "hashicorp/consul-k8s:0.9.5"
 
   # datacenter is the name of the datacenter that the agents should register
@@ -73,7 +73,7 @@ global:
 
   # bootstrapACLs will automatically create and assign ACL tokens within
   # the Consul cluster. This requires servers to be running inside Kubernetes.
-  # Additionally requires Consul >= 1.4 and consul-k8s >= 0.8.0.
+  # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
   bootstrapACLs: false
 
 # Server, when enabled, configures a server cluster to run. This should
