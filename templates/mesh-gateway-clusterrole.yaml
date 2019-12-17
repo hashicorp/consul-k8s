@@ -24,7 +24,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ .Release.Name }}-consul-mesh-gateway-acl-token
+      - {{ template "consul.fullname" . }}-mesh-gateway-acl-token
     verbs:
       - get
 {{- end }}

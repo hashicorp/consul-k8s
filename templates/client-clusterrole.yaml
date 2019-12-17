@@ -23,7 +23,7 @@ rules:
     resources:
       - secrets
     resourceNames:
-      - {{ .Release.Name }}-consul-client-acl-token
+      - {{ template "consul.fullname" . }}-client-acl-token
     verbs:
       - get
 {{- end }}

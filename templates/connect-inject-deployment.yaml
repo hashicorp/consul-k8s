@@ -57,7 +57,7 @@ spec:
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{ else if .Values.global.bootstrapACLs }}
-                -acl-auth-method="{{ .Release.Name }}-consul-k8s-auth-method" \
+                -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
                 {{- end }}
                 {{- if .Values.connectInject.centralConfig.enabled }}
                 -enable-central-config=true \

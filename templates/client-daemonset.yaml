@@ -228,7 +228,7 @@ spec:
           - "-ec"
           - |
             consul-k8s acl-init \
-              -secret-name="{{ .Release.Name }}-consul-client-acl-token" \
+              -secret-name="{{ template "consul.fullname" . }}-client-acl-token" \
               -k8s-namespace={{ .Release.Namespace }} \
               -init-type="client"
         volumeMounts:
