@@ -95,6 +95,12 @@ spec:
                 {{- if .Values.syncCatalog.k8sSourceNamespace }}
                 -k8s-source-namespace="{{ .Values.syncCatalog.k8sSourceNamespace}}" \
                 {{- end }}
+                {{- range $value := .Values.syncCatalog.k8sAllowNamespaces }}
+                -allow-k8s-namespace="{{ $value }}" \
+                {{- end }}
+                {{- range $value := .Values.syncCatalog.k8sDenyNamespaces }}
+                -deny-k8s-namespace="{{ $value }}" \
+                {{- end }}
                 -k8s-write-namespace=${NAMESPACE} \
                 {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
                 -sync-clusterip-services=false \
@@ -117,6 +123,21 @@ spec:
                 {{- if .Values.syncCatalog.addK8SNamespaceSuffix}}
                 -add-k8s-namespace-suffix \
                 {{- end}}
+                {{- if .Values.global.enableConsulNamespaces }}
+                -enable-namespaces=true \
+                {{- if .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
+                -consul-destination-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }} \
+                {{- end }}
+                {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
+                -enable-k8s-namespace-mirroring=true \
+                {{- if .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }}
+                -k8s-namespace-mirroring-prefix={{ .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }} \
+                {{- end }}
+                {{- end }}
+                {{- if .Values.global.bootstrapACLs }}
+                -consul-cross-namespace-acl-policy=cross-namespace-policy \
+                {{- end }}
+                {{- end }}
           livenessProbe:
             httpGet:
               path: /health/ready

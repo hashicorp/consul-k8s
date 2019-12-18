@@ -30,7 +30,7 @@ global:
   #   image: "consul:1.5.0"
   #   # Consul Enterprise 1.5.0
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
-  image: "consul:1.6.2"
+  image: "consul:1.7.1"
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as catalog sync. This can be overridden
@@ -40,7 +40,8 @@ global:
   # remove these checks to make the sync work.
   # If using bootstrapACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
-  imageK8S: "hashicorp/consul-k8s:0.11.0"
+  # If using Consul Enterprise namespaces, must be >= 0.12.
+  imageK8S: "hashicorp/consul-k8s:0.12.0"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -110,6 +111,14 @@ global:
     # If httpsOnly is true, Consul will disable the HTTP port on both
     # clients and servers and only accept HTTPS connections.
     httpsOnly: true
+
+  # [Enterprise Only] enableConsulNamespaces indicates that you are running
+  # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would like to
+  # make use of configuration beyond registering everything into the `default` Consul
+  # namespace. Requires consul-k8s v0.12+.
+  # Additional configuration options are found in the `consulNamespaces` section
+  # of both the catalog sync and connect injector.
+  enableConsulNamespaces: false
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -412,10 +421,61 @@ syncCatalog:
   # prepended with "consul-". (Consul -> Kubernetes sync)
   k8sPrefix: null
 
+  # k8sAllowNamespaces is a list of k8s namespaces to sync the k8s services from.
+  # If a k8s namespace is not included  in this list or is listed in `k8sDenyNamespaces`,
+  # services in that k8s namespace will not be synced even if they are explicitly
+  # annotated. Use ["*"] to automatically allow all k8s namespaces.
+  #
+  # For example, ["namespace1", "namespace2"] will only allow services in the k8s
+  # namespaces `namespace1` and `namespace2` to be synced and registered
+  # with Consul. All other k8s namespaces will be ignored.
+  #
+  # To deny all namespaces, set this to [].
+  #
+  # Note: `k8sDenyNamespaces` takes precedence over values defined here.
+  # Requires consul-k8s v0.12+
+  k8sAllowNamespaces: ["*"]
+
+  # k8sDenyNamespaces is a list of k8s namespaces that should not have their
+  # services synced. This list takes precedence over `k8sAllowNamespaces`.
+  # `*` is not supported because then nothing would be allowed to sync.
+  # Requires consul-k8s v0.12+.
+  #
+  # For example, if `k8sAllowNamespaces` is `["*"]` and `k8sDenyNamespaces` is
+  # `["namespace1", "namespace2"]`, then all k8s namespaces besides "namespace1"
+  # and "namespace2" will be synced.
+  k8sDenyNamespaces: ["kube-system", "kube-public"]
+
+  # [DEPRECATED] Use k8sAllowNamespaces and k8sDenyNamespaces instead. For
+  # backwards compatibility, if both this and the allow/deny lists are set,
+  # the allow/deny lists will be ignored.
   # k8sSourceNamespace is the Kubernetes namespace to watch for service
   # changes and sync to Consul. If this is not set then it will default
   # to all namespaces.
   k8sSourceNamespace: null
+
+  # [Enterprise Only] These settings manage the catalog sync's interaction with
+  # Consul namespaces (requires consul-ent v1.7+ and consul-k8s v0.12+).
+  # Also, `global.enableConsulNamespaces` must be true.
+  consulNamespaces:
+    # consulDestinationNamespace is the name of the Consul namespace to register all
+    # k8s services into. If the Consul namespace does not already exist,
+    # it will be created. This will be ignored if `mirroringK8S` is true.
+    consulDestinationNamespace: "default"
+
+    # mirroringK8S causes k8s services to be registered into a Consul namespace
+    # of the same name as their k8s namespace, optionally prefixed if
+    # `mirroringK8SPrefix` is set below. If the Consul namespace does not
+    # already exist, it will be created. Turning this on overrides the
+    # `consulDestinationNamespace` setting.
+    # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
+    mirroringK8S: false
+
+    # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
+    # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+    # service in the k8s `staging` namespace will be registered into the
+    # `k8s-staging` Consul namespace.
+    mirroringK8SPrefix: ""
 
   # addK8SNamespaceSuffix appends Kubernetes namespace suffix to
   # each service name synced to Consul, separated by a dash.
@@ -499,6 +559,58 @@ connectInject:
   #     namespace-label: label-value
   namespaceSelector: null
 
+  # k8sAllowNamespaces is a list of k8s namespaces to allow Connect sidecar
+  # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
+  # pods in that k8s namespace will not be injected even if they are explicitly
+  # annotated. Use ["*"] to automatically allow all k8s namespaces.
+  #
+  # For example, ["namespace1", "namespace2"] will only allow pods in the k8s
+  # namespaces `namespace1` and `namespace2` to have Connect sidecars injected
+  # and registered with Consul. All other k8s namespaces will be ignored.
+  #
+  # To deny all namespaces, set this to [].
+  #
+  # Note: `k8sDenyNamespaces` takes precedence over values defined here and
+  # `namespaceSelector` takes precedence over both since it is applied first.
+  # `kube-system` and `kube-public` are never injected, even if included here.
+  # Requires consul-k8s v0.12+
+  k8sAllowNamespaces: ["*"]
+
+  # k8sDenyNamespaces is a list of k8s namespaces that should not allow Connect
+  # sidecar injection. This list takes precedence over `k8sAllowNamespaces`.
+  # `*` is not supported because then nothing would be allowed to be injected.
+  #
+  # For example, if `k8sAllowNamespaces` is `["*"]` and k8sDenyNamespaces is
+  # `["namespace1", "namespace2"]`, then all k8s namespaces besides "namespace1"
+  # and "namespace2" will be available for injection.
+  #
+  # Note: `namespaceSelector` takes precedence over this since it is applied first.
+  # `kube-system` and `kube-public` are never injected.
+  # Requires consul-k8s v0.12+.
+  k8sDenyNamespaces: []
+
+  # [Enterprise Only] These settings manage the connect injector's interaction with
+  # Consul namespaces (requires consul-ent v1.7+ and consul-k8s v0.12+).
+  # Also, `global.enableConsulNamespaces` must be true.
+  consulNamespaces:
+    # consulDestinationNamespace is the name of the Consul namespace to register all
+    # k8s pods into. If the Consul namespace does not already exist,
+    # it will be created. This will be ignored if `mirroringK8S` is true.
+    consulDestinationNamespace: "default"
+
+    # mirroringK8S causes k8s pods to be registered into a Consul namespace
+    # of the same name as their k8s namespace, optionally prefixed if
+    # `mirroringK8SPrefix` is set below. If the Consul namespace does not
+    # already exist, it will be created. Turning this on overrides the
+    # `consulDestinationNamespace` setting.
+    mirroringK8S: false
+
+    # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
+    # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+    # pod in the k8s `staging` namespace will be registered into the
+    # `k8s-staging` Consul namespace.
+    mirroringK8SPrefix: ""
+
   # The certs section configures how the webhook TLS certs are configured.
   # These are the TLS certs for the Kube apiserver communicating to the
   # webhook. By default, the injector will generate and manage its own certs,
@@ -546,6 +658,16 @@ connectInject:
   # If not using global.bootstrapACLs and instead manually setting up an auth
   # method for Connect inject, set this to the name of your auth method.
   overrideAuthMethodName: ""
+
+  # aclInjectToken refers to a Kubernetes secret that you have created that contains
+  # an ACL token for your Consul cluster which allows the Connect injector the correct
+  # permissions. This is only needed if Consul namespaces [Enterprise only] and ACLs
+  # are enabled on the Consul cluster and you are not setting `global.bootstrapACLs`
+  # to `true`. This token needs to have `operator = "write"` privileges to be able to
+  # create Consul namespaces.
+  aclInjectToken:
+    secretName: null
+    secretKey: null
 
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
@@ -639,8 +761,8 @@ meshGateway:
     # Optional YAML string that will be appended to the Service spec.
     additionalSpec: null
 
-  # Envoy image to use.
-  imageEnvoy: envoyproxy/envoy:v1.10.0
+  # Envoy image to use. For Consul v1.7+, Envoy version 1.13+ is required.
+  imageEnvoy: envoyproxy/envoy:v1.13.0
 
   # If set to true, gateway Pods will run on the host network.
   hostNetwork: false

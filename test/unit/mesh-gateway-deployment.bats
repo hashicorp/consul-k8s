@@ -274,7 +274,7 @@ key2: value2' \
       --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "envoyproxy/envoy:v1.10.0" ]
+  [ "${actual}" = "envoyproxy/envoy:v1.13.0" ]
 }
 
 @test "meshGateway/Deployment: envoy image can be set" {
