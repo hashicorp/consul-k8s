@@ -14,27 +14,47 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 	if h.AuthMethod != "" {
 		command = append(command, "-token-file=/consul/connect-inject/acl-token")
 	}
-	if h.ConsulCACert != "" {
-		command = append(command, "-http-addr", "https://${HOST_IP}:8501")
-		command = append(command, "-ca-file", "/consul/connect-inject/consul-ca.pem")
-	} else {
-		command = append(command, "-http-addr", "${HOST_IP}:8500")
-	}
+
 	if period, ok := pod.Annotations[annotationSyncPeriod]; ok {
 		command = append(command, "-sync-period="+strings.TrimSpace(period))
+	}
+
+	envVariables := []corev1.EnvVar{
+		{
+			Name: "HOST_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+			},
+		},
+	}
+
+	if h.ConsulCACert != "" {
+		envVariables = append(envVariables,
+			// Kubernetes will interpolate HOST_IP when creating this environment
+			// variable.
+			corev1.EnvVar{
+				Name:  "CONSUL_HTTP_ADDR",
+				Value: "https://$(HOST_IP):8501",
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_CACERT",
+				Value: "/consul/connect-inject/consul-ca.pem",
+			},
+		)
+	} else {
+		envVariables = append(envVariables,
+			// Kubernetes will interpolate HOST_IP when creating this environment
+			// variable.
+			corev1.EnvVar{
+				Name:  "CONSUL_HTTP_ADDR",
+				Value: "$(HOST_IP):8500",
+			})
 	}
 
 	return corev1.Container{
 		Name:  "consul-connect-lifecycle-sidecar",
 		Image: h.ImageConsulK8S,
-		Env: []corev1.EnvVar{
-			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
-		},
+		Env:   envVariables,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,

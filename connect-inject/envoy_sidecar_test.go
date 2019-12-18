@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestHandlerContainerSidecar(t *testing.T) {
+func TestHandlerEnvoySidecar(t *testing.T) {
 	require := require.New(t)
 	h := Handler{}
 	pod := &corev1.Pod{
@@ -62,7 +62,7 @@ func TestHandlerContainerSidecar(t *testing.T) {
 
 // Test that if AuthMethod is set
 // the preStop command includes a token
-func TestHandlerContainerSidecar_AuthMethod(t *testing.T) {
+func TestHandlerEnvoySidecar_AuthMethod(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
 		AuthMethod: "test-auth-method",
@@ -96,7 +96,7 @@ func TestHandlerContainerSidecar_AuthMethod(t *testing.T) {
 // If Consul CA cert is set,
 // Consul addresses should use HTTPS
 // and CA cert should be set as env variable
-func TestHandlerContainerSidecar_WithTLS(t *testing.T) {
+func TestHandlerEnvoySidecar_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
 		ConsulCACert: "consul-ca-cert",

@@ -37,6 +37,10 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
 				},
 			},
+			{
+				Name:  "CONSUL_HTTP_ADDR",
+				Value: "$(HOST_IP):8500",
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -47,7 +51,6 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 		Command: []string{
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
-			"-http-addr", "${HOST_IP}:8500",
 		},
 	}, container)
 }
@@ -136,6 +139,14 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
 				},
 			},
+			{
+				Name:  "CONSUL_HTTP_ADDR",
+				Value: "https://$(HOST_IP):8501",
+			},
+			{
+				Name:  "CONSUL_CACERT",
+				Value: "/consul/connect-inject/consul-ca.pem",
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -146,8 +157,6 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 		Command: []string{
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
-			"-http-addr", "https://${HOST_IP}:8501",
-			"-ca-file", "/consul/connect-inject/consul-ca.pem",
 		},
 	}, container)
 }
