@@ -38,7 +38,7 @@ type Command struct {
 	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
-	flagConsulCACert    string // CA Certificate to use when communicating with Consul clients
+	flagConsulCACert    string // Path to CA Certificate to use when communicating with Consul clients
 	flagSet             *flag.FlagSet
 
 	once sync.Once
