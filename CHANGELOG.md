@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+Improvements:
+
+* Connect: Add TLS support [[GH-181](https://github.com/hashicorp/consul-k8s/pull/181)].
 
 ## 0.10.1 (December 17, 2019)
 
