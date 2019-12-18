@@ -25,4 +25,13 @@ rules:
   verbs:
   - use
 {{- end }}
+{{- if and .Values.global.bootstrapACLs .Values.global.enableConsulNamespaces }}
+- apiGroups: [""]
+  resources:
+    - secrets
+  resourceNames:
+    - {{ template "consul.fullname" . }}-connect-inject-acl-token
+  verbs:
+    - get
+{{- end }}
 {{- end }}

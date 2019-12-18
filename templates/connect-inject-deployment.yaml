@@ -41,6 +41,35 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- /* A Consul client and ACL token is only necessary for the connect injector if namespaces are enabled */}}
+            {{- if .Values.global.enableConsulNamespaces }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            {{- if (and .Values.connectInject.aclInjectToken.secretName .Values.connectInject.aclInjectToken.secretKey) }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.connectInject.aclInjectToken.secretName }}
+                  key: {{ .Values.connectInject.aclInjectToken.secretKey }}
+            {{- else if .Values.global.bootstrapACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "consul.fullname" . }}-connect-inject-acl-token"
+                  key: "token"
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -60,6 +89,7 @@ spec:
                 {{- else if .Values.global.bootstrapACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
                 {{- end }}
+
                 {{- if .Values.global.tls.enabled }}
                 -consul-ca-cert=/consul/tls/ca/tls.crt \
                 {{- end }}
@@ -68,6 +98,27 @@ spec:
                 {{- end }}
                 {{- if (and .Values.connectInject.centralConfig.enabled .Values.connectInject.centralConfig.defaultProtocol) }}
                 -default-protocol="{{ .Values.connectInject.centralConfig.defaultProtocol }}" \
+                {{- end }}
+                {{- range $value := .Values.connectInject.k8sAllowNamespaces }}
+                -allow-k8s-namespace="{{ $value }}" \
+                {{- end }}
+                {{- range $value := .Values.connectInject.k8sDenyNamespaces }}
+                -deny-k8s-namespace="{{ $value }}" \
+                {{- end }}
+                {{- if .Values.global.enableConsulNamespaces }}
+                -enable-namespaces=true \
+                {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+                -consul-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
+                {{- end }}
+                {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+                -enable-k8s-namespace-mirroring=true \
+                {{- if .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}
+                -k8s-namespace-mirroring-prefix={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }} \
+                {{- end }}
+                {{- end }}
+                {{- if .Values.global.bootstrapACLs }}
+                -consul-cross-namespace-acl-policy=cross-namespace-policy \
+                {{- end }}
                 {{- end }}
                 {{- if .Values.connectInject.certs.secretName }}
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
@@ -121,6 +172,19 @@ spec:
           secret:
             secretName: {{ template "consul.fullname" . }}-ca-cert
         {{- end }}
+      {{- end }}
+      {{- if and .Values.global.bootstrapACLs .Values.global.enableConsulNamespaces }}
+      initContainers:
+      - name: injector-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ template "consul.fullname" . }}-connect-inject-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }} \
+              -init-type="sync"
       {{- end }}
       {{- if .Values.connectInject.nodeSelector }}
       nodeSelector:
