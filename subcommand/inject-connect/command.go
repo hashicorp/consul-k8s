@@ -71,7 +71,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to CA certificate to use when communicating with Consul clients.")
+		"Path to CA certificate to use if communicating with Consul clients over HTTPS.")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
