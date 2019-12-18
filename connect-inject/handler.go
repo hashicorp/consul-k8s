@@ -120,7 +120,8 @@ type Handler struct {
 	DefaultProtocol string
 
 	// The PEM-encoded CA certificate string
-	// to use when communicating with Consul clients
+	// to use when communicating with Consul clients over HTTPS.
+	// If not set, will use HTTP.
 	ConsulCACert string
 
 	// Log
