@@ -1,20 +1,25 @@
 package serveraclinit
 
 import (
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/tlsutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -1146,9 +1151,65 @@ func TestRun_Timeout(t *testing.T) {
 	require.Equal(1, responseCode, ui.ErrorWriter.String())
 }
 
+// Test that the bootstrapping process can make calls to Consul API over HTTPS
+// when the consul agent is configured with HTTPS only (HTTP disabled).
+func TestRun_HTTPS(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+
+	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	defer cleanup()
+
+	agentConfig := fmt.Sprintf(`
+		primary_datacenter = "dc1"
+		acl {
+			enabled = true
+		}
+		ca_file = "%s"
+		cert_file = "%s"
+		key_file = "%s"`, caFile, certFile, keyFile)
+
+	a := &agent.TestAgent{
+		Name:   t.Name(),
+		HCL:    agentConfig,
+		UseTLS: true, // this also disables HTTP port
+	}
+
+	a.Start()
+	defer a.Shutdown()
+
+	createTestK8SResources(t, k8s, a, resourcePrefix, "https")
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	responseCode := cmd.Run([]string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-use-https",
+		"-consul-tls-server-name", "server.dc1.consul",
+		"-consul-ca-cert", caFile,
+		"-expected-replicas=1",
+	})
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Test that the bootstrap token is created to make sure the bootstrapping succeeded.
+	// The presence of the bootstrap token tells us that the API calls to Consul have been successful.
+	tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+	require.NoError(err)
+	require.NotNil(tokenSecret)
+	_, ok := tokenSecret.Data["token"]
+	require.True(ok)
+}
+
 // Set up test consul agent and kubernetes cluster.
 func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAgent) {
-	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
 	a := agent.NewTestAgent(t, t.Name(), `
@@ -1157,6 +1218,14 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAge
 		enabled = true
 	}`)
 
+	createTestK8SResources(t, k8s, a, prefix, "http")
+
+	return k8s, a
+}
+
+// Create test k8s resources (server pods and server stateful set)
+func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgent, prefix, scheme string) {
+	require := require.New(t)
 	consulURL, err := url.Parse("http://" + a.HTTPAddr())
 	require.NoError(err)
 	port, err := strconv.Atoi(consulURL.Port())
@@ -1181,7 +1250,7 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAge
 					Name: "consul",
 					Ports: []v1.ContainerPort{
 						{
-							Name:          "http",
+							Name:          scheme,
 							ContainerPort: int32(port),
 						},
 					},
@@ -1207,7 +1276,6 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAge
 		},
 	})
 	require.NoError(err)
-	return k8s, a
 }
 
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
@@ -1219,6 +1287,63 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string) string {
 	bootToken, ok := bootstrapSecret.Data["token"]
 	require.True(t, ok)
 	return string(bootToken)
+}
+
+// generateServerCerts generates Consul CA
+// and a server certificate and saves them to temp files.
+// It returns file names in this order:
+// CA certificate, server certificate, and server key.
+// Note that it's the responsibility of the caller to
+// remove the temporary files created by this function.
+func generateServerCerts(t *testing.T) (string, string, string, func()) {
+	require := require.New(t)
+
+	caFile, err := ioutil.TempFile("", "ca")
+	require.NoError(err)
+
+	certFile, err := ioutil.TempFile("", "cert")
+	require.NoError(err)
+
+	certKeyFile, err := ioutil.TempFile("", "key")
+	require.NoError(err)
+
+	// Generate CA
+	sn, err := tlsutil.GenerateSerialNumber()
+	require.NoError(err)
+
+	s, _, err := tlsutil.GeneratePrivateKey()
+	require.NoError(err)
+
+	constraints := []string{"consul", "localhost"}
+	ca, err := tlsutil.GenerateCA(s, sn, 1, constraints)
+	require.NoError(err)
+
+	// Generate Server Cert
+	name := fmt.Sprintf("server.%s.%s", "dc1", "consul")
+	DNSNames := []string{name, "localhost"}
+	IPAddresses := []net.IP{net.ParseIP("127.0.0.1")}
+	extKeyUsage := []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+
+	sn, err = tlsutil.GenerateSerialNumber()
+	require.NoError(err)
+
+	pub, priv, err := tlsutil.GenerateCert(s, ca, sn, name, 1, DNSNames, IPAddresses, extKeyUsage)
+	require.NoError(err)
+
+	// Write certs and key to files
+	_, err = caFile.WriteString(ca)
+	require.NoError(err)
+	_, err = certFile.WriteString(pub)
+	require.NoError(err)
+	_, err = certKeyFile.WriteString(priv)
+	require.NoError(err)
+
+	cleanupFunc := func() {
+		os.Remove(caFile.Name())
+		os.Remove(certFile.Name())
+		os.Remove(certKeyFile.Name())
+	}
+	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="

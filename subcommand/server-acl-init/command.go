@@ -42,6 +42,9 @@ type Command struct {
 	flagCreateMeshGatewayToken   bool
 	flagLogLevel                 string
 	flagTimeout                  string
+	flagConsulCACert             string
+	flagConsulTLSServerName      string
+	flagUseHTTPS                 bool
 
 	clientset kubernetes.Interface
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -82,6 +85,12 @@ func (c *Command) init() {
 		"Toggle for creating a token for a Connect mesh gateway")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
+	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to the PEM-encoded CA certificate of the Consul cluster.")
+	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
+		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
+	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -162,6 +171,10 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	scheme := "http"
+	if c.flagUseHTTPS {
+		scheme = "https"
+	}
 	// Wait if there's a rollout of servers.
 	ssName := c.withPrefix("server")
 	err = c.untilSucceeds(fmt.Sprintf("waiting for rollout of statefulset %s", ssName), func() error {
@@ -196,7 +209,7 @@ func (c *Command) Run(args []string) int {
 		logger.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
 	} else {
 		logger.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName)
+		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName, scheme)
 		if err != nil {
 			logger.Error(err.Error())
 			return 1
@@ -204,7 +217,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// For all of the next operations we'll need a Consul client.
-	serverPods, err := c.getConsulServers(logger, 1)
+	serverPods, err := c.getConsulServers(logger, 1, scheme)
 	if err != nil {
 		logger.Error(err.Error())
 		return 1
@@ -212,8 +225,12 @@ func (c *Command) Run(args []string) int {
 	serverAddr := serverPods[0].Addr
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
-		Scheme:  "http",
-		Token:   string(bootstrapToken),
+		Scheme:  scheme,
+		Token:   bootstrapToken,
+		TLSConfig: api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		},
 	})
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
@@ -312,7 +329,7 @@ func (c *Command) configureKubeClient() error {
 
 // getConsulServers returns n Consul server pods with their http addresses.
 // If there are less server pods than 'n' then the function will wait.
-func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error) {
+func (c *Command) getConsulServers(logger hclog.Logger, n int, scheme string) ([]podAddr, error) {
 	var serverPods *apiv1.PodList
 	err := c.untilSucceeds("discovering Consul server pods",
 		func() error {
@@ -345,12 +362,12 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 	for _, pod := range serverPods.Items {
 		var httpPort int32
 		for _, p := range pod.Spec.Containers[0].Ports {
-			if p.Name == "http" {
+			if p.Name == scheme {
 				httpPort = p.ContainerPort
 			}
 		}
 		if httpPort == 0 {
-			return nil, fmt.Errorf("pod %s has no port labeled 'http'", pod.Name)
+			return nil, fmt.Errorf("pod %s has no port labeled '%s'", pod.Name, scheme)
 		}
 		addr := fmt.Sprintf("%s:%d", pod.Status.PodIP, httpPort)
 		podAddrs = append(podAddrs, podAddr{
@@ -362,8 +379,8 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 }
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName string) (string, error) {
-	serverPods, err := c.getConsulServers(logger, c.flagReplicas)
+func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName, scheme string) (string, error) {
+	serverPods, err := c.getConsulServers(logger, c.flagReplicas, scheme)
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +390,11 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	firstServerAddr := serverPods[0].Addr
 	consulClient, err := api.NewClient(&api.Config{
 		Address: firstServerAddr,
-		Scheme:  "http",
+		Scheme:  scheme,
+		TLSConfig: api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
@@ -434,15 +455,19 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	// set.
 	consulClient, err = api.NewClient(&api.Config{
 		Address: firstServerAddr,
-		Scheme:  "http",
+		Scheme:  scheme,
 		Token:   string(bootstrapToken),
+		TLSConfig: api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 	}
 
 	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(logger, consulClient, serverPods, string(bootstrapToken)); err != nil {
+	if err := c.setServerTokens(logger, consulClient, serverPods, string(bootstrapToken), scheme); err != nil {
 		return "", err
 	}
 	return string(bootstrapToken), nil
@@ -451,7 +476,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 // setServerTokens creates policies and associated ACL token for each server
 // and then provides the token to the server.
 func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
-	serverPods []podAddr, bootstrapToken string) error {
+	serverPods []podAddr, bootstrapToken, scheme string) error {
 	// Create agent policy.
 	agentPolicy := api.ACLPolicy{
 		Name:        "agent-token",
@@ -497,8 +522,12 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 		// server specifically.
 		serverClient, err := api.NewClient(&api.Config{
 			Address: pod.Addr,
-			Scheme:  "http",
+			Scheme:  scheme,
 			Token:   bootstrapToken,
+			TLSConfig: api.TLSConfig{
+				Address: c.flagConsulTLSServerName,
+				CAFile:  c.flagConsulCACert,
+			},
 		})
 		if err != nil {
 			return fmt.Errorf(" creating Consul client for address %q: %s", pod.Addr, err)
