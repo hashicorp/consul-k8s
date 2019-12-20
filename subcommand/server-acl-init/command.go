@@ -35,16 +35,24 @@ type Command struct {
 	flagAllowDNS                 bool
 	flagCreateClientToken        bool
 	flagCreateSyncToken          bool
+	flagCreateInjectToken        bool
 	flagCreateInjectAuthMethod   bool
 	flagBindingRuleSelector      string
 	flagCreateEntLicenseToken    bool
 	flagCreateSnapshotAgentToken bool
 	flagCreateMeshGatewayToken   bool
-	flagLogLevel                 string
-	flagTimeout                  string
 	flagConsulCACert             string
 	flagConsulTLSServerName      string
 	flagUseHTTPS                 bool
+
+	// Flags to support namespaces
+	flagEnableNamespaces    bool   // Use namespacing on all components
+	flagConsulSyncNamespace string // Consul namespace to register all catalog sync services into if not mirroring
+	flagEnableNSMirroring   bool   // Enables mirroring of k8s namespaces into Consul
+	flagMirroringPrefix     string // Prefix added to Consul namespaces created when mirroring
+
+	flagLogLevel string
+	flagTimeout  string
 
 	clientset kubernetes.Interface
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -73,8 +81,12 @@ func (c *Command) init() {
 		"Toggle for creating a client agent token")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token")
+	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
+		"Toggle for creating a connect injector token. Only required when namespaces are enabled")
+	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
+		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
-		"Toggle for creating a connect inject token")
+		"Toggle for creating a connect inject auth method")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule")
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
@@ -83,14 +95,22 @@ func (c *Command) init() {
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway")
-	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
-		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
+	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
+		"Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
+	c.flags.StringVar(&c.flagConsulSyncNamespace, "consul-sync-namespace", "default",
+		"Defines which Consul namespace to have catalog sync register services into. If `-enable-namespace-mirroring` "+
+			"is true, this is not used.")
+	c.flags.BoolVar(&c.flagEnableNSMirroring, "enable-namespace-mirroring", false, "Enables namespace mirroring")
+	c.flags.StringVar(&c.flagMirroringPrefix, "mirroring-prefix", "",
+		"Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
+		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -238,7 +258,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateClientToken {
-		err := c.createACL("client", agentRules, consulClient, logger)
+		agentRules, err := c.agentRules()
+		if err != nil {
+			logger.Error("Error templating client agent rules", "err", err)
+			return 1
+		}
+
+		err = c.createACL("client", agentRules, consulClient, logger)
 		if err != nil {
 			logger.Error(err.Error())
 			return 1
@@ -254,7 +280,27 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateSyncToken {
-		err := c.createACL("catalog-sync", syncRules, consulClient, logger)
+		syncRules, err := c.syncRules()
+		if err != nil {
+			logger.Error("Error templating sync rules", "err", err)
+			return 1
+		}
+
+		err = c.createACL("catalog-sync", syncRules, consulClient, logger)
+		if err != nil {
+			logger.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateInjectToken {
+		injectRules, err := c.injectRules()
+		if err != nil {
+			logger.Error("Error templating inject rules", "err", err)
+			return 1
+		}
+
+		err = c.createACL("connect-inject", injectRules, consulClient, logger)
 		if err != nil {
 			logger.Error(err.Error())
 			return 1
@@ -278,7 +324,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateMeshGatewayToken {
-		err := c.createACL("mesh-gateway", meshGatewayRules, consulClient, logger)
+		meshGatewayRules, err := c.meshGatewayRules()
+		if err != nil {
+			logger.Error("Error templating dns rules", "err", err)
+			return 1
+		}
+
+		err = c.createACL("mesh-gateway", meshGatewayRules, consulClient, logger)
 		if err != nil {
 			logger.Error(err.Error())
 			return 1
@@ -477,13 +529,20 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName, sch
 // and then provides the token to the server.
 func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	serverPods []podAddr, bootstrapToken, scheme string) error {
+
+	agentRules, err := c.agentRules()
+	if err != nil {
+		logger.Error("Error templating server agent rules", "err", err)
+		return err
+	}
+
 	// Create agent policy.
 	agentPolicy := api.ACLPolicy{
 		Name:        "agent-token",
 		Description: "Agent Token Policy",
 		Rules:       agentRules,
 	}
-	err := c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
+	err = c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
 		func() error {
 			_, _, err := consulClient.ACL().PolicyCreate(&agentPolicy, nil)
 			if isPolicyExistsErr(err, agentPolicy.Name) {
@@ -614,6 +673,12 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 // configureDNSPolicies sets up policies and tokens so that Consul DNS will
 // work.
 func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Client) error {
+	dnsRules, err := c.dnsRules()
+	if err != nil {
+		logger.Error("Error templating dns rules", "err", err)
+		return err
+	}
+
 	// Create policy for the anonymous token
 	dnsPolicy := api.ACLPolicy{
 		Name:        "dns-policy",
@@ -621,7 +686,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 		Rules:       dnsRules,
 	}
 
-	err := c.untilSucceeds("creating dns policy - PUT /v1/acl/policy",
+	err = c.untilSucceeds("creating dns policy - PUT /v1/acl/policy",
 		func() error {
 			_, _, err := consulClient.ACL().PolicyCreate(&dnsPolicy, nil)
 			if isPolicyExistsErr(err, dnsPolicy.Name) {
@@ -720,11 +785,27 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 			"ServiceAccountJWT": string(saSecret.Data["token"]),
 		},
 	}
+
+	// Add options for mirroring namespaces
+	if c.flagEnableNSMirroring {
+		authMethodTmpl.Config["MapNamespaces"] = true
+		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagMirroringPrefix
+	}
+
+	// Set up the auth method in the specific namespace if not mirroring
+	// If namespaces and mirroring are enabled, this is not necessary because
+	// the auth method will fall back to being created in the Consul `default`
+	// namespace automatically, as is necessary for mirroring.
+	writeOptions := api.WriteOptions{}
+	if c.flagEnableNamespaces && !c.flagEnableNSMirroring {
+		writeOptions.Namespace = c.flagConsulSyncNamespace
+	}
+
 	var authMethod *api.ACLAuthMethod
 	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
 			var err error
-			authMethod, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &api.WriteOptions{})
+			authMethod, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
 			return err
 		}, logger)
 	if err != nil {
@@ -739,6 +820,15 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 		BindName:    "${serviceaccount.name}",
 		Selector:    c.flagBindingRuleSelector,
 	}
+
+	// Add a namespace if appropriate
+	// If namespaces and mirroring are enabled, this is not necessary because
+	// the binding rule will fall back to being created in the Consul `default`
+	// namespace automatically, as is necessary for mirroring.
+	if c.flagEnableNamespaces && !c.flagEnableNSMirroring {
+		abr.Namespace = c.flagConsulSyncNamespace
+	}
+
 	return c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
 		func() error {
 			_, _, err := consulClient.ACL().BindingRuleCreate(&abr, nil)
@@ -815,51 +905,3 @@ Usage: consul-k8s server-acl-init [options]
   and safe to run multiple times.
 
 `
-
-// ACL rules
-const agentRules = `node_prefix "" {
-   policy = "write"
-}
-service_prefix "" {
-   policy = "read"
-}`
-
-const dnsRules = `node_prefix "" {
-   policy = "read"
-}
-service_prefix "" {
-   policy = "read"
-}`
-
-const syncRules = `node_prefix "" {
-   policy = "read"
-}
-node "k8s-sync" {
-	policy = "write"
-}
-service_prefix "" {
-   policy = "write"
-}`
-
-const snapshotAgentRules = `acl = "write"
-key "consul-snapshot/lock" {
-   policy = "write"
-}
-session_prefix "" {
-   policy = "write"
-}
-service "consul-snapshot" {
-   policy = "write"
-}`
-
-// This assumes users are using the default name for the service, i.e.
-// "mesh-gateway".
-const meshGatewayRules = `service_prefix "" {
-   policy = "read"
-}
-
-service "mesh-gateway" {
-   policy = "write"
-}`
-
-const entLicenseRules = `operator = "write"`
