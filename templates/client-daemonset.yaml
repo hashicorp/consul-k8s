@@ -122,6 +122,7 @@ spec:
                 -advertise="${ADVERTISE_IP}" \
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
+                -node-meta=pod-name:${HOSTNAME} \
                 {{- if .Values.client.grpc }}
                 -hcl="ports { grpc = 8502 }" \
                 {{- end }}
