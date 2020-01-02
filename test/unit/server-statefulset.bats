@@ -383,7 +383,7 @@ load _helpers
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet when servers are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enabled=false' \
       --set 'global.gossipEncryption.secretName=foo' \
       --set 'global.gossipEncryption.secretKey=bar' \
