@@ -5,7 +5,7 @@ load _helpers
 @test "server/EnterpriseLicense: disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -14,7 +14,7 @@ load _helpers
 @test "server/EnterpriseLicense: disabled when servers are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
@@ -26,7 +26,7 @@ load _helpers
 @test "server/EnterpriseLicense: disabled when secretName is missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -36,7 +36,7 @@ load _helpers
 @test "server/EnterpriseLicense: disabled when secretKey is missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -46,7 +46,7 @@ load _helpers
 @test "server/EnterpriseLicense: enabled when secretName and secretKey is provided" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -60,7 +60,7 @@ load _helpers
 @test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.bootstrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml \
+      -x templates/enterprise-license-job.yaml \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.bootstrapACLs=true' \
@@ -72,7 +72,7 @@ load _helpers
 @test "server/EnterpriseLicense: init container is created when global.bootstrapACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.bootstrapACLs=true' \
@@ -91,7 +91,7 @@ load _helpers
 @test "server/EnterpriseLicense: no service account specified when global.bootstrapACLS=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -102,7 +102,7 @@ load _helpers
 @test "server/EnterpriseLicense: service account specified when global.bootstrapACLS=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license.yaml  \
+      -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.bootstrapACLs=true' \
