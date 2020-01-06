@@ -38,5 +38,13 @@ rules:
     verbs:
       - get
 {{- end }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-server-acl-init
+    verbs:
+      - use
+{{- end }}
 {{- end }}
 {{- end }}
