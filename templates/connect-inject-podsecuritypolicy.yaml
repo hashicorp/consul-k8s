@@ -27,7 +27,6 @@ spec:
   hostIPC: false
   hostPID: false
   runAsUser:
-    # Require the container to run without root privileges.
     rule: 'RunAsAny'
   seLinux:
     rule: 'RunAsAny'
