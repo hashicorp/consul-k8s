@@ -13,5 +13,13 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "delete"]
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-server-acl-init-cleanup
+    verbs:
+      - use
+{{- end }}
 {{- end }}
 {{- end }}
