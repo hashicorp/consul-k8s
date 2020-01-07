@@ -46,7 +46,8 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			`/bin/sh -ec export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 
 # Register the service. The HCL is stored in the volume so that
@@ -623,6 +624,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 
 /bin/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
@@ -678,6 +680,7 @@ EOF
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 /bin/consul config write -cas -modify-index 0 \
   -token-file="/consul/connect-inject/acl-token" \
   /consul/connect-inject/service-defaults.hcl || true
@@ -731,4 +734,42 @@ EOF`)
 /bin/consul config write -cas -modify-index 0 \
   -token-file="/consul/connect-inject/acl-token" \
   /consul/connect-inject/service-defaults.hcl || true`)
+}
+
+// If Consul CA cert is set,
+// Consul addresses should use HTTPS
+// and CA cert should be set as env variable
+func TestHandlerContainerInit_WithTLS(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		ConsulCACert: "consul-ca-cert",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+consul-ca-cert
+EOF`)
+	require.NotContains(actual, `
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 }

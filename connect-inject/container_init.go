@@ -24,6 +24,10 @@ type initContainerCommandData struct {
 	Upstreams            []initContainerCommandUpstreamData
 	Tags                 string
 	Meta                 map[string]string
+
+	// The PEM-encoded CA certificate to use when
+	// communicating with Consul clients
+	ConsulCACert string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -52,6 +56,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		ServiceProtocol:      protocol,
 		AuthMethod:           h.AuthMethod,
 		WriteServiceDefaults: writeServiceDefaults,
+		ConsulCACert:         h.ConsulCACert,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -199,8 +204,17 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
+{{- if .ConsulCACert}}
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+{{ .ConsulCACert }}
+EOF
+{{- else}}
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+{{- end}}
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -291,6 +305,9 @@ EOF
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
+       as non-root user consul-k8s. */}}
+chmod 444 /consul/connect-inject/acl-token
 {{- end }}
 {{- if .WriteServiceDefaults }}
 {{- /* We use -cas and -modify-index 0 so that if a service-defaults config

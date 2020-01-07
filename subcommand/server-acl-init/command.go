@@ -29,6 +29,8 @@ type Command struct {
 	flags                        *flag.FlagSet
 	k8s                          *k8sflags.K8SFlags
 	flagReleaseName              string
+	flagServerLabelSelector      string
+	flagResourcePrefix           string
 	flagReplicas                 int
 	flagNamespace                string
 	flagAllowDNS                 bool
@@ -58,7 +60,11 @@ type Command struct {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagReleaseName, "release-name", "",
-		"Name of Consul Helm release")
+		"Name of Consul Helm release. Deprecated: Use -server-label-selector=component=server,app=consul,release=<release-name> instead")
+	c.flags.StringVar(&c.flagServerLabelSelector, "server-label-selector", "",
+		"Selector (label query) to select Consul server statefulset pods, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2)")
+	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
+		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
 	c.flags.IntVar(&c.flagReplicas, "expected-replicas", 1,
 		"Number of expected Consul server replicas")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
@@ -81,6 +87,12 @@ func (c *Command) init() {
 		"Toggle for creating a token for a Connect mesh gateway")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
+	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to the PEM-encoded CA certificate of the Consul cluster.")
+	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
+		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
+	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
+		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -129,6 +141,23 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
 		return 1
 	}
+	if c.flagReleaseName != "" && c.flagServerLabelSelector != "" {
+		c.UI.Error("-release-name and -server-label-selector cannot both be set")
+		return 1
+	}
+	if c.flagServerLabelSelector != "" && c.flagResourcePrefix == "" {
+		c.UI.Error("if -server-label-selector is set -resource-prefix must also be set")
+		return 1
+	}
+	if c.flagReleaseName == "" && c.flagServerLabelSelector == "" {
+		c.UI.Error("-release-name or -server-label-selector must be set")
+		return 1
+	}
+	// If only the -release-name is set, we use it as the label selector.
+	if c.flagReleaseName != "" {
+		c.flagServerLabelSelector = fmt.Sprintf("app=consul,component=server,release=%s", c.flagReleaseName)
+	}
+
 	var cancel context.CancelFunc
 	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), timeout)
 	// The context will only ever be intentionally ended by the timeout.
@@ -153,18 +182,26 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	scheme := "http"
+	if c.flagUseHTTPS {
+		scheme = "https"
+	}
 	// Wait if there's a rollout of servers.
-	ssName := c.flagReleaseName + "-consul-server"
+	ssName := c.withPrefix("server")
 	err = c.untilSucceeds(fmt.Sprintf("waiting for rollout of statefulset %s", ssName), func() error {
-		ss, err := c.clientset.AppsV1().StatefulSets(c.flagNamespace).Get(ssName, metav1.GetOptions{})
+		// Note: We can't use the -server-label-selector flag to find the statefulset
+		// because in older versions of consul-helm it wasn't labeled with
+		// component: server. We also can't drop that label because it's required
+		// for targeting the right server Pods.
+		statefulset, err := c.clientset.AppsV1().StatefulSets(c.flagNamespace).Get(ssName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		if ss.Status.CurrentRevision == ss.Status.UpdateRevision {
+		if statefulset.Status.CurrentRevision == statefulset.Status.UpdateRevision {
 			return nil
 		}
 		return fmt.Errorf("rollout is in progress (CurrentRevision=%s UpdateRevision=%s)",
-			ss.Status.CurrentRevision, ss.Status.UpdateRevision)
+			statefulset.Status.CurrentRevision, statefulset.Status.UpdateRevision)
 	}, logger)
 	if err != nil {
 		logger.Error(err.Error())
@@ -172,7 +209,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Check if we've already been bootstrapped.
-	bootTokenSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.flagReleaseName)
+	bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
 	bootstrapToken, err := c.getBootstrapToken(logger, bootTokenSecretName)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
@@ -183,7 +220,7 @@ func (c *Command) Run(args []string) int {
 		logger.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
 	} else {
 		logger.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName)
+		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName, scheme)
 		if err != nil {
 			logger.Error(err.Error())
 			return 1
@@ -201,7 +238,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// For all of the next operations we'll need a Consul client.
-	serverPods, err := c.getConsulServers(logger, 1)
+	serverPods, err := c.getConsulServers(logger, 1, scheme)
 	if err != nil {
 		logger.Error(err.Error())
 		return 1
@@ -311,19 +348,18 @@ func (c *Command) configureKubeClient() error {
 
 // getConsulServers returns n Consul server pods with their http addresses.
 // If there are less server pods than 'n' then the function will wait.
-func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error) {
+func (c *Command) getConsulServers(logger hclog.Logger, n int, scheme string) ([]podAddr, error) {
 	var serverPods *apiv1.PodList
 	err := c.untilSucceeds("discovering Consul server pods",
 		func() error {
-			labelSelector := fmt.Sprintf("component=server, app=consul, release=%s", c.flagReleaseName)
 			var err error
-			serverPods, err = c.clientset.CoreV1().Pods(c.flagNamespace).List(metav1.ListOptions{LabelSelector: labelSelector})
+			serverPods, err = c.clientset.CoreV1().Pods(c.flagNamespace).List(metav1.ListOptions{LabelSelector: c.flagServerLabelSelector})
 			if err != nil {
 				return err
 			}
 
 			if len(serverPods.Items) == 0 {
-				return fmt.Errorf("no server pods with labels %q found", labelSelector)
+				return fmt.Errorf("no server pods with labels %q found", c.flagServerLabelSelector)
 			}
 
 			if len(serverPods.Items) < n {
@@ -345,12 +381,12 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 	for _, pod := range serverPods.Items {
 		var httpPort int32
 		for _, p := range pod.Spec.Containers[0].Ports {
-			if p.Name == "http" {
+			if p.Name == scheme {
 				httpPort = p.ContainerPort
 			}
 		}
 		if httpPort == 0 {
-			return nil, fmt.Errorf("pod %s has no port labeled 'http'", pod.Name)
+			return nil, fmt.Errorf("pod %s has no port labeled '%s'", pod.Name, scheme)
 		}
 		addr := fmt.Sprintf("%s:%d", pod.Status.PodIP, httpPort)
 		podAddrs = append(podAddrs, podAddr{
@@ -362,8 +398,8 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int) ([]podAddr, error
 }
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName string) (string, error) {
-	serverPods, err := c.getConsulServers(logger, c.flagReplicas)
+func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName, scheme string) (string, error) {
+	serverPods, err := c.getConsulServers(logger, c.flagReplicas, scheme)
 	if err != nil {
 		return "", err
 	}
@@ -384,6 +420,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	serverScheme := c.flagScheme
 	consulClient, err := api.NewClient(&api.Config{
 		Address: firstServerAddr,
+
 		Scheme:  serverScheme,
 		TLSConfig: TLSConfig,
 	})
@@ -450,13 +487,17 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 		Scheme:  serverScheme,
 		TLSConfig: TLSConfig,
 		Token:   string(bootstrapToken),
+		TLSConfig: api.TLSConfig{
+			Address: c.flagConsulTLSServerName,
+			CAFile:  c.flagConsulCACert,
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
 	}
 
 	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(logger, consulClient, serverPods, string(bootstrapToken)); err != nil {
+	if err := c.setServerTokens(logger, consulClient, serverPods, string(bootstrapToken), scheme); err != nil {
 		return "", err
 	}
 	return string(bootstrapToken), nil
@@ -465,7 +506,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 // setServerTokens creates policies and associated ACL token for each server
 // and then provides the token to the server.
 func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
-	serverPods []podAddr, bootstrapToken string) error {
+	serverPods []podAddr, bootstrapToken, scheme string) error {
 	// Create agent policy.
 	agentPolicy := api.ACLPolicy{
 		Name:        "agent-token",
@@ -525,6 +566,10 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 			Scheme:  serverScheme,
 			TLSConfig: TLSConfig,
 			Token:   bootstrapToken,
+			TLSConfig: api.TLSConfig{
+				Address: c.flagConsulTLSServerName,
+				CAFile:  c.flagConsulCACert,
+			},
 		})
 		if err != nil {
 			return fmt.Errorf(" creating Consul client for address %q: %s", pod.Addr, err)
@@ -548,7 +593,7 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 // policy and then writes the token to a Kubernetes secret.
 func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) error {
 	// Check if the secret already exists, if so, we assume the ACL has already been created.
-	secretName := fmt.Sprintf("%s-consul-%s-acl-token", c.flagReleaseName, name)
+	secretName := c.withPrefix(name + "-acl-token")
 	_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
 	if err == nil {
 		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
@@ -650,7 +695,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.Client) error {
 	// First, check if there's already an acl binding rule. If so, then this
 	// work is already done.
-	authMethodName := fmt.Sprintf("%s-consul-k8s-auth-method", c.flagReleaseName)
+	authMethodName := c.withPrefix("k8s-auth-method")
 	var existingRules []*api.ACLBindingRule
 	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
 		func() error {
@@ -679,7 +724,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-	saName := fmt.Sprintf("%s-consul-connect-injector-authmethod-svc-account", c.flagReleaseName)
+	saName := c.withPrefix("connect-injector-authmethod-svc-account")
 	err = c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
@@ -709,7 +754,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// Now we're ready to set up Consul's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
 		Name:        authMethodName,
-		Description: fmt.Sprintf("Consul %s default Kubernetes AuthMethod", c.flagReleaseName),
+		Description: "Kubernetes AuthMethod",
 		Type:        "kubernetes",
 		Config: map[string]interface{}{
 			"Host":              fmt.Sprintf("https://%s:443", kubeSvc.Spec.ClusterIP),
@@ -730,7 +775,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// Create the binding rule.
 	abr := api.ACLBindingRule{
-		Description: fmt.Sprintf("Consul %s default binding rule", c.flagReleaseName),
+		Description: "Kubernetes binding rule",
 		AuthMethod:  authMethod.Name,
 		BindType:    api.BindingRuleBindTypeService,
 		BindName:    "${serviceaccount.name}",
@@ -764,6 +809,18 @@ func (c *Command) untilSucceeds(opName string, op func() error, logger hclog.Log
 		}
 	}
 	return nil
+}
+
+// withPrefix returns the name of resource with the correct prefix based
+// on the -release-name or -resource-prefix flags.
+func (c *Command) withPrefix(resource string) string {
+	if c.flagResourcePrefix != "" {
+		return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
+	}
+	// This is to support an older version of the Helm chart that only specified
+	// the -release-name flag. We ensure that this is set if -resource-prefix
+	// is not set when parsing the flags.
+	return fmt.Sprintf("%s-consul-%s", c.flagReleaseName, resource)
 }
 
 // isNoLeaderErr returns true if err is due to trying to call the

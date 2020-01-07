@@ -1,5 +1,29 @@
 ## UNRELEASED
 
+Improvements:
+
+* Connect: Add TLS support [[GH-181](https://github.com/hashicorp/consul-k8s/pull/181)].
+
+## 0.10.1 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix bug where the new lifecycle sidecar didn't have permissions to
+  read the ACL token file. [[GH-182](https://github.com/hashicorp/consul-k8s/pull/182)]  
+
+## 0.10.0 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix critical bug where Connect-registered services instances would be deregistered
+  when the Consul client on the same node was restarted. This fix adds a new
+  sidecar that ensures the service instance is always registered. [[GH-161](https://github.com/hashicorp/consul-k8s/issues/161)]  
+  
+* Connect: Fix bug where UI links between sidecar and service didn't work because
+  the wrong service ID was being used. [[GH-163](https://github.com/hashicorp/consul-k8s/issues/163)]  
+  
+* Bootstrap ACLs: Support bootstrapACLs for users setting the `nameOverride` config. [[GH-165](https://github.com/hashicorp/consul-k8s/issues/165)]  
+
 ## 0.9.5 (December 5, 2019)
 
 Bug Fixes:
