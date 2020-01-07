@@ -42,6 +42,9 @@ type Command struct {
 	flagLogLevel                 string
 	flagTimeout                  string
 	flagScheme                   string
+	flagCAFile                   string
+	flagCertFile                 string
+	flagKeyFile                  string
 
 	clientset kubernetes.Interface
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -83,6 +86,13 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.StringVar(&c.flagScheme, "scheme", "http",
 		"Consul server protocol (http or https). Default: http")
+	c.flags.StringVar(&c.flagCAFile, "ca-file", "",
+		"CAFile is the optional path to the CA certificate used for Consul")
+	c.flags.StringVar(&c.flagCertFile, "client-file", "",
+		"CertFile is the optional path to the certificate for Consul communication. If this is set then you need to also set KeyFile")
+	c.flags.StringVar(&c.flagKeyFile, "client-key", "",
+		"KeyFile is the optional path to the private key for Consul communication. If this is set then you need to also set CertFile")
+
 
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -180,6 +190,16 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	//Define TLS Config
+	caFile := c.flagCAFile
+	certFile := c.flagCertFile
+	keyFile := c.flagKeyFile
+	TLSConfig := api.TLSConfig{
+		CAFile:   caFile,
+		CertFile: certFile,
+		KeyFile:  keyFile,
+	}
+
 	// For all of the next operations we'll need a Consul client.
 	serverPods, err := c.getConsulServers(logger, 1)
 	if err != nil {
@@ -191,6 +211,7 @@ func (c *Command) Run(args []string) int {
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
 		Scheme:  serverScheme,
+		TLSConfig: TLSConfig,
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
@@ -348,12 +369,23 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	}
 	logger.Info(fmt.Sprintf("Found %d Consul server Pods", len(serverPods)))
 
+	//Define TLS Config
+	caFile := c.flagCAFile
+	certFile := c.flagCertFile
+	keyFile := c.flagKeyFile
+	TLSConfig := api.TLSConfig{
+		CAFile:   caFile,
+		CertFile: certFile,
+		KeyFile:  keyFile,
+	}
+
 	// Pick the first pod to connect to for bootstrapping and set up connection.
 	firstServerAddr := serverPods[0].Addr
 	serverScheme := c.flagScheme
 	consulClient, err := api.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  serverScheme,
+		TLSConfig: TLSConfig,
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Consul client for address %s: %s", firstServerAddr, err)
@@ -416,6 +448,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName stri
 	consulClient, err = api.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  serverScheme,
+		TLSConfig: TLSConfig,
 		Token:   string(bootstrapToken),
 	})
 	if err != nil {
@@ -472,6 +505,16 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 		serverTokens = append(serverTokens, *token)
 	}
 
+	//Define TLS Config
+	caFile := c.flagCAFile
+	certFile := c.flagCertFile
+	keyFile := c.flagKeyFile
+	TLSConfig := api.TLSConfig{
+		CAFile:   caFile,
+		CertFile: certFile,
+		KeyFile:  keyFile,
+	}
+
 	// Pass out agent tokens to servers.
 	for i, pod := range serverPods {
 		// We create a new client for each server because we need to call each
@@ -480,6 +523,7 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 		serverClient, err := api.NewClient(&api.Config{
 			Address: pod.Addr,
 			Scheme:  serverScheme,
+			TLSConfig: TLSConfig,
 			Token:   bootstrapToken,
 		})
 		if err != nil {
