@@ -66,6 +66,11 @@ type ServiceResource struct {
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
 
+	// ClusterIPAsEndpoints set to true (the default) sync ClusterIP-type services as
+	// the individual Endpoints themselves. Setting this to false causes them to sync
+	// with only the singular IP of the service
+	ClusterIPAsEndpoints bool
+
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
 	// ip address will be used instead.
@@ -327,8 +332,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						port = int(p.NodePort)
 					} else {
 						port = int(p.Port)
-						// NOTE: for cluster IP services we always use the endpoint
-						// ports so this will be overridden.
+						// NOTE: for cluster IP services we'll use the endpoint
+						// ports unless ClusterIPAsEndpoints is false
 					}
 					break
 				}
@@ -499,66 +504,96 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			}
 		}
 
-	// For ClusterIP services, we register a service instance
-	// for each endpoint.
+	// For ClusterIP services, we register either a service instance
+	// for each endpoint or a singular instance per IP of service
 	case apiv1.ServiceTypeClusterIP:
-		if t.endpointsMap == nil {
-			return
+
+		var asEndpoints bool
+		asEndpoints = t.ClusterIPAsEndpoints
+
+		// allow an annotation to override the config behavior
+		endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
+		if ok {
+			value, err := strconv.ParseBool(endpointsAnnotation)
+			if err == nil {
+				asEndpoints = value
+			}
 		}
 
-		endpoints := t.endpointsMap[key]
-		if endpoints == nil {
-			return
-		}
+		if asEndpoints {
+			if t.endpointsMap == nil {
+				return
+			}
 
-		seen := map[string]struct{}{}
-		for _, subset := range endpoints.Subsets {
-			// For ClusterIP services, we use the endpoint port instead
-			// of the service port because we're registering each endpoint
-			// as a separate service instance.
-			epPort := baseService.Port
-			if overridePortName != "" {
-				// If we're supposed to use a specific named port, find it.
-				for _, p := range subset.Ports {
-					if overridePortName == p.Name {
+			endpoints := t.endpointsMap[key]
+			if endpoints == nil {
+				return
+			}
+
+			seen := map[string]struct{}{}
+			for _, subset := range endpoints.Subsets {
+				// For ClusterIP services, we use the endpoint port instead
+				// of the service port because we're registering each endpoint
+				// as a separate service instance.
+				epPort := baseService.Port
+				if overridePortName != "" {
+					// If we're supposed to use a specific named port, find it.
+					for _, p := range subset.Ports {
+						if overridePortName == p.Name {
+							epPort = int(p.Port)
+							break
+						}
+					}
+				} else if overridePortNumber == 0 {
+					// Otherwise we'll just use the first port in the list
+					// (unless the port number was overridden by an annotation).
+					for _, p := range subset.Ports {
 						epPort = int(p.Port)
 						break
 					}
 				}
-			} else if overridePortNumber == 0 {
-				// Otherwise we'll just use the first port in the list
-				// (unless the port number was overridden by an annotation).
-				for _, p := range subset.Ports {
-					epPort = int(p.Port)
-					break
+				for _, subsetAddr := range subset.Addresses {
+					addr := subsetAddr.IP
+					if addr == "" {
+						addr = subsetAddr.Hostname
+					}
+					if addr == "" {
+						continue
+					}
+
+					// Its not clear whether K8S guarantees ready addresses to
+					// be unique so we maintain a set to prevent duplicates just
+					// in case.
+					if _, ok := seen[addr]; ok {
+						continue
+					}
+					seen[addr] = struct{}{}
+
+					r := baseNode
+					rs := baseService
+					r.Service = &rs
+					r.Service.ID = serviceID(r.Service.Service, addr)
+					r.Service.Address = addr
+					r.Service.Port = epPort
+
+					t.consulMap[key] = append(t.consulMap[key], &r)
 				}
 			}
-			for _, subsetAddr := range subset.Addresses {
-				addr := subsetAddr.IP
-				if addr == "" {
-					addr = subsetAddr.Hostname
-				}
-				if addr == "" {
-					continue
-				}
 
-				// Its not clear whether K8S guarantees ready addresses to
-				// be unique so we maintain a set to prevent duplicates just
-				// in case.
-				if _, ok := seen[addr]; ok {
-					continue
-				}
-				seen[addr] = struct{}{}
-
-				r := baseNode
-				rs := baseService
-				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
-				r.Service.Address = addr
-				r.Service.Port = epPort
-
-				t.consulMap[key] = append(t.consulMap[key], &r)
+		} else {
+			addr := svc.Spec.ClusterIP
+			if addr == "" {
+				return
 			}
+
+			r := baseNode
+			rs := baseService
+			r.Service = &rs
+			r.Service.ID = serviceID(r.Service.Service, addr)
+			r.Service.Address = addr
+			// we can just take baseService.Port
+
+			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
 }

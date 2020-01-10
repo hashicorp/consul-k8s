@@ -1019,6 +1019,7 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		Client:        client,
 		Syncer:        syncer,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -1059,6 +1060,7 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 		Client:              client,
 		Syncer:              syncer,
 		ClusterIPSync:       true,
+		ClusterIPAsEndpoints: true,
 		ConsulServicePrefix: "prefix",
 	})
 	defer closer()
@@ -1101,6 +1103,7 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 		Client:        client,
 		Syncer:        syncer,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -1144,6 +1147,7 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 		Client:        client,
 		Syncer:        syncer,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -1186,6 +1190,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 		Client:        client,
 		Syncer:        syncer,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -1267,6 +1272,7 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 		Syncer:        syncer,
 		Namespace:     apiv1.NamespaceAll,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -1307,6 +1313,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 		Client:        client,
 		Syncer:        syncer,
 		ClusterIPSync: true,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 

@@ -44,6 +44,7 @@ type Command struct {
 	flagK8SWriteNamespace     string
 	flagConsulWritePeriod     flags.DurationValue
 	flagSyncClusterIPServices bool
+	flagSyncClusterIPServicesAsEndpoints bool
 	flagNodePortSyncType      string
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
@@ -91,6 +92,9 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagSyncClusterIPServices, "sync-clusterip-services", true,
 		"If true, all valid ClusterIP services in K8S are synced by default. If false, "+
 			"ClusterIP services are not synced to Consul.")
+	c.flags.BoolVar(&c.flagSyncClusterIPServicesAsEndpoints, "sync-clusterip-services-as-endpoints", true,
+		"If true, ClusterIP services in K8S are synced by endpoint addresses, not the IP of the service."+
+			"If false, ClusterIP services are to Consul with the IP of the service. Defaults to true.")
 	c.flags.StringVar(&c.flagNodePortSyncType, "node-port-sync-type", "ExternalOnly",
 		"Defines the type of sync for NodePort services. Valid options are ExternalOnly, "+
 			"InternalOnly and ExternalFirst.")
@@ -186,6 +190,7 @@ func (c *Command) Run(args []string) int {
 				Namespace:             c.flagK8SSourceNamespace,
 				ExplicitEnable:        !c.flagK8SDefault,
 				ClusterIPSync:         c.flagSyncClusterIPServices,
+				ClusterIPAsEndpoints:  c.flagSyncClusterIPServicesAsEndpoints,
 				NodePortSync:          catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
 				ConsulK8STag:          c.flagConsulK8STag,
 				ConsulServicePrefix:   c.flagConsulServicePrefix,
