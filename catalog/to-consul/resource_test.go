@@ -686,6 +686,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: ExternalOnly,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -728,6 +729,7 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 		Client:              client,
 		Syncer:              syncer,
 		NodePortSync:        ExternalOnly,
+		ClusterIPAsEndpoints: true,
 		ConsulServicePrefix: "prefix",
 	})
 	defer closer()
@@ -773,6 +775,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: ExternalOnly,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -829,6 +832,7 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: ExternalOnly,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -874,6 +878,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: ExternalOnly,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -924,6 +929,7 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: InternalOnly,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
@@ -968,6 +974,7 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 		Client:       client,
 		Syncer:       syncer,
 		NodePortSync: ExternalFirst,
+		ClusterIPAsEndpoints: true,
 	})
 	defer closer()
 
