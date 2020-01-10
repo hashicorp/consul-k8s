@@ -13,9 +13,9 @@ require (
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
 	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
-	github.com/hashicorp/consul v1.7.0-beta2
-	github.com/hashicorp/consul/api v1.2.1-0.20191220171653-e01f6913516b
-	github.com/hashicorp/consul/sdk v0.2.1-0.20191220171653-e01f6913516b
+	github.com/hashicorp/consul v1.6.2
+	github.com/hashicorp/consul/api v1.3.0
+	github.com/hashicorp/consul/sdk v0.3.0
 	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
