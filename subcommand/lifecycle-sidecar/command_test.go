@@ -42,6 +42,14 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			ExpErr: "-consul-binary must be set",
 		},
+		{
+			Flags: []string{
+				"-service-config=/config.hcl",
+				"-consul-binary=consul",
+				"-sync-period=0s",
+			},
+			ExpErr: "-sync-period must be greater than 0",
+		},
 	}
 
 	for _, c := range cases {
@@ -70,13 +78,13 @@ func TestRun_FlagValidation_ServiceConfigFileMissing(t *testing.T) {
 
 func TestRun_FlagValidation_ConsulBinaryMissing(t *testing.T) {
 	t.Parallel()
+
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
 	}
 
-	// Create a temporary service registration file
-	tmpDir, configFile := createServicesTmpFile(t)
+	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
 	configFlag := "-service-config=" + configFile
@@ -88,7 +96,8 @@ func TestRun_FlagValidation_ConsulBinaryMissing(t *testing.T) {
 
 func TestRun_FlagValidation_InvalidLogLevel(t *testing.T) {
 	t.Parallel()
-	tmpDir, configFile := createServicesTmpFile(t)
+
+	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
 	ui := cli.NewMockUi()
@@ -103,7 +112,8 @@ func TestRun_FlagValidation_InvalidLogLevel(t *testing.T) {
 // Test that we register the services.
 func TestRun_ServicesRegistration(t *testing.T) {
 	t.Parallel()
-	tmpDir, configFile := createServicesTmpFile(t)
+
+	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
 	a, err := testutil.NewTestServerT(t)
@@ -120,7 +130,6 @@ func TestRun_ServicesRegistration(t *testing.T) {
 		"-http-addr", a.HTTPAddr,
 		"-service-config", configFile,
 		"-sync-period", "100ms",
-		"-consul-binary", "consul",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -144,7 +153,8 @@ func TestRun_ServicesRegistration(t *testing.T) {
 // Test that we register services when the Consul agent is down at first.
 func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 	t.Parallel()
-	tmpDir, configFile := createServicesTmpFile(t)
+
+	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
 	ui := cli.NewMockUi()
@@ -157,7 +167,6 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 		"-http-addr", fmt.Sprintf("127.0.0.1:%d", randomPort),
 		"-service-config", configFile,
 		"-sync-period", "100ms",
-		"-consul-binary", "consul",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -190,6 +199,56 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 	})
 }
 
+// Test that we parse all flags and pass them down to the underlying Consul command.
+func TestRun_ConsulCommandFlags(t *testing.T) {
+	t.Parallel()
+	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+	defer os.RemoveAll(tmpDir)
+
+	a, err := testutil.NewTestServerT(t)
+	require.NoError(t, err)
+	defer a.Stop()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI: ui,
+	}
+
+	// Run async because we need to kill it when the test is over.
+	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-http-addr", a.HTTPAddr,
+		"-service-config", configFile,
+		"-sync-period", "1s",
+		"-consul-binary", "consul",
+		"-token=abc",
+		"-token-file=/token/file",
+		"-ca-file=/ca/file",
+		"-ca-path=/ca/path",
+		"-client-cert=/client/cert",
+		"-client-key=/client/key",
+		"-tls-server-name=consul.foo.com",
+	})
+	defer stopCommand(t, &cmd, exitChan)
+
+	expectedCommand := []string{
+		"services",
+		"register",
+		"-http-addr=" + a.HTTPAddr,
+		"-token=abc",
+		"-token-file=/token/file",
+		"-ca-file=/ca/file",
+		"-ca-path=/ca/path",
+		"-client-cert=/client/cert",
+		"-client-key=/client/key",
+		"-tls-server-name=consul.foo.com",
+		configFile,
+	}
+	timer := &retry.Timer{Timeout: 1000 * time.Millisecond, Wait: 100 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		require.ElementsMatch(r, expectedCommand, cmd.consulCommand)
+	})
+}
+
 // This function starts the command asynchronously and returns a non-blocking chan.
 // When finished, the command will send its exit code to the channel.
 // Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
@@ -214,12 +273,12 @@ func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 
 // createServicesTmpFile creates a temp directory
 // and writes servicesRegistration as an HCL file there.
-func createServicesTmpFile(t *testing.T) (string, string) {
+func createServicesTmpFile(t *testing.T, serviceHCL string) (string, string) {
 	tmpDir, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 
 	configFile := filepath.Join(tmpDir, "svc.hcl")
-	err = ioutil.WriteFile(configFile, []byte(servicesRegistration), 0600)
+	err = ioutil.WriteFile(configFile, []byte(serviceHCL), 0600)
 	require.NoError(t, err)
 
 	return tmpDir, configFile
