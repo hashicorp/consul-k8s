@@ -60,19 +60,22 @@ spec:
                 {{ else if .Values.global.bootstrapACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
                 {{- end }}
+                {{- if .Values.global.tls.enabled }}
+                -consul-ca-cert=/consul/tls/ca/tls.crt \
+                {{- end }}
                 {{- if .Values.connectInject.centralConfig.enabled }}
                 -enable-central-config=true \
                 {{- end }}
                 {{- if (and .Values.connectInject.centralConfig.enabled .Values.connectInject.centralConfig.defaultProtocol) }}
                 -default-protocol="{{ .Values.connectInject.centralConfig.defaultProtocol }}" \
                 {{- end }}
-{{- if .Values.connectInject.certs.secretName }}
+                {{- if .Values.connectInject.certs.secretName }}
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
                 -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
-{{- else }}
+                {{- else }}
                 -tls-auto=${CONSUL_FULLNAME}-connect-injector-cfg \
                 -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc
-{{- end }}
+                {{- end }}
           livenessProbe:
             httpGet:
               path: /health/ready
@@ -93,16 +96,32 @@ spec:
             periodSeconds: 2
             successThreshold: 1
             timeoutSeconds: 5
-{{- if .Values.connectInject.certs.secretName }}
+          {{- if (or .Values.connectInject.certs.secretName .Values.global.tls.enabled) }}
           volumeMounts:
+            {{- if .Values.connectInject.certs.secretName }}
             - name: certs
               mountPath: /etc/connect-injector/certs
               readOnly: true
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if (or .Values.connectInject.certs.secretName .Values.global.tls.enabled) }}
       volumes:
+        {{- if .Values.connectInject.certs.secretName }}
         - name: certs
           secret:
             secretName: {{ .Values.connectInject.certs.secretName }}
-{{- end }}
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+        {{- end }}
+      {{- end }}
       {{- if .Values.connectInject.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.connectInject.nodeSelector . | indent 8 | trim }}

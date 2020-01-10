@@ -40,7 +40,7 @@ global:
   # remove these checks to make the sync work.
   # If using bootstrapACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
-  imageK8S: "hashicorp/consul-k8s:0.10.1"
+  imageK8S: "hashicorp/consul-k8s:0.11.0"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -60,7 +60,7 @@ global:
   #
   # The secret can be created by running:
   #    kubectl create secret generic consul-gossip-encryption-key \
-  #      --from-literal=key=$(consul keygen)`.
+  #      --from-literal=key=$(consul keygen).
   #
   # In this case, secretName would be "consul-gossip-encryption-key" and
   # secretKey would be "key".
@@ -76,6 +76,40 @@ global:
   # the Consul cluster. This requires servers to be running inside Kubernetes.
   # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
   bootstrapACLs: false
+
+  # Enables TLS encryption across the cluster to verify authenticity of the
+  # servers and clients that connect. Note: It is HIGHLY recommended that you also
+  # enable Gossip encryption.
+  # See https://learn.hashicorp.com/consul/security-networking/agent-encryption
+  #
+  # Note: this relies on functionality introduced with Consul 1.4.1. Make sure
+  # your global.image value is at least version 1.4.1.
+  tls:
+    enabled: false
+
+    # serverAdditionalDNSSANs is a list of additional DNS names to
+    # set as Subject Alternative Names (SANs) in the server certificate.
+    # This is useful when you need to access the Consul server(s) externally,
+    # for example, if you're using the UI.
+    serverAdditionalDNSSANs: []
+
+    # serverAdditionalIPSANs is a list of additional IP addresses to
+    # set as Subject Alternative Names (SANs) in the server certificate.
+    # This is useful when you need to access Consul server(s) externally,
+    # for example, if you're using the UI.
+    serverAdditionalIPSANs: []
+
+    # If verify is true, 'verify_outgoing', 'verify_server_hostname', and
+    # 'verify_incoming_rpc' will be set to true for Consul servers and clients.
+    # Set this to false to incrementally roll out TLS on an existing Consul cluster.
+    # Note: remember to switch it back to true once the rollout is complete.
+    # Please see this guide for more details:
+    # https://learn.hashicorp.com/consul/security-networking/certificates
+    verify: true
+
+    # If httpsOnly is true, Consul will disable the HTTP port on both
+    # clients and servers and only accept HTTPS connections.
+    httpsOnly: true
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -240,7 +274,7 @@ client:
   #   - operator: "Exists"
   tolerations: ""
 
-  # nodeSelector labels for client pod assignment, formatted as a muli-line string.
+  # nodeSelector labels for client pod assignment, formatted as a multi-line string.
   # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
   # Example:
   # nodeSelector: |
@@ -426,7 +460,7 @@ syncCatalog:
     secretName: null
     secretKey: null
 
-  # nodeSelector labels for syncCatalog pod assignment, formatted as a muli-line string.
+  # nodeSelector labels for syncCatalog pod assignment, formatted as a multi-line string.
   # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
   # Example:
   # nodeSelector: |
@@ -470,7 +504,7 @@ connectInject:
   # webhook. By default, the injector will generate and manage its own certs,
   # but this requires the ability for the injector to update its own
   # MutatingWebhookConfiguration. In a production environment, custom certs
-  # should probaly be used. Configure the values below to enable this.
+  # should probably be used. Configure the values below to enable this.
   certs:
     # secretName is the name of the secret that has the TLS certificate and
     # private key to serve the injector webhook. If this is null, then the

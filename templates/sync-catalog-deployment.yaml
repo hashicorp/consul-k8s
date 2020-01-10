@@ -29,6 +29,12 @@ spec:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
+      {{- if .Values.global.tls.enabled }}
+      volumes:
+      - name: tls-ca-cert
+        secret:
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+      {{- end }}
       containers:
         - name: consul-sync-catalog
           image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
@@ -55,12 +61,26 @@ spec:
                   name: "{{ template "consul.fullname" . }}-catalog-sync-acl-token"
                   key: "token"
             {{- end}}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+          {{- if .Values.global.tls.enabled }}
+          volumeMounts:
+            - name: tls-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+          {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
               consul-k8s sync-catalog \
-                -http-addr=${HOST_IP}:8500 \
                 -k8s-default-sync={{ .Values.syncCatalog.default }} \
                 {{- if (not .Values.syncCatalog.toConsul) }}
                 -to-consul=false \

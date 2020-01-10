@@ -20,9 +20,16 @@ spec:
     release: "{{ .Release.Name }}"
     component: server
   ports:
+    {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
     - name: http
       port: 80
       targetPort: 8500
+    {{- end }}
+    {{- if .Values.global.tls.enabled }}
+    - name: https
+      port: 443
+      targetPort: 8501
+    {{- end }}
   {{- if .Values.ui.service.type }}
   type: {{ .Values.ui.service.type }}
   {{- end }}

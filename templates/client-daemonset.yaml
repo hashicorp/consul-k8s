@@ -67,6 +67,19 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
+        {{- if .Values.global.tls.enabled }}
+        - name: tls-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+        - name: tls-ca-key
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-key
+        - name: tls-client-cert
+          emptyDir:
+            # We're using tmpfs here so that
+            # client certs are not written to disk
+            medium: "Memory"
+        {{- end }}
         {{- range .Values.client.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -80,7 +93,6 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- end }}
-
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.client.image }}"
@@ -110,6 +122,12 @@ spec:
                   name: {{ .Values.global.gossipEncryption.secretName }}
                   key: {{ .Values.global.gossipEncryption.secretKey }}
             {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://localhost:8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.client | nindent 12 }}
           command:
             - "/bin/sh"
@@ -123,8 +141,23 @@ spec:
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
                 -node-meta=pod-name:${HOSTNAME} \
+                -hcl='leave_on_terminate = true' \
+                {{- if .Values.global.tls.enabled }}
+                -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
+                -hcl='cert_file = "/consul/tls/client/tls.crt"' \
+                -hcl='key_file = "/consul/tls/client/tls.key"' \
+                {{- if .Values.global.tls.verify }}
+                -hcl='verify_incoming_rpc = true' \
+                -hcl='verify_outgoing = true' \
+                -hcl='verify_server_hostname = true' \
+                {{- end }}
+                -hcl='ports { https = 8501 }' \
+                {{- if .Values.global.tls.httpsOnly }}
+                -hcl='ports { http = -1 }' \
+                {{- end }}
+                {{- end }}
                 {{- if .Values.client.grpc }}
-                -hcl="ports { grpc = 8502 }" \
+                -hcl='ports { grpc = 8502 }' \
                 {{- end }}
                 -config-dir=/consul/config \
                 {{- range .Values.client.extraVolumes }}
@@ -157,6 +190,14 @@ spec:
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
+            {{- if .Values.global.tls.enabled }}
+            - name: tls-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+            - name: tls-client-cert
+              mountPath: /consul/tls/client
+              readOnly: true
+            {{- end }}
             {{- range .Values.client.extraVolumes }}
             - name: userconfig-{{ .name }}
               readOnly: true
@@ -166,17 +207,17 @@ spec:
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- end }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - /bin/sh
-                - -c
-                - consul leave
           ports:
+            {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - containerPort: 8500
               hostPort: 8500
               name: http
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - containerPort: 8501
+              hostPort: 8501
+              name: https
+            {{- end }}
             - containerPort: 8502
               hostPort: 8502
               name: grpc
@@ -210,14 +251,21 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | \
-                  grep -E '".+"'
+                  {{- if .Values.global.tls.enabled }}
+                  curl \
+                    --cacert /consul/tls/ca/tls.crt \
+                    https://127.0.0.1:8501/v1/status/leader \
+                  {{- else }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
+                  {{- end }}
+                  2>/dev/null | grep -E '".+"'
           {{- if .Values.client.resources }}
           resources:
             {{ tpl .Values.client.resources . | nindent 12 | trim }}
           {{- end }}
-      {{- if .Values.global.bootstrapACLs }}
+      {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled) }}
       initContainers:
+      {{- if .Values.global.bootstrapACLs }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
         command:
@@ -231,6 +279,38 @@ spec:
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig
+      {{- end }}
+      {{- if .Values.global.tls.enabled }}
+      - name: client-tls-init
+        image: "{{ default .Values.global.image .Values.client.image }}"
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            cd /consul/tls/client
+            consul tls cert create -client \
+              -additional-ipaddress=${HOST_IP} \
+              -dc={{ .Values.global.datacenter }} \
+              -domain={{ .Values.global.domain }} \
+              -ca=/consul/tls/ca/cert/tls.crt \
+              -key=/consul/tls/ca/key/tls.key
+            mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0.pem tls.crt
+            mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0-key.pem tls.key
+        volumeMounts:
+          - name: tls-client-cert
+            mountPath: /consul/tls/client
+          - name: tls-ca-cert
+            mountPath: /consul/tls/ca/cert
+            readOnly: true
+          - name: tls-ca-key
+            mountPath: /consul/tls/ca/key
+            readOnly: true
+      {{- end }}
       {{- end }}
       {{- if .Values.client.nodeSelector }}
       nodeSelector:

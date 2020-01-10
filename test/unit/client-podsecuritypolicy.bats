@@ -32,6 +32,30 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/PodSecurityPolicy: only http and grpc ports are allowed as hostPorts by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8500,"max":8500},{"min":8502,"max":8502}]' ]
+}
+
+#--------------------------------------------------------------------
+# client.grpc
+
+@test "client/PodSecurityPolicy: hostPort 8502 is not allowed when client.grpc=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'client.grpc=false' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8500,"max":8500}]' ]
+}
+
 #--------------------------------------------------------------------
 # client.exposeGossipPorts
 
@@ -78,4 +102,30 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.allowedHostPaths[0].pathPrefix' | tee /dev/stderr)
   [ "${actual}" = '/opt/consul' ]
+}
+
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "client/PodSecurityPolicy: hostPort 8501 is allowed when global.tls.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8501,"max":8501},{"min":8502,"max":8502}]' ]
+}
+
+@test "client/PodSecurityPolicy: hostPort 8500 is not allowed when global.tls.enabled=true and global.tls.httpsOnly=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=true' \
+      . | tee /dev/stderr |
+      yq -c '.spec.hostPorts' | tee /dev/stderr)
+  [ "${actual}" = '[{"min":8501,"max":8501},{"min":8502,"max":8502}]' ]
 }

@@ -32,6 +32,12 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
+      {{- if .Values.global.tls.enabled }}
+      volumes:
+      - name: tls-ca-cert
+        secret:
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+      {{- end }}
       containers:
         - name: post-install-job
           image: {{ .Values.global.imageK8S }}
@@ -40,6 +46,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- if .Values.global.tls.enabled }}
+          volumeMounts:
+            - name: tls-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+           {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -48,6 +60,11 @@ spec:
                 -server-label-selector=component=server,app={{ template "consul.name" . }},release={{ .Release.Name }} \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -k8s-namespace={{ .Release.Namespace }} \
+                {{- if .Values.global.tls.enabled }}
+                -use-https \
+                -consul-ca-cert=/consul/tls/ca/tls.crt \
+                -consul-tls-server-name=server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }} \
+                {{- end }}
                 {{- if .Values.syncCatalog.enabled }}
                 -create-sync-token=true \
                 {{- end }}

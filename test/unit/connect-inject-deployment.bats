@@ -360,3 +360,52 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"override\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "connectInject/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
+@test "connectInject/Deployment: Adds both tls-ca-cert and certs volumes when global.tls.enabled is true and connectInject.certs.secretName is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'connectInject.certs.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
+  [ "${actual}" = "2" ]
+}
+
+@test "connectInject/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
+@test "connectInject/Deployment: Adds both tls-ca-cert and certs volumeMounts when global.tls.enabled is true and connectInject.certs.secretName is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'connectInject.certs.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
+  [ "${actual}" = "2" ]
+}
