@@ -238,6 +238,25 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	return v
 }
 
+// shouldSyncAsEndpoints returns true if service-as-endpoints is true or
+// ClusterIPAsEndpoints is true
+func (t *ServiceResource) shouldSyncClusterIPAsEndpoints(svc *apiv1.Service) bool {
+	var asEndpoints bool
+	asEndpoints = t.ClusterIPAsEndpoints
+
+	// allow an annotation to override the config behavior
+	endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
+	if ok {
+		value, err := strconv.ParseBool(endpointsAnnotation)
+		if err == nil {
+			asEndpoints = value
+		}
+	}
+
+	return asEndpoints
+}
+
+
 // shouldTrackEndpoints returns true if the endpoints for the given key
 // should be tracked.
 //
@@ -256,25 +275,14 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	}
 
   // We should only watch endpoints if we're actually going to sync them
-  // Should service-as-endpoints be false or ClusterIPAsEndpoints be false
-  // then don't track the endpoints of the service
-	var asEndpoints bool
-	asEndpoints = t.ClusterIPAsEndpoints
+  if svc.Spec.Type == apiv1.ServiceTypeClusterIP {
+	  if !t.shouldSyncClusterIPAsEndpoints(svc) {
+	  	return false
+	  }
+		return true
+  }
 
-	// allow an annotation to override the config behavior
-	endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
-	if ok {
-		value, err := strconv.ParseBool(endpointsAnnotation)
-		if err == nil {
-			asEndpoints = value
-		}
-	}
-
-	if !asEndpoints {
-		return false
-	}
-
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -526,20 +534,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For ClusterIP services, we register either a service instance
 	// for each endpoint or a singular instance per IP of service
 	case apiv1.ServiceTypeClusterIP:
-
-		var asEndpoints bool
-		asEndpoints = t.ClusterIPAsEndpoints
-
-		// allow an annotation to override the config behavior
-		endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
-		if ok {
-			value, err := strconv.ParseBool(endpointsAnnotation)
-			if err == nil {
-				asEndpoints = value
-			}
-		}
-
-		if asEndpoints {
+		if t.shouldSyncClusterIPAsEndpoints(svc) {
 			if t.endpointsMap == nil {
 				return
 			}
