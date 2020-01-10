@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
@@ -11,6 +12,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -21,28 +23,21 @@ func init() {
 	hclog.DefaultOptions.Level = hclog.Debug
 }
 
-func TestServiceResource_impl(t *testing.T) {
-	var _ controller.Resource = &ServiceResource{}
-	var _ controller.Backgrounder = &ServiceResource{}
-}
-
 // Test that deleting a service properly deletes the registration.
 func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Delete
@@ -62,17 +57,15 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
 
@@ -89,17 +82,14 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "false"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -118,18 +108,15 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ExplicitEnable = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:            hclog.Default(),
-		Client:         client,
-		Syncer:         syncer,
-		ExplicitEnable: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 	time.Sleep(200 * time.Millisecond)
@@ -147,18 +134,15 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ExplicitEnable = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:            hclog.Default(),
-		Client:         client,
-		Syncer:         syncer,
-		ExplicitEnable: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "t"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -171,51 +155,20 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require.Len(actual, 1)
 }
 
-// Test that system resources are not synced by default.
-func TestServiceResource_system(t *testing.T) {
-	t.Parallel()
-	require := require.New(t)
-	client := fake.NewSimpleClientset()
-	syncer := &TestSyncer{}
-
-	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
-	defer closer()
-
-	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
-	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(svc)
-	require.NoError(err)
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 0)
-}
-
 // Test changing the sync tag to false deletes the service.
 func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ExplicitEnable = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:            hclog.Default(),
-		Client:         client,
-		Syncer:         syncer,
-		ExplicitEnable: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "true"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(t, err)
@@ -248,18 +201,15 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.AddK8SNamespaceSuffix = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                   hclog.Default(),
-		Client:                client,
-		Syncer:                syncer,
-		AddK8SNamespaceSuffix: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", "namespace", "1.2.3.4")
 	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
@@ -269,7 +219,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "foo-namespace")
+		require.Equal(r, actual[0].Service.Service, "foo-namespace")
 	})
 }
 
@@ -279,19 +229,16 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.AddK8SNamespaceSuffix = true
+	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                   hclog.Default(),
-		Client:                client,
-		Syncer:                syncer,
-		AddK8SNamespaceSuffix: true,
-		ConsulServicePrefix:   "prefix",
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", "namespace", "1.2.3.4")
 	_, err := client.CoreV1().Services("namespace").Create(svc)
 	require.NoError(t, err)
 
@@ -301,7 +248,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "prefixfoo-namespace")
+		require.Equal(r, actual[0].Service.Service, "prefixfoo-namespace")
 	})
 }
 
@@ -311,18 +258,15 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.AddK8SNamespaceSuffix = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                   hclog.Default(),
-		Client:                client,
-		Syncer:                syncer,
-		AddK8SNamespaceSuffix: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", "bar", "1.2.3.4")
 	svc.Annotations[annotationServiceName] = "different-service-name"
 	_, err := client.CoreV1().Services("bar").Create(svc)
 	require.NoError(t, err)
@@ -333,7 +277,7 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "different-service-name")
+		require.Equal(r, actual[0].Service.Service, "different-service-name")
 	})
 }
 
@@ -343,17 +287,14 @@ func TestServiceResource_externalIP(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -378,18 +319,15 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                 hclog.Default(),
-		Client:              client,
-		Syncer:              syncer,
-		ConsulServicePrefix: "prefix",
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -414,17 +352,15 @@ func TestServiceResource_lb(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -445,18 +381,16 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                 hclog.Default(),
-		Client:              client,
-		Syncer:              syncer,
-		ConsulServicePrefix: "prefix",
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.2.3.4"))
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -478,17 +412,14 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Status.LoadBalancer.Ingress = append(
 		svc.Status.LoadBalancer.Ingress,
 		apiv1.LoadBalancerIngress{IP: "2.3.4.5"},
@@ -517,17 +448,14 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceName] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -547,17 +475,14 @@ func TestServiceResource_lbPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
@@ -582,17 +507,14 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServicePort] = "rpc"
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
@@ -618,18 +540,15 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ConsulK8STag = TestConsulK8STag
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		ConsulK8STag: TestConsulK8STag,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceTags] = "one, two,three"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -649,17 +568,14 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:    hclog.Default(),
-		Client: client,
-		Syncer: syncer,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert an LB service
-	svc := lbService("foo", "1.2.3.4")
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceMetaPrefix+"foo"] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -679,14 +595,11 @@ func TestServiceResource_nodePort(t *testing.T) {
 	require := require.New(t)
 	syncer := &TestSyncer{}
 	client := fake.NewSimpleClientset()
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: ExternalOnly,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	createNodes(t, client)
@@ -694,7 +607,8 @@ func TestServiceResource_nodePort(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	time.Sleep(200 * time.Millisecond)
@@ -721,15 +635,12 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
+	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                 hclog.Default(),
-		Client:              client,
-		Syncer:              syncer,
-		NodePortSync:        ExternalOnly,
-		ConsulServicePrefix: "prefix",
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	createNodes(t, client)
@@ -737,7 +648,8 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -766,14 +678,11 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: ExternalOnly,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	node1, _ := createNodes(t, client)
@@ -799,7 +708,8 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	require.NoError(err)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -822,14 +732,11 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: ExternalOnly,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	createNodes(t, client)
@@ -837,7 +744,7 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	svc := nodePortService("foo")
+	svc := nodePortService("foo", metav1.NamespaceDefault)
 	svc.Annotations = map[string]string{annotationServicePort: "rpc"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -867,14 +774,11 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: ExternalOnly,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	createNodes(t, client)
@@ -882,7 +786,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	svc := nodePortService("foo")
+	svc := nodePortService("foo", metav1.NamespaceDefault)
 	// Override service ports
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
@@ -917,14 +821,11 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = InternalOnly
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: InternalOnly,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	createNodes(t, client)
@@ -932,7 +833,8 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -961,14 +863,11 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalFirst
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:          hclog.Default(),
-		Client:       client,
-		Syncer:       syncer,
-		NodePortSync: ExternalFirst,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	node1, _ := createNodes(t, client)
@@ -984,7 +883,8 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(nodePortService("foo"))
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Wait a bit
@@ -1012,18 +912,16 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
@@ -1052,19 +950,17 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
+	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:                 hclog.Default(),
-		Client:              client,
-		Syncer:              syncer,
-		ClusterIPSync:       true,
-		ConsulServicePrefix: "prefix",
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
@@ -1094,18 +990,15 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	svc := clusterIPService("foo")
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "rpc"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -1137,18 +1030,15 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	svc := clusterIPService("foo")
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "4141"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
@@ -1179,18 +1069,15 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	svc := clusterIPService("foo")
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Port: 8500, TargetPort: intstr.FromInt(2000)},
@@ -1225,18 +1112,16 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = false
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: false,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(clusterIPService("foo"))
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
@@ -1259,19 +1144,16 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	testNamespace := "test_namespace"
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		Namespace:     apiv1.NamespaceAll,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	_, err := client.CoreV1().Services(testNamespace).Create(clusterIPService("foo"))
+	svc := clusterIPService("foo", testNamespace)
+	_, err := client.CoreV1().Services(testNamespace).Create(svc)
 	require.NoError(err)
 
 	// Insert the endpoints
@@ -1300,18 +1182,15 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
 
 	// Start the controller
-	closer := controller.TestControllerRun(&ServiceResource{
-		Log:           hclog.Default(),
-		Client:        client,
-		Syncer:        syncer,
-		ClusterIPSync: true,
-	})
+	closer := controller.TestControllerRun(&serviceResource)
 	defer closer()
 
 	// Insert the service
-	svc := clusterIPService("foo")
+	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "rpc"
 	svc.Spec.Ports = []apiv1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromString("httpPort"), Name: "http"},
@@ -1340,11 +1219,199 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
+// Test allow/deny namespace lists.
+func TestServiceResource_AllowDenyNamespaces(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		AllowList     mapset.Set
+		DenyList      mapset.Set
+		ExpNamespaces []string
+	}{
+		"empty lists": {
+			AllowList:     mapset.NewSet(),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: nil,
+		},
+		"only from allow list": {
+			AllowList:     mapset.NewSet("foo"),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: []string{"foo"},
+		},
+		"both in allow and deny": {
+			AllowList:     mapset.NewSet("foo"),
+			DenyList:      mapset.NewSet("foo"),
+			ExpNamespaces: nil,
+		},
+		"deny removes one from allow": {
+			AllowList:     mapset.NewSet("foo", "bar"),
+			DenyList:      mapset.NewSet("foo"),
+			ExpNamespaces: []string{"bar"},
+		},
+		"* in allow": {
+			AllowList:     mapset.NewSet("*"),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: []string{"foo", "bar"},
+		},
+		"* in allow with one denied": {
+			AllowList:     mapset.NewSet("*"),
+			DenyList:      mapset.NewSet("bar"),
+			ExpNamespaces: []string{"foo"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(tt *testing.T) {
+			client := fake.NewSimpleClientset()
+			syncer := &TestSyncer{}
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.AllowK8sNamespacesSet = c.AllowList
+			serviceResource.DenyK8sNamespacesSet = c.DenyList
+
+			// Start the controller
+			closer := controller.TestControllerRun(&serviceResource)
+			defer closer()
+
+			// We always have two services in two namespaces: foo and bar.
+			// Each service has the same name as its origin k8s namespace which
+			// we use for asserting that the right namespace got synced.
+			for _, ns := range []string{"foo", "bar"} {
+				_, err := client.CoreV1().Services(ns).Create(lbService(ns, ns, "1.2.3.4"))
+				require.NoError(tt, err)
+			}
+
+			// Test we got registrations from the expected namespaces.
+			retry.Run(tt, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+				require.Len(r, actual, len(c.ExpNamespaces))
+			})
+
+			syncer.Lock()
+			defer syncer.Unlock()
+			for _, expNS := range c.ExpNamespaces {
+				found := false
+				for _, reg := range syncer.Registrations {
+					// The service names are the same as their k8s destination
+					// namespaces so we can that to ensure the services were
+					// synced from the expected namespaces.
+					if reg.Service.Service == expNS {
+						found = true
+					}
+				}
+				require.True(tt, found, "did not find service from ns %s", expNS)
+			}
+		})
+	}
+}
+
+// Test that services are synced to the correct destination ns
+// when a single destination namespace is set.
+func TestServiceResource_singleDestNamespace(t *testing.T) {
+	t.Parallel()
+	consulDestNamespaces := []string{"default", "dest"}
+	for _, consulDestNamespace := range consulDestNamespaces {
+		t.Run(consulDestNamespace, func(tt *testing.T) {
+			client := fake.NewSimpleClientset()
+			syncer := &TestSyncer{}
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.ConsulDestinationNamespace = consulDestNamespace
+			serviceResource.EnableNamespaces = true
+			closer := controller.TestControllerRun(&serviceResource)
+			defer closer()
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).
+				Create(lbService("foo", metav1.NamespaceDefault, "1.2.3.4"))
+			require.NoError(tt, err)
+
+			retry.Run(tt, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+				require.Len(r, actual, 1)
+				require.Equal(r, consulDestNamespace, actual[0].Service.Namespace)
+			})
+		})
+	}
+}
+
+// Test that services are created in a mirrored namespace.
+func TestServiceResource_MirroredNamespace(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.EnableK8SNSMirroring = true
+	serviceResource.EnableNamespaces = true
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	k8sNamespaces := []string{"foo", "bar", "default"}
+	for _, ns := range k8sNamespaces {
+		_, err := client.CoreV1().Services(ns).
+			Create(lbService(ns, ns, "1.2.3.4"))
+		require.NoError(t, err)
+	}
+
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		for _, expNS := range k8sNamespaces {
+			found := false
+			for _, reg := range actual {
+				if reg.Service.Namespace == expNS {
+					found = true
+				}
+			}
+			require.True(r, found, "did not find registration from ns %s", expNS)
+		}
+	})
+}
+
+// Test that services are created in a mirrored namespace with prefix.
+func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.EnableK8SNSMirroring = true
+	serviceResource.EnableNamespaces = true
+	serviceResource.K8SNSMirroringPrefix = "prefix-"
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	k8sNamespaces := []string{"foo", "bar", "default"}
+	for _, ns := range k8sNamespaces {
+		_, err := client.CoreV1().Services(ns).
+			Create(lbService(ns, ns, "1.2.3.4"))
+		require.NoError(t, err)
+	}
+
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		for _, expNS := range k8sNamespaces {
+			found := false
+			for _, reg := range actual {
+				if reg.Service.Namespace == "prefix-"+expNS {
+					found = true
+				}
+			}
+			require.True(r, found, "did not find registration from ns %s", expNS)
+		}
+	})
+}
+
 // lbService returns a Kubernetes service of type LoadBalancer.
-func lbService(name, lbIP string) *apiv1.Service {
+func lbService(name, namespace, lbIP string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
+			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
 
@@ -1365,10 +1432,11 @@ func lbService(name, lbIP string) *apiv1.Service {
 }
 
 // nodePortService returns a Kubernetes service of type NodePort.
-func nodePortService(name string) *apiv1.Service {
+func nodePortService(name, namespace string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 
 		Spec: apiv1.ServiceSpec{
@@ -1382,10 +1450,11 @@ func nodePortService(name string) *apiv1.Service {
 }
 
 // clusterIPService returns a Kubernetes service of type ClusterIP.
-func clusterIPService(name string) *apiv1.Service {
+func clusterIPService(name, namespace string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
+			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
 
@@ -1441,7 +1510,8 @@ func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, n
 	node2 := nodeName2
 	_, err := client.CoreV1().Endpoints(namespace).Create(&apiv1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceName,
+			Name:      serviceName,
+			Namespace: namespace,
 		},
 
 		Subsets: []apiv1.EndpointSubset{
@@ -1468,4 +1538,14 @@ func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, n
 	})
 
 	require.NoError(t, err)
+}
+
+func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceResource {
+	return ServiceResource{
+		Log:                   hclog.Default(),
+		Client:                client,
+		Syncer:                syncer,
+		AllowK8sNamespacesSet: mapset.NewSet("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
+	}
 }
