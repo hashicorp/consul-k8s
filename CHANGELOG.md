@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.16.0 (Jan 10, 2020)
+
 IMPROVEMENTS:
 
   * Optionally allow enabling TLS for Consul communication [[GH-313](https://github.com/hashicorp/consul-helm/pull/313)].
