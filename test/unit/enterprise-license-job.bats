@@ -87,26 +87,3 @@ load _helpers
       yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-@test "server/EnterpriseLicense: no service account specified when global.bootstrapACLS=false" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.serviceAccountName' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "server/EnterpriseLicense: service account specified when global.bootstrapACLS=true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-job.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.serviceAccountName | contains("consul-enterprise-license")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
