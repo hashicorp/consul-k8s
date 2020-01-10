@@ -7,6 +7,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/coredns/coredns v1.2.2 // indirect
+	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/elazarl/go-bindata-assetfs v1.0.0 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect

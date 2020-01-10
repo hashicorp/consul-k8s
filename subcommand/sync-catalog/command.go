@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/deckarep/golang-set"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -23,6 +24,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
+
+type arrayFlags []string
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
 
 // Command is the command for syncing the K8S and Consul service
 // catalogs (one or both directions).
@@ -47,6 +55,14 @@ type Command struct {
 	flagNodePortSyncType      string
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
+
+	// Flags to support namespaces
+	flagEnableNamespaces       bool     // Use namespacing on all components
+	flagConsulNamespace        string   // Consul namespace to register everything if not mirroring
+	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
+	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
+	flagEnableNSMirroring      bool     // Enables mirroring of k8s namespaces into Consul
+	flagMirroringPrefix        string   // Prefix added to Consul namespaces created when mirroring
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
@@ -101,12 +117,25 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
+		"Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
+	c.flags.StringVar(&c.flagConsulNamespace, "consul-namespace", "default",
+		"Defines which Consul namespace to register all synced services into. If `enable-namespace-mirroring` "+
+			"is true, this is not used.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-namespace",
+		"K8s namespaces to explicitly allow. May be specified multiple times.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-namespace",
+		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
+	c.flags.BoolVar(&c.flagEnableNSMirroring, "enable-namespace-mirroring", false, "Enables namespace mirroring")
+	c.flags.StringVar(&c.flagMirroringPrefix, "mirroring-prefix", "",
+		"Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.http.ClientFlags())
 	flags.Merge(c.flags, c.http.ServerFlags())
 	flags.Merge(c.flags, c.k8s.Flags())
+
 	c.help = flags.Usage(help, c.flags)
 }
 
@@ -120,7 +149,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// create the clientset
+	// Create the k8s clientset
 	if c.clientset == nil {
 		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 		if err != nil {
@@ -145,6 +174,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// Set up logging
 	level := hclog.LevelFromString(c.flagLogLevel)
 	if level == hclog.NoLevel {
 		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
@@ -159,6 +189,24 @@ func (c *Command) Run(args []string) int {
 	var syncInterval time.Duration
 	c.flagConsulWritePeriod.Merge(&syncInterval)
 
+	// Convert allow/deny lists to sets
+	allowSet := mapset.NewSet()
+	denySet := mapset.NewSet()
+	if c.flagK8SSourceNamespace != "" {
+		// For backwards compatibility, if `flagK8SSourceNamespace` is set,
+		// it will be the only allowed namespace
+		allowSet.Add(c.flagK8SSourceNamespace)
+	} else {
+		for _, allow := range c.flagAllowK8sNamespacesList {
+			allowSet.Add(allow)
+		}
+		for _, deny := range c.flagDenyK8sNamespacesList {
+			denySet.Add(deny)
+		}
+	}
+	logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
+		"k8s namespaces denied from syncing", denySet)
+
 	// Create the context we'll use to cancel everything
 	ctx, cancelF := context.WithCancel(context.Background())
 
@@ -167,12 +215,14 @@ func (c *Command) Run(args []string) int {
 	if c.flagToConsul {
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
-			Client:            c.consulClient,
-			Log:               logger.Named("to-consul/sink"),
-			Namespace:         c.flagK8SSourceNamespace,
-			SyncPeriod:        syncInterval,
-			ServicePollPeriod: syncInterval * 2,
-			ConsulK8STag:      c.flagConsulK8STag,
+			Client:                c.consulClient,
+			Log:                   logger.Named("to-consul/sink"),
+			AllowK8sNamespacesSet: allowSet,
+			DenyK8sNamespacesSet:  denySet,
+			EnableNamespaces:      c.flagEnableNamespaces,
+			SyncPeriod:            syncInterval,
+			ServicePollPeriod:     syncInterval * 2,
+			ConsulK8STag:          c.flagConsulK8STag,
 		}
 		go syncer.Run(ctx)
 
@@ -183,13 +233,18 @@ func (c *Command) Run(args []string) int {
 				Log:                   logger.Named("to-consul/source"),
 				Client:                c.clientset,
 				Syncer:                syncer,
-				Namespace:             c.flagK8SSourceNamespace,
+				AllowK8sNamespacesSet: allowSet,
+				DenyK8sNamespacesSet:  denySet,
 				ExplicitEnable:        !c.flagK8SDefault,
 				ClusterIPSync:         c.flagSyncClusterIPServices,
 				NodePortSync:          catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
 				ConsulK8STag:          c.flagConsulK8STag,
 				ConsulServicePrefix:   c.flagConsulServicePrefix,
 				AddK8SNamespaceSuffix: c.flagAddK8SNamespaceSuffix,
+				EnableNamespaces:      c.flagEnableNamespaces,
+				ConsulNamespaceName:   c.flagConsulNamespace,
+				EnableNSMirroring:     c.flagEnableNSMirroring,
+				MirroringPrefix:       c.flagMirroringPrefix,
 			},
 		}
 
