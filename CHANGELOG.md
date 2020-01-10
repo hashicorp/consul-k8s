@@ -10,6 +10,13 @@ IMPROVEMENTS:
     on Kubernetes. We will have better support for other deployment architectures,
     as well as bringing your own CA, in the future.
 
+  * Use the latest version of consul-k8s (0.11.0).
+
+  * Add pod name as metadata to client nodes to help users map nodes in Consul to underlying client pods
+    [[GH-315](https://github.com/hashicorp/consul-helm/pull/315)].
+
+  * Rename `enterprise-licence.yaml` template to `enterprise-license-job.yaml` [[GH-321](https://github.com/hashicorp/consul-helm/pull/321)].
+
 BUG FIXES:
 
   * Fix graceful termination for servers [[GH-313](https://github.com/hashicorp/consul-helm/pull/313)].
@@ -18,6 +25,11 @@ BUG FIXES:
     in a "failed" state. Additionally, clients always set `leave_on_terminate` to `true`.
     This replaces the `preStop` hook that was calling `consul leave`. Note that `leave_on_terminate` defaults
     to true for clients as of Consul `0.7`, so this change only affects earlier versions.
+
+  * Helm test runner now respects the provided namespace [[GH-320](https://github.com/hashicorp/consul-helm/pull/320)].
+
+  * Add pod security policies for the `enterprise-license` [[GH-325](https://github.com/hashicorp/consul-helm/pull/325)]
+    and the `server-acl-init` jobs [[GH-326](https://github.com/hashicorp/consul-helm/pull/325)].
 
 ## 0.15.0 (Dec 17, 2019)
 
