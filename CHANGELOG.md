@@ -1,8 +1,11 @@
+## UNRELEASED
+
 ## 0.11.0 (January 10, 2020)
 
 Improvements:
 
 * Connect: Add TLS support [[GH-181](https://github.com/hashicorp/consul-k8s/pull/181)].
+* Bootstrap ACLs: Add TLS support [[GH-183](https://github.com/hashicorp/consul-k8s/pull/183)].
 
 ## 0.10.1 (December 17, 2019)
 
