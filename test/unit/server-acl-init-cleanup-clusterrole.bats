@@ -42,3 +42,17 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.enablePodSecurityPolicies
+
+@test "serverACLInitCleanup/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-cleanup-clusterrole.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
