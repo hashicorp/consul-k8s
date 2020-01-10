@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -46,10 +47,21 @@ const (
 // ServiceResource implements controller.Resource to sync Service resource
 // types from K8S.
 type ServiceResource struct {
-	Log       hclog.Logger
-	Client    kubernetes.Interface
-	Syncer    Syncer
-	Namespace string // K8S namespace to watch
+	Log    hclog.Logger
+	Client kubernetes.Interface
+	Syncer Syncer
+
+	// AllowK8sNamespacesSet is a set of k8s namespaces to explicitly allow for
+	// syncing. It supports the special character `*` which indicates that
+	// all k8s namespaces are eligible unless explicitly denied. This filter
+	// is applied before checking pod annotations.
+	AllowK8sNamespacesSet mapset.Set
+
+	// DenyK8sNamespacesSet is a set of k8s namespaces to explicitly deny
+	// syncing and thus service registration with Consul. An empty set
+	// means that no namespaces are removed from consideration. This filter
+	// takes precedence over AllowK8sNamespacesSet.
+	DenyK8sNamespacesSet mapset.Set
 
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
@@ -77,6 +89,28 @@ type ServiceResource struct {
 	// as 'foo-default'.
 	AddK8SNamespaceSuffix bool
 
+	// EnableNamespaces indicates that a user is running Consul Enterprise
+	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
+	// with syncing into either a single Consul namespace or mirrored from
+	// k8s namespaces.
+	EnableNamespaces bool
+
+	// ConsulDestinationNamespace is the name of the Consul namespace to register all
+	// synced services into if Consul namespaces are enabled and mirroring
+	// is disabled. This will not be used if mirroring is enabled.
+	ConsulDestinationNamespace string
+
+	// EnableK8SNSMirroring causes Consul namespaces to be created to match the
+	// organization within k8s. Services are registered into the Consul
+	// namespace that mirrors their k8s namespace.
+	EnableK8SNSMirroring bool
+
+	// K8SNSMirroringPrefix is an optional prefix that can be added to the Consul
+	// namespaces created while mirroring. For example, if it is set to "k8s-",
+	// then the k8s `default` namespace will be mirrored in Consul's
+	// `k8s-default` namespace.
+	K8SNSMirroringPrefix string
+
 	// serviceLock must be held for any read/write to these maps.
 	serviceLock sync.RWMutex
 
@@ -96,14 +130,16 @@ type ServiceResource struct {
 
 // Informer implements the controller.Resource interface.
 func (t *ServiceResource) Informer() cache.SharedIndexInformer {
+	// Watch all k8s namespaces. Events will be filtered out as appropriate
+	// based on the allow and deny lists in the `shouldSync` function.
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Client.CoreV1().Services(t.namespace()).List(options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Client.CoreV1().Services(t.namespace()).Watch(options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&apiv1.Service{},
@@ -134,13 +170,14 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 			t.Log.Info("service should no longer be synced", "service", key)
 			t.doDelete(key)
 		} else {
-			t.Log.Debug("syncing disabled for service, ignoring", "key", key)
+			t.Log.Debug("[ServiceResource.Upsert] syncing disabled for service, ignoring", "key", key)
 		}
 		return nil
 	}
 
 	// Syncing is enabled, let's keep track of this service.
 	t.serviceMap[key] = service
+	t.Log.Debug("[ServiceResource.Upsert] adding service to serviceMap", "key", key, "service", service)
 
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
@@ -156,6 +193,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 				t.endpointsMap = make(map[string]*apiv1.Endpoints)
 			}
 			t.endpointsMap[key] = endpoints
+			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoints to endpointsMap", "key", key, "service", service, "endpoints", endpoints)
 		}
 	}
 
@@ -180,7 +218,9 @@ func (t *ServiceResource) Delete(key string) error {
 // Precondition: assumes t.serviceLock is held
 func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
+	t.Log.Debug("[doDelete] deleting service from serviceMap", "key", key)
 	delete(t.endpointsMap, key)
+	t.Log.Debug("[doDelete] deleting endpoints from endpointsMap", "key", key)
 	// If there were registrations related to this service, then
 	// delete them and sync.
 	if _, ok := t.consulMap[key]; ok {
@@ -200,17 +240,22 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 
 // shouldSync returns true if resyncing should be enabled for the given service.
 func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
-	// If we're listening on all namespaces, we explicitly ignore the
-	// system namespace. The user can explicitly enable this by starting
-	// a sync for that namespace.
-	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
-		t.Log.Debug("ignoring system service since we're listening on all namespaces",
-			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace))
+	// Namespace logic
+	// If in deny list, don't sync
+	if t.DenyK8sNamespacesSet.Contains(svc.Namespace) {
+		t.Log.Debug("[shouldSync] service is in the deny list", "svc.Namespace", svc.Namespace, "service", svc)
+		return false
+	}
+
+	// If not in allow list or allow list is not *, don't sync
+	if !t.AllowK8sNamespacesSet.Contains("*") && !t.AllowK8sNamespacesSet.Contains(svc.Namespace) {
+		t.Log.Debug("[shouldSync] service not in allow list", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
 
 	// Ignore ClusterIP services if ClusterIP sync is disabled
 	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+		t.Log.Debug("[shouldSync] ignoring clusterip service", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
 
@@ -265,6 +310,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		return
 	}
 
+	t.Log.Debug("[generateRegistrations] generating registration", "key", key)
+
 	// Initialize our consul service map here if it isn't already.
 	if t.consulMap == nil {
 		t.consulMap = make(map[string][]*consulapi.CatalogRegistration)
@@ -279,7 +326,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// shallow copied for each instance.
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
-		Node:           "k8s-sync",
+		Node:           ConsulSyncNodeName,
 		Address:        "127.0.0.1",
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
@@ -291,13 +338,29 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
-			ConsulK8SNS:     t.namespace(),
+			ConsulK8SNS:     svc.Namespace,
 		},
 	}
 
 	// If the name is explicitly annotated, adopt that name
 	if v, ok := svc.Annotations[annotationServiceName]; ok {
 		baseService.Service = strings.TrimSpace(v)
+	}
+
+	// Update the Consul namespace based on namespace settings
+	if t.EnableNamespaces {
+		var ns string
+
+		// Mirroring takes precedence
+		if t.EnableK8SNSMirroring {
+			ns = fmt.Sprintf("%s%s", t.K8SNSMirroringPrefix, svc.Namespace)
+		} else {
+			ns = t.ConsulDestinationNamespace
+		}
+		t.Log.Debug("[generateRegistrations] namespace being used", "key", key, "namespace", ns)
+
+		// Update baseService to have a Consul namespace
+		baseService.Namespace = ns
 	}
 
 	// Determine the default port and set port annotations
@@ -382,6 +445,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		t.Log.Debug("generated registration",
 			"key", key,
 			"service", baseService.Service,
+			"namespace", baseService.Namespace,
 			"instances", len(t.consulMap[key]))
 	}()
 
@@ -580,15 +644,6 @@ func (t *ServiceResource) sync() {
 	t.Syncer.Sync(rs)
 }
 
-// namespace returns the K8S namespace to setup the resource watchers in.
-func (t *ServiceResource) namespace() string {
-	if t.Namespace != "" {
-		return t.Namespace
-	}
-
-	return metav1.NamespaceAll
-}
-
 // serviceEndpointsResource implements controller.Resource and starts
 // a background watcher on endpoints that is used by the ServiceResource
 // to keep track of changing endpoints for registered services.
@@ -597,17 +652,21 @@ type serviceEndpointsResource struct {
 }
 
 func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
+	// Watch all k8s namespaces. Events will be filtered out as appropriate in the
+	// `shouldTrackEndpoints` function which checks whether the service is marked
+	// to be tracked by the `shouldSync` function which uses the allow and deny
+	// namespace lists.
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return t.Service.Client.CoreV1().
-					Endpoints(t.Service.namespace()).
+					Endpoints(metav1.NamespaceAll).
 					List(options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return t.Service.Client.CoreV1().
-					Endpoints(t.Service.namespace()).
+					Endpoints(metav1.NamespaceAll).
 					Watch(options)
 			},
 		},
