@@ -52,9 +52,10 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		UI:                         ui,
+		clientset:                  k8s,
+		consulClient:               testAgent.Client(),
+		flagAllowK8sNamespacesList: []string{"*"},
 	}
 
 	// create a service in k8s
@@ -88,9 +89,10 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		UI:                         ui,
+		clientset:                  k8s,
+		consulClient:               testAgent.Client(),
+		flagAllowK8sNamespacesList: []string{"*"},
 	}
 
 	// create a service in k8s
@@ -140,9 +142,10 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		UI:                         ui,
+		clientset:                  k8s,
+		consulClient:               testAgent.Client(),
+		flagAllowK8sNamespacesList: []string{"*"},
 	}
 
 	// create two services in k8s
