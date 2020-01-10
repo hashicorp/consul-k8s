@@ -25,9 +25,16 @@ spec:
   # since this DNS is also used for join operations.
   publishNotReadyAddresses: true
   ports:
+    {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
     - name: http
       port: 8500
       targetPort: 8500
+    {{- end }}
+    {{- if .Values.global.tls.enabled }}
+    - name: https
+      port: 8501
+      targetPort: 8501
+    {{- end }}
     - name: serflan-tcp
       protocol: "TCP"
       port: 8301

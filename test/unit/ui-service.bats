@@ -136,3 +136,48 @@ load _helpers
       yq -r '.spec.loadBalancerIP' | tee /dev/stderr)
   [ "${actual}" = "1.2.3.4" ]
 }
+
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "ui/Service: no HTTPS listener when TLS is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
+@test "ui/Service: HTTPS listener set when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
+  [ "${actual}" == "443" ]
+}
+
+@test "ui/Service: HTTP listener still active when httpsOnly is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
+  [ "${actual}" == "80" ]
+}
+
+@test "ui/Service: no HTTP listener when httpsOnly is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}

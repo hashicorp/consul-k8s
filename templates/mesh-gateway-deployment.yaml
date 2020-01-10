@@ -48,6 +48,11 @@ spec:
       volumes:
         - name: consul-bin
           emptyDir: {}
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+        {{- end }}
       {{- if .Values.meshGateway.hostNetwork }}
       hostNetwork: {{ .Values.meshGateway.hostNetwork }}
       {{- end }}
@@ -92,6 +97,11 @@ spec:
           volumeMounts:
           - name: consul-bin
             mountPath: /consul-bin
+          {{- if .Values.global.tls.enabled }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
+          {{- end }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -114,6 +124,19 @@ spec:
                   name: "{{ template "consul.fullname" . }}-mesh-gateway-acl-token"
                   key: "token"
             {{- end}}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_GRPC_ADDR
+              value: https://$(HOST_IP):8502
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            - name: CONSUL_GRPC_ADDR
+              value: $(HOST_IP):8502
+            {{- end }}
           command:
             # /bin/sh -c is needed so we can use the pod-specific environment
             # variables.
@@ -124,8 +147,6 @@ spec:
                 -mesh-gateway \
                 -register \
                 -address="${POD_IP}:{{ .Values.meshGateway.containerPort }}" \
-                -http-addr="${HOST_IP}:8500" \
-                -grpc-addr="${HOST_IP}:8502" \
                 {{- if .Values.meshGateway.wanAddress.host }}
                 -wan-address="{{ .Values.meshGateway.wanAddress.host }}:{{ .Values.meshGateway.wanAddress.port }}" \
                 {{- else if .Values.meshGateway.wanAddress.useNodeName }}
@@ -164,7 +185,8 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -http-addr=\"${HOST_IP}:8500\" -id=\"{{ default "mesh-gateway" .Values.meshGateway.consulServiceName }}\""]
+                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ default "mesh-gateway" .Values.meshGateway.consulServiceName }}\""]
+
       {{- if .Values.meshGateway.priorityClassName }}
       priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
       {{- end }}

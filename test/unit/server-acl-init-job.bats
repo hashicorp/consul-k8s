@@ -210,3 +210,26 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-create-mesh-gateway-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "serverACLInit/Job: sets TLS flags when global.tls.enabled" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $command | jq -r '. | any(contains("-use-https"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $command | jq -r '. | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+    actual=$(echo $command | jq -r '. | any(contains("-consul-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+    [ "${actual}" = "true" ]
+}

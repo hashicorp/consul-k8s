@@ -87,3 +87,90 @@ load _helpers
       yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "server/EnterpriseLicense: no volumes when TLS is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/EnterpriseLicense: volumes present when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "server/EnterpriseLicense: no volumes mounted when TLS is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/EnterpriseLicense: volumes mounted when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "server/EnterpriseLicense: URL is http when TLS is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = "http://release-name-consul-server:8500" ]
+}
+
+@test "server/EnterpriseLicense: URL is https when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = "https://release-name-consul-server:8501" ]
+}
+
+@test "server/EnterpriseLicense: CA certificate is specified when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+}

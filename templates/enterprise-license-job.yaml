@@ -31,6 +31,12 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-enterprise-license
+      {{- if .Values.global.tls.enabled }}
+      volumes:
+        - name: tls-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+      {{- end }}
       containers:
         - name: apply-enterprise-license
           image: "{{ default .Values.global.image .Values.server.image }}"
@@ -41,7 +47,15 @@ spec:
                   name: {{ .Values.server.enterpriseLicense.secretName }}
                   key: {{ .Values.server.enterpriseLicense.secretKey }}
             - name: CONSUL_HTTP_ADDR
+              {{- if .Values.global.tls.enabled }}
+              value: https://{{ template "consul.fullname" . }}-server:8501
+              {{- else }}
               value: http://{{ template "consul.fullname" . }}-server:8500
+              {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name:  CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end}}
             {{- if .Values.global.bootstrapACLs }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
@@ -49,11 +63,17 @@ spec:
                   name: "{{ template "consul.fullname" . }}-enterprise-license-acl-token"
                   key: "token"
             {{- end}}
-          command: 
+          command:
             - "/bin/sh"
             - "-ec"
             - |
               consul license put "${ENTERPRISE_LICENSE}"
+          {{- if .Values.global.tls.enabled }}
+          volumeMounts:
+            - name: tls-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+          {{- end }}
       {{- if .Values.global.bootstrapACLs }}
       initContainers:
       - name: ent-license-acl-init

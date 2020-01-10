@@ -50,7 +50,7 @@ spec:
       tolerations:
         {{ tpl .Values.server.tolerations . | nindent 8 | trim }}
     {{- end }}
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
       securityContext:
         fsGroup: 1000
@@ -58,6 +58,14 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
+        {{- if .Values.global.tls.enabled }}
+        - name: tls-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+        - name: tls-server-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-server-cert
+        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -89,6 +97,12 @@ spec:
                   name: {{ .Values.global.gossipEncryption.secretName }}
                   key: {{ .Values.global.gossipEncryption.secretKey }}
             {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://localhost:8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
@@ -100,6 +114,20 @@ spec:
                 -advertise="${POD_IP}" \
                 -bind=0.0.0.0 \
                 -bootstrap-expect={{ .Values.server.bootstrapExpect }} \
+                {{- if .Values.global.tls.enabled }}
+                -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
+                -hcl='cert_file = "/consul/tls/server/tls.crt"' \
+                -hcl='key_file = "/consul/tls/server/tls.key"' \
+                {{- if .Values.global.tls.verify }}
+                -hcl='verify_incoming_rpc = true' \
+                -hcl='verify_outgoing = true' \
+                -hcl='verify_server_hostname = true' \
+                {{- end }}
+                -hcl='ports { https = 8501 }' \
+                {{- if .Values.global.tls.httpsOnly }}
+                -hcl='ports { http = -1 }' \
+                {{- end }}
+                {{- end }}
                 -client=0.0.0.0 \
                 -config-dir=/consul/config \
                 {{- range .Values.server.extraVolumes }}
@@ -128,6 +156,14 @@ spec:
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
+            {{- if .Values.global.tls.enabled }}
+            - name: tls-ca-cert
+              mountPath: /consul/tls/ca/
+              readOnly: true
+            - name: tls-server-cert
+              mountPath: /consul/tls/server
+              readOnly: true
+            {{- end }}
             {{- range .Values.server.extraVolumes }}
             - name: userconfig-{{ .name }}
               readOnly: true
@@ -141,8 +177,14 @@ spec:
                 - -c
                 - consul leave
           ports:
+            {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - containerPort: 8500
               name: http
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - containerPort: 8501
+              name: https
+            {{- end }}
             - containerPort: 8301
               name: serflan
             - containerPort: 8302
@@ -163,8 +205,14 @@ spec:
                 - "/bin/sh"
                 - "-ec"
                 - |
-                  curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | \
-                  grep -E '".+"'
+                  {{- if .Values.global.tls.enabled }}
+                  curl \
+                    --cacert /consul/tls/ca/tls.crt \
+                    https://127.0.0.1:8501/v1/status/leader \
+                  {{- else }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
+                  {{- end }}
+                  2>/dev/null | grep -E '".+"'
             failureThreshold: 2
             initialDelaySeconds: 5
             periodSeconds: 3

@@ -34,11 +34,10 @@ spec:
       {{- end }}
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" . }}-snapshot-agent
-
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
-      {{- if (or .Values.global.bootstrapACLs (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey)) }}
+      {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey)) }}
       volumes:
         {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
         - name: snapshot-config
@@ -52,6 +51,11 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          secret:
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+        {{- end }}
       {{- end }}
       containers:
         - name: consul-snapshot-agent
@@ -61,6 +65,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
             {{- if .Values.global.bootstrapACLs }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
@@ -79,8 +92,7 @@ spec:
                 {{- if .Values.global.bootstrapACLs}}
                 -config-dir=/consul/aclconfig \
                 {{- end }}
-                -http-addr=http://${HOST_IP}:8500
-          {{- if (or .Values.global.bootstrapACLs (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) ) }}
+          {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) ) }}
           volumeMounts:
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             - name: snapshot-config
@@ -90,6 +102,11 @@ spec:
             {{- if .Values.global.bootstrapACLs}}
             - name: aclconfig
               mountPath: /consul/aclconfig
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
             {{- end }}
           {{- end }}
       {{- if .Values.global.bootstrapACLs }}
