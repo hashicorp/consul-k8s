@@ -12,6 +12,12 @@ IMPROVEMENTS:
     on Kubernetes. We will have better support for other deployment architectures,
     as well as bringing your own CA, in the future.
 
+    Also, note that simply turning on this feature and running `helm upgrade` will result in downtime if you are using
+    Consul Connect or Sync Catalog features. We will be adding instructions on how to do this upgrade without downtime soon.
+    Additionally, if you do decide to proceed with an upgrade despite downtime
+    and you're using Consul Connect, all application pods need to be recreated after upgrade, so that the Connect injector
+    can re-inject Envoy sidecars with TLS enabled.
+
   * Use the latest version of consul-k8s (0.11.0).
 
   * Add pod name as metadata to client nodes to help users map nodes in Consul to underlying client pods
