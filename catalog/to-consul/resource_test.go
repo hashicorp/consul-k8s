@@ -1211,6 +1211,46 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
+// Test that the proper registrations are generated for a ClusterIP type not as Endpoints
+//  with annotated port name override
+func TestServiceResource_clusterIPnotAsEndpoints_AnnotatedPortName(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:                  hclog.Default(),
+		Client:               client,
+		Syncer:               syncer,
+		ClusterIPSync:        true,
+		ClusterIPAsEndpoints: false,
+	})
+	defer closer()
+
+	// Insert the service
+	svc := clusterIPService("foo")
+	svc.Annotations[annotationServicePort] = "rpc"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+
+	// Insert the endpoints
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("0.1.2.3", actual[0].Service.Address)
+	require.Equal(8500, actual[0].Service.Port)
+}
+
 // Test that the proper registrations are generated for a ClusterIP type with
 // annotated port number override.
 func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
@@ -1253,6 +1293,46 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	require.Equal("2.2.2.2", actual[1].Service.Address)
 	require.Equal(4141, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test that the proper registrations are generated for a ClusterIP type not as Endpoints
+// with annotated port number override.
+func TestServiceResource_clusterIPnotAsEndpoints_AnnotatedPortNumber(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:                  hclog.Default(),
+		Client:               client,
+		Syncer:               syncer,
+		ClusterIPSync:        true,
+		ClusterIPAsEndpoints: false,
+	})
+	defer closer()
+
+	// Insert the service
+	svc := clusterIPService("foo")
+	svc.Annotations[annotationServicePort] = "4141"
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+
+	// Insert the endpoints
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("0.1.2.3", actual[0].Service.Address)
+	require.Equal(4141, actual[0].Service.Port)
 }
 
 // Test that the proper registrations are generated for a ClusterIP type with unnamed ports.
@@ -1299,6 +1379,49 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	require.Equal("2.2.2.2", actual[1].Service.Address)
 	require.Equal(8080, actual[1].Service.Port)
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+}
+
+// Test that the proper registrations are generated for a ClusterIP type not as Endpoints
+// with unnamed ports.
+func TestServiceResource_clusterIPnotAsEndpoints_UnnamedPorts(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+
+	// Start the controller
+	closer := controller.TestControllerRun(&ServiceResource{
+		Log:                  hclog.Default(),
+		Client:               client,
+		Syncer:               syncer,
+		ClusterIPSync:        true,
+		ClusterIPAsEndpoints: false,
+	})
+	defer closer()
+
+	// Insert the service
+	svc := clusterIPService("foo")
+	svc.Spec.Ports = []apiv1.ServicePort{
+		{Port: 80, TargetPort: intstr.FromInt(8080)},
+		{Port: 8500, TargetPort: intstr.FromInt(2000)},
+	}
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+
+	// Insert the endpoints
+	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Wait a bit
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("0.1.2.3", actual[0].Service.Address)
+	require.Equal(80, actual[0].Service.Port)
 }
 
 // Test that the ClusterIP services aren't synced when ClusterIPSync
