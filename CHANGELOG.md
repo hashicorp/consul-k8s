@@ -1,5 +1,12 @@
 ## Unreleased
 
+## 0.16.1 (Jan 14, 2020)
+
+BUG FIXES:
+
+  * Fix a bug with the `tls-init` job, in which it could not correctly detect CA file
+    if Consul domain is provided [[GH-329](https://github.com/hashicorp/consul-helm/pull/329)].
+
 ## 0.16.0 (Jan 10, 2020)
 
 IMPROVEMENTS:
