@@ -596,7 +596,9 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 		} else {
 			addr := svc.Spec.ClusterIP
-			if addr == "" {
+			// "None" is valid here for Headless Services but impossible to sync
+			// Should Headless Services always be asEndpoints?
+			if addr == "" || addr == "None" {
 				return
 			}
 
