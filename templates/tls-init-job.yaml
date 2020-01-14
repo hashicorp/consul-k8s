@@ -45,7 +45,8 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul tls ca create
+              consul tls ca create \
+                -domain={{ .Values.global.domain }}
               consul tls cert create -server \
                 -days=730 \
                 -additional-dnsname='{{ template "consul.fullname" . }}-server' \
