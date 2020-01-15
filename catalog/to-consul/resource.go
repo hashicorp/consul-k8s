@@ -170,13 +170,14 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 			t.Log.Info("service should no longer be synced", "service", key)
 			t.doDelete(key)
 		} else {
-			t.Log.Debug("syncing disabled for service, ignoring", "key", key)
+			t.Log.Debug("[ServiceResource.Upsert] syncing disabled for service, ignoring", "key", key)
 		}
 		return nil
 	}
 
 	// Syncing is enabled, let's keep track of this service.
 	t.serviceMap[key] = service
+	t.Log.Debug("[ServiceResource.Upsert] adding service to serviceMap", "key", key, "service", service)
 
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
@@ -192,6 +193,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 				t.endpointsMap = make(map[string]*apiv1.Endpoints)
 			}
 			t.endpointsMap[key] = endpoints
+			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoints to endpointsMap", "key", key, "service", service, "endpoints", endpoints)
 		}
 	}
 
@@ -216,7 +218,9 @@ func (t *ServiceResource) Delete(key string) error {
 // Precondition: assumes t.serviceLock is held
 func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
+	t.Log.Debug("[doDelete] deleting service from serviceMap", "key", key)
 	delete(t.endpointsMap, key)
+	t.Log.Debug("[doDelete] deleting endpoints from endpointsMap", "key", key)
 	// If there were registrations related to this service, then
 	// delete them and sync.
 	if _, ok := t.consulMap[key]; ok {
@@ -239,16 +243,19 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	// Namespace logic
 	// If in deny list, don't sync
 	if t.DenyK8sNamespacesSet.Contains(svc.Namespace) {
+		t.Log.Debug("[shouldSync] service is in the deny list", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
 
 	// If not in allow list or allow list is not *, don't sync
 	if !t.AllowK8sNamespacesSet.Contains("*") && !t.AllowK8sNamespacesSet.Contains(svc.Namespace) {
+		t.Log.Debug("[shouldSync] service not in allow list", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
 
 	// Ignore ClusterIP services if ClusterIP sync is disabled
 	if svc.Spec.Type == apiv1.ServiceTypeClusterIP && !t.ClusterIPSync {
+		t.Log.Debug("[shouldSync] ignoring clusterip service", "svc.Namespace", svc.Namespace, "service", svc)
 		return false
 	}
 
@@ -303,6 +310,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		return
 	}
 
+	t.Log.Debug("[generateRegistrations] generating registration", "key", key)
+
 	// Initialize our consul service map here if it isn't already.
 	if t.consulMap == nil {
 		t.consulMap = make(map[string][]*consulapi.CatalogRegistration)
@@ -348,6 +357,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		} else {
 			ns = t.ConsulNamespaceName
 		}
+		t.Log.Debug("[generateRegistrations] namespace being used", "key", key, "namespace", ns)
 
 		// Update the baseNode and baseService to have a Consul namespace
 		// baseNode.Namespace = ns // This is not currently supported in the api
@@ -436,6 +446,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		t.Log.Debug("generated registration",
 			"key", key,
 			"service", baseService.Service,
+			"namespace", baseService.Namespace,
 			"instances", len(t.consulMap[key]))
 	}()
 

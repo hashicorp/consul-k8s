@@ -105,18 +105,21 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 		if s.EnableNamespaces {
 			ns = r.Service.Namespace
 		}
+		s.Log.Debug("[Sync] namespace being used", "service", r.Service, "namespace", ns)
 
 		// Mark this as a valid service, initializing state if necessary
 		if _, ok := s.serviceNames[ns]; !ok {
 			s.serviceNames[ns] = mapset.NewSet()
 		}
 		s.serviceNames[ns].Add(r.Service.Service)
+		s.Log.Debug("[Sync] adding service to serviceNames set", "service", r.Service, "service name", r.Service.Service)
 
 		// Add service to namespaces map, initializing if necessary
 		if _, ok := s.namespaces[ns]; !ok {
 			s.namespaces[ns] = make(map[string]*api.CatalogRegistration)
 		}
 		s.namespaces[ns][r.Service.ID] = r
+		s.Log.Debug("[Sync] adding service to namespaces map", "service", r.Service)
 	}
 }
 
@@ -180,6 +183,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 				s.Log.Warn("error querying services, will retry", "namespace", ns, "err", err)
 				continue
 			}
+			s.Log.Debug("[watchReapableServices] got services from Consul", "namespace", ns)
 		}
 
 		// Wait our minimum time before continuing or retrying
@@ -204,6 +208,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 					if tag == s.ConsulK8STag {
 						// We only care if we don't know about this service at all.
 						if s.serviceNames[ns].Contains(name) {
+							s.Log.Debug("[watchReapableServices] serviceNames contains service", "namespace", ns, "service name", name)
 							continue
 						}
 
@@ -279,6 +284,11 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name, namespace string)
 				if s.EnableNamespaces {
 					s.deregs[svc.ServiceID].Namespace = namespace
 				}
+				s.Log.Debug("[watchService] service being scheduled for deregistration",
+					"namespace", namespace,
+					"service name", svc.ServiceName,
+					"service id", svc.ServiceID,
+					"service dereg", s.deregs[svc.ServiceID])
 			}
 		}
 
@@ -312,6 +322,11 @@ func (s *ConsulSyncer) scheduleReapServiceLocked(name, namespace string) error {
 		if s.EnableNamespaces {
 			s.deregs[svc.ServiceID].Namespace = namespace
 		}
+		s.Log.Debug("[scheduleReapServiceLocked] service being scheduled for deregistration",
+			"namespace", namespace,
+			"service name", svc.ServiceName,
+			"service id", svc.ServiceID,
+			"service dereg", s.deregs[svc.ServiceID])
 	}
 
 	return nil
@@ -334,6 +349,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			if s.serviceNames[ns] == nil || !s.serviceNames[ns].Contains(svc) {
 				cf()
 				delete(s.watchers[ns], svc)
+				s.Log.Debug("[syncFull] deleting service watcher", "namespace", ns, "service", svc)
 			}
 		}
 	}
@@ -344,6 +360,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			if _, ok := s.watchers[ns][svc.(string)]; !ok {
 				svcCtx, cancelF := context.WithCancel(ctx)
 				go s.watchService(svcCtx, svc.(string), ns)
+				s.Log.Debug("[syncFull] starting watchService routine", "namespace", ns, "service", svc)
 
 				// Create watcher map if it doesn't exist for this namespace
 				if s.watchers[ns] == nil {
