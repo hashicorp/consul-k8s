@@ -1,5 +1,11 @@
 ## Unreleased
 
+## 0.16.2 (Jan 15, 2020)
+
+BUG FIXES:
+
+  * Fix Helm Chart version.
+
 ## 0.16.1 (Jan 14, 2020)
 
 BUG FIXES:
