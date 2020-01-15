@@ -165,6 +165,8 @@ func (c *Command) Run(args []string) int {
 	// Start the K8S-to-Consul syncer
 	var toConsulCh chan struct{}
 	if c.flagToConsul {
+		waitForServicesCh := make(chan int)
+
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
 			Client:            c.consulClient,
@@ -173,24 +175,29 @@ func (c *Command) Run(args []string) int {
 			SyncPeriod:        syncInterval,
 			ServicePollPeriod: syncInterval * 2,
 			ConsulK8STag:      c.flagConsulK8STag,
+			WaitForServicesCh: waitForServicesCh,
 		}
 		go syncer.Run(ctx)
 
+		resource := catalogtoconsul.ServiceResource{
+			Log:                   logger.Named("to-consul/source"),
+			Client:                c.clientset,
+			Syncer:                syncer,
+			Namespace:             c.flagK8SSourceNamespace,
+			ExplicitEnable:        !c.flagK8SDefault,
+			ClusterIPSync:         c.flagSyncClusterIPServices,
+			NodePortSync:          catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
+			ConsulK8STag:          c.flagConsulK8STag,
+			ConsulServicePrefix:   c.flagConsulServicePrefix,
+			AddK8SNamespaceSuffix: c.flagAddK8SNamespaceSuffix,
+			WaitForServicesCh:     waitForServicesCh,
+		}
+		resource.GetAllServices()
+
 		// Build the controller and start it
 		ctl := &controller.Controller{
-			Log: logger.Named("to-consul/controller"),
-			Resource: &catalogtoconsul.ServiceResource{
-				Log:                   logger.Named("to-consul/source"),
-				Client:                c.clientset,
-				Syncer:                syncer,
-				Namespace:             c.flagK8SSourceNamespace,
-				ExplicitEnable:        !c.flagK8SDefault,
-				ClusterIPSync:         c.flagSyncClusterIPServices,
-				NodePortSync:          catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
-				ConsulK8STag:          c.flagConsulK8STag,
-				ConsulServicePrefix:   c.flagConsulServicePrefix,
-				AddK8SNamespaceSuffix: c.flagAddK8SNamespaceSuffix,
-			},
+			Log:      logger.Named("to-consul/controller"),
+			Resource: &resource,
 		}
 
 		toConsulCh = make(chan struct{})

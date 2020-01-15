@@ -262,6 +262,9 @@ func testRegistration(node, service string) *api.CatalogRegistration {
 }
 
 func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) {
+	waitForServicesCh := make(chan int)
+	close(waitForServicesCh)
+
 	s := &ConsulSyncer{
 		Client:            client,
 		Log:               hclog.Default(),
@@ -269,6 +272,7 @@ func testConsulSyncer(t *testing.T, client *api.Client) (*ConsulSyncer, func()) 
 		ServicePollPeriod: 50 * time.Millisecond,
 		Namespace:         "default",
 		ConsulK8STag:      TestConsulK8STag,
+		WaitForServicesCh: waitForServicesCh,
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())

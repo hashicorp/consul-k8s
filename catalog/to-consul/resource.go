@@ -92,6 +92,27 @@ type ServiceResource struct {
 	// It's populated via Consul's API and lets us diff what is actually in
 	// Consul vs. what we expect to be there.
 	consulMap map[string][]*consulapi.CatalogRegistration
+
+	// WaitForServicesCh is the chan used to signal at startup that services are
+	// populated
+	WaitForServicesCh chan int
+}
+
+func (t *ServiceResource) GetAllServices() {
+	defer close(t.WaitForServicesCh)
+
+	serviceSlice, err := t.Client.CoreV1().Services(t.namespace()).List(metav1.ListOptions{})
+	if err != nil {
+		t.Log.Warn("Failed to list services", "err", err)
+		return
+	}
+
+	for _, service := range serviceSlice.Items {
+		if t.shouldSync(&service) {
+			key := fmt.Sprintf("%s/%s", service.ObjectMeta.Name, service.ObjectMeta.Namespace)
+			t.Upsert(key, &service)
+		}
+	}
 }
 
 // Informer implements the controller.Resource interface.

@@ -62,6 +62,11 @@ type ConsulSyncer struct {
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
 
+	// WaitForServicesCh is the chan used to wait for services to be
+	// populated at startup before to start removing services in consul
+	// that are no longer needed
+	WaitForServicesCh chan int
+
 	lock     sync.Mutex
 	once     sync.Once
 	services map[string]struct{} // set of valid service names
@@ -133,6 +138,12 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 // This task only marks them for deletion but doesn't perform the actual
 // deletion.
 func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
+
+	s.Log.Info("Wait for services to be populated before checking if there no longer used one in consul")
+	<-s.WaitForServicesCh
+	s.Log.Debug("Services have been populated at startup. We can start looking " +
+		"for no longer needed services in consul")
+
 	opts := api.QueryOptions{
 		AllowStale: true,
 		WaitIndex:  1,
