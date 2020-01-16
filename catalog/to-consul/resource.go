@@ -26,6 +26,10 @@ const (
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
 	ConsulK8SNS = "external-k8s-ns"
+
+	// SyncCatalogPodNameMeta is the key used in the meta to track hostname
+	// of the consul-k8s agent syncing.
+	SyncCatalogPodNameMeta = "sync-catalog-pod-name"
 )
 
 type NodePortSyncType string
@@ -92,6 +96,9 @@ type ServiceResource struct {
 	// It's populated via Consul's API and lets us diff what is actually in
 	// Consul vs. what we expect to be there.
 	consulMap map[string][]*consulapi.CatalogRegistration
+
+	// SyncCatalogPodName is the name of the pod running the sync catalog.
+	SyncCatalogPodName string
 }
 
 // Informer implements the controller.Resource interface.
@@ -290,8 +297,9 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		Service: t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
-			ConsulSourceKey: ConsulSourceValue,
-			ConsulK8SNS:     t.namespace(),
+			ConsulSourceKey:        ConsulSourceValue,
+			ConsulK8SNS:            t.namespace(),
+			SyncCatalogPodNameMeta: t.SyncCatalogPodName,
 		},
 	}
 
