@@ -203,6 +203,10 @@ IMPROVEMENTS:
 
 ## 0.7.0 (March 21, 2019)
 
+BREAKING CHANGES:
+
+  * If previously setting the release name to `consul`, you must now set `fullnameOverride: consul` in your config to prevent all resources being renamed.
+
 IMPROVEMENTS:
 
   * Support pod PriorityClasses for Consul servers and clients
