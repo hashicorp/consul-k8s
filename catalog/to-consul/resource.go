@@ -259,7 +259,6 @@ func (t *ServiceResource) shouldSyncClusterIPAsEndpoints(svc *apiv1.Service) boo
 	return asEndpoints
 }
 
-
 // shouldTrackEndpoints returns true if the endpoints for the given key
 // should be tracked.
 //

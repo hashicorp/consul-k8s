@@ -29,25 +29,25 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                     *flag.FlagSet
-	http                      *flags.HTTPFlags
-	k8s                       *k8sflags.K8SFlags
-	flagListen                string
-	flagToConsul              bool
-	flagToK8S                 bool
-	flagConsulDomain          string
-	flagConsulK8STag          string
-	flagK8SDefault            bool
-	flagK8SServicePrefix      string
-	flagConsulServicePrefix   string
-	flagK8SSourceNamespace    string
-	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     flags.DurationValue
-	flagSyncClusterIPServices bool
+	flags                                *flag.FlagSet
+	http                                 *flags.HTTPFlags
+	k8s                                  *k8sflags.K8SFlags
+	flagListen                           string
+	flagToConsul                         bool
+	flagToK8S                            bool
+	flagConsulDomain                     string
+	flagConsulK8STag                     string
+	flagK8SDefault                       bool
+	flagK8SServicePrefix                 string
+	flagConsulServicePrefix              string
+	flagK8SSourceNamespace               string
+	flagK8SWriteNamespace                string
+	flagConsulWritePeriod                flags.DurationValue
+	flagSyncClusterIPServices            bool
 	flagSyncClusterIPServicesAsEndpoints bool
-	flagNodePortSyncType      string
-	flagAddK8SNamespaceSuffix bool
-	flagLogLevel              string
+	flagNodePortSyncType                 string
+	flagAddK8SNamespaceSuffix            bool
+	flagLogLevel                         string
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
