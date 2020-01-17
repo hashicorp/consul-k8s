@@ -249,6 +249,10 @@ func (t *ServiceResource) shouldSyncClusterIPAsEndpoints(svc *apiv1.Service) boo
 		value, err := strconv.ParseBool(endpointsAnnotation)
 		if err == nil {
 			asEndpoints = value
+		} else {
+			t.Log.Warn("error parsing service-as-endpoints annotation",
+				"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
+				"err", err)
 		}
 	}
 
