@@ -241,8 +241,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 // shouldSyncAsEndpoints returns true if service-as-endpoints is true or
 // ClusterIPAsEndpoints is true
 func (t *ServiceResource) shouldSyncClusterIPAsEndpoints(svc *apiv1.Service) bool {
-	var asEndpoints bool
-	asEndpoints = t.ClusterIPAsEndpoints
+	asEndpoints := t.ClusterIPAsEndpoints
 
 	// allow an annotation to override the config behavior
 	endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
@@ -274,13 +273,10 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-  // We should only watch endpoints if we're actually going to sync them
-  if svc.Spec.Type == apiv1.ServiceTypeClusterIP {
-	  if !t.shouldSyncClusterIPAsEndpoints(svc) {
-	  	return false
-	  }
-		return true
-  }
+	// We should only watch endpoints if we're actually going to sync them
+	if svc.Spec.Type == apiv1.ServiceTypeClusterIP {
+		return t.shouldSyncClusterIPAsEndpoints(svc)
+	}
 
 	return svc.Spec.Type == apiv1.ServiceTypeNodePort
 }
