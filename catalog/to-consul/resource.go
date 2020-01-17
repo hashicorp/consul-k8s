@@ -66,7 +66,7 @@ type ServiceResource struct {
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
 
-	// ClusterIPAsEndpoints set to true (the default) sync ClusterIP-type services as
+	// ClusterIPAsEndpoints set to true (the default) syncs ClusterIP-type services as
 	// the individual Endpoints themselves. Setting this to false causes them to sync
 	// with only the singular IP of the service
 	ClusterIPAsEndpoints bool

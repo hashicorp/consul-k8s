@@ -16,7 +16,7 @@ const (
 	annotationServicePort = "consul.hashicorp.com/service-port"
 
 	// annotationServiceAsEndpoints is valid only on ClusterIP services.
-	// It specifics whether or not to sync the service with each individual endpoint or
+	// It specifies whether or not to sync the service with each individual endpoint or
 	// as the singular IP of the service. If this isn't set then the
 	// default based on the syncer configuration is chosen.
 	annotationServiceAsEndpoints = "consul.hashicorp.com/service-as-endpoints"
