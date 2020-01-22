@@ -46,10 +46,10 @@ type Command struct {
 	flagUseHTTPS                 bool
 
 	// Flags to support namespaces
-	flagEnableNamespaces    bool   // Use namespacing on all components
-	flagConsulSyncNamespace string // Consul namespace to register all catalog sync services into if not mirroring
-	flagEnableNSMirroring   bool   // Enables mirroring of k8s namespaces into Consul
-	flagMirroringPrefix     string // Prefix added to Consul namespaces created when mirroring
+	flagEnableNamespaces      bool   // Use namespacing on all components
+	flagConsulSyncNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
+	flagEnableSyncNSMirroring bool   // Enables mirroring of k8s namespaces into Consul for catalog sync
+	flagSyncMirroringPrefix   string // Prefix added to Consul namespaces created when mirroring catalog sync services
 
 	flagLogLevel string
 	flagTimeout  string
@@ -104,11 +104,12 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
 	c.flags.StringVar(&c.flagConsulSyncNamespace, "consul-sync-namespace", "default",
-		"Defines which Consul namespace to have catalog sync register services into. If `-enable-namespace-mirroring` "+
+		"Indicates which Consul namespace that catalog sync will register services into. If `-enable-sync-namespace-mirroring` "+
 			"is true, this is not used.")
-	c.flags.BoolVar(&c.flagEnableNSMirroring, "enable-namespace-mirroring", false, "Enables namespace mirroring")
-	c.flags.StringVar(&c.flagMirroringPrefix, "mirroring-prefix", "",
-		"Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flags.BoolVar(&c.flagEnableSyncNSMirroring, "enable-sync-namespace-mirroring", false, "Indicates that namespace "+
+		"mirroring will be used for catalog sync services.")
+	c.flags.StringVar(&c.flagSyncMirroringPrefix, "sync-mirroring-prefix", "",
+		"Prefix that will be added to all k8s namespaces mirrored into Consul by catalog sync if mirroring is enabled.")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -787,9 +788,9 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	}
 
 	// Add options for mirroring namespaces
-	if c.flagEnableNSMirroring {
+	if c.flagEnableSyncNSMirroring {
 		authMethodTmpl.Config["MapNamespaces"] = true
-		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagMirroringPrefix
+		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagSyncMirroringPrefix
 	}
 
 	// Set up the auth method in the specific namespace if not mirroring
@@ -797,7 +798,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// the auth method will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
 	writeOptions := api.WriteOptions{}
-	if c.flagEnableNamespaces && !c.flagEnableNSMirroring {
+	if c.flagEnableNamespaces && !c.flagEnableSyncNSMirroring {
 		writeOptions.Namespace = c.flagConsulSyncNamespace
 	}
 
@@ -825,7 +826,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// If namespaces and mirroring are enabled, this is not necessary because
 	// the binding rule will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
-	if c.flagEnableNamespaces && !c.flagEnableNSMirroring {
+	if c.flagEnableNamespaces && !c.flagEnableSyncNSMirroring {
 		abr.Namespace = c.flagConsulSyncNamespace
 	}
 

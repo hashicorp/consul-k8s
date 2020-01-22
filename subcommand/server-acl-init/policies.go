@@ -7,10 +7,10 @@ import (
 )
 
 type rulesData struct {
-	EnableNamespaces    bool
-	ConsulSyncNamespace string
-	EnableNSMirroring   bool
-	MirroringPrefix     string
+	EnableNamespaces      bool
+	ConsulSyncNamespace   string
+	EnableSyncNSMirroring bool
+	SyncMirroringPrefix   string
 }
 
 const snapshotAgentRules = `acl = "write"
@@ -95,8 +95,8 @@ func (c *Command) syncRules() (string, error) {
   }
 {{- if .EnableNamespaces }}
 operator = "write"
-{{- if .EnableNSMirroring }}
-namespace_prefix "{{ .MirroringPrefix }}" {
+{{- if .EnableSyncNSMirroring }}
+namespace_prefix "{{ .SyncMirroringPrefix }}" {
 {{- else }}
 namespace "{{ .ConsulSyncNamespace }}" {
 {{- end }}
@@ -137,10 +137,10 @@ func (c *Command) renderRules(tmpl string) (string, error) {
 	// Populate the data that will be used in the template.
 	// Not all templates will need all of the fields.
 	data := rulesData{
-		EnableNamespaces:    c.flagEnableNamespaces,
-		ConsulSyncNamespace: c.flagConsulSyncNamespace,
-		EnableNSMirroring:   c.flagEnableNSMirroring,
-		MirroringPrefix:     c.flagMirroringPrefix,
+		EnableNamespaces:      c.flagEnableNamespaces,
+		ConsulSyncNamespace:   c.flagConsulSyncNamespace,
+		EnableSyncNSMirroring: c.flagEnableSyncNSMirroring,
+		SyncMirroringPrefix:   c.flagSyncMirroringPrefix,
 	}
 
 	// Render the template
