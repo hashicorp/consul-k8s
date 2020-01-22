@@ -152,12 +152,12 @@ namespace_prefix "" {
 
 func TestSyncRules(t *testing.T) {
 	cases := []struct {
-		Name                string
-		EnableNamespaces    bool
-		ConsulSyncNamespace string
-		EnableNSMirroring   bool
-		MirroringPrefix     string
-		Expected            string
+		Name                  string
+		EnableNamespaces      bool
+		ConsulSyncNamespace   string
+		EnableSyncNSMirroring bool
+		SyncMirroringPrefix   string
+		Expected              string
 	}{
 		{
 			"Namespaces are disabled",
@@ -239,10 +239,10 @@ namespace_prefix "prefix-" {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:    tt.EnableNamespaces,
-				flagConsulSyncNamespace: tt.ConsulSyncNamespace,
-				flagEnableNSMirroring:   tt.EnableNSMirroring,
-				flagMirroringPrefix:     tt.MirroringPrefix,
+				flagEnableNamespaces:      tt.EnableNamespaces,
+				flagConsulSyncNamespace:   tt.ConsulSyncNamespace,
+				flagEnableSyncNSMirroring: tt.EnableSyncNSMirroring,
+				flagSyncMirroringPrefix:   tt.SyncMirroringPrefix,
 			}
 
 			syncRules, err := cmd.syncRules()
