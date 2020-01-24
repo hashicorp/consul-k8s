@@ -206,10 +206,14 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 			for name, tags := range services {
 				for _, tag := range tags {
 					if tag == s.ConsulK8STag {
-						// We only care if we don't know about this service at all.
-						if s.serviceNames[ns].Contains(name) {
-							s.Log.Debug("[watchReapableServices] serviceNames contains service", "namespace", ns, "service name", name)
-							continue
+						// Check that the namespace exists in the valid service names map
+						// before checking whether it contains the service
+						if _, ok := s.serviceNames[ns]; ok {
+							// We only care if we don't know about this service at all.
+							if s.serviceNames[ns].Contains(name) {
+								s.Log.Debug("[watchReapableServices] serviceNames contains service", "namespace", ns, "service name", name)
+								continue
+							}
 						}
 
 						s.Log.Info("invalid service found, scheduling for delete",
@@ -276,20 +280,26 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name, namespace string)
 		s.lock.Lock()
 
 		for _, svc := range services {
-			if !s.serviceNames[namespace].Contains(svc.ServiceName) || s.namespaces[namespace][svc.ServiceID] == nil {
-				s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
-					Node:      svc.Node,
-					ServiceID: svc.ServiceID,
+			// Make sure the namespace exists before we run checks against it
+			if _, ok := s.serviceNames[namespace]; ok {
+				// If the service is valid and its info isn't nil, we don't deregister it
+				if s.serviceNames[namespace].Contains(svc.ServiceName) && s.namespaces[namespace][svc.ServiceID] != nil {
+					continue
 				}
-				if s.EnableNamespaces {
-					s.deregs[svc.ServiceID].Namespace = namespace
-				}
-				s.Log.Debug("[watchService] service being scheduled for deregistration",
-					"namespace", namespace,
-					"service name", svc.ServiceName,
-					"service id", svc.ServiceID,
-					"service dereg", s.deregs[svc.ServiceID])
 			}
+
+			s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
+				Node:      svc.Node,
+				ServiceID: svc.ServiceID,
+			}
+			if s.EnableNamespaces {
+				s.deregs[svc.ServiceID].Namespace = namespace
+			}
+			s.Log.Debug("[watchService] service being scheduled for deregistration",
+				"namespace", namespace,
+				"service name", svc.ServiceName,
+				"service id", svc.ServiceID,
+				"service dereg", s.deregs[svc.ServiceID])
 		}
 
 		s.lock.Unlock()
