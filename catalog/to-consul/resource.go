@@ -359,8 +359,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 		t.Log.Debug("[generateRegistrations] namespace being used", "key", key, "namespace", ns)
 
-		// Update the baseNode and baseService to have a Consul namespace
-		// baseNode.Namespace = ns // This is not currently supported in the api
+		// Update baseService to have a Consul namespace
 		baseService.Namespace = ns
 	}
 

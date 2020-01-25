@@ -150,35 +150,36 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 // This task only marks them for deletion but doesn't perform the actual
 // deletion.
 func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
+	opts := api.QueryOptions{
+		AllowStale: true,
+		WaitIndex:  1,
+		WaitTime:   1 * time.Minute,
+	}
+
+	if s.EnableNamespaces {
+		opts.Namespace = "*"
+	}
+
 	// minWait is the minimum time to wait between scheduling service deletes.
 	// This prevents a lot of churn in services causing high CPU usage.
 	minWait := s.SyncPeriod / 4
 	minWaitCh := time.After(0)
 	for {
-		// Get services within all the namespaces we're tracking
-		serviceMap := make(map[string]map[string][]string)
-		var err error
-		for ns, _ := range s.namespaces {
-			// Set up default query options. If namespaces are not enabled,
-			// ns will be "" and thus not serialized in the request body.
-			opts := api.QueryOptions{
-				AllowStale: true,
-				WaitTime:   15 * time.Second,
-				Namespace:  ns,
-			}
-
-			// Get all of the services from this namespace
-			err = backoff.Retry(func() error {
-				var err error
-				serviceMap[ns], _, err = s.Client.Catalog().Services(&opts)
-				return err
-			}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
-			if err != nil {
-				s.Log.Warn("error querying services, will retry", "namespace", ns, "err", err)
-				continue
-			}
-			s.Log.Debug("[watchReapableServices] got services from Consul", "namespace", ns)
+		// Get all services on the synthetic node. This call crosses
+		// namespaces.
+		var nodeCatalog *api.CatalogNodeServiceList
+		var meta *api.QueryMeta
+		err := backoff.Retry(func() error {
+			var err error
+			nodeCatalog, meta, err = s.Client.Catalog().NodeServiceList("k8s-sync", &opts)
+			return err
+		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+		if err != nil {
+			s.Log.Warn("error querying services, will retry", "err", err)
+			continue
 		}
+		s.Log.Debug("[watchReapableServices] services returned from NodeServiceList",
+			"services", nodeCatalog.Services)
 
 		// Wait our minimum time before continuing or retrying
 		select {
@@ -192,36 +193,39 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 			return
 		}
 
+		// Update our blocking index
+		opts.WaitIndex = meta.LastIndex
+
 		// Lock so we can modify the stored state
 		s.lock.Lock()
 
-		// Go through the service map and find services that should be reaped
-		for ns, services := range serviceMap {
-			for name, tags := range services {
-				for _, tag := range tags {
-					if tag == s.ConsulK8STag {
-						// Check that the namespace exists in the valid service names map
-						// before checking whether it contains the service
-						if _, ok := s.serviceNames[ns]; ok {
-							// We only care if we don't know about this service at all.
-							if s.serviceNames[ns].Contains(name) {
-								s.Log.Debug("[watchReapableServices] serviceNames contains service", "namespace", ns, "service name", name)
-								continue
-							}
+		// Go through the service array and find services that should be reaped
+		for _, service := range nodeCatalog.Services {
+			for _, tag := range service.Tags {
+				if tag == s.ConsulK8STag {
+					// Check that the namespace exists in the valid service names map
+					// before checking whether it contains the service
+					if _, ok := s.serviceNames[service.Namespace]; ok {
+						// We only care if we don't know about this service at all.
+						if s.serviceNames[service.Namespace].Contains(service.Service) {
+							s.Log.Debug("[watchReapableServices] serviceNames contains service",
+								"namespace", service.Namespace,
+								"service-name", service.Service)
+							continue
 						}
-
-						s.Log.Info("invalid service found, scheduling for delete",
-							"service-name", name, "service-consul-namespace", ns)
-						if err := s.scheduleReapServiceLocked(name, ns); err != nil {
-							s.Log.Info("error querying service for delete",
-								"service-name", name,
-								"service-consul-namespace", ns,
-								"err", err)
-						}
-
-						// We're done searching this service, let it go
-						break
 					}
+
+					s.Log.Info("invalid service found, scheduling for delete",
+						"service-name", service.Service, "service-consul-namespace", service.Namespace)
+					if err := s.scheduleReapServiceLocked(service.Service, service.Namespace); err != nil {
+						s.Log.Info("error querying service for delete",
+							"service-name", service.Service,
+							"service-consul-namespace", service.Namespace,
+							"err", err)
+					}
+
+					// We're done searching this service, let it go
+					break
 				}
 			}
 		}
