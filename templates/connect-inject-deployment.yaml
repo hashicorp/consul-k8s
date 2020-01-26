@@ -57,7 +57,7 @@ spec:
                 -listen=:8080 \
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
-                {{ else if .Values.global.bootstrapACLs }}
+                {{- else if .Values.global.bootstrapACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
                 {{- end }}
                 {{- if .Values.global.tls.enabled }}
