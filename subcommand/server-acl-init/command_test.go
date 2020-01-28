@@ -330,104 +330,119 @@ func TestRun_AllowDNS(t *testing.T) {
 	})
 }
 
-func TestRun_ConnectInjectToken(t *testing.T) {
+func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	t.Parallel()
-	k8s, testAgent := completeSetup(t, resourcePrefix)
-	defer testAgent.Shutdown()
-	require := require.New(t)
-
-	// Create Kubernetes Service.
-	_, err := k8s.CoreV1().Services(ns).Create(&v1.Service{
-		Spec: v1.ServiceSpec{
-			ClusterIP: "1.2.3.4",
+	cases := map[string]struct {
+		AuthMethodFlag string
+	}{
+		"-create-inject-token flag": {
+			AuthMethodFlag: "-create-inject-token",
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubernetes",
+		"-create-inject-auth-method flag": {
+			AuthMethodFlag: "-create-inject-auth-method",
 		},
-	})
-	require.NoError(err)
-
-	// Create ServiceAccount for the injector that the helm chart creates.
-	_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
-		},
-		Secrets: []v1.ObjectReference{
-			{
-				Name: resourcePrefix + "-connect-injector-authmethod-svc-accohndbv",
-			},
-		},
-	})
-	require.NoError(err)
-
-	// Create the ServiceAccount Secret.
-	caCertBytes, err := base64.StdEncoding.DecodeString(serviceAccountCACert)
-	require.NoError(err)
-	tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
-	require.NoError(err)
-	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-connect-injector-authmethod-svc-accohndbv",
-		},
-		Data: map[string][]byte{
-			"ca.crt": caCertBytes,
-			"token":  tokenBytes,
-		},
-	})
-	require.NoError(err)
-
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
 	}
-	cmd.init()
-	bindingRuleSelector := "serviceaccount.name!=default"
-	cmdArgs := []string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-		"-create-inject-token",
-		"-acl-binding-rule-selector=" + bindingRuleSelector,
+	for testName, c := range cases {
+		t.Run(testName, func(t *testing.T) {
+
+			k8s, testAgent := completeSetup(t, resourcePrefix)
+			defer testAgent.Shutdown()
+			require := require.New(t)
+
+			// Create Kubernetes Service.
+			_, err := k8s.CoreV1().Services(ns).Create(&v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "1.2.3.4",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "kubernetes",
+				},
+			})
+			require.NoError(err)
+
+			// Create ServiceAccount for the injector that the helm chart creates.
+			_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+				},
+				Secrets: []v1.ObjectReference{
+					{
+						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+					},
+				},
+			})
+			require.NoError(err)
+
+			// Create the ServiceAccount Secret.
+			caCertBytes, err := base64.StdEncoding.DecodeString(serviceAccountCACert)
+			require.NoError(err)
+			tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
+			require.NoError(err)
+			_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+				},
+				Data: map[string][]byte{
+					"ca.crt": caCertBytes,
+					"token":  tokenBytes,
+				},
+			})
+			require.NoError(err)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmd.init()
+			bindingRuleSelector := "serviceaccount.name!=default"
+			cmdArgs := []string{
+				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-expected-replicas=1",
+				"-acl-binding-rule-selector=" + bindingRuleSelector,
+			}
+			cmdArgs = append(cmdArgs, c.AuthMethodFlag)
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the auth method was created.
+			bootToken := getBootToken(t, k8s, resourcePrefix)
+			consul := testAgent.Client()
+			authMethodName := resourcePrefix + "-k8s-auth-method"
+			authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
+				&api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			require.Contains(authMethod.Config, "Host")
+			require.Equal(authMethod.Config["Host"], "https://1.2.3.4:443")
+			require.Contains(authMethod.Config, "CACert")
+			require.Equal(authMethod.Config["CACert"], string(caCertBytes))
+			require.Contains(authMethod.Config, "ServiceAccountJWT")
+			require.Equal(authMethod.Config["ServiceAccountJWT"], string(tokenBytes))
+
+			// Check that the binding rule was created.
+			rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			require.Len(rules, 1)
+			require.Equal("service", string(rules[0].BindType))
+			require.Equal("${serviceaccount.name}", rules[0].BindName)
+			require.Equal(bindingRuleSelector, rules[0].Selector)
+
+			// Test that if the same command is re-run it doesn't error.
+			t.Run("retried", func(t *testing.T) {
+				ui := cli.NewMockUi()
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				cmd.init()
+				responseCode := cmd.Run(cmdArgs)
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
+			})
+		})
 	}
-	responseCode := cmd.Run(cmdArgs)
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Check that the auth method was created.
-	bootToken := getBootToken(t, k8s, resourcePrefix)
-	consul := testAgent.Client()
-	authMethodName := resourcePrefix + "-k8s-auth-method"
-	authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
-		&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	require.Contains(authMethod.Config, "Host")
-	require.Equal(authMethod.Config["Host"], "https://1.2.3.4:443")
-	require.Contains(authMethod.Config, "CACert")
-	require.Equal(authMethod.Config["CACert"], string(caCertBytes))
-	require.Contains(authMethod.Config, "ServiceAccountJWT")
-	require.Equal(authMethod.Config["ServiceAccountJWT"], string(tokenBytes))
-
-	// Check that the binding rule was created.
-	rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	require.Len(rules, 1)
-	require.Equal("service", string(rules[0].BindType))
-	require.Equal("${serviceaccount.name}", rules[0].BindName)
-	require.Equal(bindingRuleSelector, rules[0].Selector)
-
-	// Test that if the same command is re-run it doesn't error.
-	t.Run("retried", func(t *testing.T) {
-		ui := cli.NewMockUi()
-		cmd := Command{
-			UI:        ui,
-			clientset: k8s,
-		}
-		cmd.init()
-		responseCode := cmd.Run(cmdArgs)
-		require.Equal(0, responseCode, ui.ErrorWriter.String())
-	})
 }
 
 // Test that if the server pods aren't available at first that bootstrap
