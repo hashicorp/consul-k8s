@@ -152,12 +152,12 @@ namespace_prefix "" {
 
 func TestSyncRules(t *testing.T) {
 	cases := []struct {
-		Name                  string
-		EnableNamespaces      bool
-		ConsulSyncNamespace   string
-		EnableSyncNSMirroring bool
-		SyncMirroringPrefix   string
-		Expected              string
+		Name                           string
+		EnableNamespaces               bool
+		ConsulSyncDestinationNamespace string
+		EnableSyncK8SNSMirroring       bool
+		SyncK8SNSMirroringPrefix       string
+		Expected                       string
 	}{
 		{
 			"Namespaces are disabled",
@@ -239,10 +239,10 @@ namespace_prefix "prefix-" {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:      tt.EnableNamespaces,
-				flagConsulSyncNamespace:   tt.ConsulSyncNamespace,
-				flagEnableSyncNSMirroring: tt.EnableSyncNSMirroring,
-				flagSyncMirroringPrefix:   tt.SyncMirroringPrefix,
+				flagEnableNamespaces:               tt.EnableNamespaces,
+				flagConsulSyncDestinationNamespace: tt.ConsulSyncDestinationNamespace,
+				flagEnableSyncK8SNSMirroring:       tt.EnableSyncK8SNSMirroring,
+				flagSyncK8SNSMirroringPrefix:       tt.SyncK8SNSMirroringPrefix,
 			}
 
 			syncRules, err := cmd.syncRules()
@@ -253,7 +253,7 @@ namespace_prefix "prefix-" {
 	}
 }
 
-func TestInjectorRules(t *testing.T) {
+func TestInjectRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool

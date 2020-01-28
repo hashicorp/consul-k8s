@@ -7,10 +7,10 @@ import (
 )
 
 type rulesData struct {
-	EnableNamespaces      bool
-	ConsulSyncNamespace   string
-	EnableSyncNSMirroring bool
-	SyncMirroringPrefix   string
+	EnableNamespaces               bool
+	ConsulSyncDestinationNamespace string
+	EnableSyncK8SNSMirroring       bool
+	SyncK8SNSMirroringPrefix       string
 }
 
 const snapshotAgentRules = `acl = "write"
@@ -91,14 +91,14 @@ namespace_prefix "" {
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
   node "k8s-sync" {
-	policy = "write"
+    policy = "write"
   }
 {{- if .EnableNamespaces }}
 operator = "write"
-{{- if .EnableSyncNSMirroring }}
-namespace_prefix "{{ .SyncMirroringPrefix }}" {
+{{- if .EnableSyncK8SNSMirroring }}
+namespace_prefix "{{ .SyncK8SNSMirroringPrefix }}" {
 {{- else }}
-namespace "{{ .ConsulSyncNamespace }}" {
+namespace "{{ .ConsulSyncDestinationNamespace }}" {
 {{- end }}
 {{- end }}
   node_prefix "" {
@@ -137,10 +137,10 @@ func (c *Command) renderRules(tmpl string) (string, error) {
 	// Populate the data that will be used in the template.
 	// Not all templates will need all of the fields.
 	data := rulesData{
-		EnableNamespaces:      c.flagEnableNamespaces,
-		ConsulSyncNamespace:   c.flagConsulSyncNamespace,
-		EnableSyncNSMirroring: c.flagEnableSyncNSMirroring,
-		SyncMirroringPrefix:   c.flagSyncMirroringPrefix,
+		EnableNamespaces:               c.flagEnableNamespaces,
+		ConsulSyncDestinationNamespace: c.flagConsulSyncDestinationNamespace,
+		EnableSyncK8SNSMirroring:       c.flagEnableSyncK8SNSMirroring,
+		SyncK8SNSMirroringPrefix:       c.flagSyncK8SNSMirroringPrefix,
 	}
 
 	// Render the template

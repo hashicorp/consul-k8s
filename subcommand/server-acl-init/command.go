@@ -46,10 +46,10 @@ type Command struct {
 	flagUseHTTPS                 bool
 
 	// Flags to support namespaces
-	flagEnableNamespaces      bool   // Use namespacing on all components
-	flagConsulSyncNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
-	flagEnableSyncNSMirroring bool   // Enables mirroring of k8s namespaces into Consul for catalog sync
-	flagSyncMirroringPrefix   string // Prefix added to Consul namespaces created when mirroring catalog sync services
+	flagEnableNamespaces               bool   // Use namespacing on all components
+	flagConsulSyncDestinationNamespace string // Consul namespace to register all catalog sync services into if not mirroring
+	flagEnableSyncK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul for catalog sync
+	flagSyncK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring catalog sync services
 
 	flagLogLevel string
 	flagTimeout  string
@@ -82,11 +82,11 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token")
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
-		"Toggle for creating a connect injector token. Only required when namespaces are enabled")
+		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
-		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
+		"Toggle for creating a connect inject auth method.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
-		"Toggle for creating a connect inject auth method")
+		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule")
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
@@ -102,14 +102,15 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
-		"Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
-	c.flags.StringVar(&c.flagConsulSyncNamespace, "consul-sync-namespace", "default",
-		"Indicates which Consul namespace that catalog sync will register services into. If `-enable-sync-namespace-mirroring` "+
-			"is true, this is not used.")
-	c.flags.BoolVar(&c.flagEnableSyncNSMirroring, "enable-sync-namespace-mirroring", false, "Indicates that namespace "+
-		"mirroring will be used for catalog sync services.")
-	c.flags.StringVar(&c.flagSyncMirroringPrefix, "sync-mirroring-prefix", "",
-		"Prefix that will be added to all k8s namespaces mirrored into Consul by catalog sync if mirroring is enabled.")
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
+	c.flags.StringVar(&c.flagConsulSyncDestinationNamespace, "consul-sync-destination-namespace", "default",
+		"[Enterprise Only] Indicates which Consul namespace that catalog sync will register services into. If "+
+			"'-enable-sync-namespace-mirroring' is true, this is not used.")
+	c.flags.BoolVar(&c.flagEnableSyncK8SNSMirroring, "enable-sync-k8s-namespace-mirroring", false, "[Enterprise Only] "+
+		"Indicates that namespace mirroring will be used for catalog sync services.")
+	c.flags.StringVar(&c.flagSyncK8SNSMirroringPrefix, "sync-k8s-namespace-mirroring-prefix", "",
+		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul by catalog sync "+
+			"if mirroring is enabled.")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -788,9 +789,9 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	}
 
 	// Add options for mirroring namespaces
-	if c.flagEnableSyncNSMirroring {
+	if c.flagEnableSyncK8SNSMirroring {
 		authMethodTmpl.Config["MapNamespaces"] = true
-		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagSyncMirroringPrefix
+		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagSyncK8SNSMirroringPrefix
 	}
 
 	// Set up the auth method in the specific namespace if not mirroring
@@ -798,8 +799,8 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// the auth method will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
 	writeOptions := api.WriteOptions{}
-	if c.flagEnableNamespaces && !c.flagEnableSyncNSMirroring {
-		writeOptions.Namespace = c.flagConsulSyncNamespace
+	if c.flagEnableNamespaces && !c.flagEnableSyncK8SNSMirroring {
+		writeOptions.Namespace = c.flagConsulSyncDestinationNamespace
 	}
 
 	var authMethod *api.ACLAuthMethod
@@ -826,8 +827,8 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// If namespaces and mirroring are enabled, this is not necessary because
 	// the binding rule will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
-	if c.flagEnableNamespaces && !c.flagEnableSyncNSMirroring {
-		abr.Namespace = c.flagConsulSyncNamespace
+	if c.flagEnableNamespaces && !c.flagEnableSyncK8SNSMirroring {
+		abr.Namespace = c.flagConsulSyncDestinationNamespace
 	}
 
 	return c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
