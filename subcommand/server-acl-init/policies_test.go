@@ -166,7 +166,7 @@ func TestSyncRules(t *testing.T) {
 			true,
 			"prefix-",
 			`node "k8s-sync" {
-	policy = "write"
+    policy = "write"
   }
   node_prefix "" {
     policy = "read"
@@ -182,7 +182,7 @@ func TestSyncRules(t *testing.T) {
 			false,
 			"prefix-",
 			`node "k8s-sync" {
-	policy = "write"
+    policy = "write"
   }
 operator = "write"
 namespace "sync-namespace" {
@@ -201,7 +201,7 @@ namespace "sync-namespace" {
 			true,
 			"",
 			`node "k8s-sync" {
-	policy = "write"
+    policy = "write"
   }
 operator = "write"
 namespace_prefix "" {
@@ -220,7 +220,7 @@ namespace_prefix "" {
 			true,
 			"prefix-",
 			`node "k8s-sync" {
-	policy = "write"
+    policy = "write"
   }
 operator = "write"
 namespace_prefix "prefix-" {
