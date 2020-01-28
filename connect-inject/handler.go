@@ -142,21 +142,21 @@ type Handler struct {
 	// takes precedence over AllowK8sNamespacesSet.
 	DenyK8sNamespacesSet mapset.Set
 
-	// ConsulNamespaceName is the name of the Consul namespace to register all
+	// ConsulDestinationNamespace is the name of the Consul namespace to register all
 	// injected services into if Consul namespaces are enabled and mirroring
 	// is disabled. This will not be used if mirroring is enabled.
-	ConsulNamespaceName string
+	ConsulDestinationNamespace string
 
-	// EnableNSMirroring causes Consul namespaces to be created to match the
+	// EnableK8SNSMirroring causes Consul namespaces to be created to match the
 	// organization within k8s. Services are registered into the Consul
 	// namespace that mirrors their k8s namespace.
-	EnableNSMirroring bool
+	EnableK8SNSMirroring bool
 
-	// MirroringPrefix is an optional prefix that can be added to the Consul
+	// K8SNSMirroringPrefix is an optional prefix that can be added to the Consul
 	// namespaces created while mirroring. For example, if it is set to "k8s-",
 	// then the k8s `default` namespace will be mirrored in Consul's
 	// `k8s-default` namespace.
-	MirroringPrefix string
+	K8SNSMirroringPrefix string
 
 	// Log
 	Log hclog.Logger
@@ -471,10 +471,10 @@ func (h *Handler) consulNamespace(ns string) string {
 	}
 
 	// Mirroring takes precedence
-	if h.EnableNSMirroring {
-		return fmt.Sprintf("%s%s", h.MirroringPrefix, ns)
+	if h.EnableK8SNSMirroring {
+		return fmt.Sprintf("%s%s", h.K8SNSMirroringPrefix, ns)
 	} else {
-		return h.ConsulNamespaceName
+		return h.ConsulDestinationNamespace
 	}
 }
 

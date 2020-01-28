@@ -50,12 +50,12 @@ type Command struct {
 	flagConsulCACert         string // Path to CA Certificate to use when communicating with Consul clients
 
 	// Flags to support namespaces
-	flagEnableNamespaces       bool     // Use namespacing on all components
-	flagConsulNamespace        string   // Consul namespace to register everything if not mirroring
-	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
-	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
-	flagEnableNSMirroring      bool     // Enables mirroring of k8s namespaces into Consul
-	flagMirroringPrefix        string   // Prefix added to Consul namespaces created when mirroring
+	flagEnableNamespaces           bool     // Use namespacing on all components
+	flagConsulDestinationNamespace string   // Consul namespace to register everything if not mirroring
+	flagAllowK8sNamespacesList     []string // K8s namespaces to explicitly inject
+	flagDenyK8sNamespacesList      []string // K8s namespaces to deny injection (has precedence)
+	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
+	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -94,18 +94,19 @@ func (c *Command) init() {
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to CA certificate to use if communicating with Consul clients over HTTPS.")
-	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
-		"Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
-	c.flagSet.StringVar(&c.flagConsulNamespace, "consul-namespace", "default",
-		"Defines which Consul namespace to register all injected services into. If `enable-namespace-mirroring` "+
-			"is true, this is not used.")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-namespace",
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
-	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-namespace",
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
-	c.flagSet.BoolVar(&c.flagEnableNSMirroring, "enable-namespace-mirroring", false, "Enables namespace mirroring")
-	c.flagSet.StringVar(&c.flagMirroringPrefix, "mirroring-prefix", "",
-		"Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
+	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
+		"[Enterprise Only] Defines which Consul namespace to register all injected services into. If '-enable-namespace-mirroring' "+
+			"is true, this is not used.")
+	c.flagSet.BoolVar(&c.flagEnableK8SNSMirroring, "enable-k8s-namespace-mirroring", false, "[Enterprise Only] Enables "+
+		"k8s namespace mirroring")
+	c.flagSet.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
+		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
@@ -194,21 +195,22 @@ func (c *Command) Run(args []string) int {
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ConsulClient:          c.consulClient,
-		ImageConsul:           c.flagConsulImage,
-		ImageEnvoy:            c.flagEnvoyImage,
-		ImageConsulK8S:        c.flagConsulK8sImage,
-		RequireAnnotation:     !c.flagDefaultInject,
-		AuthMethod:            c.flagACLAuthMethod,
-		WriteServiceDefaults:  c.flagWriteServiceDefaults,
-		DefaultProtocol:       c.flagDefaultProtocol,
-		ConsulCACert:          string(consulCACert),
-		EnableNamespaces:      c.flagEnableNamespaces,
-		AllowK8sNamespacesSet: allowSet,
-		DenyK8sNamespacesSet:  denySet,
-		ConsulNamespaceName:   c.flagConsulNamespace,
-		EnableNSMirroring:     c.flagEnableNSMirroring,
-		Log:                   hclog.Default().Named("handler"),
+		ConsulClient:               c.consulClient,
+		ImageConsul:                c.flagConsulImage,
+		ImageEnvoy:                 c.flagEnvoyImage,
+		ImageConsulK8S:             c.flagConsulK8sImage,
+		RequireAnnotation:          !c.flagDefaultInject,
+		AuthMethod:                 c.flagACLAuthMethod,
+		WriteServiceDefaults:       c.flagWriteServiceDefaults,
+		DefaultProtocol:            c.flagDefaultProtocol,
+		ConsulCACert:               string(consulCACert),
+		EnableNamespaces:           c.flagEnableNamespaces,
+		AllowK8sNamespacesSet:      allowSet,
+		DenyK8sNamespacesSet:       denySet,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+		Log:                        hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)

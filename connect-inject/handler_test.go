@@ -649,13 +649,13 @@ func TestHandlerPortValue(t *testing.T) {
 // Test consulNamespace function
 func TestConsulNamespace(t *testing.T) {
 	cases := []struct {
-		Name                string
-		EnableNamespaces    bool
-		ConsulNamespaceName string
-		EnableNSMirroring   bool
-		MirroringPrefix     string
-		K8sNamespace        string
-		Expected            string
+		Name                       string
+		EnableNamespaces           bool
+		ConsulDestinationNamespace string
+		EnableK8SNSMirroring       bool
+		K8SNSMirroringPrefix       string
+		K8sNamespace               string
+		Expected                   string
 	}{
 		{
 			"namespaces disabled",
@@ -733,10 +733,10 @@ func TestConsulNamespace(t *testing.T) {
 			require := require.New(t)
 
 			h := Handler{
-				EnableNamespaces:    tt.EnableNamespaces,
-				ConsulNamespaceName: tt.ConsulNamespaceName,
-				EnableNSMirroring:   tt.EnableNSMirroring,
-				MirroringPrefix:     tt.MirroringPrefix,
+				EnableNamespaces:           tt.EnableNamespaces,
+				ConsulDestinationNamespace: tt.ConsulDestinationNamespace,
+				EnableK8SNSMirroring:       tt.EnableK8SNSMirroring,
+				K8SNSMirroringPrefix:       tt.K8SNSMirroringPrefix,
 			}
 
 			ns := h.consulNamespace(tt.K8sNamespace)
