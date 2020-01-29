@@ -1146,7 +1146,12 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
-		// We only expect the calls for creating client tokens.
+		// We only expect the calls for creating client tokens
+		// and updating the server policy.
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
 		{
 			"PUT",
 			"/v1/acl/policy",
