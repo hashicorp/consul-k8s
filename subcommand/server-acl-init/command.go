@@ -227,8 +227,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	var updateServerPolicy bool
 	if bootstrapToken != "" {
 		logger.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
+
+		// Mark that we should update the server ACL policy in case
+		// there are namespace related config changes. Because of the
+		// organization of the server token creation code, the policy
+		// otherwise won't be updated.
+		updateServerPolicy = true
 	} else {
 		logger.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
 		bootstrapToken, err = c.bootstrapServers(logger, bootTokenSecretName, scheme)
@@ -257,6 +264,18 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
+	}
+
+	// With the addition of namespaces, the ACL policies associated
+	// with the server tokens may need to be updated if Enterprise Consul
+	// users upgrade to 1.7+. This updates the policy if the bootstrap
+	// token had previously existed, which signals a potential config change.
+	if updateServerPolicy {
+		_, err = c.setServerPolicy(consulClient, logger)
+		if err != nil {
+			logger.Error("Error updating the server ACL policy")
+			return 1
+		}
 	}
 
 	if c.flagCreateClientToken {
@@ -532,27 +551,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName, sch
 func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	serverPods []podAddr, bootstrapToken, scheme string) error {
 
-	agentRules, err := c.agentRules()
-	if err != nil {
-		logger.Error("Error templating server agent rules", "err", err)
-		return err
-	}
-
-	// Create agent policy.
-	agentPolicy := api.ACLPolicy{
-		Name:        "agent-token",
-		Description: "Agent Token Policy",
-		Rules:       agentRules,
-	}
-	err = c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
-		func() error {
-			_, _, err := consulClient.ACL().PolicyCreate(&agentPolicy, nil)
-			if isPolicyExistsErr(err, agentPolicy.Name) {
-				logger.Info(fmt.Sprintf("Policy %q already exists", agentPolicy.Name))
-				return nil
-			}
-			return err
-		}, logger)
+	agentPolicy, err := c.setServerPolicy(consulClient, logger)
 	if err != nil {
 		return err
 	}
@@ -608,37 +607,57 @@ func (c *Command) setServerTokens(logger hclog.Logger, consulClient *api.Client,
 	return nil
 }
 
+func (c *Command) setServerPolicy(consulClient *api.Client, logger hclog.Logger) (api.ACLPolicy, error) {
+	agentRules, err := c.agentRules()
+	if err != nil {
+		logger.Error("Error templating server agent rules", "err", err)
+		return api.ACLPolicy{}, err
+	}
+
+	// Create agent policy.
+	agentPolicy := api.ACLPolicy{
+		Name:        "agent-token",
+		Description: "Agent Token Policy",
+		Rules:       agentRules,
+	}
+	err = c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
+		func() error {
+			return c.createOrUpdateACLPolicy(agentPolicy, logger, consulClient)
+		}, logger)
+	if err != nil {
+		return api.ACLPolicy{}, err
+	}
+
+	return agentPolicy, nil
+}
+
 // createACL creates a policy with rules and name, creates an ACL token for that
 // policy and then writes the token to a Kubernetes secret.
 func (c *Command) createACL(name, rules string, consulClient *api.Client, logger hclog.Logger) error {
-	// Check if the secret already exists, if so, we assume the ACL has already been created.
-	secretName := c.withPrefix(name + "-acl-token")
-	_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
-	if err == nil {
-		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
-		return nil
-	}
-
 	// Create policy with the given rules.
 	policyTmpl := api.ACLPolicy{
 		Name:        fmt.Sprintf("%s-token", name),
 		Description: fmt.Sprintf("%s Token Policy", name),
 		Rules:       rules,
 	}
-	err = c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+	err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 		func() error {
-			_, _, err := consulClient.ACL().PolicyCreate(&policyTmpl, &api.WriteOptions{})
-			if isPolicyExistsErr(err, policyTmpl.Name) {
-				logger.Info(fmt.Sprintf("Policy %q already exists", policyTmpl.Name))
-				return nil
-			}
-			return err
+			return c.createOrUpdateACLPolicy(policyTmpl, logger, consulClient)
 		}, logger)
 	if err != nil {
 		return err
 	}
 
-	// Create token for the policy.
+	// Check if the secret already exists, if so, we assume the ACL has already been
+	// created and return.
+	secretName := c.withPrefix(name + "-acl-token")
+	_, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	if err == nil {
+		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
+		return nil
+	}
+
+	// Create token for the policy if the secret did not exist previously.
 	tokenTmpl := api.ACLToken{
 		Description: fmt.Sprintf("%s Token", name),
 		Policies:    []*api.ACLTokenPolicyLink{{Name: policyTmpl.Name}},
@@ -690,12 +709,7 @@ func (c *Command) configureDNSPolicies(logger hclog.Logger, consulClient *api.Cl
 
 	err = c.untilSucceeds("creating dns policy - PUT /v1/acl/policy",
 		func() error {
-			_, _, err := consulClient.ACL().PolicyCreate(&dnsPolicy, nil)
-			if isPolicyExistsErr(err, dnsPolicy.Name) {
-				logger.Info(fmt.Sprintf("Policy %q already exists", dnsPolicy.Name))
-				return nil
-			}
-			return err
+			return c.createOrUpdateACLPolicy(dnsPolicy, logger, consulClient)
 		}, logger)
 	if err != nil {
 		return err
@@ -836,6 +850,45 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 			_, _, err := consulClient.ACL().BindingRuleCreate(&abr, nil)
 			return err
 		}, logger)
+}
+
+func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, logger hclog.Logger, consulClient *api.Client) error {
+	// Attempt to create the ACL policy
+	_, _, err := consulClient.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+
+	// With the introduction of Consul namespaces, if someone upgrades into a
+	// Consul version with namespace support or changes any of their namespace
+	// settings, the policies associated with their ACL tokens will need to be
+	// updated to be namespace aware.
+	if isPolicyExistsErr(err, policy.Name) {
+		logger.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
+
+		// The policy ID is required in any PolicyUpdate call, so first we need to
+		// get the existing policy to extract its ID.
+		existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Find the policy that matches our name and description
+		// and that's the ID we need
+		for _, existingPolicy := range existingPolicies {
+			if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
+				policy.ID = existingPolicy.ID
+			}
+		}
+
+		// This shouldn't happen, because we're looking for a policy
+		// only after we've hit a `Policy already exists` error.
+		if policy.ID == "" {
+			return errors.New("Unable to find existing ACL policy")
+		}
+
+		// Update the policy now that we've found its ID
+		_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
+		return err
+	}
+	return err
 }
 
 // untilSucceeds runs op until it returns a nil error.
