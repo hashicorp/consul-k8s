@@ -109,7 +109,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 	require.NoError(t, err)
 	defer svr.Stop()
 	client, err := api.NewClient(&api.Config{
-		Address:    svr.HTTPAddr,
+		Address: svr.HTTPAddr,
 	})
 	require.NoError(t, err)
 

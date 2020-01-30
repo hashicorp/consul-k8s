@@ -24,7 +24,7 @@ func TestSource_initServices(t *testing.T) {
 	require.NoError(err)
 	defer svr.Stop()
 	client, err := api.NewClient(&api.Config{
-		Address:    svr.HTTPAddr,
+		Address: svr.HTTPAddr,
 	})
 	require.NoError(err)
 

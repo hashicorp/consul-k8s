@@ -18,7 +18,7 @@ func TestConsulSyncer_registerConsulNamespace(t *testing.T) {
 	require.NoError(err)
 	defer svr.Stop()
 	client, err := api.NewClient(&api.Config{
-		Address:    svr.HTTPAddr,
+		Address: svr.HTTPAddr,
 	})
 	require.NoError(err)
 
@@ -36,7 +36,7 @@ func TestConsulSyncer_registerConsulNamespace(t *testing.T) {
 	// Read the service back out
 	var service *api.CatalogService
 	retry.Run(t, func(r *retry.R) {
-		services, _, err := client.Catalog().Service("bar", "", &api.QueryOptions{Namespace:"newnamespace"})
+		services, _, err := client.Catalog().Service("bar", "", &api.QueryOptions{Namespace: "newnamespace"})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}

@@ -97,7 +97,7 @@ func TestRun_Defaults(t *testing.T) {
 
 			// Check that it has the right policies.
 			consul, err := api.NewClient(&api.Config{
-				Address:    testSvr.HTTPAddr,
+				Address: testSvr.HTTPAddr,
 			})
 			require.NoError(err)
 			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
