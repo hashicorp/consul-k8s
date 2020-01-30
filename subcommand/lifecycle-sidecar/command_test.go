@@ -3,7 +3,9 @@ package subcommand
 import (
 	"fmt"
 	"github.com/hashicorp/consul/agent"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -103,18 +105,23 @@ func TestRun_ServicesRegistration(t *testing.T) {
 	err = ioutil.WriteFile(configFile, []byte(servicesRegistration), 0600)
 	require.NoError(t, err)
 
-	a := agent.NewTestAgent(t, t.Name(), `primary_datacenter = "dc1"`)
-	defer a.Shutdown()
+	svr, err := testutil.NewTestServerT(t)
+	require.NoError(t, err)
+	defer svr.Stop()
+	client, err := api.NewClient(&api.Config{
+		Address:    svr.HTTPAddr,
+	})
+	require.NoError(t, err)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:           ui,
-		consulClient: a.Client(),
+		consulClient: client,
 	}
 
 	// Run async because we need to kill it when the test is over.
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-http-addr", a.HTTPAddr(),
+		"-http-addr", svr.HTTPAddr,
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
@@ -122,11 +129,11 @@ func TestRun_ServicesRegistration(t *testing.T) {
 
 	timer := &retry.Timer{Timeout: 1 * time.Second, Wait: 100 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		svc, _, err := a.Client().Agent().Service("service-id", nil)
+		svc, _, err := client.Agent().Service("service-id", nil)
 		require.NoError(r, err)
 		require.Equal(r, 80, svc.Port)
 
-		svcProxy, _, err := a.Client().Agent().Service("service-id-sidecar-proxy", nil)
+		svcProxy, _, err := client.Agent().Service("service-id-sidecar-proxy", nil)
 		require.NoError(r, err)
 		require.Equal(r, 2000, svcProxy.Port)
 	})

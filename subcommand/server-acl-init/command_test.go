@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -74,8 +75,8 @@ func TestRun_Defaults(t *testing.T) {
 		},
 	} {
 		t.Run(flags[0], func(t *testing.T) {
-			k8s, testAgent := completeSetup(t, resourcePrefix)
-			defer testAgent.Shutdown()
+			k8s, testSvr := completeSetup2(t, resourcePrefix)
+			defer testSvr.Stop()
 			require := require.New(t)
 
 			// Run the command.
@@ -95,7 +96,10 @@ func TestRun_Defaults(t *testing.T) {
 			bootToken := getBootToken(t, k8s, resourcePrefix)
 
 			// Check that it has the right policies.
-			consul := testAgent.Client()
+			consul, err := api.NewClient(&api.Config{
+				Address:    testSvr.HTTPAddr,
+			})
+			require.NoError(err)
 			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
 			require.Equal("global-management", tokenData.Policies[0].Name)
@@ -1223,10 +1227,76 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAge
 	return k8s, a
 }
 
+// Set up test consul agent and kubernetes cluster.
+func completeSetup2(t *testing.T, prefix string) (*fake.Clientset, *testutil.TestServer) {
+	k8s := fake.NewSimpleClientset()
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+	})
+	require.NoError(t, err)
+	createTestK8SResources2(t, k8s, svr.HTTPAddr, prefix, "http")
+	return k8s, svr
+}
+
 // Create test k8s resources (server pods and server stateful set)
 func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgent, prefix, scheme string) {
 	require := require.New(t)
 	consulURL, err := url.Parse("http://" + a.HTTPAddr())
+	require.NoError(err)
+	port, err := strconv.Atoi(consulURL.Port())
+	require.NoError(err)
+
+	// Create Consul server Pod.
+	_, err = k8s.CoreV1().Pods(ns).Create(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: prefix + "-server-0",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: v1.PodStatus{
+			PodIP: consulURL.Hostname(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "consul",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          scheme,
+							ContainerPort: int32(port),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Create Consul server Statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: prefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
+}
+
+// Create test k8s resources (server pods and server stateful set)
+func createTestK8SResources2(t *testing.T, k8s *fake.Clientset, consulHTTPAddr, prefix, scheme string) {
+	require := require.New(t)
+	consulURL, err := url.Parse("http://" + consulHTTPAddr)
 	require.NoError(err)
 	port, err := strconv.Atoi(consulURL.Port())
 	require.NoError(err)

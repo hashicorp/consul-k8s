@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"reflect"
 	"testing"
 
@@ -19,13 +20,16 @@ func TestSource_initServices(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t, t.Name(), ``)
-	defer a.Shutdown()
-	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
-	client := a.Client()
+	svr, err := testutil.NewTestServerT(t)
+	require.NoError(err)
+	defer svr.Stop()
+	client, err := api.NewClient(&api.Config{
+		Address:    svr.HTTPAddr,
+	})
+	require.NoError(err)
 
 	// Create services before the source is running
-	_, err := client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
+	_, err = client.Catalog().Register(testRegistration("hostA", "svcA", nil), nil)
 	require.NoError(err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
 	require.NoError(err)

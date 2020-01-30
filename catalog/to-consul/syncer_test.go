@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"testing"
 	"time"
 
@@ -18,10 +19,14 @@ func TestConsulSyncer_register(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t, t.Name(), ``)
-	defer a.Shutdown()
-	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
-	client := a.Client()
+	svr, err := testutil.NewTestServerT(t)
+	require.NoError(err)
+	defer svr.Stop()
+
+	client, err := api.NewClient(&api.Config{
+		Address:    svr.HTTPAddr,
+	})
+	require.NoError(err)
 
 	s, closer := testConsulSyncer(t, client)
 	defer closer()
@@ -55,10 +60,13 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t, t.Name(), ``)
-	defer a.Shutdown()
-	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
-	client := a.Client()
+	svr, err := testutil.NewTestServerT(t)
+	require.NoError(err)
+	defer svr.Stop()
+	client, err := api.NewClient(&api.Config{
+		Address:    svr.HTTPAddr,
+	})
+	require.NoError(err)
 
 	s, closer := testConsulSyncer(t, client)
 	defer closer()
@@ -69,7 +77,7 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	})
 
 	// Create an invalid service directly in Consul
-	_, err := client.Catalog().Register(testRegistration("k8s-sync", "baz", "default"), nil)
+	_, err = client.Catalog().Register(testRegistration("k8s-sync", "baz", "default"), nil)
 	require.NoError(err)
 
 	// Reaped service should not exist

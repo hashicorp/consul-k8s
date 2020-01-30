@@ -3,7 +3,7 @@ version: 2.1
 executors:
   go:
     docker:
-      - image: circleci/golang:1.13
+      - image: lkysow/consul-build-test:jan30
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
@@ -56,6 +56,30 @@ jobs:
       - run: |
           PACKAGE_NAMES=$(go list ./...)
           gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  test-enterprise:
+    executor: go
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+
+      # run go tests with gotestsum
+      - run: |
+          PACKAGE_NAMES=$(go list ./...)
+          gotestsum -tags=enterprise --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
