@@ -113,6 +113,9 @@ workflows:
       - test:
           requires:
             - go-fmt-and-vet
+      - test-enterprise:
+          requires:
+            - test
       - build-distros:
           requires:
             - test
