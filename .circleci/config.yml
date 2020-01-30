@@ -79,7 +79,7 @@ jobs:
       # run go tests with gotestsum
       - run: |
           PACKAGE_NAMES=$(go list ./...)
-          gotestsum -tags=enterprise --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
@@ -109,13 +109,13 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-      - go-fmt-and-vet
-      - test:
-          requires:
-            - go-fmt-and-vet
-      - test-enterprise:
-          requires:
-            - test
-      - build-distros:
-          requires:
-            - test
+#      - go-fmt-and-vet
+#      - test:
+#          requires:
+#            - go-fmt-and-vet
+      - test-enterprise
+#          requires:
+#            - test
+#      - build-distros:
+#          requires:
+#            - test
