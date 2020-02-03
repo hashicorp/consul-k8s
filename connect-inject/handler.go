@@ -262,7 +262,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Container{container},
 		"/spec/initContainers")...)
 
-	// Add the Envoy and lifecycle sidecars.
+	// Create the envoy sidecar definition
 	esContainer, err := h.envoySidecar(&pod)
 	if err != nil {
 		return &v1beta1.AdmissionResponse{
@@ -271,7 +271,18 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			},
 		}
 	}
-	connectContainer := h.lifecycleSidecar(&pod)
+
+	// Create the lifecycle sidecar definition
+	connectContainer, err := h.lifecycleSidecar(&pod)
+	if err != nil {
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring injection lifecycle sidecar container: %s", err),
+			},
+		}
+	}
+
+	// Add the envoy and lifecycle sidecar patches
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
 		[]corev1.Container{esContainer, connectContainer},

@@ -1,22 +1,41 @@
 package connectinject
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"bytes"
 	"strings"
+	"text/template"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
-	command := []string{
-		"consul-k8s",
-		"lifecycle-sidecar",
-		"-service-config", "/consul/connect-inject/service.hcl",
-	}
-	if h.AuthMethod != "" {
-		command = append(command, "-token-file=/consul/connect-inject/acl-token")
+const defaultSyncPeriod = 10 // in seconds
+
+type lifecycleContainerCommandData struct {
+	AuthMethod      string
+	SyncPeriodInSec int
+}
+
+func (h *Handler) lifecycleSidecar(pod *corev1.Pod) (corev1.Container, error) {
+	// Check that the sync period is valid if provided
+	var syncPeriodInSec int
+	if period, ok := pod.Annotations[annotationSyncPeriod]; ok {
+		syncPeriodDuration, err := time.ParseDuration(period)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+
+		syncPeriodInSec = int(syncPeriodDuration.Seconds())
 	}
 
-	if period, ok := pod.Annotations[annotationSyncPeriod]; ok {
-		command = append(command, "-sync-period="+strings.TrimSpace(period))
+	// Set the sync period to the default value if it's zero
+	if syncPeriodInSec <= 0 {
+		syncPeriodInSec = defaultSyncPeriod
+	}
+
+	data := lifecycleContainerCommandData{
+		AuthMethod:      h.AuthMethod,
+		SyncPeriodInSec: syncPeriodInSec,
 	}
 
 	envVariables := []corev1.EnvVar{
@@ -51,9 +70,18 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 			})
 	}
 
+	// Render the command
+	var buf bytes.Buffer
+	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
+		lifecycleContainerCommandTpl)))
+	err := tpl.Execute(&buf, &data)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	return corev1.Container{
 		Name:  "consul-connect-lifecycle-sidecar",
-		Image: h.ImageConsulK8S,
+		Image: h.ImageConsul,
 		Env:   envVariables,
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -61,6 +89,17 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command: command,
-	}
+		Command: []string{"/bin/sh", "-ec", buf.String()},
+	}, nil
 }
+
+const lifecycleContainerCommandTpl = `
+while true;
+do /bin/consul services register \
+  {{- if .AuthMethod }}
+  -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  /consul/connect-inject/service.hcl;
+sleep {{ .SyncPeriodInSec }};
+done;
+`

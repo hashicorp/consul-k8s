@@ -17,8 +17,10 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 	handler := Handler{
 		Log:            hclog.Default().Named("handler"),
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		ImageConsul:    "hashicorp/consul:3.2.1",
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+
+	container, err := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -27,9 +29,10 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 			},
 		},
 	})
+
 	require.Equal(t, corev1.Container{
 		Name:  "consul-connect-lifecycle-sidecar",
-		Image: "hashicorp/consul-k8s:9.9.9",
+		Image: "hashicorp/consul:3.2.1",
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
@@ -49,10 +52,15 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 			},
 		},
 		Command: []string{
-			"consul-k8s", "lifecycle-sidecar",
-			"-service-config", "/consul/connect-inject/service.hcl",
+			"/bin/sh", "-ec",
+			`while true;
+do /bin/consul services register \
+  /consul/connect-inject/service.hcl;
+sleep 10;
+done;`,
 		},
 	}, container)
+	require.NoError(t, err)
 }
 
 // Test that if there's an auth method we set the -token-file flag
@@ -61,11 +69,10 @@ func TestLifecycleSidecar_AuthMethod(t *testing.T) {
 	for _, authMethod := range []string{"", "auth-method"} {
 		t.Run("authmethod: "+authMethod, func(t *testing.T) {
 			handler := Handler{
-				Log:            hclog.Default().Named("handler"),
-				AuthMethod:     authMethod,
-				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+				Log:        hclog.Default().Named("handler"),
+				AuthMethod: authMethod,
 			}
-			container := handler.lifecycleSidecar(&corev1.Pod{
+			container, err := handler.lifecycleSidecar(&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -76,13 +83,14 @@ func TestLifecycleSidecar_AuthMethod(t *testing.T) {
 			})
 
 			if authMethod == "" {
-				require.NotContains(t, container.Command, "-token-file=/consul/connect-inject/acl-token")
+				require.NotContains(t, container.Command[2], `-token-file="/consul/connect-inject/acl-token"`)
 			} else {
 				require.Contains(t,
-					container.Command,
-					"-token-file=/consul/connect-inject/acl-token",
+					container.Command[2],
+					`-token-file="/consul/connect-inject/acl-token"`,
 				)
 			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -91,10 +99,10 @@ func TestLifecycleSidecar_AuthMethod(t *testing.T) {
 // period we use that value.
 func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
-		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		Log: hclog.Default().Named("handler"),
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+
+	container, err := handler.lifecycleSidecar(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"consul.hashicorp.com/connect-sync-period": "55s",
@@ -109,7 +117,8 @@ func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 		},
 	})
 
-	require.Contains(t, container.Command, "-sync-period=55s")
+	require.Contains(t, container.Command[2], "sleep 55")
+	require.NoError(t, err)
 }
 
 // Test that the Consul address uses HTTPS
@@ -118,9 +127,11 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 	handler := Handler{
 		Log:            hclog.Default().Named("handler"),
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		ImageConsul:    "hashicorp/consul:3.2.1",
 		ConsulCACert:   "consul-ca-cert",
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+
+	container, err := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -129,9 +140,10 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 			},
 		},
 	})
+
 	require.Equal(t, corev1.Container{
 		Name:  "consul-connect-lifecycle-sidecar",
-		Image: "hashicorp/consul-k8s:9.9.9",
+		Image: "hashicorp/consul:3.2.1",
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
@@ -155,8 +167,13 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 			},
 		},
 		Command: []string{
-			"consul-k8s", "lifecycle-sidecar",
-			"-service-config", "/consul/connect-inject/service.hcl",
+			"/bin/sh", "-ec",
+			`while true;
+do /bin/consul services register \
+  /consul/connect-inject/service.hcl;
+sleep 10;
+done;`,
 		},
 	}, container)
+	require.NoError(t, err)
 }
