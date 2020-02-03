@@ -23,7 +23,7 @@ type initContainerCommandData struct {
 	WriteServiceDefaults bool
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
-	// enabled in Consul (necesary for OSS).
+	// enabled in Consul (necessary for OSS).
 	ConsulNamespace string
 	Upstreams       []initContainerCommandUpstreamData
 	Tags            string
@@ -35,10 +35,11 @@ type initContainerCommandData struct {
 }
 
 type initContainerCommandUpstreamData struct {
-	Name       string
-	LocalPort  int32
-	Datacenter string
-	Query      string
+	Name                    string
+	LocalPort               int32
+	ConsulUpstreamNamespace string
+	Datacenter              string
+	Query                   string
 }
 
 // containerInit returns the init container spec for registering the Consul
@@ -111,14 +112,25 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		for _, raw := range strings.Split(raw, ",") {
 			parts := strings.SplitN(raw, ":", 3)
 
-			var datacenter, service_name, prepared_query string
+			var datacenter, service_name, prepared_query, namespace string
 			var port int32
 			if parts[0] == "prepared_query" {
 				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
 				prepared_query = strings.TrimSpace(parts[1])
 			} else {
 				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
-				service_name = strings.TrimSpace(parts[0])
+
+				// Parse the namespace if provided
+				if data.ConsulNamespace != "" {
+					pieces := strings.SplitN(parts[0], ".", 2)
+					service_name = pieces[0]
+
+					if len(pieces) > 1 {
+						namespace = pieces[1]
+					}
+				} else {
+					service_name = strings.TrimSpace(parts[0])
+				}
 
 				// parse the optional datacenter
 				if len(parts) > 2 {
@@ -127,12 +139,19 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 			}
 
 			if port > 0 {
-				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
+				upstream := initContainerCommandUpstreamData{
 					Name:       service_name,
 					LocalPort:  port,
 					Datacenter: datacenter,
 					Query:      prepared_query,
-				})
+				}
+
+				// Add namespace to upstream
+				if namespace != "" {
+					upstream.ConsulUpstreamNamespace = namespace
+				}
+
+				data.Upstreams = append(data.Upstreams, upstream)
 			}
 		}
 	}
@@ -262,6 +281,9 @@ services {
       destination_type = "prepared_query" 
       destination_name = "{{ .Query}}"
       {{- end}}
+      {{- if .ConsulUpstreamNamespace }}
+      destination_namespace = "{{ .ConsulUpstreamNamespace }}"
+      {{- end}}
       local_bind_port = {{ .LocalPort }}
       {{- if .Datacenter }}
       datacenter = "{{ .Datacenter }}"
@@ -347,7 +369,7 @@ chmod 444 /consul/connect-inject/acl-token
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
   {{- if .ConsulNamespace }}
-  -namespace={{ .ConsulNamespace }} \
+  -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   /consul/connect-inject/service.hcl
 
@@ -356,6 +378,9 @@ chmod 444 /consul/connect-inject/acl-token
   -proxy-id="${PROXY_SERVICE_ID}" \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 

@@ -191,6 +191,7 @@ services {
 			"",
 			`datacenter`,
 		},
+
 		{
 			"Upstream prepared query",
 			func(pod *corev1.Pod) *corev1.Pod {
@@ -483,6 +484,233 @@ services {
 			require := require.New(t)
 
 			var h Handler
+			container, err := h.containerInit(tt.Pod(minimal()))
+			require.NoError(err)
+			actual := strings.Join(container.Command, " ")
+			require.Contains(actual, tt.Cmd)
+			if tt.CmdNot != "" {
+				require.NotContains(actual, tt.CmdNot)
+			}
+		})
+	}
+}
+
+func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
+	minimal := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					annotationService: "foo",
+				},
+			},
+
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: "web",
+					},
+					{
+						Name: "web-side",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		Name    string
+		Pod     func(*corev1.Pod) *corev1.Pod
+		Handler Handler
+		Cmd     string // Strings.Contains test
+		CmdNot  string // Not contains
+	}{
+		{
+			"Only service, whole template, default namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+
+# Register the service. The HCL is stored in the volume so that
+# the preStop hook can access it to deregister the service.
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${PROXY_SERVICE_ID}"
+  name = "web-sidecar-proxy"
+  kind = "connect-proxy"
+  address = "${POD_IP}"
+  port = 20000
+  namespace = "default"
+
+  proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+  }
+
+  checks {
+    name = "Proxy Public Listener"
+    tcp = "${POD_IP}:20000"
+    interval = "10s"
+    deregister_critical_service_after = "10m"
+  }
+
+  checks {
+    name = "Destination Alias"
+    alias_service = "web"
+  }
+}
+
+services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "default"
+}
+EOF
+
+/bin/consul services register \
+  -namespace="default" \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -namespace="default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`,
+			"",
+		},
+
+		{
+			"Only service, whole template, non-default namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+
+# Register the service. The HCL is stored in the volume so that
+# the preStop hook can access it to deregister the service.
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${PROXY_SERVICE_ID}"
+  name = "web-sidecar-proxy"
+  kind = "connect-proxy"
+  address = "${POD_IP}"
+  port = 20000
+  namespace = "non-default"
+
+  proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+  }
+
+  checks {
+    name = "Proxy Public Listener"
+    tcp = "${POD_IP}:20000"
+    interval = "10s"
+    deregister_critical_service_after = "10m"
+  }
+
+  checks {
+    name = "Destination Alias"
+    alias_service = "web"
+  }
+}
+
+services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "non-default"
+}
+EOF
+
+/bin/consul services register \
+  -namespace="non-default" \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -namespace="non-default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`,
+			"",
+		},
+
+		{
+			"Upstream namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db.namespace:1234"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+			},
+			`proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+    upstreams {
+      destination_type = "service" 
+      destination_name = "db"
+      destination_namespace = "namespace"
+      local_bind_port = 1234
+    }
+  }`,
+			"",
+		},
+
+		{
+			"Upstream no namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+			},
+			`proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+    upstreams {
+      destination_type = "service" 
+      destination_name = "db"
+      local_bind_port = 1234
+    }
+  }`,
+			"",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			h := tt.Handler
 			container, err := h.containerInit(tt.Pod(minimal()))
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
