@@ -852,8 +852,6 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 
 	// If the binding rule already exists and namespaces are enabled, update it
 	if len(existingRules) > 0 && c.flagEnableNamespaces {
-		fmt.Sprintf("updating acl binding rule for %s", authMethodTmpl.Name)
-
 		// Find the policy that matches our name and description
 		// and that's the ID we need
 		for _, existingRule := range existingRules {
@@ -869,7 +867,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 			return errors.New("Unable to find a matching ACL binding rule to update")
 		}
 
-		err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
+		err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodTmpl.Name),
 			func() error {
 				_, _, err := consulClient.ACL().BindingRuleUpdate(&abr, nil)
 				return err
