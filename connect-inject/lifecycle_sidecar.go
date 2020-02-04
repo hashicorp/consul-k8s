@@ -10,6 +10,7 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 		"consul-k8s",
 		"lifecycle-sidecar",
 		"-service-config", "/consul/connect-inject/service.hcl",
+		"-consul-location", "/consul/connect-inject/consul",
 	}
 	if h.AuthMethod != "" {
 		command = append(command, "-token-file=/consul/connect-inject/acl-token")
