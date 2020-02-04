@@ -17,20 +17,15 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-type lifecycleCommandData struct {
-	AuthMethod      string
-	SyncPeriodInSec int
-}
-
 type Command struct {
 	UI cli.Ui
 
-	http               *flags.HTTPFlags
-	flagServiceConfig  string
-	flagConsulLocation string
-	flagSyncPeriod     string
-	flagSet            *flag.FlagSet
-	flagLogLevel       string
+	http              *flags.HTTPFlags
+	flagServiceConfig string
+	flagConsulBinary  string
+	flagSyncPeriod    string
+	flagSet           *flag.FlagSet
+	flagLogLevel      string
 
 	once         sync.Once
 	help         string
@@ -41,7 +36,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagServiceConfig, "service-config", "", "Path to the service config file")
-	c.flagSet.StringVar(&c.flagConsulLocation, "consul-location", "", "Path to a consul binary")
+	c.flagSet.StringVar(&c.flagConsulBinary, "consul-binary", "", "Path to a consul binary")
 	c.flagSet.StringVar(&c.flagSyncPeriod, "sync-period", "10s", "Time between syncing the service registration. Defaults to 10s.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
@@ -78,19 +73,9 @@ func (c *Command) Run(args []string) int {
 
 	// Log initial configuration
 	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
-		"consul-location", c.flagConsulLocation,
+		"consul-binary", c.flagConsulBinary,
 		"sync-period", syncPeriod,
 		"log-level", logLevel)
-
-	// Set up Consul client (may already exist in tests).
-	if c.consulClient == nil {
-		var err error
-		c.consulClient, err = c.http.APIClient()
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating Consul client: %s", err))
-			return 1
-		}
-	}
 
 	// Set up channel for graceful SIGINT shutdown.
 	signal.Notify(c.sigCh, os.Interrupt)
@@ -103,12 +88,20 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		cmd := exec.Command(c.flagConsulLocation, "services", "register", c.flagServiceConfig)
-		err := cmd.Run()
-		if err != nil {
-			logger.Error("failed to sync service", "err", err)
+		var cmd *exec.Cmd
+		if c.http.TokenFile() == "" {
+			cmd = exec.Command(c.flagConsulBinary, "services", "register", c.flagServiceConfig)
 		} else {
-			logger.Info("successfully synced service")
+			cmd = exec.Command(c.flagConsulBinary, "services", "register", c.flagServiceConfig,
+				fmt.Sprintf("-token-file=%s", c.http.TokenFile()))
+		}
+
+		// Run the command and record the stdout and stderr output
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			logger.Error("failed to sync service", "output", output, "err", err)
+		} else {
+			logger.Info("successfully synced service", "output", output)
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
@@ -129,8 +122,8 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 		err = errors.New("-service-config must be set")
 		return
 	}
-	if c.flagConsulLocation == "" {
-		err = errors.New("-consul-location must be set")
+	if c.flagConsulBinary == "" {
+		err = errors.New("-consul-binary must be set")
 		return
 	}
 	syncPeriod, err = time.ParseDuration(c.flagSyncPeriod)
@@ -143,9 +136,9 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
 		return
 	}
-	_, err = os.Stat(c.flagConsulLocation)
+	_, err = os.Stat(c.flagConsulBinary)
 	if os.IsNotExist(err) {
-		err = fmt.Errorf("-consul-location binary %q not found", c.flagConsulLocation)
+		err = fmt.Errorf("-consul-binary %q not found", c.flagConsulBinary)
 		return
 	}
 	logLevel = hclog.LevelFromString(c.flagLogLevel)
