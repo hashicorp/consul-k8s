@@ -23,14 +23,14 @@ func TestRun_FlagValidation(t *testing.T) {
 		{
 			Flags: []string{
 				"-service-config=/config.hcl",
-				"-consul-location=",
+				"-consul-binary=",
 			},
-			ExpErr: "-consul-location must be set",
+			ExpErr: "-consul-binary must be set",
 		},
 		{
 			Flags: []string{
 				"-service-config=/config.hcl",
-				"-consul-location=/consul",
+				"-consul-binary=/consul",
 				"-sync-period=notparseable",
 			},
 			ExpErr: "-sync-period is invalid: time: invalid duration notparseable",
@@ -56,12 +56,12 @@ func TestRun_ServiceConfigFileMissing(t *testing.T) {
 	cmd := Command{
 		UI: ui,
 	}
-	responseCode := cmd.Run([]string{"-service-config=/does/not/exist", "-consul-location=/not/a/valid/path"})
+	responseCode := cmd.Run([]string{"-service-config=/does/not/exist", "-consul-binary=/not/a/valid/path"})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
 	require.Contains(t, ui.ErrorWriter.String(), "-service-config file \"/does/not/exist\" not found")
 }
 
-func TestRun_ConsulLocationMissing(t *testing.T) {
+func TestRun_ConsulBinaryMissing(t *testing.T) {
 	t.Parallel()
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -79,9 +79,9 @@ func TestRun_ConsulLocationMissing(t *testing.T) {
 
 	configFlag := "-service-config=" + configFile
 
-	responseCode := cmd.Run([]string{configFlag, "-consul-location=/not/a/valid/path"})
+	responseCode := cmd.Run([]string{configFlag, "-consul-binary=/not/a/valid/path"})
 	require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
-	require.Contains(t, ui.ErrorWriter.String(), "-consul-location binary \"/not/a/valid/path\" not found")
+	require.Contains(t, ui.ErrorWriter.String(), "-consul-binary \"/not/a/valid/path\" not found")
 }
 
 const servicesRegistration = `
