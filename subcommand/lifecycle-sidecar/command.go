@@ -4,26 +4,33 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
-	"github.com/hashicorp/consul/command/services"
-	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
-	"github.com/prometheus/common/log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
+	"github.com/prometheus/common/log"
 )
+
+type lifecycleCommandData struct {
+	AuthMethod      string
+	SyncPeriodInSec int
+}
 
 type Command struct {
 	UI cli.Ui
 
-	http              *flags.HTTPFlags
-	flagServiceConfig string
-	flagSyncPeriod    string
-	flagSet           *flag.FlagSet
-	flagLogLevel      string
+	http               *flags.HTTPFlags
+	flagServiceConfig  string
+	flagConsulLocation string
+	flagSyncPeriod     string
+	flagSet            *flag.FlagSet
+	flagLogLevel       string
 
 	once         sync.Once
 	help         string
@@ -34,6 +41,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagServiceConfig, "service-config", "", "Path to the service config file")
+	c.flagSet.StringVar(&c.flagConsulLocation, "consul-location", "", "Path to a consul binary")
 	c.flagSet.StringVar(&c.flagSyncPeriod, "sync-period", "10s", "Time between syncing the service registration. Defaults to 10s.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
@@ -56,15 +64,23 @@ func (c *Command) Run(args []string) int {
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
+
 	syncPeriod, logLevel, err := c.validateFlags()
 	if err != nil {
 		c.UI.Error("Error: " + err.Error())
 		return 1
 	}
+
 	logger := hclog.New(&hclog.LoggerOptions{
 		Level:  logLevel,
 		Output: os.Stderr,
 	})
+
+	// Log initial configuration
+	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
+		"consul-location", c.flagConsulLocation,
+		"sync-period", syncPeriod,
+		"log-level", logLevel)
 
 	// Set up Consul client (may already exist in tests).
 	if c.consulClient == nil {
@@ -74,19 +90,6 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Error creating Consul client: %s", err))
 			return 1
 		}
-	}
-
-	// This config file should have been written by the init Pod.
-	// Its existence is checked in validateFlags().
-	svcs, err := services.ServicesFromFiles([]string{c.flagServiceConfig})
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error: %s", err))
-		return 1
-	}
-	if len(svcs) != 2 {
-		c.UI.Error(fmt.Sprintf(
-			"Error: expected 2 services to be defined in %s, found %d", c.flagServiceConfig, len(svcs)))
-		return 1
 	}
 
 	// Set up channel for graceful SIGINT shutdown.
@@ -100,13 +103,12 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		for _, svc := range svcs {
-			err := c.consulClient.Agent().ServiceRegister(svc)
-			if err != nil {
-				logger.Error("failed to sync service", "id", svc.ID, "err", err)
-			} else {
-				logger.Info("successfully synced service", "id", svc.ID)
-			}
+		cmd := exec.Command(c.flagConsulLocation, "services", "register", c.flagServiceConfig)
+		err := cmd.Run()
+		if err != nil {
+			logger.Error("failed to sync service", "err", err)
+		} else {
+			logger.Info("successfully synced service")
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
@@ -127,6 +129,10 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 		err = errors.New("-service-config must be set")
 		return
 	}
+	if c.flagConsulLocation == "" {
+		err = errors.New("-consul-location must be set")
+		return
+	}
 	syncPeriod, err = time.ParseDuration(c.flagSyncPeriod)
 	if err != nil {
 		err = fmt.Errorf("-sync-period is invalid: %s", err)
@@ -135,6 +141,11 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 	_, err = os.Stat(c.flagServiceConfig)
 	if os.IsNotExist(err) {
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
+		return
+	}
+	_, err = os.Stat(c.flagConsulLocation)
+	if os.IsNotExist(err) {
+		err = fmt.Errorf("-consul-location binary %q not found", c.flagConsulLocation)
 		return
 	}
 	logLevel = hclog.LevelFromString(c.flagLogLevel)
