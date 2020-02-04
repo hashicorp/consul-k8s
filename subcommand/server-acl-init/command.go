@@ -745,7 +745,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	if err != nil {
 		return err
 	}
-	if len(existingRules) > 0 {
+	if len(existingRules) > 0 && !c.flagEnableNamespaces {
 		logger.Info(fmt.Sprintf("Binding rule for %s already exists", authMethodName))
 		return nil
 	}
@@ -812,6 +812,8 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	// If namespaces and mirroring are enabled, this is not necessary because
 	// the auth method will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
+	// Note: if the config changes, an auth method will be created in the
+	// correct namespace, but the old auth method will not be removed.
 	writeOptions := api.WriteOptions{}
 	if c.flagEnableNamespaces && !c.flagEnableSyncK8SNSMirroring {
 		writeOptions.Namespace = c.flagConsulSyncDestinationNamespace
@@ -821,6 +823,9 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
 			var err error
+			// `AuthMethodCreate` will also be able to update an existing
+			// AuthMethod based on the name provided. This means that any namespace
+			// configuration changes will correctly update the AuthMethod.
 			authMethod, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
 			return err
 		}, logger)
@@ -845,11 +850,39 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 		abr.Namespace = c.flagConsulSyncDestinationNamespace
 	}
 
-	return c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
-		func() error {
-			_, _, err := consulClient.ACL().BindingRuleCreate(&abr, nil)
-			return err
-		}, logger)
+	// If the binding rule already exists and namespaces are enabled, update it
+	if len(existingRules) > 0 && c.flagEnableNamespaces {
+		fmt.Sprintf("updating acl binding rule for %s", authMethodTmpl.Name)
+
+		// Find the policy that matches our name and description
+		// and that's the ID we need
+		for _, existingRule := range existingRules {
+			if existingRule.BindName == abr.BindName && existingRule.Description == abr.Description {
+				abr.ID = existingRule.ID
+			}
+		}
+
+		// This will only happen if there are existing policies
+		// for this auth method, but none that match the binding
+		// rule set up here in the bootstrap method.
+		if abr.ID == "" {
+			return errors.New("Unable to find a matching ACL binding rule to update")
+		}
+
+		err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
+			func() error {
+				_, _, err := consulClient.ACL().BindingRuleUpdate(&abr, nil)
+				return err
+			}, logger)
+	} else {
+		// Otherwise create the binding rule
+		err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodTmpl.Name),
+			func() error {
+				_, _, err := consulClient.ACL().BindingRuleCreate(&abr, nil)
+				return err
+			}, logger)
+	}
+	return err
 }
 
 func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, logger hclog.Logger, consulClient *api.Client) error {
