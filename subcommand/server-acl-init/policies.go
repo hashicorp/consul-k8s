@@ -69,6 +69,9 @@ namespace_prefix "" {
 // This assumes users are using the default name for the service, i.e.
 // "mesh-gateway".
 func (c *Command) meshGatewayRules() (string, error) {
+	// Mesh gateways can only act as a proxy for services
+	// that its ACL token has access to. So, in the case of
+	// Consul namespaces, it needs access to all namespaces.
 	meshGatewayRulesTpl := `
 {{- if .EnableNamespaces }}
 namespace_prefix "" {

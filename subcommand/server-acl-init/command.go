@@ -31,7 +31,7 @@ type Command struct {
 	flagServerLabelSelector      string
 	flagResourcePrefix           string
 	flagReplicas                 int
-	flagNamespace                string
+	flagK8sNamespace             string
 	flagAllowDNS                 bool
 	flagCreateClientToken        bool
 	flagCreateSyncToken          bool
@@ -76,7 +76,7 @@ func (c *Command) init() {
 		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
 	c.flags.IntVar(&c.flagReplicas, "expected-replicas", 1,
 		"Number of expected Consul server replicas")
-	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
+	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
@@ -215,7 +215,7 @@ func (c *Command) Run(args []string) int {
 		// because in older versions of consul-helm it wasn't labeled with
 		// component: server. We also can't drop that label because it's required
 		// for targeting the right server Pods.
-		statefulset, err := c.clientset.AppsV1().StatefulSets(c.flagNamespace).Get(ssName, metav1.GetOptions{})
+		statefulset, err := c.clientset.AppsV1().StatefulSets(c.flagK8sNamespace).Get(ssName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -284,7 +284,7 @@ func (c *Command) Run(args []string) int {
 	if updateServerPolicy {
 		_, err = c.setServerPolicy(consulClient, logger)
 		if err != nil {
-			logger.Error("Error updating the server ACL policy")
+			logger.Error("Error updating the server ACL policy", "err", err)
 			return 1
 		}
 	}
@@ -385,7 +385,7 @@ func (c *Command) Run(args []string) int {
 // reading the Kubernetes Secret with name secretName.
 // If there is no bootstrap token yet, then it returns an empty string (not an error).
 func (c *Command) getBootstrapToken(logger hclog.Logger, secretName string) (string, error) {
-	secret, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return "", nil
@@ -418,7 +418,7 @@ func (c *Command) getConsulServers(logger hclog.Logger, n int, scheme string) ([
 	err := c.untilSucceeds("discovering Consul server pods",
 		func() error {
 			var err error
-			serverPods, err = c.clientset.CoreV1().Pods(c.flagNamespace).List(metav1.ListOptions{LabelSelector: c.flagServerLabelSelector})
+			serverPods, err = c.clientset.CoreV1().Pods(c.flagK8sNamespace).List(metav1.ListOptions{LabelSelector: c.flagServerLabelSelector})
 			if err != nil {
 				return err
 			}
@@ -528,7 +528,7 @@ func (c *Command) bootstrapServers(logger hclog.Logger, bootTokenSecretName, sch
 					"token": bootstrapToken,
 				},
 			}
-			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
+			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(secret)
 			return err
 		}, logger)
 	if err != nil {
@@ -662,7 +662,7 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 	// Check if the secret already exists, if so, we assume the ACL has already been
 	// created and return.
 	secretName := c.withPrefix(name + "-acl-token")
-	_, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	_, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(secretName, metav1.GetOptions{})
 	if err == nil {
 		logger.Info(fmt.Sprintf("Secret %q already exists", secretName))
 		return nil
@@ -697,7 +697,7 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client, logger
 					"token": []byte(token),
 				},
 			}
-			_, err := c.clientset.CoreV1().Secrets(c.flagNamespace).Create(secret)
+			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(secret)
 			return err
 		}, logger)
 }
@@ -756,6 +756,8 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	if err != nil {
 		return err
 	}
+	// If Consul namespaces are enabled, someone may have changed their namespace
+	// configuration, so auth methods and binding rules should be updated accordingly
 	if len(existingRules) > 0 && !c.flagEnableNamespaces {
 		logger.Info(fmt.Sprintf("Binding rule for %s already exists", authMethodName))
 		return nil
@@ -778,7 +780,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	err = c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
-			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagNamespace).Get(saName, metav1.GetOptions{})
+			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(saName, metav1.GetOptions{})
 			return err
 		}, logger)
 	if err != nil {
@@ -794,7 +796,7 @@ func (c *Command) configureConnectInject(logger hclog.Logger, consulClient *api.
 	err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
 		func() error {
 			var err error
-			saSecret, err = c.clientset.CoreV1().Secrets(c.flagNamespace).Get(saSecretName, metav1.GetOptions{})
+			saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(saSecretName, metav1.GetOptions{})
 			return err
 		}, logger)
 	if err != nil {
