@@ -100,6 +100,21 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 	writeOptions := api.WriteOptions{}
 	if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
 		writeOptions.Namespace = c.flagConsulInjectDestinationNamespace
+
+		if c.flagConsulInjectDestinationNamespace != "default" {
+			// If not the default namespace, check if it exists, creating it
+			// if necessary. The Consul namespace must exist for the AuthMethod
+			// to be created there.
+			err = c.untilSucceeds(fmt.Sprintf("checking or creating namespace %s",
+				c.flagConsulInjectDestinationNamespace),
+				func() error {
+					err := c.checkAndCreateNamespace(c.flagConsulInjectDestinationNamespace, consulClient)
+					return err
+				})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	var authMethod *api.ACLAuthMethod
