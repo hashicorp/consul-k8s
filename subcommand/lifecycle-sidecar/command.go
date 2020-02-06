@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -23,21 +22,20 @@ type Command struct {
 	http              *flags.HTTPFlags
 	flagServiceConfig string
 	flagConsulBinary  string
-	flagSyncPeriod    string
+	flagSyncPeriod    time.Duration
 	flagSet           *flag.FlagSet
 	flagLogLevel      string
 
-	once         sync.Once
-	help         string
-	consulClient *api.Client
-	sigCh        chan os.Signal
+	once  sync.Once
+	help  string
+	sigCh chan os.Signal
 }
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagServiceConfig, "service-config", "", "Path to the service config file")
-	c.flagSet.StringVar(&c.flagConsulBinary, "consul-binary", "", "Path to a consul binary")
-	c.flagSet.StringVar(&c.flagSyncPeriod, "sync-period", "10s", "Time between syncing the service registration. Defaults to 10s.")
+	c.flagSet.StringVar(&c.flagConsulBinary, "consul-binary", "consul", "Path to a consul binary")
+	c.flagSet.DurationVar(&c.flagSyncPeriod, "sync-period", 10*time.Second, "Time between syncing the service registration. Defaults to 10s.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\". Defaults to info.")
@@ -80,6 +78,10 @@ func (c *Command) Run(args []string) int {
 	// Set up channel for graceful SIGINT shutdown.
 	signal.Notify(c.sigCh, os.Interrupt)
 
+	consulCommand := []string{"services", "register"}
+	consulCommand = append(consulCommand, c.parseConsulFlags()...)
+	consulCommand = append(consulCommand, c.flagServiceConfig)
+
 	// The main work loop. We continually re-register our service every
 	// syncPeriod. Consul is smart enough to know when the service hasn't changed
 	// and so won't update any indices. This means we won't be causing a lot
@@ -88,20 +90,14 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		var cmd *exec.Cmd
-		if c.http.TokenFile() == "" {
-			cmd = exec.Command(c.flagConsulBinary, "services", "register", c.flagServiceConfig)
-		} else {
-			cmd = exec.Command(c.flagConsulBinary, "services", "register", c.flagServiceConfig,
-				fmt.Sprintf("-token-file=%s", c.http.TokenFile()))
-		}
+		cmd := exec.Command(c.flagConsulBinary, consulCommand...)
 
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("failed to sync service", "output", output, "err", err)
+			logger.Error("failed to sync service", "output", string(output), "err", err)
 		} else {
-			logger.Info("successfully synced service", "output", output)
+			logger.Info("successfully synced service", "output", string(output))
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
@@ -126,19 +122,15 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 		err = errors.New("-consul-binary must be set")
 		return
 	}
-	syncPeriod, err = time.ParseDuration(c.flagSyncPeriod)
-	if err != nil {
-		err = fmt.Errorf("-sync-period is invalid: %s", err)
-		return
-	}
+
 	_, err = os.Stat(c.flagServiceConfig)
 	if os.IsNotExist(err) {
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
 		return
 	}
-	_, err = os.Stat(c.flagConsulBinary)
-	if os.IsNotExist(err) {
-		err = fmt.Errorf("-consul-binary %q not found", c.flagConsulBinary)
+	_, err = exec.LookPath(c.flagConsulBinary)
+	if err != nil {
+		err = fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
 		return
 	}
 	logLevel = hclog.LevelFromString(c.flagLogLevel)
@@ -147,6 +139,18 @@ func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Leve
 		return
 	}
 	return
+}
+
+// parseConsulFlags creates Consul client command flags
+// from command's HTTP flags and returns them as an array of strings.
+func (c *Command) parseConsulFlags() []string {
+	var consulCommandFlags []string
+	c.http.ClientFlags().VisitAll(func(f *flag.Flag) {
+		if f.Value.String() != "" {
+			consulCommandFlags = append(consulCommandFlags, fmt.Sprintf("-%s=%s", f.Name, f.Value.String()))
+		}
+	})
+	return consulCommandFlags
 }
 
 // interrupt sends os.Interrupt signal to the command
