@@ -7,7 +7,7 @@ executors:
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
       - CONSUL_VERSION: 1.6.3 # Consul's OSS version to use in tests
-      - CONSUL_ENT_VERSION: 1.7.0+ent-beta4 # Consul's enterprise version to use in tests
+      - CONSUL_ENT_VERSION: 1.7.0+ent # Consul's enterprise version to use in tests
 
 jobs:
   go-fmt-and-vet:
@@ -129,3 +129,4 @@ workflows:
       - build-distros:
           requires:
             - test
+            - test_enterprise
