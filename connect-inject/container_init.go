@@ -24,10 +24,11 @@ type initContainerCommandData struct {
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
-	ConsulNamespace string
-	Upstreams       []initContainerCommandUpstreamData
-	Tags            string
-	Meta            map[string]string
+	ConsulNamespace           string
+	NamespaceMirroringEnabled bool
+	Upstreams                 []initContainerCommandUpstreamData
+	Tags                      string
+	Meta                      map[string]string
 
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
@@ -57,13 +58,14 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
 
 	data := initContainerCommandData{
-		ServiceName:          pod.Annotations[annotationService],
-		ProxyServiceName:     fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
-		ServiceProtocol:      protocol,
-		AuthMethod:           h.AuthMethod,
-		WriteServiceDefaults: writeServiceDefaults,
-		ConsulNamespace:      h.consulNamespace(k8sNamespace),
-		ConsulCACert:         h.ConsulCACert,
+		ServiceName:               pod.Annotations[annotationService],
+		ProxyServiceName:          fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
+		ServiceProtocol:           protocol,
+		AuthMethod:                h.AuthMethod,
+		WriteServiceDefaults:      writeServiceDefaults,
+		ConsulNamespace:           h.consulNamespace(k8sNamespace),
+		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
+		ConsulCACert:              h.ConsulCACert,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -342,8 +344,14 @@ EOF
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
-  {{- if .ConsulNamespace }}
+  {{- if.ConsulNamespace }}
+  {{- if .NamespaceMirroringEnabled }}
+  {{- /* If namespace mirroring is enabled, the auth method is
+         defined in the default namespace */}}
+  -namespace="default" \
+  {{- else }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
   {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 {{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
