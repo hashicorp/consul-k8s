@@ -514,17 +514,27 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 					{
 						Name: "web-side",
 					},
+					{
+						Name: "auth-method-secret",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "service-account-secret",
+								MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+							},
+						},
+					},
 				},
 			},
 		}
 	}
 
 	cases := []struct {
-		Name    string
-		Pod     func(*corev1.Pod) *corev1.Pod
-		Handler Handler
-		Cmd     string // Strings.Contains test
-		CmdNot  string // Not contains
+		Name         string
+		Pod          func(*corev1.Pod) *corev1.Pod
+		Handler      Handler
+		K8sNamespace string
+		Cmd          string // Strings.Contains test
+		CmdNot       string // Not contains
 	}{
 		{
 			"Only service, whole template, default namespace",
@@ -536,6 +546,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
+			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -603,6 +614,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 			},
+			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -661,6 +673,161 @@ cp /bin/consul /consul/connect-inject/consul`,
 		},
 
 		{
+			"Whole template, auth method, non-default namespace, mirroring disabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				AuthMethod:                 "auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+			},
+			k8sNamespace,
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+
+# Register the service. The HCL is stored in the volume so that
+# the preStop hook can access it to deregister the service.
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${PROXY_SERVICE_ID}"
+  name = "web-sidecar-proxy"
+  kind = "connect-proxy"
+  address = "${POD_IP}"
+  port = 20000
+  namespace = "non-default"
+
+  proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+  }
+
+  checks {
+    name = "Proxy Public Listener"
+    tcp = "${POD_IP}:20000"
+    interval = "10s"
+    deregister_critical_service_after = "10m"
+  }
+
+  checks {
+    name = "Destination Alias"
+    alias_service = "web"
+  }
+}
+
+services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "non-default"
+}
+EOF
+/bin/consul login -method="auth-method" \
+  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
+  -token-sink-file="/consul/connect-inject/acl-token" \
+  -namespace="non-default" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
+
+/bin/consul services register \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="non-default" \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="non-default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`,
+			"",
+		},
+
+		{
+			"Whole template, auth method, non-default namespace, mirroring enabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				AuthMethod:                 "auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
+				EnableK8SNSMirroring:       true,
+			},
+			k8sNamespace,
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+
+# Register the service. The HCL is stored in the volume so that
+# the preStop hook can access it to deregister the service.
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${PROXY_SERVICE_ID}"
+  name = "web-sidecar-proxy"
+  kind = "connect-proxy"
+  address = "${POD_IP}"
+  port = 20000
+  namespace = "k8snamespace"
+
+  proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+  }
+
+  checks {
+    name = "Proxy Public Listener"
+    tcp = "${POD_IP}:20000"
+    interval = "10s"
+    deregister_critical_service_after = "10m"
+  }
+
+  checks {
+    name = "Destination Alias"
+    alias_service = "web"
+  }
+}
+
+services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "k8snamespace"
+}
+EOF
+/bin/consul login -method="auth-method" \
+  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
+  -token-sink-file="/consul/connect-inject/acl-token" \
+  -namespace="default" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
+
+/bin/consul services register \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="k8snamespace" \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="k8snamespace" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`,
+			"",
+		},
+
+		{
 			"Upstream namespace",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
@@ -671,6 +838,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
+			k8sNamespace,
 			`proxy {
     destination_service_name = "web"
     destination_service_id = "${SERVICE_ID}"
@@ -695,6 +863,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
+			k8sNamespace,
 			`proxy {
     destination_service_name = "web"
     destination_service_id = "${SERVICE_ID}"
