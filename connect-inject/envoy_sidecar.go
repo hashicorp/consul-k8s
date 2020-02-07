@@ -13,10 +13,10 @@ type sidecarContainerCommandData struct {
 	ConsulNamespace string
 }
 
-func (h *Handler) envoySidecar(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	templateData := sidecarContainerCommandData{
 		AuthMethod:      h.AuthMethod,
-		ConsulNamespace: h.consulNamespace(pod.Namespace),
+		ConsulNamespace: h.consulNamespace(k8sNamespace),
 	}
 
 	// Render the command

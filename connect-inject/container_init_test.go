@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const k8sNamespace = "k8snamespace"
+
 func TestHandlerContainerInit(t *testing.T) {
 	minimal := func() *corev1.Pod {
 		return &corev1.Pod{
@@ -484,7 +486,7 @@ services {
 			require := require.New(t)
 
 			var h Handler
-			container, err := h.containerInit(tt.Pod(minimal()))
+			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -711,7 +713,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 			require := require.New(t)
 
 			h := tt.Handler
-			container, err := h.containerInit(tt.Pod(minimal()))
+			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -744,7 +746,7 @@ func TestHandlerContainerInit_writeServiceDefaultsDefaultProtocol(t *testing.T) 
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -792,7 +794,7 @@ func TestHandlerContainerInit_writeServiceDefaultsPodProtocol(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -844,7 +846,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -894,7 +896,7 @@ func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -948,7 +950,7 @@ func TestHandlerContainerInit_noDefaultProtocol(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.NotContains(actual, `
@@ -987,7 +989,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod)
+	container, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `

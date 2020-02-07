@@ -285,7 +285,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 
 	// Add the init container that registers the service and sets up
 	// the Envoy configuration.
-	container, err := h.containerInit(&pod)
+	container, err := h.containerInit(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection init container", "err", err, "Pod Name", pod.Name)
 		return &v1beta1.AdmissionResponse{
@@ -300,7 +300,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		"/spec/initContainers")...)
 
 	// Add the Envoy and lifecycle sidecars.
-	esContainer, err := h.envoySidecar(&pod)
+	esContainer, err := h.envoySidecar(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection sidecar container", "err", err, "Pod Name", pod.Name)
 		return &v1beta1.AdmissionResponse{
@@ -344,9 +344,9 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// that process before modifying the Consul cluster.
 	if h.EnableNamespaces {
 		// Check if the namespace exists. If not, create it.
-		if err := h.checkAndCreateNamespace(h.consulNamespace(pod.Namespace)); err != nil {
+		if err := h.checkAndCreateNamespace(h.consulNamespace(req.Namespace)); err != nil {
 			h.Log.Error("Error checking or creating namespace", "err", err,
-				"Namespace", h.consulNamespace(pod.Namespace), "Pod Name", pod.Name)
+				"Namespace", h.consulNamespace(req.Namespace), "Pod Name", pod.Name)
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: fmt.Sprintf("Error checking or creating namespace: %s", err),
