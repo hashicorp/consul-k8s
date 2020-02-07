@@ -44,7 +44,7 @@ type initContainerCommandUpstreamData struct {
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	protocol := h.DefaultProtocol
 	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
 		protocol = annoProtocol
@@ -62,7 +62,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		ServiceProtocol:      protocol,
 		AuthMethod:           h.AuthMethod,
 		WriteServiceDefaults: writeServiceDefaults,
-		ConsulNamespace:      h.consulNamespace(pod.Namespace),
+		ConsulNamespace:      h.consulNamespace(k8sNamespace),
 		ConsulCACert:         h.ConsulCACert,
 	}
 	if data.ServiceName == "" {

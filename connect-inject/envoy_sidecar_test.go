@@ -27,7 +27,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod)
+	container, err := h.envoySidecar(pod, k8sNamespace)
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -82,7 +82,7 @@ func TestHandlerEnvoySidecar_AuthMethod(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod)
+	container, err := h.envoySidecar(pod, k8sNamespace)
 	require.NoError(err)
 
 	preStopCommand := strings.Join(container.Lifecycle.PreStop.Exec.Command, " ")
@@ -116,7 +116,7 @@ func TestHandlerEnvoySidecar_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod)
+	container, err := h.envoySidecar(pod, k8sNamespace)
 	require.NoError(err)
 	require.Equal(container.Env, []corev1.EnvVar{
 		{
@@ -134,4 +134,38 @@ func TestHandlerEnvoySidecar_WithTLS(t *testing.T) {
 			Value: "https://$(HOST_IP):8501",
 		},
 	})
+}
+
+// Test that the pre-stop command is modified when namespaces
+// are enabled. A single test is enough here, since the exclusion
+// cases are tested in the other cases above and there are numerous
+// tests specifically for `h.consulNamespace` in handler_test.go
+func TestHandlerEnvoySidecar_Namespaces(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		EnableNamespaces:           true,
+		ConsulDestinationNamespace: k8sNamespace,
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.envoySidecar(pod, k8sNamespace)
+	require.NoError(err)
+
+	preStopCommand := strings.Join(container.Lifecycle.PreStop.Exec.Command, " ")
+	require.Equal(preStopCommand, `/bin/sh -ec /consul/connect-inject/consul services deregister \
+  -namespace="k8snamespace" \
+  /consul/connect-inject/service.hcl`)
 }
