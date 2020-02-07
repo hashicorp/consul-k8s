@@ -15,6 +15,12 @@ const (
 	// service or an integer value.
 	annotationServicePort = "consul.hashicorp.com/service-port"
 
+	// annotationServiceAsEndpoints is valid only on ClusterIP services.
+	// It specifies whether or not to sync the service with each individual endpoint or
+	// as the singular IP of the service. If this isn't set then the
+	// default based on the syncer configuration is chosen.
+	annotationServiceAsEndpoints = "consul.hashicorp.com/service-as-endpoints"
+
 	// annotationServiceTags specifies the tags for the registered service
 	// instance. Multiple tags should be comma separated. Whitespace around
 	// the tags is automatically trimmed.

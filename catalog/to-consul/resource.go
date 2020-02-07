@@ -66,6 +66,11 @@ type ServiceResource struct {
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
 
+	// ClusterIPAsEndpoints set to true (the default) syncs ClusterIP-type services as
+	// the individual Endpoints themselves. Setting this to false causes them to sync
+	// with only the singular IP of the service
+	ClusterIPAsEndpoints bool
+
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
 	// ip address will be used instead.
@@ -233,6 +238,27 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	return v
 }
 
+// shouldSyncAsEndpoints returns true if service-as-endpoints is true or
+// ClusterIPAsEndpoints is true
+func (t *ServiceResource) shouldSyncClusterIPAsEndpoints(svc *apiv1.Service) bool {
+	asEndpoints := t.ClusterIPAsEndpoints
+
+	// allow an annotation to override the config behavior
+	endpointsAnnotation, ok := svc.Annotations[annotationServiceAsEndpoints]
+	if ok {
+		value, err := strconv.ParseBool(endpointsAnnotation)
+		if err == nil {
+			asEndpoints = value
+		} else {
+			t.Log.Warn("error parsing service-as-endpoints annotation",
+				"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
+				"err", err)
+		}
+	}
+
+	return asEndpoints
+}
+
 // shouldTrackEndpoints returns true if the endpoints for the given key
 // should be tracked.
 //
@@ -250,7 +276,12 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
+	// We should only watch endpoints if we're actually going to sync them
+	if svc.Spec.Type == apiv1.ServiceTypeClusterIP {
+		return t.shouldSyncClusterIPAsEndpoints(svc)
+	}
+
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -327,8 +358,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						port = int(p.NodePort)
 					} else {
 						port = int(p.Port)
-						// NOTE: for cluster IP services we always use the endpoint
-						// ports so this will be overridden.
+						// NOTE: for cluster IP services we'll use the endpoint
+						// ports unless ClusterIPAsEndpoints is false
 					}
 					break
 				}
@@ -499,66 +530,85 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			}
 		}
 
-	// For ClusterIP services, we register a service instance
-	// for each endpoint.
+	// For ClusterIP services, we register either a service instance
+	// for each endpoint or a singular instance per IP of service
 	case apiv1.ServiceTypeClusterIP:
-		if t.endpointsMap == nil {
-			return
-		}
+		if t.shouldSyncClusterIPAsEndpoints(svc) {
+			if t.endpointsMap == nil {
+				return
+			}
 
-		endpoints := t.endpointsMap[key]
-		if endpoints == nil {
-			return
-		}
+			endpoints := t.endpointsMap[key]
+			if endpoints == nil {
+				return
+			}
 
-		seen := map[string]struct{}{}
-		for _, subset := range endpoints.Subsets {
-			// For ClusterIP services, we use the endpoint port instead
-			// of the service port because we're registering each endpoint
-			// as a separate service instance.
-			epPort := baseService.Port
-			if overridePortName != "" {
-				// If we're supposed to use a specific named port, find it.
-				for _, p := range subset.Ports {
-					if overridePortName == p.Name {
+			seen := map[string]struct{}{}
+			for _, subset := range endpoints.Subsets {
+				// For ClusterIP services, we use the endpoint port instead
+				// of the service port because we're registering each endpoint
+				// as a separate service instance.
+				epPort := baseService.Port
+				if overridePortName != "" {
+					// If we're supposed to use a specific named port, find it.
+					for _, p := range subset.Ports {
+						if overridePortName == p.Name {
+							epPort = int(p.Port)
+							break
+						}
+					}
+				} else if overridePortNumber == 0 {
+					// Otherwise we'll just use the first port in the list
+					// (unless the port number was overridden by an annotation).
+					for _, p := range subset.Ports {
 						epPort = int(p.Port)
 						break
 					}
 				}
-			} else if overridePortNumber == 0 {
-				// Otherwise we'll just use the first port in the list
-				// (unless the port number was overridden by an annotation).
-				for _, p := range subset.Ports {
-					epPort = int(p.Port)
-					break
+				for _, subsetAddr := range subset.Addresses {
+					addr := subsetAddr.IP
+					if addr == "" {
+						addr = subsetAddr.Hostname
+					}
+					if addr == "" {
+						continue
+					}
+
+					// Its not clear whether K8S guarantees ready addresses to
+					// be unique so we maintain a set to prevent duplicates just
+					// in case.
+					if _, ok := seen[addr]; ok {
+						continue
+					}
+					seen[addr] = struct{}{}
+
+					r := baseNode
+					rs := baseService
+					r.Service = &rs
+					r.Service.ID = serviceID(r.Service.Service, addr)
+					r.Service.Address = addr
+					r.Service.Port = epPort
+
+					t.consulMap[key] = append(t.consulMap[key], &r)
 				}
 			}
-			for _, subsetAddr := range subset.Addresses {
-				addr := subsetAddr.IP
-				if addr == "" {
-					addr = subsetAddr.Hostname
-				}
-				if addr == "" {
-					continue
-				}
 
-				// Its not clear whether K8S guarantees ready addresses to
-				// be unique so we maintain a set to prevent duplicates just
-				// in case.
-				if _, ok := seen[addr]; ok {
-					continue
-				}
-				seen[addr] = struct{}{}
-
-				r := baseNode
-				rs := baseService
-				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
-				r.Service.Address = addr
-				r.Service.Port = epPort
-
-				t.consulMap[key] = append(t.consulMap[key], &r)
+		} else {
+			addr := svc.Spec.ClusterIP
+			// "None" is valid here for Headless Services but impossible to sync
+			// Should Headless Services always be asEndpoints?
+			if addr == "" || addr == "None" {
+				return
 			}
+
+			r := baseNode
+			rs := baseService
+			r.Service = &rs
+			r.Service.ID = serviceID(r.Service.Service, addr)
+			r.Service.Address = addr
+			// we can just take baseService.Port
+
+			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
 }
