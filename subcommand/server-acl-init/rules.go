@@ -73,15 +73,24 @@ func (c *Command) meshGatewayRules() (string, error) {
 	// that its ACL token has access to. So, in the case of
 	// Consul namespaces, it needs access to all namespaces.
 	meshGatewayRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
-{{- end }}
-  service_prefix "" {
-     policy = "read"
+  agent_prefix "" {
+  	policy = "read"
   }
-
+{{- if .EnableNamespaces }}
+namespace "default" {
+{{- end }}
   service "mesh-gateway" {
      policy = "write"
+  }
+{{- if .EnableNamespaces }}
+}
+namespace_prefix "" {
+{{- end }}
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
   }
 {{- if .EnableNamespaces }}
 }
