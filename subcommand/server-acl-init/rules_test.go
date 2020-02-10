@@ -109,26 +109,36 @@ func TestMeshGatewayRules(t *testing.T) {
 		{
 			"Namespaces are disabled",
 			false,
-			`
-  service_prefix "" {
-     policy = "read"
+			`agent_prefix "" {
+  	policy = "read"
   }
-
   service "mesh-gateway" {
      policy = "write"
+  }
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
   }`,
 		},
 		{
 			"Namespaces are enabled",
 			true,
-			`
-namespace_prefix "" {
-  service_prefix "" {
-     policy = "read"
+			`agent_prefix "" {
+  	policy = "read"
   }
-
+namespace "default" {
   service "mesh-gateway" {
      policy = "write"
+  }
+}
+namespace_prefix "" {
+  node_prefix "" {
+  	policy = "read"
+  }
+  service_prefix "" {
+     policy = "read"
   }
 }`,
 		},
