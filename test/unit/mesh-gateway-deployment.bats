@@ -335,7 +335,7 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq  '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  [[ $(echo "$actual" | yq -r '.command[2]')  =~ '-address="${POD_IP}:443"' ]]
+  [ $(echo "$actual" | yq -r '.command | join(" ") | contains("-address=\"${POD_IP}:443\"")') = "true" ]
   [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "443" ]
   [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "443" ]
   [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "443" ]
@@ -352,7 +352,7 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq  '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  [[ $(echo "$actual" | yq -r '.command[2]')  =~ '-address="${POD_IP}:8443"' ]]
+  [ $(echo "$actual" | yq -r '.command | join(" ") | contains("-address=\"${POD_IP}:8443\"")') = "true" ]
   [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "8443" ]
   [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "8443" ]
   [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "8443" ]
@@ -370,8 +370,8 @@ key2: value2' \
       --set 'client.grpc=true' \
       --set 'meshGateway.wanAddress.useNodeIP=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:443"' ]]
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-wan-address=\"${HOST_IP}:443\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: wanAddress uses NodeIP by default" {
@@ -382,8 +382,8 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:443"' ]]
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-wan-address=\"${HOST_IP}:443\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: wanAddress.useNodeIP" {
@@ -396,8 +396,8 @@ key2: value2' \
       --set 'meshGateway.wanAddress.useNodeIP=true' \
       --set 'meshGateway.wanAddress.port=4444' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:4444"' ]]
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-wan-address=\"${HOST_IP}:4444\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: wanAddress.useNodeName" {
@@ -411,8 +411,8 @@ key2: value2' \
       --set 'meshGateway.wanAddress.useNodeName=true' \
       --set 'meshGateway.wanAddress.port=4444' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${NODE_NAME}:4444"' ]]
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-wan-address=\"${NODE_NAME}:4444\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/Deployment: wanAddress.host" {
@@ -427,8 +427,8 @@ key2: value2' \
       --set 'meshGateway.wanAddress.host=myhost' \
       --set 'meshGateway.wanAddress.port=4444' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="myhost:4444"' ]]
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-wan-address=\"myhost:4444\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -460,7 +460,7 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
 
-  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="mesh-gateway"' ]]
+  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ "-service=\"mesh-gateway\"" ]]
   [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"mesh-gateway\"' ]]
 }
 
@@ -475,7 +475,7 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
 
-  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="overridden"' ]]
+  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ "-service=\"overridden\"" ]]
   [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"overridden\"' ]]
 }
 
