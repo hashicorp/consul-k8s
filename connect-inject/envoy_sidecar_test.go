@@ -169,3 +169,37 @@ func TestHandlerEnvoySidecar_Namespaces(t *testing.T) {
   -namespace="k8snamespace" \
   /consul/connect-inject/service.hcl`)
 }
+
+func TestHandlerEnvoySidecar_NamespacesAndAuthMethod(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		EnableNamespaces:           true,
+		ConsulDestinationNamespace: k8sNamespace,
+		AuthMethod:                 "test-auth-method",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.envoySidecar(pod, k8sNamespace)
+	require.NoError(err)
+
+	preStopCommand := strings.Join(container.Lifecycle.PreStop.Exec.Command, " ")
+	require.Equal(preStopCommand, `/bin/sh -ec /consul/connect-inject/consul services deregister \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="k8snamespace" \
+  /consul/connect-inject/service.hcl
+&& /consul/connect-inject/consul logout \
+  -token-file="/consul/connect-inject/acl-token"`)
+}

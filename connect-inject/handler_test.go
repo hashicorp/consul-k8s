@@ -688,7 +688,7 @@ func TestConsulNamespace(t *testing.T) {
 		},
 
 		{
-			"namespaces enabled, mirroring diabled",
+			"namespaces enabled, mirroring disabled",
 			true,
 			"default",
 			false,
@@ -864,7 +864,7 @@ func TestShouldInject(t *testing.T) {
 			true,
 		},
 		{
-			"namespaces enabled, allow only non-default",
+			"namespaces enabled, allow only ns1 and ns2",
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
