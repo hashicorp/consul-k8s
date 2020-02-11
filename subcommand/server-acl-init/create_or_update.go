@@ -128,7 +128,7 @@ func (c *Command) checkAndCreateNamespace(ns string, consulClient *api.Client) e
 		if err != nil {
 			return err
 		}
-		c.Log.Info("creating consul namespace", "name", consulNamespace.Name)
+		c.Log.Info("created consul namespace", "name", consulNamespace.Name)
 	}
 
 	return nil

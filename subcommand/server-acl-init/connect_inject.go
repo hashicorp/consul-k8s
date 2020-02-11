@@ -121,7 +121,9 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 	}
 
 	// If the binding rule already exists, update it
-	// This
+	// This updates the binding rule any time the acl bootstrapping
+	// command is rerun, which is a bit of extra overhead, but is
+	// necessary to pick up any potential config changes.
 	if len(existingRules) > 0 {
 		// Find the policy that matches our name and description
 		// and that's the ID we need
