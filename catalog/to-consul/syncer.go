@@ -176,10 +176,10 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 		if err != nil {
 			s.Log.Warn("error querying services, will retry", "err", err)
-			continue
+		} else {
+			s.Log.Debug("[watchReapableServices] services returned from NodeServiceList",
+				"services", nodeCatalog.Services)
 		}
-		s.Log.Debug("[watchReapableServices] services returned from NodeServiceList",
-			"services", nodeCatalog.Services)
 
 		// Wait our minimum time before continuing or retrying
 		select {
