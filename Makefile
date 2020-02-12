@@ -86,6 +86,10 @@ dev-tree:
 test:
 	go test ./...
 
+# requires a consul enterprise binary on the path
+ent-test:
+	go test ./... -tags=enterprise
+
 cov:
 	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out
