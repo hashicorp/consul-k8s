@@ -290,6 +290,28 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// If namespaces are enabled, to allow cross-Consul-namespace permissions
+	// for services from k8s, the Consul `default` namespace needs a policy
+	// allowing service discovery in all namespaces. Each namespace that is
+	// created by consul-k8s components (this bootstrapper, catalog sync or
+	// connect inject) needs to reference this policy on namespace creation
+	// to finish the cross namespace permission setup.
+	if c.flagEnableNamespaces {
+		policyTmpl := api.ACLPolicy{
+			Name:        "cross-namespace-policy-for-k8s",
+			Description: "Policy to allow permissions to cross Consul namespaces for k8s services",
+			Rules:       crossNamespaceRules,
+		}
+		err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+			func() error {
+				return c.createOrUpdateACLPolicy(policyTmpl, consulClient)
+			})
+		if err != nil {
+			c.Log.Error("Error creating or updating the cross namespace policy", "err", err)
+			return 1
+		}
+	}
+
 	if c.flagCreateClientToken {
 		agentRules, err := c.agentRules()
 		if err != nil {

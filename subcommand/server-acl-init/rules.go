@@ -26,6 +26,15 @@ service "consul-snapshot" {
 
 const entLicenseRules = `operator = "write"`
 
+const crossNamespaceRules = `namespace_prefix "" {
+  service_prefix "" {
+    policy = "read"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+} `
+
 func (c *Command) agentRules() (string, error) {
 	agentRulesTpl := `
   node_prefix "" {
