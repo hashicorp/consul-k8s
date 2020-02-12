@@ -4,16 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/tlsutil"
-	"github.com/mitchellh/cli"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
-	appv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 	"math/rand"
 	"net"
 	"net/http"
@@ -23,6 +14,16 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/consul/agent"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/tlsutil"
+	"github.com/mitchellh/cli"
+	"github.com/stretchr/testify/require"
+	appv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 var ns = "default"
@@ -92,7 +93,7 @@ func TestRun_Defaults(t *testing.T) {
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Test that the bootstrap kube secret is created.
-			bootToken := getBootToken(t, k8s, resourcePrefix)
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 
 			// Check that it has the right policies.
 			consul := testAgent.Client()
@@ -160,14 +161,14 @@ func TestRun_Tokens(t *testing.T) {
 			TokenName:          "catalog-sync",
 			SecretName:         "my-prefix-catalog-sync-acl-token",
 		},
-		"connect-inject token -release-name": {
+		"connect-inject-namespace token -release-name": {
 			TokenFlag:          "-create-inject-namespace-token",
 			ResourcePrefixFlag: "",
 			ReleaseNameFlag:    "release-name",
 			TokenName:          "connect-inject",
 			SecretName:         "release-name-consul-connect-inject-acl-token",
 		},
-		"connect-inject token -resource-prefix": {
+		"connect-inject-namespace token -resource-prefix": {
 			TokenFlag:          "-create-inject-namespace-token",
 			ResourcePrefixFlag: "my-prefix",
 			TokenName:          "connect-inject",
@@ -235,7 +236,7 @@ func TestRun_Tokens(t *testing.T) {
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the client policy was created.
-			bootToken := getBootToken(t, k8s, prefix)
+			bootToken := getBootToken(t, k8s, prefix, ns)
 			consul := testAgent.Client()
 			policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
@@ -299,7 +300,7 @@ func TestRun_AllowDNS(t *testing.T) {
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Check that the dns policy was created.
-	bootToken := getBootToken(t, k8s, resourcePrefix)
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 	consul := testAgent.Client()
 	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 	require.NoError(err)
@@ -343,51 +344,12 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 		},
 	}
 	for testName, c := range cases {
-		t.Run(testName, func(t *testing.T) {
+		t.Run(testName, func(tt *testing.T) {
 
-			k8s, testAgent := completeSetup(t, resourcePrefix)
+			k8s, testAgent := completeSetup(tt, resourcePrefix)
 			defer testAgent.Shutdown()
-			require := require.New(t)
-
-			// Create Kubernetes Service.
-			_, err := k8s.CoreV1().Services(ns).Create(&v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP: "1.2.3.4",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "kubernetes",
-				},
-			})
-			require.NoError(err)
-
-			// Create ServiceAccount for the injector that the helm chart creates.
-			_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
-				},
-				Secrets: []v1.ObjectReference{
-					{
-						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
-					},
-				},
-			})
-			require.NoError(err)
-
-			// Create the ServiceAccount Secret.
-			caCertBytes, err := base64.StdEncoding.DecodeString(serviceAccountCACert)
-			require.NoError(err)
-			tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
-			require.NoError(err)
-			_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
-				},
-				Data: map[string][]byte{
-					"ca.crt": caCertBytes,
-					"token":  tokenBytes,
-				},
-			})
-			require.NoError(err)
+			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
+			require := require.New(tt)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -409,7 +371,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the auth method was created.
-			bootToken := getBootToken(t, k8s, resourcePrefix)
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul := testAgent.Client()
 			authMethodName := resourcePrefix + "-k8s-auth-method"
 			authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
@@ -418,9 +380,9 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			require.Contains(authMethod.Config, "Host")
 			require.Equal(authMethod.Config["Host"], "https://1.2.3.4:443")
 			require.Contains(authMethod.Config, "CACert")
-			require.Equal(authMethod.Config["CACert"], string(caCertBytes))
+			require.Equal(authMethod.Config["CACert"], caCert)
 			require.Contains(authMethod.Config, "ServiceAccountJWT")
-			require.Equal(authMethod.Config["ServiceAccountJWT"], string(tokenBytes))
+			require.Equal(authMethod.Config["ServiceAccountJWT"], jwtToken)
 
 			// Check that the binding rule was created.
 			rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Token: bootToken})
@@ -442,6 +404,82 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				require.Equal(0, responseCode, ui.ErrorWriter.String())
 			})
 		})
+	}
+}
+
+// Test that ACL binding rules are updated if the rule selector changes.
+func TestRun_BindingRuleUpdates(t *testing.T) {
+	t.Parallel()
+	k8s, agent := completeSetup(t, resourcePrefix)
+	setUpK8sServiceAccount(t, k8s)
+	defer agent.Shutdown()
+	require := require.New(t)
+	consul := agent.Client()
+
+	ui := cli.NewMockUi()
+	commonArgs := []string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-expected-replicas=1",
+		"-create-inject-auth-method",
+	}
+	firstRunArgs := append(commonArgs,
+		"-acl-binding-rule-selector=serviceaccount.name!=default",
+	)
+	// Our second run, we change the binding rule selector.
+	secondRunArgs := append(commonArgs,
+		"-acl-binding-rule-selector=serviceaccount.name!=changed",
+	)
+
+	// Run the command first to populate the binding rule.
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	responseCode := cmd.Run(firstRunArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Validate the binding rule.
+	{
+		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+		authMethodName := releaseName + "-consul-k8s-auth-method"
+		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
+		require.NoError(err)
+		require.Len(rules, 1)
+		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+		require.NoError(err)
+		require.NotNil(actRule)
+		require.Equal("Kubernetes binding rule", actRule.Description)
+		require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+		require.Equal("${serviceaccount.name}", actRule.BindName)
+		require.Equal("serviceaccount.name!=default", actRule.Selector)
+	}
+
+	// Re-run the command with namespace flags. The policies should be updated.
+	// NOTE: We're redefining the command so that the old flag values are
+	// reset.
+	cmd = Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	responseCode = cmd.Run(secondRunArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check the binding rule is changed expected.
+	{
+		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+		authMethodName := releaseName + "-consul-k8s-auth-method"
+		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
+		require.NoError(err)
+		require.Len(rules, 1)
+		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+		require.NoError(err)
+		require.NotNil(actRule)
+		require.Equal("Kubernetes binding rule", actRule.Description)
+		require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+		require.Equal("${serviceaccount.name}", actRule.BindName)
+		require.Equal("serviceaccount.name!=changed", actRule.Selector)
 	}
 }
 
@@ -555,7 +593,7 @@ func TestRun_DelayedServerPods(t *testing.T) {
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, resourcePrefix)
+	getBootToken(t, k8s, resourcePrefix, ns)
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -711,7 +749,7 @@ func TestRun_InProgressDeployment(t *testing.T) {
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, resourcePrefix)
+	getBootToken(t, k8s, resourcePrefix, ns)
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -857,7 +895,7 @@ func TestRun_NoLeader(t *testing.T) {
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, resourcePrefix)
+	getBootToken(t, k8s, resourcePrefix, ns)
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -1212,7 +1250,7 @@ func TestRun_HTTPS(t *testing.T) {
 	a.Start()
 	defer a.Shutdown()
 
-	createTestK8SResources(t, k8s, a, resourcePrefix, "https")
+	createTestK8SResources(t, k8s, a.HTTPAddr(), resourcePrefix, "https", ns)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1251,21 +1289,21 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAge
 		enabled = true
 	}`)
 
-	createTestK8SResources(t, k8s, a, prefix, "http")
+	createTestK8SResources(t, k8s, a.HTTPAddr(), prefix, "http", ns)
 
 	return k8s, a
 }
 
 // Create test k8s resources (server pods and server stateful set)
-func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgent, prefix, scheme string) {
+func createTestK8SResources(t *testing.T, k8s *fake.Clientset, consulHTTPAddr, prefix, scheme, k8sNamespace string) {
 	require := require.New(t)
-	consulURL, err := url.Parse("http://" + a.HTTPAddr())
+	consulURL, err := url.Parse("http://" + consulHTTPAddr)
 	require.NoError(err)
 	port, err := strconv.Atoi(consulURL.Port())
 	require.NoError(err)
 
 	// Create Consul server Pod.
-	_, err = k8s.CoreV1().Pods(ns).Create(&v1.Pod{
+	_, err = k8s.CoreV1().Pods(k8sNamespace).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: prefix + "-server-0",
 			Labels: map[string]string{
@@ -1294,7 +1332,7 @@ func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgen
 	require.NoError(err)
 
 	// Create Consul server Statefulset.
-	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+	_, err = k8s.AppsV1().StatefulSets(k8sNamespace).Create(&appv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: prefix + "-server",
 			Labels: map[string]string{
@@ -1313,8 +1351,8 @@ func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgen
 
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
 // cause a test failure if the Secret doesn't exist or is malformed.
-func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string) string {
-	bootstrapSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-bootstrap-acl-token", prefix), metav1.GetOptions{})
+func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace string) string {
+	bootstrapSecret, err := k8s.CoreV1().Secrets(k8sNamespace).Get(fmt.Sprintf("%s-bootstrap-acl-token", prefix), metav1.GetOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, bootstrapSecret)
 	bootToken, ok := bootstrapSecret.Data["token"]
@@ -1377,6 +1415,53 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 		os.Remove(certKeyFile.Name())
 	}
 	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
+}
+
+// setUpK8sServiceAccount creates a Service Account for the connect injector.
+// This Service Account would normally automatically be created by Kubernetes
+// when the injector deployment is created. It returns the Service Account
+// CA Cert and JWT token.
+func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) {
+	// Create Kubernetes Service.
+	_, err := k8s.CoreV1().Services(ns).Create(&v1.Service{
+		Spec: v1.ServiceSpec{
+			ClusterIP: "1.2.3.4",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kubernetes",
+		},
+	})
+	require.NoError(t, err)
+
+	// Create ServiceAccount for the injector that the helm chart creates.
+	_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+		},
+		Secrets: []v1.ObjectReference{
+			{
+				Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// Create the ServiceAccount Secret.
+	caCertBytes, err := base64.StdEncoding.DecodeString(serviceAccountCACert)
+	require.NoError(t, err)
+	tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
+	require.NoError(t, err)
+	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+		},
+		Data: map[string][]byte{
+			"ca.crt": caCertBytes,
+			"token":  tokenBytes,
+		},
+	})
+	require.NoError(t, err)
+	return string(caCertBytes), string(tokenBytes)
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
