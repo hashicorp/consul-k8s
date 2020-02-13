@@ -326,7 +326,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// shallow copied for each instance.
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
-		Node:           "k8s-sync",
+		Node:           ConsulSyncNodeName,
 		Address:        "127.0.0.1",
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,

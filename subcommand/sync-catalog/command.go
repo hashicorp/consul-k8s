@@ -60,9 +60,10 @@ type Command struct {
 	consulClient *api.Client
 	clientset    kubernetes.Interface
 
-	once  sync.Once
-	sigCh chan os.Signal
-	help  string
+	once   sync.Once
+	sigCh  chan os.Signal
+	help   string
+	logger hclog.Logger
 }
 
 func (c *Command) init() {
@@ -131,6 +132,14 @@ func (c *Command) init() {
 	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)
+
+	// Wait on an interrupt to exit. This channel must be initialized before
+	// Run() is called so that there are no race conditions where the channel
+	// is not defined.
+	if c.sigCh == nil {
+		c.sigCh = make(chan os.Signal, 1)
+		signal.Notify(c.sigCh, os.Interrupt)
+	}
 }
 
 func (c *Command) Run(args []string) int {
@@ -169,15 +178,17 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Set up logging
-	level := hclog.LevelFromString(c.flagLogLevel)
-	if level == hclog.NoLevel {
-		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
-		return 1
+	if c.logger == nil {
+		level := hclog.LevelFromString(c.flagLogLevel)
+		if level == hclog.NoLevel {
+			c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+			return 1
+		}
+		c.logger = hclog.New(&hclog.LoggerOptions{
+			Level:  level,
+			Output: os.Stderr,
+		})
 	}
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  level,
-		Output: os.Stderr,
-	})
 
 	// Get the sync interval
 	var syncInterval time.Duration
@@ -198,7 +209,7 @@ func (c *Command) Run(args []string) int {
 			denySet.Add(deny)
 		}
 	}
-	logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
+	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
 
 	// Create the context we'll use to cancel everything
@@ -209,22 +220,20 @@ func (c *Command) Run(args []string) int {
 	if c.flagToConsul {
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
-			Client:                c.consulClient,
-			Log:                   logger.Named("to-consul/sink"),
-			AllowK8sNamespacesSet: allowSet,
-			DenyK8sNamespacesSet:  denySet,
-			EnableNamespaces:      c.flagEnableNamespaces,
-			SyncPeriod:            syncInterval,
-			ServicePollPeriod:     syncInterval * 2,
-			ConsulK8STag:          c.flagConsulK8STag,
+			Client:            c.consulClient,
+			Log:               c.logger.Named("to-consul/sink"),
+			EnableNamespaces:  c.flagEnableNamespaces,
+			SyncPeriod:        syncInterval,
+			ServicePollPeriod: syncInterval * 2,
+			ConsulK8STag:      c.flagConsulK8STag,
 		}
 		go syncer.Run(ctx)
 
 		// Build the controller and start it
 		ctl := &controller.Controller{
-			Log: logger.Named("to-consul/controller"),
+			Log: c.logger.Named("to-consul/controller"),
 			Resource: &catalogtoconsul.ServiceResource{
-				Log:                        logger.Named("to-consul/source"),
+				Log:                        c.logger.Named("to-consul/source"),
 				Client:                     c.clientset,
 				Syncer:                     syncer,
 				AllowK8sNamespacesSet:      allowSet,
@@ -255,7 +264,7 @@ func (c *Command) Run(args []string) int {
 		sink := &catalogtok8s.K8SSink{
 			Client:    c.clientset,
 			Namespace: c.flagK8SWriteNamespace,
-			Log:       logger.Named("to-k8s/sink"),
+			Log:       c.logger.Named("to-k8s/sink"),
 		}
 
 		source := &catalogtok8s.Source{
@@ -263,14 +272,14 @@ func (c *Command) Run(args []string) int {
 			Domain:       c.flagConsulDomain,
 			Sink:         sink,
 			Prefix:       c.flagK8SServicePrefix,
-			Log:          logger.Named("to-k8s/source"),
+			Log:          c.logger.Named("to-k8s/source"),
 			ConsulK8STag: c.flagConsulK8STag,
 		}
 		go source.Run(ctx)
 
 		// Build the controller and start it
 		ctl := &controller.Controller{
-			Log:      logger.Named("to-k8s/controller"),
+			Log:      c.logger.Named("to-k8s/controller"),
 			Resource: sink,
 		}
 
@@ -293,9 +302,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Wait on an interrupt to exit
-	c.sigCh = make(chan os.Signal, 1)
-	signal.Notify(c.sigCh, os.Interrupt)
 	select {
 	// Unexpected exit
 	case <-toConsulCh:
