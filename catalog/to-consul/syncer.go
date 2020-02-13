@@ -19,6 +19,10 @@ const (
 	// ConsulServicePollPeriod is how often a service is checked for
 	// whether it has instances to reap.
 	ConsulServicePollPeriod = 60 * time.Second
+
+	// ConsulSyncNodeName is the name of the node in Consul that we register
+	// services on. It's not a real node backed by a Consul agent.
+	ConsulSyncNodeName = "k8s-sync"
 )
 
 // Syncer is responsible for syncing a set of Consul catalog registrations.
@@ -37,18 +41,6 @@ type Syncer interface {
 type ConsulSyncer struct {
 	Client *api.Client
 	Log    hclog.Logger
-
-	// AllowK8sNamespacesSet is a set of k8s namespaces to explicitly allow for
-	// syncing. It supports the special character `*` which indicates that
-	// all k8s namespaces are eligible unless explicitly denied. This filter
-	// is applied before checking pod annotations.
-	AllowK8sNamespacesSet mapset.Set
-
-	// DenyK8sNamespacesSet is a set of k8s namespaces to explicitly deny
-	// syncing and thus service registration with Consul. An empty set
-	// means that no namespaces are removed from consideration. This filter
-	// takes precedence over AllowK8sNamespacesSet.
-	DenyK8sNamespacesSet mapset.Set
 
 	// EnableNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
@@ -171,7 +163,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		var meta *api.QueryMeta
 		err := backoff.Retry(func() error {
 			var err error
-			nodeCatalog, meta, err = s.Client.Catalog().NodeServiceList("k8s-sync", &opts)
+			nodeCatalog, meta, err = s.Client.Catalog().NodeServiceList(ConsulSyncNodeName, &opts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 		if err != nil {
@@ -439,6 +431,8 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 }
 
 func (s *ConsulSyncer) init() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if s.serviceNames == nil {
 		s.serviceNames = make(map[string]mapset.Set)
 	}

@@ -23,11 +23,6 @@ func init() {
 	hclog.DefaultOptions.Level = hclog.Debug
 }
 
-func TestServiceResource_impl(t *testing.T) {
-	var _ controller.Resource = &ServiceResource{}
-	var _ controller.Backgrounder = &ServiceResource{}
-}
-
 // Test that deleting a service properly deletes the registration.
 func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()
@@ -160,31 +155,6 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require.Len(actual, 1)
 }
 
-// // Test that system resources are not synced by default.
-// func TestServiceResource_system(t *testing.T) {
-// 	t.Parallel()
-// 	require := require.New(t)
-// 	client := fake.NewSimpleClientset()
-// 	syncer := &TestSyncer{}
-// 	serviceResource := defaultServiceResource(client, syncer)
-
-// 	// Start the controller
-// 	closer := controller.TestControllerRun(&serviceResource)
-// 	defer closer()
-
-// 	// Insert an LB service
-// 	svc := lbService("foo", metav1.NamespaceSystem, "1.2.3.4")
-// 	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(svc)
-// 	require.NoError(err)
-// 	time.Sleep(200 * time.Millisecond)
-
-// 	// Verify what we got
-// 	syncer.Lock()
-// 	defer syncer.Unlock()
-// 	actual := syncer.Registrations
-// 	require.Len(actual, 0)
-// }
-
 // Test changing the sync tag to false deletes the service.
 func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	t.Parallel()
@@ -249,7 +219,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "foo-namespace")
+		require.Equal(r, actual[0].Service.Service, "foo-namespace")
 	})
 }
 
@@ -278,7 +248,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "prefixfoo-namespace")
+		require.Equal(r, actual[0].Service.Service, "prefixfoo-namespace")
 	})
 }
 
@@ -307,7 +277,7 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(t, actual[0].Service.Service, "different-service-name")
+		require.Equal(r, actual[0].Service.Service, "different-service-name")
 	})
 }
 
@@ -1249,6 +1219,193 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
 }
 
+// Test allow/deny namespace lists.
+func TestServiceResource_AllowDenyNamespaces(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		AllowList     mapset.Set
+		DenyList      mapset.Set
+		ExpNamespaces []string
+	}{
+		"empty lists": {
+			AllowList:     mapset.NewSet(),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: nil,
+		},
+		"only from allow list": {
+			AllowList:     mapset.NewSet("foo"),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: []string{"foo"},
+		},
+		"both in allow and deny": {
+			AllowList:     mapset.NewSet("foo"),
+			DenyList:      mapset.NewSet("foo"),
+			ExpNamespaces: nil,
+		},
+		"deny removes one from allow": {
+			AllowList:     mapset.NewSet("foo", "bar"),
+			DenyList:      mapset.NewSet("foo"),
+			ExpNamespaces: []string{"bar"},
+		},
+		"* in allow": {
+			AllowList:     mapset.NewSet("*"),
+			DenyList:      mapset.NewSet(),
+			ExpNamespaces: []string{"foo", "bar"},
+		},
+		"* in allow with one denied": {
+			AllowList:     mapset.NewSet("*"),
+			DenyList:      mapset.NewSet("bar"),
+			ExpNamespaces: []string{"foo"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(tt *testing.T) {
+			client := fake.NewSimpleClientset()
+			syncer := &TestSyncer{}
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.AllowK8sNamespacesSet = c.AllowList
+			serviceResource.DenyK8sNamespacesSet = c.DenyList
+
+			// Start the controller
+			closer := controller.TestControllerRun(&serviceResource)
+			defer closer()
+
+			// We always have two services in two namespaces: foo and bar.
+			// Each service has the same name as its origin k8s namespace which
+			// we use for asserting that the right namespace got synced.
+			for _, ns := range []string{"foo", "bar"} {
+				_, err := client.CoreV1().Services(ns).Create(lbService(ns, ns, "1.2.3.4"))
+				require.NoError(tt, err)
+			}
+
+			// Test we got registrations from the expected namespaces.
+			retry.Run(tt, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+				require.Len(r, actual, len(c.ExpNamespaces))
+			})
+
+			syncer.Lock()
+			defer syncer.Unlock()
+			for _, expNS := range c.ExpNamespaces {
+				found := false
+				for _, reg := range syncer.Registrations {
+					// The service names are the same as their k8s destination
+					// namespaces so we can that to ensure the services were
+					// synced from the expected namespaces.
+					if reg.Service.Service == expNS {
+						found = true
+					}
+				}
+				require.True(tt, found, "did not find service from ns %s", expNS)
+			}
+		})
+	}
+}
+
+// Test that services are synced to the correct destination ns
+// when a single destination namespace is set.
+func TestServiceResource_singleDestNamespace(t *testing.T) {
+	t.Parallel()
+	consulDestNamespaces := []string{"default", "dest"}
+	for _, consulDestNamespace := range consulDestNamespaces {
+		t.Run(consulDestNamespace, func(tt *testing.T) {
+			client := fake.NewSimpleClientset()
+			syncer := &TestSyncer{}
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.ConsulDestinationNamespace = consulDestNamespace
+			serviceResource.EnableNamespaces = true
+			closer := controller.TestControllerRun(&serviceResource)
+			defer closer()
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).
+				Create(lbService("foo", metav1.NamespaceDefault, "1.2.3.4"))
+			require.NoError(tt, err)
+
+			retry.Run(tt, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+				require.Len(r, actual, 1)
+				require.Equal(r, consulDestNamespace, actual[0].Service.Namespace)
+			})
+		})
+	}
+}
+
+// Test that services are created in a mirrored namespace.
+func TestServiceResource_MirroredNamespace(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.EnableK8SNSMirroring = true
+	serviceResource.EnableNamespaces = true
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	k8sNamespaces := []string{"foo", "bar", "default"}
+	for _, ns := range k8sNamespaces {
+		_, err := client.CoreV1().Services(ns).
+			Create(lbService(ns, ns, "1.2.3.4"))
+		require.NoError(t, err)
+	}
+
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		for _, expNS := range k8sNamespaces {
+			found := false
+			for _, reg := range actual {
+				if reg.Service.Namespace == expNS {
+					found = true
+				}
+			}
+			require.True(r, found, "did not find registration from ns %s", expNS)
+		}
+	})
+}
+
+// Test that services are created in a mirrored namespace with prefix.
+func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.EnableK8SNSMirroring = true
+	serviceResource.EnableNamespaces = true
+	serviceResource.K8SNSMirroringPrefix = "prefix-"
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	k8sNamespaces := []string{"foo", "bar", "default"}
+	for _, ns := range k8sNamespaces {
+		_, err := client.CoreV1().Services(ns).
+			Create(lbService(ns, ns, "1.2.3.4"))
+		require.NoError(t, err)
+	}
+
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		for _, expNS := range k8sNamespaces {
+			found := false
+			for _, reg := range actual {
+				if reg.Service.Namespace == "prefix-"+expNS {
+					found = true
+				}
+			}
+			require.True(r, found, "did not find registration from ns %s", expNS)
+		}
+	})
+}
+
 // lbService returns a Kubernetes service of type LoadBalancer.
 func lbService(name, namespace, lbIP string) *apiv1.Service {
 	return &apiv1.Service{
@@ -1384,15 +1541,11 @@ func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, n
 }
 
 func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceResource {
-	// Set up required allow and deny sets
-	allowSet := mapset.NewSet("*")
-	denySet := mapset.NewSet()
-
 	return ServiceResource{
 		Log:                   hclog.Default(),
 		Client:                client,
 		Syncer:                syncer,
-		AllowK8sNamespacesSet: allowSet,
-		DenyK8sNamespacesSet:  denySet,
+		AllowK8sNamespacesSet: mapset.NewSet("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
 	}
 }
