@@ -280,7 +280,7 @@ function build_consul_local {
             then
                GOBIN_EXTRA="${os}_${arch}/"
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"* "${outdir}/consul-k8s"
+            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"/consul-k8s "${outdir}/consul-k8s"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"

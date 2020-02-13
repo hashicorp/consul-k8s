@@ -1,4 +1,106 @@
-## UNRELEASED
+## 0.11.0 (January 10, 2020)
+
+Improvements:
+
+* Connect: Add TLS support [[GH-181](https://github.com/hashicorp/consul-k8s/pull/181)].
+
+## 0.10.1 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix bug where the new lifecycle sidecar didn't have permissions to
+  read the ACL token file. [[GH-182](https://github.com/hashicorp/consul-k8s/pull/182)]  
+
+## 0.10.0 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix critical bug where Connect-registered services instances would be deregistered
+  when the Consul client on the same node was restarted. This fix adds a new
+  sidecar that ensures the service instance is always registered. [[GH-161](https://github.com/hashicorp/consul-k8s/issues/161)]  
+  
+* Connect: Fix bug where UI links between sidecar and service didn't work because
+  the wrong service ID was being used. [[GH-163](https://github.com/hashicorp/consul-k8s/issues/163)]  
+  
+* Bootstrap ACLs: Support bootstrapACLs for users setting the `nameOverride` config. [[GH-165](https://github.com/hashicorp/consul-k8s/issues/165)]  
+
+## 0.9.5 (December 5, 2019)
+
+Bug Fixes:
+
+* Sync: Add Kubernetes namespace as a suffix
+  to the service names via `-add-k8s-namespace-suffix` flag.
+  This prevents service name collisions in Consul when there
+  are two services with the same name in different
+  namespaces in Kubernetes [[GH-139](https://github.com/hashicorp/consul-k8s/issues/139)]
+  
+* Connect: Only write a `service-defaults` config during Connect injection if
+  the protocol is set explicitly [[GH-169](https://github.com/hashicorp/consul-k8s/pull/169)]  
+
+## 0.9.4 (October 28, 2019)
+
+Bug Fixes:
+
+* Sync: Now changing the annotation `consul.hashicorp.com/service-sync` to `false`
+  or deleting the annotation will un-sync the service. [[GH-76](https://github.com/hashicorp/consul-k8s/issues/76)]
+
+* Sync: Rewrite Consul services to lowercase so they're valid Kubernetes services.
+  [[GH-110](https://github.com/hashicorp/consul-k8s/issues/110)]
+
+## 0.9.3 (October 15, 2019)
+
+Bug Fixes:
+
+* Add new delete-completed-job command that is used to delete the
+  server-acl-init Kubernetes Job once it's completed. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
+* Fixes a bug where even if the ACL Tokens for the other components existed
+  (e.g. client or sync-catalog) we'd try to generate new tokens and update the secrets. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
+## 0.9.2 (October 4, 2019)
+
+Improvements:
+
+* Allow users to set annotations on their Kubernetes services that get synced into
+  Consul meta when using the Connect Inject functionality.
+  To use, set one or more `consul.hashicorp.com/service-meta-<key>: <value>` annotations
+  which will result in Consul meta `<key>: <value>`
+  [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+Bug Fixes:
+
+* Fix bug during connect-inject where the `-default-protocol` flag was being
+  ignored [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+* Fix bug during connect-inject where service-tag annotations were
+  being ignored [[GH-141](https://github.com/hashicorp/consul-k8s/pull/141)]
+
+* Fix bug during `server-acl-init` where if any step errored then the command
+  would exit and subsequent commands would fail. Now this command runs until
+  completion, i.e. it retries failed steps indefinitely and is idempotent
+  [[GH-138](https://github.com/hashicorp/consul-k8s/issues/138)]
+
+Deprecations:
+
+* The `consul.hashicorp.com/connect-service-tags` annotation is deprecated.
+  Use `consul.hashicorp.com/service-tags` instead.
+
+## 0.9.1 (September 18, 2019)
+
+Improvements:
+
+* Allow users to set tags on their Kubernetes services that get synced into
+  Consul service tags via the `consul.hashicorp.com/connect-service-tags`
+  annotation [[GH-115](https://github.com/hashicorp/consul-k8s/pull/115)]
+
+Bug fixes:
+
+* Fix bootstrap acl issue when Consul was installed into a namespace other than `default`
+  [[GH-106](https://github.com/hashicorp/consul-k8s/issues/106)]
+* Fix sync bug where `ClusterIP` services had their `Service` port instead
+  of their `Endpoint` port registered. If the `Service`'s `targetPort` was different
+  then `port` then the wrong port would be registered [[GH-132](https://github.com/hashicorp/consul-k8s/issues/132)]
+
 
 ## 0.9.0 (July 8, 2019)
 

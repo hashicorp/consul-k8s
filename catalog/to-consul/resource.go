@@ -71,15 +71,27 @@ type ServiceResource struct {
 	// ip address will be used instead.
 	NodePortSync NodePortSyncType
 
-	// serviceMap is a mapping of unique key (given by controller) to
-	// the service structure. endpointsMap is the mapping of the same
-	// uniqueKey to a set of endpoints.
-	//
+	// AddK8SNamespaceSuffix set to true appends Kubernetes namespace
+	// to the service name being synced to Consul separated by a dash.
+	// For example, service 'foo' in the 'default' namespace will be synced
+	// as 'foo-default'.
+	AddK8SNamespaceSuffix bool
+
 	// serviceLock must be held for any read/write to these maps.
-	serviceLock  sync.RWMutex
-	serviceMap   map[string]*apiv1.Service
+	serviceLock sync.RWMutex
+
+	// serviceMap holds services we should sync to Consul. Keys are the
+	// in the form <kube namespace>/<kube svc name>.
+	serviceMap map[string]*apiv1.Service
+
+	// endpointsMap uses the same keys as serviceMap but maps to the endpoints
+	// of each service.
 	endpointsMap map[string]*apiv1.Endpoints
-	consulMap    map[string][]*consulapi.CatalogRegistration
+
+	// consulMap holds the services in Consul that we've registered from kube.
+	// It's populated via Consul's API and lets us diff what is actually in
+	// Consul vs. what we expect to be there.
+	consulMap map[string][]*consulapi.CatalogRegistration
 }
 
 // Informer implements the controller.Resource interface.
@@ -109,18 +121,25 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 		return nil
 	}
 
-	if !t.shouldSync(service) {
-		t.Log.Debug("syncing disabled for service, ignoring", "key", key)
-		return nil
-	}
-
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
 
-	// Syncing is enabled, let's keep track of this service.
 	if t.serviceMap == nil {
 		t.serviceMap = make(map[string]*apiv1.Service)
 	}
+
+	if !t.shouldSync(service) {
+		// Check if its in our map and delete it.
+		if _, ok := t.serviceMap[key]; ok {
+			t.Log.Info("service should no longer be synced", "service", key)
+			t.doDelete(key)
+		} else {
+			t.Log.Debug("syncing disabled for service, ignoring", "key", key)
+		}
+		return nil
+	}
+
+	// Syncing is enabled, let's keep track of this service.
 	t.serviceMap[key] = service
 
 	// If we care about endpoints, we should do the initial endpoints load.
@@ -151,18 +170,23 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 func (t *ServiceResource) Delete(key string) error {
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
+	t.doDelete(key)
+	t.Log.Info("delete", "key", key)
+	return nil
+}
+
+// doDelete is a helper function for deletion.
+//
+// Precondition: assumes t.serviceLock is held
+func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
 	delete(t.endpointsMap, key)
-
 	// If there were registrations related to this service, then
 	// delete them and sync.
 	if _, ok := t.consulMap[key]; ok {
 		delete(t.consulMap, key)
 		t.sync()
 	}
-
-	t.Log.Info("delete", "key", key)
-	return nil
 }
 
 // Run implements the controller.Backgrounder interface.
@@ -181,7 +205,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	// a sync for that namespace.
 	if t.namespace() == metav1.NamespaceAll && svc.Namespace == metav1.NamespaceSystem {
 		t.Log.Debug("ignoring system service since we're listening on all namespaces",
-			"service-name", t.prefixServiceName(svc.Name))
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace))
 		return false
 	}
 
@@ -199,7 +223,7 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 	v, err := strconv.ParseBool(raw)
 	if err != nil {
 		t.Log.Warn("error parsing service-sync annotation",
-			"service-name", t.prefixServiceName(svc.Name),
+			"service-name", t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 			"err", err)
 
 		// Fallback to default
@@ -216,8 +240,8 @@ func (t *ServiceResource) shouldSync(svc *apiv1.Service) bool {
 func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 	// The service must be one we care about for us to watch the endpoints.
 	// We care about a service that exists in our service map (is enabled
-	// for syncing) and is a NodePort type. Only NodePort type services
-	// use the endpoints at all.
+	// for syncing) and is a NodePort or ClusterIP type since only those
+	// types use endpoints.
 	if t.serviceMap == nil {
 		return false
 	}
@@ -263,7 +287,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	baseService := consulapi.AgentService{
-		Service: t.prefixServiceName(svc.Name),
+		Service: t.addPrefixAndK8SNamespace(svc.Name, svc.Namespace),
 		Tags:    []string{t.ConsulK8STag},
 		Meta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
@@ -277,52 +301,58 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	// Determine the default port and set port annotations
+	var overridePortName string
+	var overridePortNumber int
 	if len(svc.Spec.Ports) > 0 {
-		// Create port variable, defaults to 0
 		var port int
-
-		// Flag identifying whether the service is of NodePort type
 		isNodePort := svc.Spec.Type == apiv1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
-		target, ok := svc.Annotations[annotationServicePort]
+		portAnnotation, ok := svc.Annotations[annotationServicePort]
 		if ok {
-			if v, err := strconv.ParseInt(target, 0, 0); err == nil {
+			if v, err := strconv.ParseInt(portAnnotation, 0, 0); err == nil {
 				port = int(v)
+				overridePortNumber = port
+			} else {
+				overridePortName = portAnnotation
 			}
 		}
 
 		// For when the port was a name instead of an int
-		if port == 0 && target != "" {
+		if overridePortName != "" {
 			// Find the named port
 			for _, p := range svc.Spec.Ports {
-				if p.Name == target {
-					// Pick the right port based on the type of service
+				if p.Name == overridePortName {
 					if isNodePort && p.NodePort > 0 {
 						port = int(p.NodePort)
 					} else {
 						port = int(p.Port)
+						// NOTE: for cluster IP services we always use the endpoint
+						// ports so this will be overridden.
 					}
+					break
 				}
 			}
 		}
 
 		// If the port was not set above, set it with the first port
-		// based on the service type
-		if port == 0 && isNodePort {
-			// Find first defined NodePort
-			for _, p := range svc.Spec.Ports {
-				if p.NodePort > 0 {
-					port = int(p.NodePort)
-					break
+		// based on the service type.
+		if port == 0 {
+			if isNodePort {
+				// Find first defined NodePort
+				for _, p := range svc.Spec.Ports {
+					if p.NodePort > 0 {
+						port = int(p.NodePort)
+						break
+					}
 				}
+			} else {
+				port = int(svc.Spec.Ports[0].Port)
+				// NOTE: for cluster IP services we always use the endpoint
+				// ports so this will be overridden.
 			}
 		}
-		if port == 0 && !isNodePort {
-			port = int(svc.Spec.Ports[0].Port)
-		}
 
-		// Set service port based on defined port
 		baseService.Port = port
 
 		// Add all the ports as annotations
@@ -470,7 +500,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		}
 
 	// For ClusterIP services, we register a service instance
-	// for each pod.
+	// for each endpoint.
 	case apiv1.ServiceTypeClusterIP:
 		if t.endpointsMap == nil {
 			return
@@ -483,6 +513,26 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 		seen := map[string]struct{}{}
 		for _, subset := range endpoints.Subsets {
+			// For ClusterIP services, we use the endpoint port instead
+			// of the service port because we're registering each endpoint
+			// as a separate service instance.
+			epPort := baseService.Port
+			if overridePortName != "" {
+				// If we're supposed to use a specific named port, find it.
+				for _, p := range subset.Ports {
+					if overridePortName == p.Name {
+						epPort = int(p.Port)
+						break
+					}
+				}
+			} else if overridePortNumber == 0 {
+				// Otherwise we'll just use the first port in the list
+				// (unless the port number was overridden by an annotation).
+				for _, p := range subset.Ports {
+					epPort = int(p.Port)
+					break
+				}
+			}
 			for _, subsetAddr := range subset.Addresses {
 				addr := subsetAddr.IP
 				if addr == "" {
@@ -505,6 +555,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
+				r.Service.Port = epPort
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
@@ -614,9 +665,14 @@ func (t *serviceEndpointsResource) Delete(key string) error {
 	return nil
 }
 
-func (t *ServiceResource) prefixServiceName(name string) string {
+func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) string {
 	if t.ConsulServicePrefix != "" {
-		return fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
+		name = fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
 	}
+
+	if t.AddK8SNamespaceSuffix {
+		name = fmt.Sprintf("%s-%s", name, namespace)
+	}
+
 	return name
 }

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	catalogFromConsul "github.com/hashicorp/consul-k8s/catalog/from-consul"
-	catalogFromK8S "github.com/hashicorp/consul-k8s/catalog/from-k8s"
+	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
+	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -45,12 +45,15 @@ type Command struct {
 	flagConsulWritePeriod     flags.DurationValue
 	flagSyncClusterIPServices bool
 	flagNodePortSyncType      string
+	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
 
 	consulClient *api.Client
+	clientset    kubernetes.Interface
 
-	once sync.Once
-	help string
+	once  sync.Once
+	sigCh chan os.Signal
+	help  string
 }
 
 func (c *Command) init() {
@@ -91,6 +94,10 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagNodePortSyncType, "node-port-sync-type", "ExternalOnly",
 		"Defines the type of sync for NodePort services. Valid options are ExternalOnly, "+
 			"InternalOnly and ExternalFirst.")
+	c.flags.BoolVar(&c.flagAddK8SNamespaceSuffix, "add-k8s-namespace-suffix", false,
+		"If true, Kubernetes namespace will be appended to service names synced to Consul separated by a dash. "+
+			"If false, no suffix will be appended to the service names in Consul. "+
+			"If the service name annotation is provided, the suffix is not appended.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -113,24 +120,29 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
-		return 1
-	}
-
 	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
-		return 1
+	if c.clientset == nil {
+		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
+			return 1
+		}
+
+		c.clientset, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
+			return 1
+		}
 	}
 
 	// Setup Consul client
-	c.consulClient, err = c.http.APIClient()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
-		return 1
+	if c.consulClient == nil {
+		var err error
+		c.consulClient, err = c.http.APIClient()
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
+			return 1
+		}
 	}
 
 	level := hclog.LevelFromString(c.flagLogLevel)
@@ -154,7 +166,7 @@ func (c *Command) Run(args []string) int {
 	var toConsulCh chan struct{}
 	if c.flagToConsul {
 		// Build the Consul sync and start it
-		syncer := &catalogFromK8S.ConsulSyncer{
+		syncer := &catalogtoconsul.ConsulSyncer{
 			Client:            c.consulClient,
 			Log:               logger.Named("to-consul/sink"),
 			Namespace:         c.flagK8SSourceNamespace,
@@ -167,16 +179,17 @@ func (c *Command) Run(args []string) int {
 		// Build the controller and start it
 		ctl := &controller.Controller{
 			Log: logger.Named("to-consul/controller"),
-			Resource: &catalogFromK8S.ServiceResource{
-				Log:                 logger.Named("to-consul/source"),
-				Client:              clientset,
-				Syncer:              syncer,
-				Namespace:           c.flagK8SSourceNamespace,
-				ExplicitEnable:      !c.flagK8SDefault,
-				ClusterIPSync:       c.flagSyncClusterIPServices,
-				NodePortSync:        catalogFromK8S.NodePortSyncType(c.flagNodePortSyncType),
-				ConsulK8STag:        c.flagConsulK8STag,
-				ConsulServicePrefix: c.flagConsulServicePrefix,
+			Resource: &catalogtoconsul.ServiceResource{
+				Log:                   logger.Named("to-consul/source"),
+				Client:                c.clientset,
+				Syncer:                syncer,
+				Namespace:             c.flagK8SSourceNamespace,
+				ExplicitEnable:        !c.flagK8SDefault,
+				ClusterIPSync:         c.flagSyncClusterIPServices,
+				NodePortSync:          catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
+				ConsulK8STag:          c.flagConsulK8STag,
+				ConsulServicePrefix:   c.flagConsulServicePrefix,
+				AddK8SNamespaceSuffix: c.flagAddK8SNamespaceSuffix,
 			},
 		}
 
@@ -190,13 +203,13 @@ func (c *Command) Run(args []string) int {
 	// Start Consul-to-K8S sync
 	var toK8SCh chan struct{}
 	if c.flagToK8S {
-		sink := &catalogFromConsul.K8SSink{
-			Client:    clientset,
+		sink := &catalogtok8s.K8SSink{
+			Client:    c.clientset,
 			Namespace: c.flagK8SWriteNamespace,
 			Log:       logger.Named("to-k8s/sink"),
 		}
 
-		source := &catalogFromConsul.Source{
+		source := &catalogtok8s.Source{
 			Client:       c.consulClient,
 			Domain:       c.flagConsulDomain,
 			Sink:         sink,
@@ -232,8 +245,8 @@ func (c *Command) Run(args []string) int {
 	}()
 
 	// Wait on an interrupt to exit
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
+	c.sigCh = make(chan os.Signal, 1)
+	signal.Notify(c.sigCh, os.Interrupt)
 	select {
 	// Unexpected exit
 	case <-toConsulCh:
@@ -252,7 +265,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 
 	// Interrupted, gracefully exit
-	case <-sigCh:
+	case <-c.sigCh:
 		cancelF()
 		if toConsulCh != nil {
 			<-toConsulCh
@@ -280,6 +293,12 @@ func (c *Command) Synopsis() string { return synopsis }
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.help
+}
+
+// interrupt sends os.Interrupt signal to the command
+// so it can exit gracefully. This function is needed for tests
+func (c *Command) interrupt() {
+	c.sigCh <- os.Interrupt
 }
 
 const synopsis = "Sync Kubernetes services and Consul services."

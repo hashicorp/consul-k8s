@@ -3,6 +3,7 @@ package connectinject
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"text/template"
 
@@ -10,13 +11,23 @@ import (
 )
 
 type initContainerCommandData struct {
-	ServiceName     string
-	ServicePort     int32
+	ServiceName      string
+	ProxyServiceName string
+	ServicePort      int32
+	// ServiceProtocol is the protocol for the service-defaults config
+	// that will be written if WriteServiceDefaults is true.
 	ServiceProtocol string
 	AuthMethod      string
-	CentralConfig   bool
-	Upstreams       []initContainerCommandUpstreamData
-	Tags            string
+	// WriteServiceDefaults controls whether a service-defaults config is
+	// written for this service.
+	WriteServiceDefaults bool
+	Upstreams            []initContainerCommandUpstreamData
+	Tags                 string
+	Meta                 map[string]string
+
+	// The PEM-encoded CA certificate to use when
+	// communicating with Consul clients
+	ConsulCACert string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -29,11 +40,23 @@ type initContainerCommandUpstreamData struct {
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
+	protocol := h.DefaultProtocol
+	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
+		protocol = annoProtocol
+	}
+	// We only write a service-defaults config if central config is enabled
+	// and a protocol is specified. Previously, we would write a config when
+	// the protocol was empty. This is the same as setting it to tcp. This
+	// would then override any global proxy-defaults config. Now, we only
+	// write the config if a protocol is explicitly set.
+	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
 	data := initContainerCommandData{
-		ServiceName:     pod.Annotations[annotationService],
-		ServiceProtocol: pod.Annotations[annotationProtocol],
-		AuthMethod:      h.AuthMethod,
-		CentralConfig:   h.CentralConfig,
+		ServiceName:          pod.Annotations[annotationService],
+		ProxyServiceName:     fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
+		ServiceProtocol:      protocol,
+		AuthMethod:           h.AuthMethod,
+		WriteServiceDefaults: writeServiceDefaults,
+		ConsulCACert:         h.ConsulCACert,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -49,18 +72,32 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		}
 	}
 
-	// If tags are specified split the string into an array and create
-	// the tags string
+	var tags []string
 	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags := strings.Split(raw, ",")
+		tags = strings.Split(raw, ",")
+	}
+	// Get the tags from the deprecated tags annotation and combine.
+	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
+		tags = append(tags, strings.Split(raw, ",")...)
+	}
 
-		// Create json array from the annotations
+	if len(tags) > 0 {
+		// Create json array from the annotations since we're going to output
+		// this in an HCL config file and HCL arrays are json formatted.
 		jsonTags, err := json.Marshal(tags)
 		if err != nil {
 			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
+		} else {
+			data.Tags = string(jsonTags)
 		}
+	}
 
-		data.Tags = string(jsonTags)
+	// If there is metadata specified split into a map and create.
+	data.Meta = make(map[string]string)
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
+			data.Meta[strings.TrimPrefix(k, annotationMeta)] = v
+		}
 	}
 
 	// If upstreams are specified, configure those
@@ -150,6 +187,14 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
+			{
+				Name:  "SERVICE_ID",
+				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ServiceName),
+			},
+			{
+				Name:  "PROXY_SERVICE_ID",
+				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
+			},
 		},
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
@@ -159,29 +204,46 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
+{{- if .ConsulCACert}}
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+{{ .ConsulCACert }}
+EOF
+{{- else}}
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+{{- end}}
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "${POD_NAME}-{{ .ServiceName }}-sidecar-proxy"
-  name = "{{ .ServiceName }}-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
+  name = "{{ .ProxyServiceName }}"
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  {{- if .Tags}}
+  tags = {{.Tags}}
+  {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
+  {{- end}}
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
-    destination_service_id = "{{ .ServiceName}}"
-    {{ if (gt .ServicePort 0) -}}
+    destination_service_id = "${SERVICE_ID}"
+    {{- if (gt .ServicePort 0) }}
     local_service_address = "127.0.0.1"
     local_service_port = {{ .ServicePort }}
-    {{ end -}}
-
-
-    {{ range .Upstreams -}}
+    {{- end }}
+    {{- range .Upstreams }}
     upstreams {
       {{- if .Name }}
       destination_type = "service" 
@@ -196,7 +258,7 @@ services {
       datacenter = "{{ .Datacenter }}"
       {{- end}}
     }
-    {{ end }}
+    {{- end }}
   }
 
   checks {
@@ -213,38 +275,48 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-{{ .ServiceName }}"
+  id   = "${SERVICE_ID}"
   name = "{{ .ServiceName }}"
   address = "${POD_IP}"
   port = {{ .ServicePort }}
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
+  {{- if .Meta}}
+  meta = {
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+  }
+  {{- end}}
 }
 EOF
 
-{{ if .CentralConfig -}}
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+{{- if .WriteServiceDefaults }}
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "{{ .ServiceName }}"
 protocol = "{{ .ServiceProtocol }}"
 EOF
 {{- end }}
-
-{{ if .AuthMethod -}}
+{{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
+       as non-root user consul-k8s. */}}
+chmod 444 /consul/connect-inject/acl-token
 {{- end }}
-
-{{ if .CentralConfig -}}
+{{- if .WriteServiceDefaults }}
+{{- /* We use -cas and -modify-index 0 so that if a service-defaults config
+       already exists for this service, we don't override it */}}
 /bin/consul config write -cas -modify-index 0 \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
 {{- end }}
 
 /bin/consul services register \
@@ -255,7 +327,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-{{ .ServiceName }}-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}

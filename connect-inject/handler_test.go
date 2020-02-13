@@ -90,6 +90,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
@@ -138,6 +142,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
 				},
 				{
 					Operation: "add",
@@ -202,14 +210,18 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
 		},
 
 		{
-			"empty pod basic, protocol in annotation",
-			Handler{CentralConfig: true, Log: hclog.Default().Named("handler")},
+			"empty pod basic, no default protocol",
+			Handler{WriteServiceDefaults: true, DefaultProtocol: "", Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -224,8 +236,43 @@ func TestHandlerHandle(t *testing.T) {
 			[]jsonpatch.JsonPatchOperation{
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationProtocol),
+					Path:      "/spec/volumes",
 				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+			},
+		},
+
+		{
+			"empty pod basic, protocol in annotation",
+			Handler{WriteServiceDefaults: true, Log: hclog.Default().Named("handler")},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: basicSpec,
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotationService:  "foo",
+							annotationProtocol: "grpc",
+						},
+					},
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -240,6 +287,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
 			},
@@ -247,7 +298,7 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic, default protocol specified",
-			Handler{CentralConfig: true, DefaultProtocol: "http", Log: hclog.Default().Named("handler")},
+			Handler{WriteServiceDefaults: true, DefaultProtocol: "http", Log: hclog.Default().Named("handler")},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -270,6 +321,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
 				},
 				{
 					Operation: "add",

@@ -55,7 +55,26 @@ const (
 
 	// annotationTags is a list of tags to register with the service
 	// this is specified as a comma separated list e.g. abc,123
-	annotationTags = "consul.hashicorp.com/connect-service-tags"
+	annotationTags = "consul.hashicorp.com/service-tags"
+
+	// annotationConnectTags is a list of tags to register with the service
+	// this is specified as a comma separated list e.g. abc,123
+	//
+	// Deprecated: 'consul.hashicorp.com/service-tags' is the new annotation
+	// and should be used instead. We made this change because the tagging is
+	// not specific to connect as both the connect proxy *and* the Consul
+	// service that gets registered is tagged.
+	annotationConnectTags = "consul.hashicorp.com/connect-service-tags"
+
+	// annotationMeta is a list of metadata key/value pairs to add to the service
+	// registration. This is specified in the format `<key>:<value>`
+	// e.g. consul.hashicorp.com/service-meta-foo:bar
+	annotationMeta = "consul.hashicorp.com/service-meta-"
+
+	// annotationSyncPeriod controls the -sync-period flag passed to the
+	// consul-k8s lifecycle-sidecar command. This flag controls how often the
+	// service is synced (i.e. re-registered) with the local agent.
+	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
 )
 
 var (
@@ -79,6 +98,10 @@ type Handler struct {
 	ImageConsul string
 	ImageEnvoy  string
 
+	// ImageConsulK8S is the container image for consul-k8s to use.
+	// This image is used for the lifecycle-sidecar container.
+	ImageConsulK8S string
+
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.
 	RequireAnnotation bool
@@ -87,14 +110,19 @@ type Handler struct {
 	// use for identity with connectInjection if ACLs are enabled
 	AuthMethod string
 
-	// CentralConfig tracks whether injection should register services
-	// to central config as well as normal service registration.
+	// WriteServiceDefaults controls whether injection should write a
+	// service-defaults config entry for each service.
 	// Requires an additional `protocol` parameter.
-	CentralConfig bool
+	WriteServiceDefaults bool
 
 	// DefaultProtocol is the default protocol to use for central config
 	// registrations. It will be overridden by a specific annotation.
 	DefaultProtocol string
+
+	// The PEM-encoded CA certificate string
+	// to use when communicating with Consul clients over HTTPS.
+	// If not set, will use HTTP.
+	ConsulCACert string
 
 	// Log
 	Log hclog.Logger
@@ -234,8 +262,8 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Container{container},
 		"/spec/initContainers")...)
 
-	// Add the Envoy sidecar
-	esContainer, err := h.containerSidecar(&pod)
+	// Add the Envoy and lifecycle sidecars.
+	esContainer, err := h.envoySidecar(&pod)
 	if err != nil {
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
@@ -243,9 +271,10 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			},
 		}
 	}
+	connectContainer := h.lifecycleSidecar(&pod)
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
-		[]corev1.Container{esContainer},
+		[]corev1.Container{esContainer, connectContainer},
 		"/spec/containers")...)
 
 	// Add annotations so that we know we're injected
@@ -350,9 +379,9 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 		}
 	}
 
-	if h.CentralConfig {
+	if h.WriteServiceDefaults {
 		// Default protocol is specified by a flag if not explicitly annotated
-		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok {
+		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok && h.DefaultProtocol != "" {
 			if cs := pod.Spec.Containers; len(cs) > 0 {
 				// Create the patch for this first, so that the Annotation
 				// object will be created if necessary

@@ -3,7 +3,7 @@ version: 2.1
 executors:
   go:
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.13
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
 
@@ -55,7 +55,7 @@ jobs:
       # run go tests with gotestsum
       - run: |
           PACKAGE_NAMES=$(go list ./...)
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- $PACKAGE_NAMES
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
