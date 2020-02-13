@@ -122,7 +122,7 @@ func (c *Command) checkAndCreateNamespace(ns string, consulClient *api.Client) e
 		// default policy that needs to be attached
 		aclConfig := api.NamespaceACLConfig{
 			PolicyDefaults: []api.ACLLink{
-				{Name: "cross-namespace-policy-for-k8s"},
+				{Name: "cross-namespace-policy"},
 			},
 		}
 
