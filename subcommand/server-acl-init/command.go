@@ -298,7 +298,7 @@ func (c *Command) Run(args []string) int {
 	// to finish the cross namespace permission setup.
 	if c.flagEnableNamespaces {
 		policyTmpl := api.ACLPolicy{
-			Name:        "cross-namespace-policy-for-k8s",
+			Name:        "cross-namespace-policy",
 			Description: "Policy to allow permissions to cross Consul namespaces for k8s services",
 			Rules:       crossNamespaceRules,
 		}
@@ -308,6 +308,22 @@ func (c *Command) Run(args []string) int {
 			})
 		if err != nil {
 			c.Log.Error("Error creating or updating the cross namespace policy", "err", err)
+			return 1
+		}
+
+		// Apply this to the PolicyDefaults for the Consul `default` namespace
+		aclConfig := api.NamespaceACLConfig{
+			PolicyDefaults: []api.ACLLink{
+				{Name: policyTmpl.Name},
+			},
+		}
+		consulNamespace := api.Namespace{
+			Name: "default",
+			ACLs: &aclConfig,
+		}
+		_, _, err = consulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
+		if err != nil {
+			c.Log.Error("Error updating the default namespace to include the cross namespace policy", "err", err)
 			return 1
 		}
 	}
