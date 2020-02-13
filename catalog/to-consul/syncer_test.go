@@ -2,6 +2,8 @@ package catalog
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -244,6 +246,42 @@ func TestConsulSyncer_reapServiceSameNamespace(t *testing.T) {
 	require.Equal("k8s-sync", service.Node)
 	require.Equal("bar", service.ServiceName)
 	require.Equal("127.0.0.1", service.Address)
+}
+
+// Test that when the syncer is stopped, we don't continue to call the Consul
+// API. This test was added as a regression test after a bug was discovered
+// that after the context was cancelled, we would continue to make API calls
+// to the Consul API in a tight loop.
+func TestConsulSyncer_stopsGracefully(t *testing.T) {
+	t.Parallel()
+
+	// We use a test http server here so we can count the number of calls.
+	callCount := 0
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		// We need to respond with errors to trigger the bug. If we don't
+		// then the code path is only encountered after a timeout which we
+		// won't trigger in the test.
+		w.WriteHeader(500)
+	}))
+	defer consulServer.Close()
+
+	// Start the syncer.
+	client, err := api.NewClient(&api.Config{
+		Address: consulServer.URL,
+	})
+	require.NoError(t, err)
+	s, closer := testConsulSyncer(t, client)
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("k8s-sync", "bar", "default"),
+	})
+
+	// Compare the call count before and after stopping the server.
+	beforeStopAPICount := callCount
+	closer()
+	time.Sleep(100 * time.Millisecond)
+	// Before the bugfix, the count would be >100.
+	require.LessOrEqual(t, callCount-beforeStopAPICount, 2)
 }
 
 func testRegistration(node, service, namespace string) *api.CatalogRegistration {
