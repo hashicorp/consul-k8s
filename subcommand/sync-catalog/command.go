@@ -56,6 +56,7 @@ type Command struct {
 	flagDenyK8sNamespacesList      []string // K8s namespaces to deny injection (has precedence)
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
+	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
@@ -124,6 +125,9 @@ func (c *Command) init() {
 		"namespace mirroring")
 	c.flags.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "cross-consul-namespace-acl-policy", "",
+		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
+			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &k8sflags.K8SFlags{}

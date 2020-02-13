@@ -56,6 +56,7 @@ type Command struct {
 	flagDenyK8sNamespacesList      []string // K8s namespaces to deny injection (has precedence)
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
+	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -107,6 +108,9 @@ func (c *Command) init() {
 		"k8s namespace mirroring")
 	c.flagSet.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "cross-consul-namespace-acl-policy", "",
+		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
+			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
@@ -210,6 +214,7 @@ func (c *Command) Run(args []string) int {
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
 		Log:                        hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
