@@ -218,14 +218,25 @@ func (c *Command) Run(args []string) int {
 	// Start the K8S-to-Consul syncer
 	var toConsulCh chan struct{}
 	if c.flagToConsul {
+		// If namespaces are enabled we need to use a new Consul API endpoint
+		// to list node services. This endpoint is only available in Consul
+		// 1.7+. To preserve backwards compatibility, when namespaces are not
+		// enabled we use a client that queries the older API endpoint.
+		var svcsClient catalogtoconsul.ConsulNodeServicesClient
+		if c.flagEnableNamespaces {
+			svcsClient = &catalogtoconsul.ConsulOnePointSevenNodeServicesClient{}
+		} else {
+			svcsClient = &catalogtoconsul.ConsulPreOnePointSevenNodeServicesClient{}
+		}
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
-			Client:            c.consulClient,
-			Log:               c.logger.Named("to-consul/sink"),
-			EnableNamespaces:  c.flagEnableNamespaces,
-			SyncPeriod:        syncInterval,
-			ServicePollPeriod: syncInterval * 2,
-			ConsulK8STag:      c.flagConsulK8STag,
+			Client:                   c.consulClient,
+			Log:                      c.logger.Named("to-consul/sink"),
+			EnableNamespaces:         c.flagEnableNamespaces,
+			SyncPeriod:               syncInterval,
+			ServicePollPeriod:        syncInterval * 2,
+			ConsulK8STag:             c.flagConsulK8STag,
+			ConsulNodeServicesClient: svcsClient,
 		}
 		go syncer.Run(ctx)
 
