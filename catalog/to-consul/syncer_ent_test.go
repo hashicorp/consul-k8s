@@ -23,6 +23,7 @@ func TestConsulSyncer_ConsulNamespaces(t *testing.T) {
 
 	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
 		s.EnableNamespaces = true
+		s.ConsulNodeServicesClient = &ConsulOnePointSevenNodeServicesClient{}
 	})
 	defer closer()
 
@@ -69,6 +70,7 @@ func TestConsulSyncer_ReapConsulNamespace(t *testing.T) {
 
 	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
 		s.EnableNamespaces = true
+		s.ConsulNodeServicesClient = &ConsulOnePointSevenNodeServicesClient{}
 	})
 	defer closer()
 
@@ -131,6 +133,7 @@ func TestConsulSyncer_reapServiceInstanceNamespacesEnabled(t *testing.T) {
 	})
 	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
 		s.EnableNamespaces = true
+		s.ConsulNodeServicesClient = &ConsulOnePointSevenNodeServicesClient{}
 	})
 	defer closer()
 
