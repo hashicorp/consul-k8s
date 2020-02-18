@@ -108,7 +108,7 @@ func (c *Command) init() {
 		"k8s namespace mirroring")
 	c.flagSet.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
-	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "cross-consul-namespace-acl-policy", "",
+	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
