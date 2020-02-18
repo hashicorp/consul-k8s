@@ -165,6 +165,9 @@ spec:
                 {{- if and .Values.global.bootstrapACLs (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.bootstrapACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end }}
                 -service={{ .Values.meshGateway.consulServiceName | quote }} \
                 {{- end }}
+                {{- if .Values.global.federation.enabled }}
+                -expose-servers \
+                {{- end }}
           {{- if .Values.meshGateway.enableHealthChecks }}
           livenessProbe:
             tcpSocket:
