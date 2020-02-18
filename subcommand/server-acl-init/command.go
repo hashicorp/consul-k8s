@@ -23,25 +23,26 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                        *flag.FlagSet
-	k8s                          *k8sflags.K8SFlags
-	flagReleaseName              string
-	flagServerLabelSelector      string
-	flagResourcePrefix           string
-	flagReplicas                 int
-	flagK8sNamespace             string
-	flagAllowDNS                 bool
-	flagCreateClientToken        bool
-	flagCreateSyncToken          bool
-	flagCreateInjectToken        bool
-	flagCreateInjectAuthMethod   bool
-	flagBindingRuleSelector      string
-	flagCreateEntLicenseToken    bool
-	flagCreateSnapshotAgentToken bool
-	flagCreateMeshGatewayToken   bool
-	flagConsulCACert             string
-	flagConsulTLSServerName      string
-	flagUseHTTPS                 bool
+	flags                         *flag.FlagSet
+	k8s                           *k8sflags.K8SFlags
+	flagReleaseName               string
+	flagServerLabelSelector       string
+	flagResourcePrefix            string
+	flagReplicas                  int
+	flagK8sNamespace              string
+	flagAllowDNS                  bool
+	flagCreateClientToken         bool
+	flagCreateSyncToken           bool
+	flagCreateInjectToken         bool
+	flagCreateInjectAuthMethod    bool
+	flagBindingRuleSelector       string
+	flagCreateEntLicenseToken     bool
+	flagCreateSnapshotAgentToken  bool
+	flagCreateMeshGatewayToken    bool
+	flagCreateACLReplicationToken bool
+	flagConsulCACert              string
+	flagConsulTLSServerName       string
+	flagUseHTTPS                  bool
 
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -99,6 +100,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway")
+	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
+		"Toggle for creating a token for ACL replication between datacenters")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
@@ -410,6 +413,19 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateInjectAuthMethod {
 		err := c.configureConnectInject(consulClient)
+		if err != nil {
+			c.Log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateACLReplicationToken {
+		rules, err := c.aclReplicationRules()
+		if err != nil {
+			c.Log.Error("Error templating acl replication token rules", "err", err)
+			return 1
+		}
+		err = c.createACL("acl-replication", rules, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
