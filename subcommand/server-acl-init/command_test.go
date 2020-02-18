@@ -201,6 +201,20 @@ func TestRun_Tokens(t *testing.T) {
 			TokenName:          "mesh-gateway",
 			SecretName:         "my-prefix-mesh-gateway-acl-token",
 		},
+		"acl-replication token -release-name": {
+			TokenFlag:          "-create-acl-replication-token",
+			ResourcePrefixFlag: "",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "acl-replication",
+			SecretName:         "release-name-consul-acl-replication-acl-token",
+		},
+		"acl-replication token -resource-prefix": {
+			TokenFlag:          "-create-acl-replication-token",
+			ResourcePrefixFlag: "my-prefix",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "acl-replication",
+			SecretName:         "my-prefix-acl-replication-acl-token",
+		},
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {

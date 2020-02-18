@@ -148,6 +148,32 @@ operator = "write"
 	return c.renderRules(injectRulesTpl)
 }
 
+func (c *Command) aclReplicationRules() (string, error) {
+	// NOTE: The node_prefix rule is not required for ACL replication. It's
+	// added so that this token can be used as an ACL replication token *and*
+	// as an agent token. This allows us to only pass one token between
+	// datacenters during federation since in order to start ACL replication,
+	// we need a token with both replication and agent permissions.
+	aclReplicationRulesTpl := `
+acl = "write"
+operator = "write"
+{{- if .EnableNamespaces }}
+namespace_prefix "" {
+{{- end }}
+  node_prefix "" {
+    policy = "write"
+  }
+  service_prefix "" {
+    policy = "read"
+    intentions = "read"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+`
+	return c.renderRules(aclReplicationRulesTpl)
+}
+
 func (c *Command) renderRules(tmpl string) (string, error) {
 	// Check that it's a valid template
 	compiled, err := template.New("root").Parse(strings.TrimSpace(tmpl))
