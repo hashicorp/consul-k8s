@@ -75,7 +75,7 @@ const (
 	// consul-k8s lifecycle-sidecar command. This flag controls how often the
 	// service is synced (i.e. re-registered) with the local agent.
 	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
-  
+
 	// annotationCheck is the key of the annotation that is added to
 	// http check specified URL. Any 2xx code is considered passing
 	annotationCheck = "consul.hashicorp.com/connect-service-check"
