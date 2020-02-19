@@ -165,7 +165,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		var meta *api.QueryMeta
 		err := backoff.Retry(func() error {
 			var err error
-			services, meta, err = s.ConsulNodeServicesClient.NodeServicesWithTag(s.Client, s.ConsulK8STag, ConsulSyncNodeName, opts)
+			services, meta, err = s.ConsulNodeServicesClient.NodeServices(s.ConsulK8STag, ConsulSyncNodeName, *opts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
+func TestConsulPreNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		ConsulServices []api.CatalogRegistration
@@ -45,10 +45,10 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 			},
 			Exp: nil,
 		},
-		"service on k8s node but without tag": {
+		"service on k8s node without any tags": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id",
@@ -59,10 +59,24 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 			},
 			Exp: nil,
 		},
+		"service on k8s node without k8s tag": {
+			ConsulServices: []api.CatalogRegistration{
+				{
+					Node:    ConsulSyncNodeName,
+					Address: "127.0.0.1",
+					Service: &api.AgentService{
+						ID:      "svc-id",
+						Service: "svc",
+						Tags:    []string{"not-k8s", "foo"},
+					},
+				},
+			},
+			Exp: nil,
+		},
 		"service on k8s node with k8s tag": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id",
@@ -81,7 +95,7 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"multiple services": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc1-id",
@@ -90,7 +104,7 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc2-id2",
@@ -113,7 +127,7 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"multiple service instances": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id1",
@@ -122,7 +136,7 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id2",
@@ -156,8 +170,10 @@ func TestPreConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 				require.NoError(err)
 			}
 
-			client := ConsulPreOnePointSevenNodeServicesClient{}
-			svcs, _, err := client.NodeServicesWithTag(consulClient, "k8s", "k8s-sync", nil)
+			client := ConsulPreNamespacesNodeServicesClient{
+				Client: consulClient,
+			}
+			svcs, _, err := client.NodeServices("k8s", ConsulSyncNodeName, api.QueryOptions{})
 			require.NoError(err)
 			require.Len(svcs, len(c.Exp))
 			for _, expSvc := range c.Exp {
