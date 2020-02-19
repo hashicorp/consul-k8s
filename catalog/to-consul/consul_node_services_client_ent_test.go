@@ -11,7 +11,7 @@ import (
 )
 
 // Test the Consul 1.7 client against Consul Enterprise.
-func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
+func TestConsulNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		ConsulServices []api.CatalogRegistration
@@ -48,10 +48,10 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 			},
 			Exp: nil,
 		},
-		"service on k8s node but without tag": {
+		"service on k8s node without any tags": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id",
@@ -62,10 +62,24 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 			},
 			Exp: nil,
 		},
+		"service on k8s node without k8s tag": {
+			ConsulServices: []api.CatalogRegistration{
+				{
+					Node:    ConsulSyncNodeName,
+					Address: "127.0.0.1",
+					Service: &api.AgentService{
+						ID:      "svc-id",
+						Service: "svc",
+						Tags:    []string{"not-k8s", "foo"},
+					},
+				},
+			},
+			Exp: nil,
+		},
 		"service on k8s node with k8s tag": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id",
@@ -84,7 +98,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"multiple services": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc1-id",
@@ -93,7 +107,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc2-id2",
@@ -116,7 +130,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"multiple service instances": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id1",
@@ -125,7 +139,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id2",
@@ -144,7 +158,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"services across multiple namespaces": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id1",
@@ -153,7 +167,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc-ns-id",
@@ -177,7 +191,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"services with same name across multiple namespaces": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id",
@@ -186,7 +200,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc-id",
@@ -210,7 +224,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 		"multiple services across multiple namespaces": {
 			ConsulServices: []api.CatalogRegistration{
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id1",
@@ -219,7 +233,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc-id2",
@@ -228,7 +242,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc-id1",
@@ -238,7 +252,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc-id2",
@@ -248,7 +262,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc2-id1",
@@ -257,7 +271,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:      "svc2-id2",
@@ -266,7 +280,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc2-id1",
@@ -276,7 +290,7 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 					},
 				},
 				{
-					Node:    "k8s-sync",
+					Node:    ConsulSyncNodeName,
 					Address: "127.0.0.1",
 					Service: &api.AgentService{
 						ID:        "svc2-id2",
@@ -308,6 +322,9 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 	}
 
 	for name, c := range cases {
+		if name != "multiple services across multiple namespaces" {
+			continue
+		}
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
 			svr, err := testutil.NewTestServerT(tt)
@@ -329,8 +346,10 @@ func TestConsulOnePointSevenClient_NodeServicesWithTag(t *testing.T) {
 				require.NoError(err)
 			}
 
-			client := ConsulOnePointSevenNodeServicesClient{}
-			svcs, _, err := client.NodeServicesWithTag(consulClient, "k8s", "k8s-sync", &api.QueryOptions{
+			client := ConsulNamespacesNodeServicesClient{
+				Client: consulClient,
+			}
+			svcs, _, err := client.NodeServices("k8s", ConsulSyncNodeName, api.QueryOptions{
 				Namespace: "*",
 			})
 			require.NoError(err)
