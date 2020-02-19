@@ -217,12 +217,14 @@ func testConsulSyncer(client *api.Client) (*ConsulSyncer, func()) {
 // prior to starting via the configurator method.
 func testConsulSyncerWithConfig(client *api.Client, configurator func(*ConsulSyncer)) (*ConsulSyncer, func()) {
 	s := &ConsulSyncer{
-		Client:                   client,
-		Log:                      hclog.Default(),
-		SyncPeriod:               200 * time.Millisecond,
-		ServicePollPeriod:        50 * time.Millisecond,
-		ConsulK8STag:             TestConsulK8STag,
-		ConsulNodeServicesClient: &ConsulPreOnePointSevenNodeServicesClient{},
+		Client:            client,
+		Log:               hclog.Default(),
+		SyncPeriod:        200 * time.Millisecond,
+		ServicePollPeriod: 50 * time.Millisecond,
+		ConsulK8STag:      TestConsulK8STag,
+		ConsulNodeServicesClient: &ConsulPreNamespacesNodeServicesClient{
+			Client: client,
+		},
 	}
 	configurator(s)
 	s.init()

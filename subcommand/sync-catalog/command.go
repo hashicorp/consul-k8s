@@ -224,9 +224,13 @@ func (c *Command) Run(args []string) int {
 		// enabled we use a client that queries the older API endpoint.
 		var svcsClient catalogtoconsul.ConsulNodeServicesClient
 		if c.flagEnableNamespaces {
-			svcsClient = &catalogtoconsul.ConsulOnePointSevenNodeServicesClient{}
+			svcsClient = &catalogtoconsul.ConsulNamespacesNodeServicesClient{
+				Client: c.consulClient,
+			}
 		} else {
-			svcsClient = &catalogtoconsul.ConsulPreOnePointSevenNodeServicesClient{}
+			svcsClient = &catalogtoconsul.ConsulPreNamespacesNodeServicesClient{
+				Client: c.consulClient,
+			}
 		}
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
