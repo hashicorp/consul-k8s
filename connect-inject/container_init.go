@@ -260,7 +260,7 @@ services {
   }
   {{- end}}
   {{- if .ServiceCheck}}
-  checks {
+  check {
     name = "{{ .ServiceName }}-check"
     http = "http://${POD_IP}:{{ .ServicePort }}{{ .ServiceCheck }}"
     interval = "1s"
