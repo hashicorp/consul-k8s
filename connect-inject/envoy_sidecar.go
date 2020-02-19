@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) envoySidecar(pod *corev1.Pod) (corev1.Container, error) {
 
 	// Render the command
 	var buf bytes.Buffer
@@ -19,7 +19,7 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 		return corev1.Container{}, err
 	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:  "consul-connect-envoy-sidecar",
 		Image: h.ImageEnvoy,
 		Env: []corev1.EnvVar{
@@ -31,7 +31,7 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			corev1.VolumeMount{
+			{
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
 			},
@@ -52,11 +52,27 @@ func (h *Handler) containerSidecar(pod *corev1.Pod) (corev1.Container, error) {
 			"--max-obj-name-len", "256",
 			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 		},
-	}, nil
+	}
+	if h.ConsulCACert != "" {
+		caCertEnvVar := corev1.EnvVar{
+			Name:  "CONSUL_CACERT",
+			Value: "/consul/connect-inject/consul-ca.pem",
+		}
+		consulAddrEnvVar := corev1.EnvVar{
+			Name:  "CONSUL_HTTP_ADDR",
+			Value: "https://$(HOST_IP):8501",
+		}
+		container.Env = append(container.Env, caCertEnvVar, consulAddrEnvVar)
+	} else {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "CONSUL_HTTP_ADDR",
+			Value: "$(HOST_IP):8500",
+		})
+	}
+	return container, nil
 }
 
 const sidecarPreStopCommandTpl = `
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 /consul/connect-inject/consul services deregister \
   {{- if . }}
   -token-file="/consul/connect-inject/acl-token" \

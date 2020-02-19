@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	fromk8s "github.com/hashicorp/consul-k8s/catalog/from-k8s"
+	toconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -108,7 +108,7 @@ func TestSource_ignoreK8S(t *testing.T) {
 	require.NoError(err)
 	_, err = client.Catalog().Register(testRegistration("hostB", "svcA", nil), nil)
 	require.NoError(err)
-	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{fromk8s.TestConsulK8STag}), nil)
+	_, err = client.Catalog().Register(testRegistration("hostB", "svcB", []string{toconsul.TestConsulK8STag}), nil)
 	require.NoError(err)
 
 	_, sink, closer := testSource(t, client)
@@ -253,7 +253,7 @@ func testSource(t *testing.T, client *api.Client) (*Source, *TestSink, func()) {
 		Domain:       "test",
 		Sink:         sink,
 		Log:          hclog.Default(),
-		ConsulK8STag: fromk8s.TestConsulK8STag,
+		ConsulK8STag: toconsul.TestConsulK8STag,
 	}
 
 	ctx, cancelF := context.WithCancel(context.Background())

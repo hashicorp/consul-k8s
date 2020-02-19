@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,9 +34,11 @@ type Command struct {
 	flagDefaultInject   bool   // True to inject by default
 	flagConsulImage     string // Docker image for Consul
 	flagEnvoyImage      string // Docker image for Envoy
+	flagConsulK8sImage  string // Docker image for consul-k8s
 	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
 	flagCentralConfig   bool   // True to enable central config injection
 	flagDefaultProtocol string // Default protocol for use with central config
+	flagConsulCACert    string // Path to CA Certificate to use when communicating with Consul clients
 	flagSet             *flag.FlagSet
 
 	once sync.Once
@@ -59,17 +62,28 @@ func (c *Command) init() {
 		"Docker image for Consul. Defaults to an Consul 1.3.0.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
 		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
+	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
+		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
-	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false, "Enable central config.")
+	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false,
+		"Write a service-defaults config for every Connect service using protocol from -default-protocol or Pod annotation.")
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
+	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
+		"Path to CA certificate to use if communicating with Consul clients over HTTPS.")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
+		return 1
+	}
+
+	// Validate flags.
+	if c.flagConsulK8sImage == "" {
+		c.UI.Error("-consul-k8s-image must be set")
 		return 1
 	}
 
@@ -107,15 +121,27 @@ func (c *Command) Run(args []string) int {
 	defer cancelFunc()
 	go c.certWatcher(ctx, certCh, clientset)
 
+	var consulCACert []byte
+	if c.flagConsulCACert != "" {
+		var err error
+		consulCACert, err = ioutil.ReadFile(c.flagConsulCACert)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file %s: %s", c.flagConsulCACert, err))
+			return 1
+		}
+	}
+
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ImageConsul:       c.flagConsulImage,
-		ImageEnvoy:        c.flagEnvoyImage,
-		RequireAnnotation: !c.flagDefaultInject,
-		AuthMethod:        c.flagACLAuthMethod,
-		CentralConfig:     c.flagCentralConfig,
-		DefaultProtocol:   c.flagDefaultProtocol,
-		Log:               hclog.Default().Named("handler"),
+		ImageConsul:          c.flagConsulImage,
+		ImageEnvoy:           c.flagEnvoyImage,
+		ImageConsulK8S:       c.flagConsulK8sImage,
+		RequireAnnotation:    !c.flagDefaultInject,
+		AuthMethod:           c.flagACLAuthMethod,
+		WriteServiceDefaults: c.flagCentralConfig,
+		DefaultProtocol:      c.flagDefaultProtocol,
+		ConsulCACert:         string(consulCACert),
+		Log:                  hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)

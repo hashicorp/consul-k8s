@@ -1,5 +1,79 @@
 ## UNRELEASED
 
+## 0.11.0 (January 10, 2020)
+
+Improvements:
+
+* Connect: Add TLS support [[GH-181](https://github.com/hashicorp/consul-k8s/pull/181)].
+* Bootstrap ACLs: Add TLS support [[GH-183](https://github.com/hashicorp/consul-k8s/pull/183)].
+
+Notes:
+
+* Build: Our darwin releases for this version and up will be signed and notarized according to Apple's requirements.
+Prior to this release, MacOS 10.15+ users attempting to run our software may see the error: "'consul-k8s' cannot be opened because the developer cannot be verified." This error affected all MacOS 10.15+ users who downloaded our software directly via web browsers, and was caused by changes to Apple's third-party software requirements.
+
+  MacOS 10.15+ users should plan to upgrade to 0.11.0+.
+* Build: ARM release binaries: Starting with 0.11.0, `consul-k8s` will ship three separate versions of ARM builds. The previous ARM binaries of Consul could potentially crash due to the way the Go runtime manages internal pointers to its Go routine management constructs and how it keeps track of them especially during signal handling (https://github.com/golang/go/issues/32912). From 0.11.0 forward, it is recommended to use:
+
+  consul-k8s\_{version}\_linux_armelv5.zip for all 32-bit armel systems
+  consul-k8s\_{version}\_linux_armhfv6.zip for all armhf systems with v6+ architecture
+  consul-k8s\_{version}\_linux_arm64.zip for all v8 64-bit architectures
+* Build: The `freebsd_arm` variant has been removed.
+
+
+## 0.10.1 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix bug where the new lifecycle sidecar didn't have permissions to
+  read the ACL token file. [[GH-182](https://github.com/hashicorp/consul-k8s/pull/182)]
+
+## 0.10.0 (December 17, 2019)
+
+Bug Fixes:
+
+* Connect: Fix critical bug where Connect-registered services instances would be deregistered
+  when the Consul client on the same node was restarted. This fix adds a new
+  sidecar that ensures the service instance is always registered. [[GH-161](https://github.com/hashicorp/consul-k8s/issues/161)]
+
+* Connect: Fix bug where UI links between sidecar and service didn't work because
+  the wrong service ID was being used. [[GH-163](https://github.com/hashicorp/consul-k8s/issues/163)]
+
+* Bootstrap ACLs: Support bootstrapACLs for users setting the `nameOverride` config. [[GH-165](https://github.com/hashicorp/consul-k8s/issues/165)]
+
+## 0.9.5 (December 5, 2019)
+
+Bug Fixes:
+
+* Sync: Add Kubernetes namespace as a suffix
+  to the service names via `-add-k8s-namespace-suffix` flag.
+  This prevents service name collisions in Consul when there
+  are two services with the same name in different
+  namespaces in Kubernetes [[GH-139](https://github.com/hashicorp/consul-k8s/issues/139)]
+
+* Connect: Only write a `service-defaults` config during Connect injection if
+  the protocol is set explicitly [[GH-169](https://github.com/hashicorp/consul-k8s/pull/169)]
+
+## 0.9.4 (October 28, 2019)
+
+Bug Fixes:
+
+* Sync: Now changing the annotation `consul.hashicorp.com/service-sync` to `false`
+  or deleting the annotation will un-sync the service. [[GH-76](https://github.com/hashicorp/consul-k8s/issues/76)]
+
+* Sync: Rewrite Consul services to lowercase so they're valid Kubernetes services.
+  [[GH-110](https://github.com/hashicorp/consul-k8s/issues/110)]
+
+## 0.9.3 (October 15, 2019)
+
+Bug Fixes:
+
+* Add new delete-completed-job command that is used to delete the
+  server-acl-init Kubernetes Job once it's completed. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
+* Fixes a bug where even if the ACL Tokens for the other components existed
+  (e.g. client or sync-catalog) we'd try to generate new tokens and update the secrets. [[GH-152](https://github.com/hashicorp/consul-k8s/pull/152)]
+
 ## 0.9.2 (October 4, 2019)
 
 Improvements:

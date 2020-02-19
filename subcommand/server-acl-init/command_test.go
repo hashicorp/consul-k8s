@@ -1,20 +1,25 @@
 package serveraclinit
 
 import (
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/tlsutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -22,135 +27,174 @@ import (
 
 var ns = "default"
 var releaseName = "release-name"
+var resourcePrefix = "release-name-consul"
 
-// Set up test consul agent and kubernetes clusters with
-func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
-	require := require.New(t)
-	k8s := fake.NewSimpleClientset()
-
-	a := agent.NewTestAgent(t, t.Name(), `
-	primary_datacenter = "dc1"
-	acl {
-		enabled = true
-	}`)
-
-	consulURL, err := url.Parse("http://" + a.HTTPAddr())
-	require.NoError(err)
-	port, err := strconv.Atoi(consulURL.Port())
-	require.NoError(err)
-
-	// Create Consul server Pod.
-	_, err = k8s.CoreV1().Pods(ns).Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
+func TestRun_FlagValidation(t *testing.T) {
+	cases := []struct {
+		Flags  []string
+		ExpErr string
+	}{
+		{
+			Flags:  []string{},
+			ExpErr: "-release-name or -server-label-selector must be set",
 		},
-		Status: v1.PodStatus{
-			PodIP: consulURL.Hostname(),
+		{
+			Flags:  []string{"-release-name=name", "-server-label-selector=hi"},
+			ExpErr: "-release-name and -server-label-selector cannot both be set",
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
+		{
+			Flags:  []string{"-server-label-selector=hi"},
+			ExpErr: "if -server-label-selector is set -resource-prefix must also be set",
 		},
-	})
-	require.NoError(err)
-	return k8s, a
+	}
+
+	for _, c := range cases {
+		t.Run(c.ExpErr, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			responseCode := cmd.Run(c.Flags)
+			require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
+			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
+		})
+	}
 }
 
+// Test what happens if no extra flags were set (i.e. the defaults apply).
+// We test with both the deprecated -release-name and the new -server-label-selector
+// flags.
 func TestRun_Defaults(t *testing.T) {
 	t.Parallel()
-	k8s, testAgent := completeSetup(t)
-	defer testAgent.Shutdown()
-	require := require.New(t)
+	for _, flags := range [][]string{
+		{"-release-name=" + releaseName},
+		{
+			"-server-label-selector=component=server,app=consul,release=" + releaseName,
+			"-resource-prefix=" + resourcePrefix,
+		},
+	} {
+		t.Run(flags[0], func(t *testing.T) {
+			k8s, testAgent := completeSetup(t, resourcePrefix)
+			defer testAgent.Shutdown()
+			require := require.New(t)
 
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			args := append([]string{
+				"-k8s-namespace=" + ns,
+				"-expected-replicas=1",
+			}, flags...)
+			responseCode := cmd.Run(args)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Test that the bootstrap kube secret is created.
+			bootToken := getBootToken(t, k8s, resourcePrefix)
+
+			// Check that it has the right policies.
+			consul := testAgent.Client()
+			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			require.Equal("global-management", tokenData.Policies[0].Name)
+
+			// Check that the agent policy was created.
+			policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			found := false
+			for _, p := range policies {
+				if p.Name == "agent-token" {
+					found = true
+					break
+				}
+			}
+			require.True(found, "agent-token policy was not found")
+
+			// We should also test that the server's token was updated, however I
+			// couldn't find a way to test that with the test agent. Instead we test
+			// that in another test when we're using an httptest server instead of
+			// the test agent and we can assert that the /v1/agent/token/agent
+			// endpoint was called.
+		})
 	}
-	cmd.init()
-	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
-		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-	})
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Test that the bootstrap kube secret is created.
-	bootToken := getBootToken(t, k8s, releaseName)
-
-	// Check that it has the right policies.
-	consul := testAgent.Client()
-	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	require.Equal("global-management", tokenData.Policies[0].Name)
-
-	// Check that the agent policy was created.
-	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	found := false
-	for _, p := range policies {
-		if p.Name == "agent-token" {
-			found = true
-			break
-		}
-	}
-	require.True(found, "agent-token policy was not found")
-
-	// We should also test that the server's token was updated, however I
-	// couldn't find a way to test that with the test agent. Instead we test
-	// that in another test when we're using an httptest server instead of
-	// the test agent and we can assert that the /v1/agent/token/agent
-	// endpoint was called.
 }
 
 // Test the different flags that should create tokens and save them as
-// Kubernetes secrets.
+// Kubernetes secrets. We test using the -release-name flag vs using the
+// -resource-prefix flag.
 func TestRun_Tokens(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		Flag      string
-		TokenName string
+		TokenFlag          string
+		ResourcePrefixFlag string
+		ReleaseNameFlag    string
+		TokenName          string
+		SecretName         string
 	}{
-		"client token": {
-			"-create-client-token",
-			"client",
+		"client token -release-name": {
+			TokenFlag:          "-create-client-token",
+			ResourcePrefixFlag: "",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "client",
+			SecretName:         "release-name-consul-client-acl-token",
 		},
-		"catalog-sync token": {
-			"-create-sync-token",
-			"catalog-sync",
+		"client token -resource-prefix": {
+			TokenFlag:          "-create-client-token",
+			ResourcePrefixFlag: "my-prefix",
+			TokenName:          "client",
+			SecretName:         "my-prefix-client-acl-token",
 		},
-		"enterprise-license token": {
-			"-create-enterprise-license-token",
-			"enterprise-license",
+		"catalog-sync token -release-name": {
+			TokenFlag:          "-create-sync-token",
+			ResourcePrefixFlag: "",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "catalog-sync",
+			SecretName:         "release-name-consul-catalog-sync-acl-token",
 		},
-		"snapshot-agent token": {
-			"-create-snapshot-agent-token",
-			"client-snapshot-agent",
+		"catalog-sync token -resource-prefix": {
+			TokenFlag:          "-create-sync-token",
+			ResourcePrefixFlag: "my-prefix",
+			TokenName:          "catalog-sync",
+			SecretName:         "my-prefix-catalog-sync-acl-token",
 		},
-		"mesh-gateway token": {
-			"-create-mesh-gateway-token",
-			"mesh-gateway",
+		"enterprise-license token -release-name": {
+			TokenFlag:          "-create-enterprise-license-token",
+			ResourcePrefixFlag: "",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "enterprise-license",
+			SecretName:         "release-name-consul-enterprise-license-acl-token",
+		},
+		"enterprise-license token -resource-prefix": {
+			TokenFlag:          "-create-enterprise-license-token",
+			ResourcePrefixFlag: "my-prefix",
+			TokenName:          "enterprise-license",
+			SecretName:         "my-prefix-enterprise-license-acl-token",
+		},
+		"mesh-gateway token -release-name": {
+			TokenFlag:          "-create-mesh-gateway-token",
+			ResourcePrefixFlag: "",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "mesh-gateway",
+			SecretName:         "release-name-consul-mesh-gateway-acl-token",
+		},
+		"mesh-gateway token -resource-prefix": {
+			TokenFlag:          "-create-mesh-gateway-token",
+			ResourcePrefixFlag: "my-prefix",
+			ReleaseNameFlag:    "release-name",
+			TokenName:          "mesh-gateway",
+			SecretName:         "my-prefix-mesh-gateway-acl-token",
 		},
 	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			k8s, testAgent := completeSetup(t)
+	for testName, c := range cases {
+		t.Run(testName, func(t *testing.T) {
+			prefix := c.ResourcePrefixFlag
+			if c.ResourcePrefixFlag == "" {
+				prefix = releaseName + "-consul"
+			}
+			k8s, testAgent := completeSetup(t, prefix)
 			defer testAgent.Shutdown()
 			require := require.New(t)
 
@@ -161,16 +205,24 @@ func TestRun_Tokens(t *testing.T) {
 				clientset: k8s,
 			}
 			cmd.init()
-			responseCode := cmd.Run([]string{
-				"-release-name=" + releaseName,
+			cmdArgs := []string{
 				"-k8s-namespace=" + ns,
 				"-expected-replicas=1",
-				c.Flag,
-			})
+				c.TokenFlag,
+			}
+			if c.ResourcePrefixFlag != "" {
+				// If using the -resource-prefix flag, we expect the -server-label-selector
+				// flag to also be set.
+				labelSelector := fmt.Sprintf("release=%s,component=server,app=consul", releaseName)
+				cmdArgs = append(cmdArgs, "-resource-prefix="+c.ResourcePrefixFlag, "-server-label-selector="+labelSelector)
+			} else {
+				cmdArgs = append(cmdArgs, "-release-name="+c.ReleaseNameFlag)
+			}
+			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the client policy was created.
-			bootToken := getBootToken(t, k8s, releaseName)
+			bootToken := getBootToken(t, k8s, prefix)
 			consul := testAgent.Client()
 			policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
@@ -181,26 +233,38 @@ func TestRun_Tokens(t *testing.T) {
 					break
 				}
 			}
+			require.True(found, "%s-token policy was not found", c.TokenName)
 
 			// Test that the token was created as a Kubernetes Secret.
-			require.True(found, "%s-token policy was not found", c.TokenName)
-			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-consul-%s-acl-token", releaseName, c.TokenName), metav1.GetOptions{})
+			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
 			require.NoError(err)
 			require.NotNil(tokenSecret)
-			token, ok := tokenSecret.StringData["token"]
+			token, ok := tokenSecret.Data["token"]
 			require.True(ok)
 
 			// Test that the token has the expected policies in Consul.
-			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: token})
+			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
 			require.NoError(err)
 			require.Equal(c.TokenName+"-token", tokenData.Policies[0].Name)
+
+			// Test that if the same command is run again, it doesn't error.
+			t.Run(testName+"-retried", func(t *testing.T) {
+				ui := cli.NewMockUi()
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				cmd.init()
+				responseCode := cmd.Run(cmdArgs)
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
+			})
 		})
 	}
 }
 
 func TestRun_AllowDNS(t *testing.T) {
 	t.Parallel()
-	k8s, testAgent := completeSetup(t)
+	k8s, testAgent := completeSetup(t, resourcePrefix)
 	defer testAgent.Shutdown()
 	require := require.New(t)
 
@@ -211,16 +275,18 @@ func TestRun_AllowDNS(t *testing.T) {
 		clientset: k8s,
 	}
 	cmd.init()
-	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
+	cmdArgs := []string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-expected-replicas=1",
 		"-allow-dns",
-	})
+	}
+	responseCode := cmd.Run(cmdArgs)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Check that the dns policy was created.
-	bootToken := getBootToken(t, k8s, releaseName)
+	bootToken := getBootToken(t, k8s, resourcePrefix)
 	consul := testAgent.Client()
 	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 	require.NoError(err)
@@ -237,11 +303,23 @@ func TestRun_AllowDNS(t *testing.T) {
 	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: "anonymous"})
 	require.NoError(err)
 	require.Equal("dns-policy", tokenData.Policies[0].Name)
+
+	// Test that if the same command is re-run it doesn't error.
+	t.Run("retried", func(t *testing.T) {
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode := cmd.Run(cmdArgs)
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	})
 }
 
 func TestRun_ConnectInjectToken(t *testing.T) {
 	t.Parallel()
-	k8s, testAgent := completeSetup(t)
+	k8s, testAgent := completeSetup(t, resourcePrefix)
 	defer testAgent.Shutdown()
 	require := require.New(t)
 
@@ -250,7 +328,7 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "1.2.3.4",
 		},
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubernetes",
 		},
 	})
@@ -258,12 +336,12 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 
 	// Create ServiceAccount for the injector that the helm chart creates.
 	_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-connect-injector-authmethod-svc-account",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
 		},
 		Secrets: []v1.ObjectReference{
 			{
-				Name: releaseName + "-consul-connect-injector-authmethod-svc-accohndbv",
+				Name: resourcePrefix + "-connect-injector-authmethod-svc-accohndbv",
 			},
 		},
 	})
@@ -275,8 +353,8 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 	tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
 	require.NoError(err)
 	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-connect-injector-authmethod-svc-accohndbv",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-connect-injector-authmethod-svc-accohndbv",
 		},
 		Data: map[string][]byte{
 			"ca.crt": caCertBytes,
@@ -293,19 +371,21 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 	}
 	cmd.init()
 	bindingRuleSelector := "serviceaccount.name!=default"
-	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
+	cmdArgs := []string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-expected-replicas=1",
 		"-create-inject-token",
 		"-acl-binding-rule-selector=" + bindingRuleSelector,
-	})
+	}
+	responseCode := cmd.Run(cmdArgs)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Check that the auth method was created.
-	bootToken := getBootToken(t, k8s, releaseName)
+	bootToken := getBootToken(t, k8s, resourcePrefix)
 	consul := testAgent.Client()
-	authMethodName := releaseName + "-consul-k8s-auth-method"
+	authMethodName := resourcePrefix + "-k8s-auth-method"
 	authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
 		&api.QueryOptions{Token: bootToken})
 	require.NoError(err)
@@ -323,6 +403,18 @@ func TestRun_ConnectInjectToken(t *testing.T) {
 	require.Equal("service", string(rules[0].BindType))
 	require.Equal("${serviceaccount.name}", rules[0].BindName)
 	require.Equal(bindingRuleSelector, rules[0].Selector)
+
+	// Test that if the same command is re-run it doesn't error.
+	t.Run("retried", func(t *testing.T) {
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+		responseCode := cmd.Run(cmdArgs)
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	})
 }
 
 // Test that if the server pods aren't available at first that bootstrap
@@ -366,7 +458,8 @@ func TestRun_DelayedServerPods(t *testing.T) {
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
-			"-release-name=" + releaseName,
+			"-server-label-selector=component=server,app=consul,release=" + releaseName,
+			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
 			"-expected-replicas=1",
 		})
@@ -382,8 +475,8 @@ func TestRun_DelayedServerPods(t *testing.T) {
 
 		pods := k8s.CoreV1().Pods(ns)
 		_, err = pods.Create(&v1.Pod{
-			ObjectMeta: v12.ObjectMeta{
-				Name: releaseName + "-consul-server-0",
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourcePrefix + "-server-0",
 				Labels: map[string]string{
 					"component": "server",
 					"app":       "consul",
@@ -408,6 +501,21 @@ func TestRun_DelayedServerPods(t *testing.T) {
 			},
 		})
 		require.NoError(err)
+		_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourcePrefix + "-server",
+				Labels: map[string]string{
+					"component": "server",
+					"app":       "consul",
+					"release":   releaseName,
+				},
+			},
+			Status: appv1.StatefulSetStatus{
+				UpdateRevision:  "current",
+				CurrentRevision: "current",
+			},
+		})
+		require.NoError(err)
 	}()
 
 	// Wait for the command to exit.
@@ -419,7 +527,163 @@ func TestRun_DelayedServerPods(t *testing.T) {
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, releaseName)
+	getBootToken(t, k8s, resourcePrefix)
+
+	// Test that the expected API calls were made.
+	require.Equal([]APICall{
+		{
+			"PUT",
+			"/v1/acl/bootstrap",
+		},
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/agent",
+		},
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+	}, consulAPICalls)
+}
+
+// Test that if a deployment of the statefulset is in progress we wait.
+func TestRun_InProgressDeployment(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+
+	type APICall struct {
+		Method string
+		Path   string
+	}
+	var consulAPICalls []APICall
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		consulAPICalls = append(consulAPICalls, APICall{
+			Method: r.Method,
+			Path:   r.URL.Path,
+		})
+
+		// Send an empty JSON response with code 200 to all calls.
+		fmt.Fprintln(w, "{}")
+	}))
+	defer consulServer.Close()
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(err)
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(err)
+
+	// The pods and statefulset are created but as an in-progress deployment
+	pods := k8s.CoreV1().Pods(ns)
+	_, err = pods.Create(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server-0",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: v1.PodStatus{
+			PodIP: serverURL.Hostname(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "consul",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: int32(port),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "updated",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+
+	// Start the command before the Pod exist.
+	// Run in a goroutine so we can create the Pods asynchronously
+	done := make(chan bool)
+	var responseCode int
+	go func() {
+		responseCode = cmd.Run([]string{
+			"-server-label-selector=component=server,app=consul,release=" + releaseName,
+			"-resource-prefix=" + resourcePrefix,
+			"-k8s-namespace=" + ns,
+			"-expected-replicas=1",
+		})
+		close(done)
+	}()
+
+	// Asynchronously update the deployment status after a delay.
+	go func() {
+		// Update after a delay between 100 and 500ms.
+		// It's randomized to ensure we're not relying on specific timing.
+		delay := 100 + rand.Intn(400)
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		_, err = k8s.AppsV1().StatefulSets(ns).Update(&appv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourcePrefix + "-server",
+				Labels: map[string]string{
+					"component": "server",
+					"app":       "consul",
+					"release":   releaseName,
+				},
+			},
+			Status: appv1.StatefulSetStatus{
+				UpdateRevision:  "updated",
+				CurrentRevision: "updated",
+			},
+		})
+		require.NoError(err)
+	}()
+
+	// Wait for the command to exit.
+	select {
+	case <-done:
+		require.Equal(0, responseCode, ui.ErrorWriter.String())
+	case <-time.After(2 * time.Second):
+		require.FailNow("command did not exit after 2s")
+	}
+
+	// Test that the bootstrap kube secret is created.
+	getBootToken(t, k8s, resourcePrefix)
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -495,8 +759,8 @@ func TestRun_NoLeader(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-server-0",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server-0",
 			Labels: map[string]string{
 				"component": "server",
 				"app":       "consul",
@@ -521,6 +785,21 @@ func TestRun_NoLeader(t *testing.T) {
 		},
 	})
 	require.NoError(err)
+	// Create Consul server Statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -534,7 +813,8 @@ func TestRun_NoLeader(t *testing.T) {
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
-			"-release-name=" + releaseName,
+			"-server-label-selector=component=server,app=consul,release=" + releaseName,
+			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
 			"-expected-replicas=1",
 		})
@@ -549,7 +829,7 @@ func TestRun_NoLeader(t *testing.T) {
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, releaseName)
+	getBootToken(t, k8s, resourcePrefix)
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
@@ -562,125 +842,6 @@ func TestRun_NoLeader(t *testing.T) {
 			"PUT",
 			"/v1/acl/bootstrap",
 		},
-		{
-			"PUT",
-			"/v1/acl/bootstrap",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-		{
-			"PUT",
-			"/v1/agent/token/agent",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-	}, consulAPICalls)
-}
-
-// Test that if already bootstrapped, we continue on to next steps.
-func TestRun_AlreadyBootstrapped(t *testing.T) {
-	t.Parallel()
-	require := require.New(t)
-	k8s := fake.NewSimpleClientset()
-
-	type APICall struct {
-		Method string
-		Path   string
-	}
-	var consulAPICalls []APICall
-
-	// Start the Consul server.
-	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record all the API calls made.
-		consulAPICalls = append(consulAPICalls, APICall{
-			Method: r.Method,
-			Path:   r.URL.Path,
-		})
-
-		switch r.URL.Path {
-		// If ACLs are already bootstrapped then the bootstrap endpoint returns this error.
-		case "/v1/acl/bootstrap":
-			w.WriteHeader(403)
-			fmt.Fprintln(w, "Permission denied: rpc error making call: ACL bootstrap no longer allowed (reset index: 14)")
-		default:
-			fmt.Fprintln(w, "{}")
-		}
-	}))
-	defer consulServer.Close()
-
-	// Create the Server Pods.
-	serverURL, err := url.Parse(consulServer.URL)
-	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
-	pods := k8s.CoreV1().Pods(ns)
-	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: serverURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-
-	// Create the bootstrap secret since this should have already been created.
-	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-bootstrap-acl-token",
-		},
-		StringData: map[string]string{
-			"token": "bootstrap-token",
-		},
-	})
-	require.NoError(err)
-
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	cmd.init()
-	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
-		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-	})
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Test that the expected API calls were made.
-	require.Equal([]APICall{
 		{
 			"PUT",
 			"/v1/acl/bootstrap",
@@ -753,8 +914,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-server-0",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server-0",
 			Labels: map[string]string{
 				"component": "server",
 				"app":       "consul",
@@ -779,6 +940,22 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 		},
 	})
 	require.NoError(err)
+	// Create the server statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -788,7 +965,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	}
 	cmd.init()
 	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-expected-replicas=1",
 	})
@@ -828,8 +1006,9 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	}, consulAPICalls)
 }
 
-// Test if there is an old bootstrap Secret we update it.
-func TestRun_BootstrapTokenExists(t *testing.T) {
+// Test if there is an old bootstrap Secret we assume the servers were
+// bootstrapped already and continue on to the next step.
+func TestRun_AlreadyBootstrapped(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
@@ -862,8 +1041,8 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 	require.NoError(err)
 	pods := k8s.CoreV1().Pods(ns)
 	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-server-0",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server-0",
 			Labels: map[string]string{
 				"component": "server",
 				"app":       "consul",
@@ -888,14 +1067,30 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 		},
 	})
 	require.NoError(err)
-
-	// Create the old bootstrap secret.
-	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: v12.ObjectMeta{
-			Name: releaseName + "-consul-bootstrap-acl-token",
+	// Create the server statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
 		},
-		StringData: map[string]string{
-			"token": "old-token",
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
+
+	// Create the bootstrap secret.
+	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-bootstrap-acl-token",
+		},
+		Data: map[string][]byte{
+			"token": []byte("old-token"),
 		},
 	})
 	require.NoError(err)
@@ -908,36 +1103,22 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 	}
 	cmd.init()
 	responseCode := cmd.Run([]string{
-		"-release-name=" + releaseName,
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-expected-replicas=1",
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-	// Test that the Secret was updated.
-	secret, err := k8s.CoreV1().Secrets(ns).Get(releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+	// Test that the Secret is the same.
+	secret, err := k8s.CoreV1().Secrets(ns).Get(resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
 	require.NoError(err)
-	require.Contains(secret.StringData, "token")
-	require.NotEqual("old-token", secret.StringData["token"])
+	require.Contains(secret.Data, "token")
+	require.Equal("old-token", string(secret.Data["token"]))
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
-		{
-			"PUT",
-			"/v1/acl/bootstrap",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-		{
-			"PUT",
-			"/v1/agent/token/agent",
-		},
+		// We only expect the calls for creating client tokens.
 		{
 			"PUT",
 			"/v1/acl/policy",
@@ -949,15 +1130,220 @@ func TestRun_BootstrapTokenExists(t *testing.T) {
 	}, consulAPICalls)
 }
 
+// Test that we exit after timeout.
+func TestRun_Timeout(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	responseCode := cmd.Run([]string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-expected-replicas=1",
+		"-timeout=500ms",
+	})
+	require.Equal(1, responseCode, ui.ErrorWriter.String())
+}
+
+// Test that the bootstrapping process can make calls to Consul API over HTTPS
+// when the consul agent is configured with HTTPS only (HTTP disabled).
+func TestRun_HTTPS(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+
+	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	defer cleanup()
+
+	agentConfig := fmt.Sprintf(`
+		primary_datacenter = "dc1"
+		acl {
+			enabled = true
+		}
+		ca_file = "%s"
+		cert_file = "%s"
+		key_file = "%s"`, caFile, certFile, keyFile)
+
+	a := &agent.TestAgent{
+		Name:   t.Name(),
+		HCL:    agentConfig,
+		UseTLS: true, // this also disables HTTP port
+	}
+
+	a.Start()
+	defer a.Shutdown()
+
+	createTestK8SResources(t, k8s, a, resourcePrefix, "https")
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	responseCode := cmd.Run([]string{
+		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-use-https",
+		"-consul-tls-server-name", "server.dc1.consul",
+		"-consul-ca-cert", caFile,
+		"-expected-replicas=1",
+	})
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Test that the bootstrap token is created to make sure the bootstrapping succeeded.
+	// The presence of the bootstrap token tells us that the API calls to Consul have been successful.
+	tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+	require.NoError(err)
+	require.NotNil(tokenSecret)
+	_, ok := tokenSecret.Data["token"]
+	require.True(ok)
+}
+
+// Set up test consul agent and kubernetes cluster.
+func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAgent) {
+	k8s := fake.NewSimpleClientset()
+
+	a := agent.NewTestAgent(t, t.Name(), `
+	primary_datacenter = "dc1"
+	acl {
+		enabled = true
+	}`)
+
+	createTestK8SResources(t, k8s, a, prefix, "http")
+
+	return k8s, a
+}
+
+// Create test k8s resources (server pods and server stateful set)
+func createTestK8SResources(t *testing.T, k8s *fake.Clientset, a *agent.TestAgent, prefix, scheme string) {
+	require := require.New(t)
+	consulURL, err := url.Parse("http://" + a.HTTPAddr())
+	require.NoError(err)
+	port, err := strconv.Atoi(consulURL.Port())
+	require.NoError(err)
+
+	// Create Consul server Pod.
+	_, err = k8s.CoreV1().Pods(ns).Create(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: prefix + "-server-0",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: v1.PodStatus{
+			PodIP: consulURL.Hostname(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "consul",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          scheme,
+							ContainerPort: int32(port),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Create Consul server Statefulset.
+	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: prefix + "-server",
+			Labels: map[string]string{
+				"component": "server",
+				"app":       "consul",
+				"release":   releaseName,
+			},
+		},
+		Status: appv1.StatefulSetStatus{
+			UpdateRevision:  "current",
+			CurrentRevision: "current",
+		},
+	})
+	require.NoError(err)
+}
+
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
 // cause a test failure if the Secret doesn't exist or is malformed.
-func getBootToken(t *testing.T, k8s *fake.Clientset, releaseName string) string {
-	bootstrapSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName), metav1.GetOptions{})
+func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string) string {
+	bootstrapSecret, err := k8s.CoreV1().Secrets(ns).Get(fmt.Sprintf("%s-bootstrap-acl-token", prefix), metav1.GetOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, bootstrapSecret)
-	bootToken, ok := bootstrapSecret.StringData["token"]
+	bootToken, ok := bootstrapSecret.Data["token"]
 	require.True(t, ok)
-	return bootToken
+	return string(bootToken)
+}
+
+// generateServerCerts generates Consul CA
+// and a server certificate and saves them to temp files.
+// It returns file names in this order:
+// CA certificate, server certificate, and server key.
+// Note that it's the responsibility of the caller to
+// remove the temporary files created by this function.
+func generateServerCerts(t *testing.T) (string, string, string, func()) {
+	require := require.New(t)
+
+	caFile, err := ioutil.TempFile("", "ca")
+	require.NoError(err)
+
+	certFile, err := ioutil.TempFile("", "cert")
+	require.NoError(err)
+
+	certKeyFile, err := ioutil.TempFile("", "key")
+	require.NoError(err)
+
+	// Generate CA
+	sn, err := tlsutil.GenerateSerialNumber()
+	require.NoError(err)
+
+	s, _, err := tlsutil.GeneratePrivateKey()
+	require.NoError(err)
+
+	constraints := []string{"consul", "localhost"}
+	ca, err := tlsutil.GenerateCA(s, sn, 1, constraints)
+	require.NoError(err)
+
+	// Generate Server Cert
+	name := fmt.Sprintf("server.%s.%s", "dc1", "consul")
+	DNSNames := []string{name, "localhost"}
+	IPAddresses := []net.IP{net.ParseIP("127.0.0.1")}
+	extKeyUsage := []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+
+	sn, err = tlsutil.GenerateSerialNumber()
+	require.NoError(err)
+
+	pub, priv, err := tlsutil.GenerateCert(s, ca, sn, name, 1, DNSNames, IPAddresses, extKeyUsage)
+	require.NoError(err)
+
+	// Write certs and key to files
+	_, err = caFile.WriteString(ca)
+	require.NoError(err)
+	_, err = certFile.WriteString(pub)
+	require.NoError(err)
+	_, err = certKeyFile.WriteString(priv)
+	require.NoError(err)
+
+	cleanupFunc := func() {
+		os.Remove(caFile.Name())
+		os.Remove(certFile.Name())
+		os.Remove(certKeyFile.Name())
+	}
+	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="

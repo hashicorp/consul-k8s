@@ -46,14 +46,15 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			`/bin/sh -ec export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -61,7 +62,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
   }
 
   checks {
@@ -78,7 +79,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 0
@@ -90,7 +91,7 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-web-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -106,7 +107,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -114,7 +115,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -133,7 +134,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -150,7 +151,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "service" 
       destination_name = "db"
@@ -169,7 +170,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "service" 
       destination_name = "db"
@@ -199,7 +200,7 @@ services {
 			},
 			`proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     upstreams {
       destination_type = "prepared_query" 
       destination_name = "handle"
@@ -218,7 +219,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -227,7 +228,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -246,7 +247,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -264,7 +265,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -273,7 +274,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -292,7 +293,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -310,7 +311,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -319,7 +320,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -338,7 +339,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -357,7 +358,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -366,7 +367,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -385,7 +386,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -413,7 +414,7 @@ services {
 				return pod
 			},
 			`services {
-  id   = "${POD_NAME}-web-sidecar-proxy"
+  id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
   address = "${POD_IP}"
@@ -425,7 +426,7 @@ services {
 
   proxy {
     destination_service_name = "web"
-    destination_service_id = "web"
+    destination_service_id = "${SERVICE_ID}"
     local_service_address = "127.0.0.1"
     local_service_port = 1234
   }
@@ -444,7 +445,7 @@ services {
 }
 
 services {
-  id   = "${POD_NAME}-web"
+  id   = "${SERVICE_ID}"
   name = "web"
   address = "${POD_IP}"
   port = 1234
@@ -493,11 +494,12 @@ services {
 	}
 }
 
-func TestHandlerContainerInit_centralConfig(t *testing.T) {
+// Test that we write service-defaults config and use the default protocol.
+func TestHandlerContainerInit_writeServiceDefaultsDefaultProtocol(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		CentralConfig:   true,
-		DefaultProtocol: "grpc",
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "grpc",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -518,21 +520,69 @@ func TestHandlerContainerInit_centralConfig(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "foo"
 protocol = "grpc"
 EOF
 /bin/consul config write -cas -modify-index 0 \
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
 
 /bin/consul services register \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Copy the Consul binary
+cp /bin/consul /consul/connect-inject/consul`)
+}
+
+// Test that we write service-defaults config and use the protocol from the Pod.
+func TestHandlerContainerInit_writeServiceDefaultsPodProtocol(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "http",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService:  "foo",
+				annotationProtocol: "grpc",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
+kind = "service-defaults"
+name = "foo"
+protocol = "grpc"
+EOF
+/bin/consul config write -cas -modify-index 0 \
+  /consul/connect-inject/service-defaults.hcl || true
+
+/bin/consul services register \
+  /consul/connect-inject/service.hcl
+
+# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -574,6 +624,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 
 /bin/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
@@ -581,7 +632,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
 }
@@ -589,9 +640,9 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		AuthMethod:      "release-name-consul-k8s-auth-method",
-		CentralConfig:   true,
-		DefaultProtocol: "grpc",
+		AuthMethod:           "release-name-consul-k8s-auth-method",
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "grpc",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -619,8 +670,8 @@ func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "foo"
 protocol = "grpc"
@@ -629,9 +680,10 @@ EOF
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+chmod 444 /consul/connect-inject/acl-token
 /bin/consul config write -cas -modify-index 0 \
   -token-file="/consul/connect-inject/acl-token" \
-  /consul/connect-inject/central-config.hcl || true
+  /consul/connect-inject/service-defaults.hcl || true
 
 /bin/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
@@ -639,8 +691,85 @@ EOF
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-foo-sidecar-proxy" \
+  -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 `)
+}
+
+// If the default protocol is empty and no protocol is set on the Pod,
+// we expect no service-defaults config to be written.
+func TestHandlerContainerInit_noDefaultProtocol(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		WriteServiceDefaults: true,
+		DefaultProtocol:      "",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.NotContains(actual, `
+# Create the service-defaults config for the service
+cat <<EOF >/consul/connect-inject/service-defaults.hcl
+kind = "service-defaults"
+name = "foo"
+protocol = ""
+EOF`)
+	require.NotContains(actual, `
+/bin/consul config write -cas -modify-index 0 \
+  -token-file="/consul/connect-inject/acl-token" \
+  /consul/connect-inject/service-defaults.hcl || true`)
+}
+
+// If Consul CA cert is set,
+// Consul addresses should use HTTPS
+// and CA cert should be set as env variable
+func TestHandlerContainerInit_WithTLS(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		ConsulCACert: "consul-ca-cert",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+consul-ca-cert
+EOF`)
+	require.NotContains(actual, `
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 }
