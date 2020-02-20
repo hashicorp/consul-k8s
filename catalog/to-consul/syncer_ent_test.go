@@ -3,11 +3,12 @@
 package catalog
 
 import (
+	"testing"
+
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // Test that the syncer registers services in Consul namespaces.
