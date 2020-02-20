@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"context"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/consul/testrpc"
 	"github.com/hashicorp/go-hclog"
