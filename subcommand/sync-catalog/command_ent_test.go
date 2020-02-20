@@ -609,7 +609,7 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 			require.NoError(tt, err)
 
 			// Set up consul server
-			a, err := testutil.NewTestServerConfigT(t, func(client *testutil.TestServerConfig) {
+			a, err := testutil.NewTestServerConfigT(tt, func(client *testutil.TestServerConfig) {
 				client.ACL.Enabled = true
 			})
 			require.NoError(tt, err)
