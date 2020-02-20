@@ -79,32 +79,37 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 	// settings, the policies associated with their ACL tokens will need to be
 	// updated to be namespace aware.
 	if isPolicyExistsErr(err, policy.Name) {
-		c.Log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
+		if c.flagEnableNamespaces {
+			c.Log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
 
-		// The policy ID is required in any PolicyUpdate call, so first we need to
-		// get the existing policy to extract its ID.
-		existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
-		if err != nil {
-			return err
-		}
-
-		// Find the policy that matches our name and description
-		// and that's the ID we need
-		for _, existingPolicy := range existingPolicies {
-			if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
-				policy.ID = existingPolicy.ID
+			// The policy ID is required in any PolicyUpdate call, so first we need to
+			// get the existing policy to extract its ID.
+			existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
+			if err != nil {
+				return err
 			}
-		}
 
-		// This shouldn't happen, because we're looking for a policy
-		// only after we've hit a `Policy already exists` error.
-		if policy.ID == "" {
-			return errors.New("Unable to find existing ACL policy")
-		}
+			// Find the policy that matches our name and description
+			// and that's the ID we need
+			for _, existingPolicy := range existingPolicies {
+				if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
+					policy.ID = existingPolicy.ID
+				}
+			}
 
-		// Update the policy now that we've found its ID
-		_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
-		return err
+			// This shouldn't happen, because we're looking for a policy
+			// only after we've hit a `Policy already exists` error.
+			if policy.ID == "" {
+				return errors.New("Unable to find existing ACL policy")
+			}
+
+			// Update the policy now that we've found its ID
+			_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
+			return err
+		} else {
+			c.Log.Info(fmt.Sprintf("Policy %q already exists", policy.Name))
+			return nil
+		}
 	}
 	return err
 }
