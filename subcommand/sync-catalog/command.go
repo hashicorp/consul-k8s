@@ -241,6 +241,7 @@ func (c *Command) Run(args []string) int {
 			Client:                   c.consulClient,
 			Log:                      c.logger.Named("to-consul/sink"),
 			EnableNamespaces:         c.flagEnableNamespaces,
+			CrossNamespaceACLPolicy:  c.flagCrossNamespaceACLPolicy,
 			SyncPeriod:               syncInterval,
 			ServicePollPeriod:        syncInterval * 2,
 			ConsulK8STag:             c.flagConsulK8STag,

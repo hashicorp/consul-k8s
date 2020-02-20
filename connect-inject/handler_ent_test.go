@@ -9,6 +9,7 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
@@ -430,13 +431,13 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			})
 			require.NoError(err)
 
-			// Wait a bit for the system to stabilize and
-			// come out of legacy ACL mode
-			time.Sleep(100 * time.Millisecond)
-
 			// Bootstrap the server and get the bootstrap token
-			bootstrapResp, _, err := bootClient.ACL().Bootstrap()
-			require.NoError(err)
+			var bootstrapResp *api.ACLToken
+			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+			retry.RunWith(timer, t, func(r *retry.R) {
+				bootstrapResp, _, err = bootClient.ACL().Bootstrap()
+				require.NoError(err)
+			})
 			bootstrapToken := bootstrapResp.SecretID
 			require.NotEmpty(bootstrapToken)
 
