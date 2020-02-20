@@ -228,11 +228,11 @@ func (c *Command) Run(args []string) int {
 		// enabled we use a client that queries the older API endpoint.
 		var svcsClient catalogtoconsul.ConsulNodeServicesClient
 		if c.flagEnableNamespaces {
-			svcsClient = &catalogtoconsul.ConsulNamespacesNodeServicesClient{
+			svcsClient = &catalogtoconsul.NamespacesNodeServicesClient{
 				Client: c.consulClient,
 			}
 		} else {
-			svcsClient = &catalogtoconsul.ConsulPreNamespacesNodeServicesClient{
+			svcsClient = &catalogtoconsul.PreNamespacesNodeServicesClient{
 				Client: c.consulClient,
 			}
 		}

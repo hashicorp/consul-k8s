@@ -25,9 +25,9 @@ type ConsulNodeServicesClient interface {
 	NodeServices(tag string, nodeName string, opts api.QueryOptions) ([]ConsulService, *api.QueryMeta, error)
 }
 
-// ConsulPreNamespacesNodeServicesClient implements ConsulNodeServicesClient
+// PreNamespacesNodeServicesClient implements ConsulNodeServicesClient
 // for Consul < 1.7 which does not support namespaces.
-type ConsulPreNamespacesNodeServicesClient struct {
+type PreNamespacesNodeServicesClient struct {
 	Client *api.Client
 }
 
@@ -35,7 +35,7 @@ type ConsulPreNamespacesNodeServicesClient struct {
 // tag registered on nodeName using a Consul API that is supported in
 // Consul versions before 1.7. Consul versions after 1.7 still support
 // this API but the API is not namespace-aware.
-func (s *ConsulPreNamespacesNodeServicesClient) NodeServices(
+func (s *PreNamespacesNodeServicesClient) NodeServices(
 	tag string,
 	nodeName string,
 	opts api.QueryOptions) ([]ConsulService, *api.QueryMeta, error) {
@@ -75,9 +75,9 @@ func (s *ConsulPreNamespacesNodeServicesClient) NodeServices(
 	return svcs, meta, nil
 }
 
-// ConsulNamespacesNodeServicesClient implements ConsulNodeServicesClient
+// NamespacesNodeServicesClient implements ConsulNodeServicesClient
 // for Consul >= 1.7 which supports namespaces.
-type ConsulNamespacesNodeServicesClient struct {
+type NamespacesNodeServicesClient struct {
 	Client *api.Client
 }
 
@@ -85,7 +85,7 @@ type ConsulNamespacesNodeServicesClient struct {
 // tag registered on nodeName using a Consul API that is supported in
 // Consul versions >= 1.7. If opts.Namespace is set to
 // "*", services from all namespaces will be returned.
-func (s *ConsulNamespacesNodeServicesClient) NodeServices(
+func (s *NamespacesNodeServicesClient) NodeServices(
 	tag string,
 	nodeName string,
 	opts api.QueryOptions) ([]ConsulService, *api.QueryMeta, error) {

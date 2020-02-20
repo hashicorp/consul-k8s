@@ -11,7 +11,7 @@ import (
 )
 
 // Test the Consul 1.7 client against Consul Enterprise.
-func TestConsulNamespacesNodeServicesClient_NodeServices(t *testing.T) {
+func TestNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		ConsulServices []api.CatalogRegistration
@@ -346,7 +346,7 @@ func TestConsulNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 				require.NoError(err)
 			}
 
-			client := ConsulNamespacesNodeServicesClient{
+			client := NamespacesNodeServicesClient{
 				Client: consulClient,
 			}
 			svcs, _, err := client.NodeServices("k8s", ConsulSyncNodeName, api.QueryOptions{

@@ -222,7 +222,7 @@ func testConsulSyncerWithConfig(client *api.Client, configurator func(*ConsulSyn
 		SyncPeriod:        200 * time.Millisecond,
 		ServicePollPeriod: 50 * time.Millisecond,
 		ConsulK8STag:      TestConsulK8STag,
-		ConsulNodeServicesClient: &ConsulPreNamespacesNodeServicesClient{
+		ConsulNodeServicesClient: &PreNamespacesNodeServicesClient{
 			Client: client,
 		},
 	}

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConsulPreNamespacesNodeServicesClient_NodeServices(t *testing.T) {
+func TestPreNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		ConsulServices []api.CatalogRegistration
@@ -170,7 +170,7 @@ func TestConsulPreNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 				require.NoError(err)
 			}
 
-			client := ConsulPreNamespacesNodeServicesClient{
+			client := PreNamespacesNodeServicesClient{
 				Client: consulClient,
 			}
 			svcs, _, err := client.NodeServices("k8s", ConsulSyncNodeName, api.QueryOptions{})
