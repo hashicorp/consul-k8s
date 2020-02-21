@@ -40,6 +40,13 @@ jobs:
             fi
       - run: go vet ./...
 
+  # lint consul tests
+  lint-consul-retry:
+    executor: go
+    steps:
+      - checkout
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+
   test:
     executor: go
     environment:
@@ -120,12 +127,15 @@ workflows:
   test-and-build:
     jobs:
       - go-fmt-and-vet
+      - lint-consul-retry
       - test:
           requires:
             - go-fmt-and-vet
+            - lint-consul-retry
       - test_enterprise:
           requires:
             - go-fmt-and-vet
+            - lint-consul-retry
       - build-distros:
           requires:
             - test
