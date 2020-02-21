@@ -107,7 +107,7 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 			_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
 			return err
 		} else {
-			c.Log.Info(fmt.Sprintf("Policy %q already exists", policy.Name))
+			c.Log.Info(fmt.Sprintf("Policy %q already exists, skipping update", policy.Name))
 			return nil
 		}
 	}
