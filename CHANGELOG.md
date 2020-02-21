@@ -1,5 +1,99 @@
 ## Unreleased
 
+BREAKING CHANGES:
+
+* `consul-k8s` `v0.12.0`+ is now required. The chart is passing new flags that are only available in this version.
+  To use this version if not using the chart defaults, set
+  ```yaml
+  global:
+    imageK8S: hashicorp/consul-k8s:0.12.0
+  ```
+
+IMPROVEMENTS:
+
+* Catalog Sync
+  * New Helm values have been added to configure which Kubernetes namespaces we will sync from. The defaults are shown below:
+    ```yaml
+    syncCatalog:
+      toConsul: true
+      k8sAllowNamespaces: ["*"]
+      k8sDenyNamespaces: ["kube-system", "kube-public"]
+    ```
+  * If running Consul Enterprise 1.7.0+, Consul namespaces are supported. New Helm values have been added to allow configuring which
+    Consul namespaces Kubernetes services are synced to. See [https://www.consul.io/docs/platform/k8s/service-sync.html#consul-enterprise-namespaces](https://www.consul.io/docs/platform/k8s/service-sync.html#consul-enterprise-namespaces) for more details.
+
+    ```yaml
+    global:
+      enableConsulNamespaces: true
+    syncCatalog:
+      consulNamespaces:
+        # consulDestinationNamespace is the name of the Consul namespace to register all
+        # k8s services into. If the Consul namespace does not already exist,
+        # it will be created. This will be ignored if `mirroringK8S` is true.
+        consulDestinationNamespace: "default"
+
+        # mirroringK8S causes k8s services to be registered into a Consul namespace
+        # of the same name as their k8s namespace, optionally prefixed if
+        # `mirroringK8SPrefix` is set below. If the Consul namespace does not
+        # already exist, it will be created. Turning this on overrides the
+        # `consulDestinationNamespace` setting.
+        # `addK8SNamespaceSuffix` may no longer be needed if enabling this option.
+        mirroringK8S: false
+
+        # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
+        # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+        # service in the k8s `staging` namespace will be registered into the
+        # `k8s-staging` Consul namespace.
+        mirroringK8SPrefix: ""
+    ```
+
+* Connect Inject
+  * New Helm values have been added to configure which Kubernetes namespaces we will inject pods in. The defaults are shown below:
+    ```yaml
+    connectInject:
+      k8sAllowNamespaces: ["*"]
+      k8sDenyNamespaces: []
+    ```
+  * If running Consul Enterprise 1.7.0+, Consul namespaces are supported. New Helm values have been added to allow configuring which Consul namespaces Kubernetes pods
+    are registered into. See [https://www.consul.io/docs/platform/k8s/connect.html#consul-enterprise-namespaces](https://www.consul.io/docs/platform/k8s/connect.html#consul-enterprise-namespaces) for more details.
+    ```yaml
+    global:
+      enableConsulNamespaces: true
+
+    connectInject:
+      consulNamespaces:
+        # consulDestinationNamespace is the name of the Consul namespace to register all
+        # k8s pods into. If the Consul namespace does not already exist,
+        # it will be created. This will be ignored if `mirroringK8S` is true.
+        consulDestinationNamespace: "default"
+
+        # mirroringK8S causes k8s pods to be registered into a Consul namespace
+        # of the same name as their k8s namespace, optionally prefixed if
+        # `mirroringK8SPrefix` is set below. If the Consul namespace does not
+        # already exist, it will be created. Turning this on overrides the
+        # `consulDestinationNamespace` setting.
+        mirroringK8S: false
+
+        # If `mirroringK8S` is set to true, `mirroringK8SPrefix` allows each Consul namespace
+        # to be given a prefix. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+        # pod in the k8s `staging` namespace will be registered into the
+        # `k8s-staging` Consul namespace.
+        mirroringK8SPrefix: ""
+    ```
+
+BUG FIXES:
+
+* Fix template rendering bug when setting `connectInject.overrideAuthMethodName` [[GH-342](https://github.com/hashicorp/consul-helm/pull/342)]
+* Set `"consul.hashicorp.com/connect-inject": "false"` annotation on enterprise license job so it is not connect injected [[GH-343](https://github.com/hashicorp/consul-helm/pull/343)]
+
+DEPRECATIONS:
+
+* `.syncCatalog.k8sSourceNamespace` should no longer be used. Instead, use the new `.syncCatalog.k8sAllowNamespaces` and `.syncCatalog.k8sDenyNamespaces` features. For backward compatibility, if both this and the allow/deny lists are set, the allow/deny lists will be ignored.
+
+NOTES:
+
+* Bootstrap ACLs: Previously, ACL policies were not updated after creation. Now, if namespaces are enabled, they are updated every time the ACL bootstrapper is run so that any namespace config changes can be adjusted. This change is only an issue if you are updating ACL policies after creation.
+
 ## 0.16.2 (Jan 15, 2020)
 
 BUG FIXES:
