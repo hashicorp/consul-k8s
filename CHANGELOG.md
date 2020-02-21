@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.12.0 (February 21, 2020)
 
 BREAKING CHANGES:
 
