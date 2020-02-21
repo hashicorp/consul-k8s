@@ -82,9 +82,9 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
 		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", connectinject.DefaultConsulImage,
-		"Docker image for Consul. Defaults to Consul 1.7.0.")
+		"Docker image for Consul. Defaults to consul:1.7.1.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
-		"Docker image for Envoy. Defaults to Envoy 1.9.1.")
+		"Docker image for Envoy. Defaults to envoyproxy/envoy-alpine:v1.13.0.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",

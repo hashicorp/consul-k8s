@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	DefaultConsulImage = "consul:1.7.0"
+	DefaultConsulImage = "consul:1.7.1"
 	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.13.0"
 )
 
