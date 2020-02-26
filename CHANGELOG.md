@@ -1,5 +1,48 @@
 ## UNRELEASED
 
+## 0.12.0 (February 21, 2020)
+
+BREAKING CHANGES:
+
+* Connect Injector
+  * Previously the injector would inject sidecars into pods in all namespaces. New flags `-allow-k8s-namespace` and `-deny-k8s-namespace` have been added. If no `-allow-k8s-namespace` flag is specified, the injector **will not inject sidecars into pods in any namespace**. To maintain the previous behavior, set `-allow-k8s-namespace='*'`.
+* Catalog Sync
+  * `kube-system` and `kube-public` namespaces are now synced from **unless** `-deny-k8s-namespace=kube-system -deny-k8s-namespace=kube-public` are passed to the `sync-catalog` command.
+  * Previously, multiple sync processes could be run in the same Kubernetes cluster with different source Kubernetes namespaces and the same `-consul-k8s-tag`. This is no longer possible.
+  The sync processes will now delete one-another's registrations. To continue running multiple sync processes, each process must be passed a different `-consul-k8s-tag` flag.
+  * Previously, catalog sync would delete services tagged with `-consul-k8s-tag` (defaults to `k8s`) that were registered out-of-band, i.e. not by the sync process itself. It would delete services regardless of which node they were registered on.
+  Now the sync process will only delete those services not registered by itself if they are on the `k8s-sync` node (the synthetic node created by the catalog sync process).
+
+* Connect and Mesh Gateways: Consul 1.7+ now requires that we pass `-envoy-version` flag if using a version other than the default (1.13.0) so that it can generate correct bootstrap configuration. This is not yet supported in the Helm chart and consul-k8s, and as such, we require Envoy version 1.13.0.
+
+IMPROVEMENTS:
+
+* Support [**Consul namespaces [Enterprise feature]**](https://www.consul.io/docs/enterprise/namespaces/index.html) in all consul-k8s components [[GH-197](https://github.com/hashicorp/consul-k8s/pull/197)]
+* Create allow and deny lists of k8s namespaces for catalog sync and Connect inject
+* Connect Inject
+  * Changes default Consul Docker image (`-consul-image`) to `consul:1.7.1`
+  * Changes default Envoy Docker image (`-envoy-image`) to `envoyproxy/envoy-alpine:v1.13.0`
+
+BUG FIXES:
+
+* Bootstrap ACLs: Allow users to update their Connect ACL binding rule definition on upgrade
+* Bootstrap ACLs: Fixes mesh gateway ACL policies to have the correct permissions
+* Sync: Fixes a hot loop bug when getting an error from Consul when retrieving service information [[GH-204](https://github.com/hashicorp/consul-k8s/pull/204)]
+
+DEPRECATIONS:
+* `connect-inject` flag `-create-inject-token` is deprecated in favor of new flag `-create-inject-auth-method`
+
+NOTES:
+
+* Bootstrap ACLs: Previously, ACL policies were not updated after creation. Now, if namespaces are enabled, they are updated every time the ACL bootstrapper is run so that any namespace config changes can be adjusted. This change is only an issue if you are updating ACL policies after creation.
+
+* Connect: Adds additional parsing of the upstream annotation to support namespaces. The format of the annotation becomes:
+
+    `service_name.optional_namespace:port:optional_datacenter`
+
+  The `service_name.namespace` is only parsed if namespaces are enabled. If they are not enabled and someone has added a `.namespace`, the upstream will not work correctly, as is the case when someone has put in an incorrect service name, port or datacenter. If namespaces are enabled and the `.namespace` is not defined, Consul will automatically fallback to assuming the service is in the same namespace as the service defining the upstream.
+
+
 ## 0.11.0 (January 10, 2020)
 
 Improvements:

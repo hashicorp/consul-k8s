@@ -26,6 +26,8 @@ type Command struct {
 	flagSet           *flag.FlagSet
 	flagLogLevel      string
 
+	consulCommand []string
+
 	once  sync.Once
 	help  string
 	sigCh chan os.Signal
@@ -58,29 +60,29 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	syncPeriod, logLevel, err := c.validateFlags()
+	err := c.validateFlags()
 	if err != nil {
 		c.UI.Error("Error: " + err.Error())
 		return 1
 	}
 
 	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  logLevel,
+		Level:  hclog.LevelFromString(c.flagLogLevel),
 		Output: os.Stderr,
 	})
 
 	// Log initial configuration
 	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
 		"consul-binary", c.flagConsulBinary,
-		"sync-period", syncPeriod,
-		"log-level", logLevel)
+		"sync-period", c.flagSyncPeriod,
+		"log-level", c.flagLogLevel)
 
 	// Set up channel for graceful SIGINT shutdown.
 	signal.Notify(c.sigCh, os.Interrupt)
 
-	consulCommand := []string{"services", "register"}
-	consulCommand = append(consulCommand, c.parseConsulFlags()...)
-	consulCommand = append(consulCommand, c.flagServiceConfig)
+	c.consulCommand = []string{"services", "register"}
+	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
+	c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
 
 	// The main work loop. We continually re-register our service every
 	// syncPeriod. Consul is smart enough to know when the service hasn't changed
@@ -90,7 +92,7 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		cmd := exec.Command(c.flagConsulBinary, consulCommand...)
+		cmd := exec.Command(c.flagConsulBinary, c.consulCommand...)
 
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
@@ -102,7 +104,7 @@ func (c *Command) Run(args []string) int {
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
 		select {
-		case <-time.After(syncPeriod):
+		case <-time.After(c.flagSyncPeriod):
 			continue
 		case <-c.sigCh:
 			log.Info("SIGINT received, shutting down")
@@ -111,34 +113,36 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
-// validateFlags validates the flags and returns the parsed syncPeriod and
-// logLevel.
-func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Level, err error) {
+// validateFlags validates the flags and returns the logLevel.
+func (c *Command) validateFlags() error {
 	if c.flagServiceConfig == "" {
-		err = errors.New("-service-config must be set")
-		return
+		return errors.New("-service-config must be set")
 	}
 	if c.flagConsulBinary == "" {
-		err = errors.New("-consul-binary must be set")
-		return
+		return errors.New("-consul-binary must be set")
+	}
+	if c.flagSyncPeriod == 0 {
+		// if sync period is 0, then the select loop will
+		// always pick the first case, and it'll be impossible
+		// to terminate the command gracefully with SIGINT.
+		return errors.New("-sync-period must be greater than 0")
 	}
 
-	_, err = os.Stat(c.flagServiceConfig)
+	_, err := os.Stat(c.flagServiceConfig)
 	if os.IsNotExist(err) {
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
-		return
+		return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
 	}
 	_, err = exec.LookPath(c.flagConsulBinary)
 	if err != nil {
-		err = fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
-		return
+		return fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
 	}
-	logLevel = hclog.LevelFromString(c.flagLogLevel)
+	logLevel := hclog.LevelFromString(c.flagLogLevel)
 	if logLevel == hclog.NoLevel {
-		err = fmt.Errorf("unknown log level: %s", c.flagLogLevel)
-		return
+		return fmt.Errorf("unknown log level: %s", c.flagLogLevel)
 	}
-	return
+
+	return nil
 }
 
 // parseConsulFlags creates Consul client command flags

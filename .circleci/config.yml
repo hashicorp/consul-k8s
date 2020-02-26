@@ -6,7 +6,8 @@ executors:
       - image: circleci/golang:1.13
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      - CONSUL_VERSION: 1.6.3 # this can be OSS or enterprise, e.g., 1.7.0+ent-beta4
+      - CONSUL_VERSION: 1.7.0 # Consul's OSS version to use in tests
+      - CONSUL_ENT_VERSION: 1.7.0+ent # Consul's enterprise version to use in tests
 
 jobs:
   go-fmt-and-vet:
@@ -39,6 +40,13 @@ jobs:
             fi
       - run: go vet ./...
 
+  # lint consul tests
+  lint-consul-retry:
+    executor: go
+    steps:
+      - checkout
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+
   test:
     executor: go
     environment:
@@ -62,6 +70,34 @@ jobs:
           PACKAGE_NAMES=$(go list ./...)
           gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  test_enterprise:
+    executor: go
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+
+      # run go tests with gotestsum
+      - run: |
+          # download and install the consul binary
+          wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
+               unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+               rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
+      - run: |
+          PACKAGE_NAMES=$(go list ./...)
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -91,9 +127,16 @@ workflows:
   test-and-build:
     jobs:
       - go-fmt-and-vet
+      - lint-consul-retry
       - test:
           requires:
             - go-fmt-and-vet
+            - lint-consul-retry
+      - test_enterprise:
+          requires:
+            - go-fmt-and-vet
+            - lint-consul-retry
       - build-distros:
           requires:
             - test
+            - test_enterprise

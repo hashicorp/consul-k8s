@@ -1,4 +1,4 @@
-package subcommand
+package connectinject
 
 import (
 	"context"
@@ -13,8 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -23,23 +25,44 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type arrayFlags []string
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 type Command struct {
 	UI cli.Ui
 
-	flagListen          string
-	flagAutoName        string // MutatingWebhookConfiguration for updating
-	flagAutoHosts       string // SANs for the auto-generated TLS cert.
-	flagCertFile        string // TLS cert for listening (PEM)
-	flagKeyFile         string // TLS cert private key (PEM)
-	flagDefaultInject   bool   // True to inject by default
-	flagConsulImage     string // Docker image for Consul
-	flagEnvoyImage      string // Docker image for Envoy
-	flagConsulK8sImage  string // Docker image for consul-k8s
-	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
-	flagCentralConfig   bool   // True to enable central config injection
-	flagDefaultProtocol string // Default protocol for use with central config
-	flagConsulCACert    string // Path to CA Certificate to use when communicating with Consul clients
-	flagSet             *flag.FlagSet
+	flagListen               string
+	flagAutoName             string // MutatingWebhookConfiguration for updating
+	flagAutoHosts            string // SANs for the auto-generated TLS cert.
+	flagCertFile             string // TLS cert for listening (PEM)
+	flagKeyFile              string // TLS cert private key (PEM)
+	flagDefaultInject        bool   // True to inject by default
+	flagConsulImage          string // Docker image for Consul
+	flagEnvoyImage           string // Docker image for Envoy
+	flagConsulK8sImage       string // Docker image for consul-k8s
+	flagACLAuthMethod        string // Auth Method to use for ACLs, if enabled
+	flagWriteServiceDefaults bool   // True to enable central config injection
+	flagDefaultProtocol      string // Default protocol for use with central config
+	flagConsulCACert         string // Path to CA Certificate to use when communicating with Consul clients
+
+	// Flags to support namespaces
+	flagEnableNamespaces           bool     // Use namespacing on all components
+	flagConsulDestinationNamespace string   // Consul namespace to register everything if not mirroring
+	flagAllowK8sNamespacesList     []string // K8s namespaces to explicitly inject
+	flagDenyK8sNamespacesList      []string // K8s namespaces to deny injection (has precedence)
+	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
+	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
+	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
+
+	flagSet *flag.FlagSet
+	http    *flags.HTTPFlags
+
+	consulClient *api.Client
+	clientset    *kubernetes.Clientset
 
 	once sync.Once
 	help string
@@ -48,8 +71,8 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
+	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
 	c.flagSet.StringVar(&c.flagAutoName, "tls-auto", "",
 		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
 	c.flagSet.StringVar(&c.flagAutoHosts, "tls-auto-hosts", "",
@@ -59,19 +82,40 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
 		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", connectinject.DefaultConsulImage,
-		"Docker image for Consul. Defaults to an Consul 1.3.0.")
+		"Docker image for Consul. Defaults to consul:1.7.1.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
-		"Docker image for Envoy. Defaults to Envoy 1.8.0.")
+		"Docker image for Envoy. Defaults to envoyproxy/envoy-alpine:v1.13.0.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
-	c.flagSet.BoolVar(&c.flagCentralConfig, "enable-central-config", false,
+	c.flagSet.BoolVar(&c.flagWriteServiceDefaults, "enable-central-config", false,
 		"Write a service-defaults config for every Connect service using protocol from -default-protocol or Pod annotation.")
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to CA certificate to use if communicating with Consul clients over HTTPS.")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
+		"K8s namespaces to explicitly allow. May be specified multiple times.")
+	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
+		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
+	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
+	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
+		"[Enterprise Only] Defines which Consul namespace to register all injected services into. If '-enable-namespace-mirroring' "+
+			"is true, this is not used.")
+	c.flagSet.BoolVar(&c.flagEnableK8SNSMirroring, "enable-k8s-namespace-mirroring", false, "[Enterprise Only] Enables "+
+		"k8s namespace mirroring")
+	c.flagSet.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
+		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
+		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
+			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+
+	c.http = &flags.HTTPFlags{}
+	flags.Merge(c.flagSet, c.http.ClientFlags())
+	flags.Merge(c.flagSet, c.http.ServerFlags())
+
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -88,15 +132,27 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// We must have an in-cluster K8S client
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error loading in-cluster K8S config: %s", err))
-		return 1
+	if c.clientset == nil {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error loading in-cluster K8S config: %s", err))
+			return 1
+		}
+		c.clientset, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error creating K8S client: %s", err))
+			return 1
+		}
 	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error creating K8S client: %s", err))
-		return 1
+
+	// Set up Consul client
+	if c.consulClient == nil {
+		var err error
+		c.consulClient, err = c.http.APIClient()
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
+			return 1
+		}
 	}
 
 	// Determine where to source the certificates from
@@ -119,7 +175,17 @@ func (c *Command) Run(args []string) int {
 	go certNotify.Start(context.Background())
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	go c.certWatcher(ctx, certCh, clientset)
+	go c.certWatcher(ctx, certCh, c.clientset)
+
+	// Convert allow/deny lists to sets
+	allowSet := mapset.NewSet()
+	denySet := mapset.NewSet()
+	for _, allow := range c.flagAllowK8sNamespacesList {
+		allowSet.Add(allow)
+	}
+	for _, deny := range c.flagDenyK8sNamespacesList {
+		denySet.Add(deny)
+	}
 
 	var consulCACert []byte
 	if c.flagConsulCACert != "" {
@@ -133,15 +199,23 @@ func (c *Command) Run(args []string) int {
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ImageConsul:          c.flagConsulImage,
-		ImageEnvoy:           c.flagEnvoyImage,
-		ImageConsulK8S:       c.flagConsulK8sImage,
-		RequireAnnotation:    !c.flagDefaultInject,
-		AuthMethod:           c.flagACLAuthMethod,
-		WriteServiceDefaults: c.flagCentralConfig,
-		DefaultProtocol:      c.flagDefaultProtocol,
-		ConsulCACert:         string(consulCACert),
-		Log:                  hclog.Default().Named("handler"),
+		ConsulClient:               c.consulClient,
+		ImageConsul:                c.flagConsulImage,
+		ImageEnvoy:                 c.flagEnvoyImage,
+		ImageConsulK8S:             c.flagConsulK8sImage,
+		RequireAnnotation:          !c.flagDefaultInject,
+		AuthMethod:                 c.flagACLAuthMethod,
+		WriteServiceDefaults:       c.flagWriteServiceDefaults,
+		DefaultProtocol:            c.flagDefaultProtocol,
+		ConsulCACert:               string(consulCACert),
+		EnableNamespaces:           c.flagEnableNamespaces,
+		AllowK8sNamespacesSet:      allowSet,
+		DenyK8sNamespacesSet:       denySet,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+		Log:                        hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
