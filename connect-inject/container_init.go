@@ -67,7 +67,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
-		ServiceCheck:         pod.Annotations[annotationCheck],
+		ServiceCheck:              pod.Annotations[annotationCheck],
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
