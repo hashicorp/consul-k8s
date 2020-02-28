@@ -22,17 +22,23 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags          *flag.FlagSet
-	k8s            *k8sflags.K8SFlags
-	flagSecretName string
-	flagInitType   string
-	flagNamespace  string
-	flagACLDir     string
+	flags             *flag.FlagSet
+	k8s               *k8sflags.K8SFlags
+	flagSecretName    string
+	flagInitType      string
+	flagACLDownPolicy string
+	flagNamespace     string
+	flagACLDir        string
 
 	k8sClient *kubernetes.Clientset
 
 	once sync.Once
 	help string
+}
+
+type TemplatePayload struct {
+	Secret        string
+	ACLDownPolicy string
 }
 
 func (c *Command) init() {
@@ -41,6 +47,8 @@ func (c *Command) init() {
 		"Name of secret to watch for an ACL token")
 	c.flags.StringVar(&c.flagInitType, "init-type", "",
 		"ACL init target, valid values are `client` and `sync`")
+	c.flags.StringVar(&c.flagACLDownPolicy, "acl-down-policy", "extend-cache",
+		"ACL down-policy, valid values are `allow`, `deny`, `extend-cache` or `async-cache`")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.StringVar(&c.flagACLDir, "acl-dir", "/consul/aclconfig",
@@ -92,8 +100,10 @@ func (c *Command) Run(args []string) int {
 		// Construct extra client config json with acl details
 		// This will be mounted as a volume for the client to use
 		var buf bytes.Buffer
+		payload := TemplatePayload{secret, c.flagACLDownPolicy}
+
 		tpl := template.Must(template.New("root").Parse(strings.TrimSpace(clientACLConfigTpl)))
-		err = tpl.Execute(&buf, secret)
+		err = tpl.Execute(&buf, payload)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error creating template: %s", err))
 			return 1
@@ -140,9 +150,9 @@ const clientACLConfigTpl = `
   "acl": {
     "enabled": true,
     "default_policy": "deny",
-    "down_policy": "extend-cache",
+    "down_policy": "{{ .ACLDownPolicy }}",
     "tokens": {
-      "agent": "{{ . }}"
+      "agent": "{{ .Secret }}"
     }
   }
 }
