@@ -67,9 +67,25 @@ spec:
             {{- end}}
           command:
             - "/bin/sh"
-            - "-ec"
+            - "-c"
             - |
-              consul license put "${ENTERPRISE_LICENSE}"
+                # Create a script that we can execute with the timeout command.
+                cat > apply-license.sh << 'EOF'
+                #!/bin/sh
+                while true; do
+                  echo "Applying license..."
+                  if consul license put "${ENTERPRISE_LICENSE}"; then
+                    echo "License applied successfully"
+                    break
+                  fi
+                  echo "Retrying in 2s..."
+                  sleep 2
+                done
+                EOF
+                chmod +x ./apply-license.sh
+
+                # Time out after 20 minutes.
+                timeout -t 1200 ./apply-license.sh
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
             - name: tls-ca-cert
