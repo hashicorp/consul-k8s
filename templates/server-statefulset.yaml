@@ -110,6 +110,13 @@ spec:
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
+            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+            - name: ACL_REPLICATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.replicationToken.secretName | quote }}
+                  key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
@@ -153,6 +160,9 @@ spec:
                 {{- end }}
                 {{- if .Values.global.federation.enabled }}
                 -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
+                {{- end }}
+                {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
                 {{- end }}
                 {{- if .Values.ui.enabled }}
                 -ui \
