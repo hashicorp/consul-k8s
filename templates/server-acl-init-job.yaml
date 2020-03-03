@@ -32,18 +32,28 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
-      {{- if .Values.global.tls.enabled }}
+      {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey)) }}
       volumes:
-      - name: consul-ca-cert
-        secret:
-          {{- if .Values.global.tls.caCert.secretName }}
-          secretName: {{ .Values.global.tls.caCert.secretName }}
-          {{- else }}
-          secretName: {{ template "consul.fullname" . }}-ca-cert
-          {{- end }}
-          items:
-          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-            path: tls.crt
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+        {{- end }}
+        {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+        - name: acl-replication-token
+          secret:
+            secretName: {{ .Values.global.acls.replicationToken.secretName }}
+            items:
+              - key: {{ .Values.global.acls.replicationToken.secretKey }}
+                path: acl-replication-token
+        {{- end }}
       {{- end }}
       containers:
         - name: post-install-job
@@ -53,11 +63,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if .Values.global.tls.enabled }}
+          {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey)) }}
           volumeMounts:
+            {{- if .Values.global.tls.enabled }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
+            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+            - name: acl-replication-token
+              mountPath: /consul/acl/tokens
+              readOnly: true
+            {{- end }}
            {{- end }}
           command:
             - "/bin/sh"
@@ -95,6 +112,12 @@ spec:
                 {{- end }}
                 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
                 -create-client-token=false \
+                {{- end }}
+                {{- if .Values.global.acls.createReplicationToken }}
+                -create-acl-replication-token=true \
+                {{- end }}
+                {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                -acl-replication-token-file=/consul/acl/tokens/acl-replication-token \
                 {{- end }}
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \
