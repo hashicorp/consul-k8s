@@ -47,7 +47,7 @@ type Command struct {
 	flagACLAuthMethod        string // Auth Method to use for ACLs, if enabled
 	flagWriteServiceDefaults bool   // True to enable central config injection
 	flagDefaultProtocol      string // Default protocol for use with central config
-	flagConsulCACert         string // Path to CA Certificate to use when communicating with Consul clients
+	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -62,7 +62,7 @@ type Command struct {
 	http    *flags.HTTPFlags
 
 	consulClient *api.Client
-	clientset    *kubernetes.Clientset
+	clientset    kubernetes.Interface
 
 	once sync.Once
 	help string
@@ -94,7 +94,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultProtocol, "default-protocol", "",
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
-		"Path to CA certificate to use if communicating with Consul clients over HTTPS.")
+		"[Deprecated] Please use '-ca-file' flag instead. Path to CA certificate to use if communicating with Consul clients over HTTPS.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -145,10 +145,28 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// create Consul API config object
+	cfg := api.DefaultConfig()
+	c.http.MergeOntoConfig(cfg)
+	if cfg.TLSConfig.CAFile == "" && c.flagConsulCACert != "" {
+		cfg.TLSConfig.CAFile = c.flagConsulCACert
+	}
+
+	// load CA file contents
+	var consulCACert []byte
+	if cfg.TLSConfig.CAFile != "" {
+		var err error
+		consulCACert, err = ioutil.ReadFile(cfg.TLSConfig.CAFile)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
+			return 1
+		}
+	}
+
 	// Set up Consul client
 	if c.consulClient == nil {
 		var err error
-		c.consulClient, err = c.http.APIClient()
+		c.consulClient, err = api.NewClient(cfg)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 			return 1
@@ -185,16 +203,6 @@ func (c *Command) Run(args []string) int {
 	}
 	for _, deny := range c.flagDenyK8sNamespacesList {
 		denySet.Add(deny)
-	}
-
-	var consulCACert []byte
-	if c.flagConsulCACert != "" {
-		var err error
-		consulCACert, err = ioutil.ReadFile(c.flagConsulCACert)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file %s: %s", c.flagConsulCACert, err))
-			return 1
-		}
 	}
 
 	// Build the HTTP handler and server
@@ -252,7 +260,7 @@ func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	return certRaw.(*tls.Certificate), nil
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset *kubernetes.Clientset) {
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset kubernetes.Interface) {
 	var bundle cert.Bundle
 	for {
 		select {
@@ -282,7 +290,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			// The CA Bundle value must be base64 encoded
 			value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
-			_, err := clientset.Admissionregistration().
+			_, err := clientset.AdmissionregistrationV1beta1().
 				MutatingWebhookConfigurations().
 				Patch(c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
 					`[{
