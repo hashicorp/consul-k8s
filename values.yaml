@@ -112,6 +112,33 @@ global:
     # clients and servers and only accept HTTPS connections.
     httpsOnly: true
 
+    # caCert is a Kubernetes secret containing the certificate
+    # of the CA to use for TLS communication within the Consul cluster.
+    # If you have generated the CA yourself with the consul CLI,
+    # you could use the following command to create the secret in Kubernetes:
+    #
+    #   kubectl create secret generic consul-ca-cert \
+    #           --from-file='tls.crt=./consul-agent-ca.pem'
+    caCert:
+      secretName: null
+      secretKey: null
+
+    # caKey is a Kubernetes secret containing the private key
+    # of the CA to use for TLS communications within the Consul cluster.
+    # If you have generated the CA yourself with the consul CLI,
+    # you could use the following command to create the secret in Kubernetes:
+    #
+    #   kubectl create secret generic consul-ca-key \
+    #           --from-file='tls.key=./consul-agent-ca-key.pem'
+    #
+    # Note that we need the CA key so that we can generate server and client certificates.
+    # It is particularly important for the client certificates since they need to have host IPs
+    # as Subject Alternative Names. In the future, we may support bringing your own server
+    # certificates.
+    caKey:
+      secretName: null
+      secretKey: null
+
   # [Enterprise Only] enableConsulNamespaces indicates that you are running
   # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would like to
   # make use of configuration beyond registering everything into the `default` Consul
@@ -202,7 +229,7 @@ server:
   # in a PodSpec.
   tolerations: ""
 
-  # nodeSelector labels for server pod assignment, formatted as a muli-line string.
+  # nodeSelector labels for server pod assignment, formatted as a multi-line string.
   # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
   # Example:
   # nodeSelector: |
@@ -218,7 +245,7 @@ server:
   # the annotations to apply to the server pods
   annotations: null
 
-  # extraEnvVars is a list of extra enviroment variables to set with the stateful set. These could be
+  # extraEnvVars is a list of extra environment variables to set with the stateful set. These could be
   # used to include proxy settings required for cloud auto-join feature,
   # in case kubernetes cluster is behind egress http proxies. Additionally, it could be used to configure
   # custom consul parameters.
@@ -311,7 +338,7 @@ client:
   # the annotations to apply to the client pods
   annotations: null
 
-  # extraEnvVars is a list of extra enviroment variables to set with the pod. These could be
+  # extraEnvVars is a list of extra environment variables to set with the pod. These could be
   # used to include proxy settings required for cloud auto-join feature,
   # in case kubernetes cluster is behind egress http proxies. Additionally, it could be used to configure
   # custom consul parameters.
@@ -333,7 +360,7 @@ client:
   #    type: RollingUpdate
   updateStrategy: null
 
-  # snaphotAgent contains settings for setting up and running snapshot agents
+  # snapshotAgent contains settings for setting up and running snapshot agents
   # within the Consul clusters. They are required to be co-located with Consul
   # clients, so will inherit the clients' nodeSelector, tolerations and affinity.
   # This is an Enterprise feature only.
@@ -635,7 +662,7 @@ connectInject:
     certName: tls.crt
     keyName: tls.key
 
-  # nodeSelector labels for connectInject pod assignment, formatted as a muli-line string.
+  # nodeSelector labels for connectInject pod assignment, formatted as a multi-line string.
   # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
   # Example:
   # nodeSelector: |

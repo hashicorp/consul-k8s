@@ -430,7 +430,7 @@ load _helpers
       -x templates/client-daemonset.yaml  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "tls-ca-cert")' | tee /dev/stderr)
+      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
@@ -611,6 +611,36 @@ load _helpers
 
   actual=$(echo $command | jq -r '. | contains("verify_server_hostname = true")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: can overwrite CA secret with the provided one" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo-ca-cert' \
+      --set 'global.tls.caCert.secretKey=key' \
+      --set 'global.tls.caKey.secretName=foo-ca-key' \
+      --set 'global.tls.caKey.secretKey=key' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec' | tee /dev/stderr)
+
+  # check that the provided ca cert secret is attached as a volume
+  local actual
+  actual=$(echo $spec | jq -r '.volumes[] | select(.name=="consul-ca-cert") | .secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo-ca-cert" ]
+
+  # check that the provided ca key secret is attached as volume
+  actual=$(echo $spec | jq -r '.volumes[] | select(.name=="consul-ca-key") | .secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo-ca-key" ]
+
+  # check that the volumes pulls the provided secret keys as a CA cert
+  actual=$(echo $spec | jq -r '.volumes[] | select(.name=="consul-ca-cert") | .secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = "key" ]
+
+  # check that the volumes pulls the provided secret keys as a CA key
+  actual=$(echo $spec | jq -r '.volumes[] | select(.name=="consul-ca-key") | .secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = "key" ]
 }
 
 #--------------------------------------------------------------------

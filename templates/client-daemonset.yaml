@@ -68,12 +68,26 @@ spec:
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
         {{- if .Values.global.tls.enabled }}
-        - name: tls-ca-cert
+        - name: consul-ca-cert
           secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
             secretName: {{ template "consul.fullname" . }}-ca-cert
-        - name: tls-ca-key
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+        - name: consul-ca-key
           secret:
+            {{- if .Values.global.tls.caKey.secretName }}
+            secretName: {{ .Values.global.tls.caKey.secretName }}
+            {{- else }}
             secretName: {{ template "consul.fullname" . }}-ca-key
+            {{- end }}
+            items:
+            - key: {{ default "tls.key" .Values.global.tls.caKey.secretKey }}
+              path: tls.key
         - name: tls-client-cert
           emptyDir:
             # We're using tmpfs here so that
@@ -191,7 +205,7 @@ spec:
             - name: config
               mountPath: /consul/config
             {{- if .Values.global.tls.enabled }}
-            - name: tls-ca-cert
+            - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
             - name: tls-client-cert
@@ -304,10 +318,10 @@ spec:
         volumeMounts:
           - name: tls-client-cert
             mountPath: /consul/tls/client
-          - name: tls-ca-cert
+          - name: consul-ca-cert
             mountPath: /consul/tls/ca/cert
             readOnly: true
-          - name: tls-ca-key
+          - name: consul-ca-key
             mountPath: /consul/tls/ca/key
             readOnly: true
       {{- end }}

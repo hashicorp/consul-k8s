@@ -34,9 +34,16 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
       {{- if .Values.global.tls.enabled }}
       volumes:
-      - name: tls-ca-cert
+      - name: consul-ca-cert
         secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
           secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+            path: tls.crt
       {{- end }}
       containers:
         - name: post-install-job
@@ -48,7 +55,7 @@ spec:
                   fieldPath: metadata.namespace
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
-            - name: tls-ca-cert
+            - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
            {{- end }}
