@@ -54,7 +54,14 @@ spec:
         {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
             secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
         {{- end }}
       {{- end }}
       containers:

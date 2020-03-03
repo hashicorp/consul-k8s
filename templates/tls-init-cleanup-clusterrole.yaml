@@ -15,8 +15,10 @@ rules:
   resources:
     - secrets
   resourceNames:
+    {{- if (not (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName)) }}
     - {{ template "consul.fullname" . }}-ca-cert
     - {{ template "consul.fullname" . }}-ca-key
+    {{- end }}
     - {{ template "consul.fullname" . }}-server-cert
   verbs:
     - delete

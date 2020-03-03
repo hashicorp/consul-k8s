@@ -59,9 +59,16 @@ spec:
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
         {{- if .Values.global.tls.enabled }}
-        - name: tls-ca-cert
+        - name: consul-ca-cert
           secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
             secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
         - name: tls-server-cert
           secret:
             secretName: {{ template "consul.fullname" . }}-server-cert
@@ -157,7 +164,7 @@ spec:
             - name: config
               mountPath: /consul/config
             {{- if .Values.global.tls.enabled }}
-            - name: tls-ca-cert
+            - name: consul-ca-cert
               mountPath: /consul/tls/ca/
               readOnly: true
             - name: tls-server-cert

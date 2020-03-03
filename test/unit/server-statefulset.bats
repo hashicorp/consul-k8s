@@ -469,7 +469,7 @@ load _helpers
       -x templates/server-statefulset.yaml  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[] | select(.name == "tls-ca-cert")' | tee /dev/stderr)
+      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
@@ -489,7 +489,7 @@ load _helpers
       -x templates/server-statefulset.yaml  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "tls-ca-cert")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
 }
 
@@ -624,7 +624,7 @@ load _helpers
 @test "server/StatefulSet: doesn't set the verify_* flags by default when global.tls.enabled and global.tls.verify is false" {
   cd `chart_dir`
   local command=$(helm template \
-      -x templates/server-statefulset.yaml  \
+      -x templates/server-statefulset.yaml \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.verify=false' \
       . | tee /dev/stderr |
@@ -639,4 +639,26 @@ load _helpers
 
   actual=$(echo $command | jq -r '. | contains("verify_server_hostname = true")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: can overwrite CA secret with the provided one" {
+  cd `chart_dir`
+  local ca_cert_volume=$(helm template \
+      -x templates/server-statefulset.yaml \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo-ca-cert' \
+      --set 'global.tls.caCert.secretKey=key' \
+      --set 'global.tls.caKey.secretName=foo-ca-key' \
+      --set 'global.tls.caKey.secretKey=key' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+
+  # check that the provided ca cert secret is attached as a volume
+  local actual
+  actual=$(echo $ca_cert_volume | jq -r '.secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo-ca-cert" ]
+
+  # check that the volume uses the provided secret key
+  actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = "key" ]
 }

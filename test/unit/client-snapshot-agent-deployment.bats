@@ -246,3 +246,26 @@ load _helpers
       yq '.spec.template.spec.containers[0].volumeMounts | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "client/SnapshotAgentDeployment: can overwrite CA with the provided secret" {
+  cd `chart_dir`
+  local ca_cert_volume=$(helm template \
+      -x templates/client-snapshot-agent-deployment.yaml  \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo-ca-cert' \
+      --set 'global.tls.caCert.secretKey=key' \
+      --set 'global.tls.caKey.secretName=foo-ca-key' \
+      --set 'global.tls.caKey.secretKey=key' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+
+  # check that the provided ca cert secret is attached as a volume
+  local actual
+  actual=$(echo $ca_cert_volume | jq -r '.secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo-ca-cert" ]
+
+  # check that it uses the provided secret key
+  actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = "key" ]
+}
