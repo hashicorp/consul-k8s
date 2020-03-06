@@ -17,6 +17,7 @@ import (
 
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/tlsutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -75,8 +76,8 @@ func TestRun_Defaults(t *testing.T) {
 		},
 	} {
 		t.Run(flags[0], func(t *testing.T) {
-			k8s, testAgent := completeSetup(t, resourcePrefix)
-			defer testAgent.Shutdown()
+			k8s, testSvr := completeSetup(t, resourcePrefix)
+			defer testSvr.Stop()
 			require := require.New(t)
 
 			// Run the command.
@@ -96,7 +97,10 @@ func TestRun_Defaults(t *testing.T) {
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 
 			// Check that it has the right policies.
-			consul := testAgent.Client()
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(err)
 			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
 			require.Equal("global-management", tokenData.Policies[0].Name)
@@ -208,8 +212,8 @@ func TestRun_Tokens(t *testing.T) {
 			if c.ResourcePrefixFlag == "" {
 				prefix = releaseName + "-consul"
 			}
-			k8s, testAgent := completeSetup(t, prefix)
-			defer testAgent.Shutdown()
+			k8s, testSvr := completeSetup(t, prefix)
+			defer testSvr.Stop()
 			require := require.New(t)
 
 			// Run the command.
@@ -237,7 +241,10 @@ func TestRun_Tokens(t *testing.T) {
 
 			// Check that the client policy was created.
 			bootToken := getBootToken(t, k8s, prefix, ns)
-			consul := testAgent.Client()
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(err)
 			policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
 			found := false
@@ -278,8 +285,8 @@ func TestRun_Tokens(t *testing.T) {
 
 func TestRun_AllowDNS(t *testing.T) {
 	t.Parallel()
-	k8s, testAgent := completeSetup(t, resourcePrefix)
-	defer testAgent.Shutdown()
+	k8s, testSvr := completeSetup(t, resourcePrefix)
+	defer testSvr.Stop()
 	require := require.New(t)
 
 	// Run the command.
@@ -301,7 +308,10 @@ func TestRun_AllowDNS(t *testing.T) {
 
 	// Check that the dns policy was created.
 	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-	consul := testAgent.Client()
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+	})
+	require.NoError(err)
 	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
 	require.NoError(err)
 	found := false
@@ -346,8 +356,8 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	for testName, c := range cases {
 		t.Run(testName, func(tt *testing.T) {
 
-			k8s, testAgent := completeSetup(tt, resourcePrefix)
-			defer testAgent.Shutdown()
+			k8s, testSvr := completeSetup(tt, resourcePrefix)
+			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
 
@@ -372,7 +382,10 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 
 			// Check that the auth method was created.
 			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-			consul := testAgent.Client()
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(err)
 			authMethodName := resourcePrefix + "-k8s-auth-method"
 			authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
 				&api.QueryOptions{Token: bootToken})
@@ -410,11 +423,15 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 // Test that ACL binding rules are updated if the rule selector changes.
 func TestRun_BindingRuleUpdates(t *testing.T) {
 	t.Parallel()
-	k8s, agent := completeSetup(t, resourcePrefix)
+	k8s, testSvr := completeSetup(t, resourcePrefix)
 	setUpK8sServiceAccount(t, k8s)
-	defer agent.Shutdown()
+	defer testSvr.Stop()
 	require := require.New(t)
-	consul := agent.Client()
+
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+	})
+	require.NoError(err)
 
 	ui := cli.NewMockUi()
 	commonArgs := []string{
@@ -1241,6 +1258,8 @@ func TestRun_HTTPS(t *testing.T) {
 		cert_file = "%s"
 		key_file = "%s"`, caFile, certFile, keyFile)
 
+	// NOTE: We can't use testutil.TestServer for this test because the HTTP
+	// port can't be disabled (causes a seg fault).
 	a := &agent.TestAgent{
 		Name:   t.Name(),
 		HCL:    agentConfig,
@@ -1280,18 +1299,17 @@ func TestRun_HTTPS(t *testing.T) {
 }
 
 // Set up test consul agent and kubernetes cluster.
-func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *agent.TestAgent) {
+func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 
-	a := agent.NewTestAgent(t, t.Name(), `
-	primary_datacenter = "dc1"
-	acl {
-		enabled = true
-	}`)
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+	})
+	require.NoError(t, err)
 
-	createTestK8SResources(t, k8s, a.HTTPAddr(), prefix, "http", ns)
+	createTestK8SResources(t, k8s, svr.HTTPAddr, prefix, "http", ns)
 
-	return k8s, a
+	return k8s, svr
 }
 
 // Create test k8s resources (server pods and server stateful set)
