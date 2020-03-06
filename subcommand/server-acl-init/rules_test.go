@@ -309,6 +309,9 @@ func TestReplicationTokenRules(t *testing.T) {
 			false,
 			`acl = "write"
 operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
   node_prefix "" {
     policy = "write"
   }
@@ -322,6 +325,9 @@ operator = "write"
 			true,
 			`acl = "write"
 operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
 namespace_prefix "" {
   node_prefix "" {
     policy = "write"
