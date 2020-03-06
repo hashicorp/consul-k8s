@@ -103,3 +103,25 @@ load _helpers
       yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
   [ "${actual}" == "" ]
 }
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "server/Service: one annotation by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-service.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "server/Service: can set annotations" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-service.yaml  \
+      --set 'server.service.annotations=key: value' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
