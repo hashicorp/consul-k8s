@@ -569,11 +569,14 @@ connectInject:
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
 
-  # imageConsul and imageEnvoy can be set to Docker images for Consul and
-  # Envoy, respectively. If the Consul image is not specified, the global
-  # default will be used. If the Envoy image is not specified, an early
-  # version of Envoy will be used.
+  # The Docker image for Consul to use when performing Connect injection.
+  # Defaults to global.image.
   imageConsul: null
+
+  # The Docker image for envoy to use as the proxy sidecar when performing
+  # Connect injection. If using Consul 1.7+, the envoy version must be 1.13+.
+  # If not set, the image used depends on the consul-k8s version. For
+  # consul-k8s 0.12.0 the default is envoyproxy/envoy-alpine:v1.13.0.
   imageEnvoy: null
 
   # namespaceSelector is the selector for restricting the webhook to only
