@@ -149,14 +149,19 @@ operator = "write"
 }
 
 func (c *Command) aclReplicationRules() (string, error) {
-	// NOTE: The node_prefix rule is not required for ACL replication. It's
-	// added so that this token can be used as an ACL replication token *and*
-	// as an agent token. This allows us to only pass one token between
+	// NOTE: The node_prefix and agent_prefix rules are not required for ACL
+	// replication. They're added so that this token can be used as an ACL
+	// replication token, an agent token and for the server-acl-init command
+	// where we need agent:read to get the current datacenter.
+	// This allows us to only pass one token between
 	// datacenters during federation since in order to start ACL replication,
 	// we need a token with both replication and agent permissions.
 	aclReplicationRulesTpl := `
 acl = "write"
 operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
