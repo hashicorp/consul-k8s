@@ -76,6 +76,14 @@ type ConsulSyncer struct {
 	lock sync.Mutex
 	once sync.Once
 
+	// initialSync is used to ensure that we have received our initial list
+	// of services before we start reaping services. When it is closed,
+	// the initial sync is complete.
+	initialSync chan bool
+	// initialSyncOnce controls the close operation on the initialSync channel
+	// to ensure it isn't closed more than once.
+	initialSyncOnce sync.Once
+
 	// serviceNames is all namespaces mapped to a set of valid
 	// Consul service names
 	serviceNames map[string]mapset.Set
@@ -119,6 +127,10 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 		s.namespaces[ns][r.Service.ID] = r
 		s.Log.Debug("[Sync] adding service to namespaces map", "service", r.Service)
 	}
+
+	// Signal that the initial sync is complete and our maps have been populated.
+	// We can now safely reap untracked services.
+	s.initialSyncOnce.Do(func() { close(s.initialSync) })
 }
 
 // Run is the long-running runloop for reconciling the local set of
@@ -151,6 +163,13 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 // This task only marks them for deletion but doesn't perform the actual
 // deletion.
 func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
+	// We must wait for the initial sync to be complete and our maps to be
+	// populated. If we don't wait, we will reap all services tagged with k8s
+	// because we have no tracked services in our maps yet.
+	select {
+	case <-s.initialSync:
+	}
+
 	opts := &api.QueryOptions{
 		AllowStale: true,
 		WaitIndex:  1,
@@ -451,6 +470,9 @@ func (s *ConsulSyncer) init() {
 	}
 	if s.ServicePollPeriod == 0 {
 		s.ServicePollPeriod = ConsulServicePollPeriod
+	}
+	if s.initialSync == nil {
+		s.initialSync = make(chan bool)
 	}
 }
 

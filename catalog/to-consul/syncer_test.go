@@ -155,6 +155,51 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	}
 }
 
+// Test that the syncer doesn't reap any services until the initial sync has
+// been performed.
+func TestConsulSyncer_noReapingUntilInitialSync(t *testing.T) {
+	t.Parallel()
+
+	a, err := testutil.NewTestServerT(t)
+	require.NoError(t, err)
+	defer a.Stop()
+	client, err := api.NewClient(&api.Config{
+		Address: a.HTTPAddr,
+	})
+	require.NoError(t, err)
+	s, closer := testConsulSyncer(client)
+	// Set the sync period to 5ms so we know it will have run at least once
+	// after we wait 100ms.
+	s.SyncPeriod = 5 * time.Millisecond
+	defer closer()
+
+	// Create a service directly in Consul. Since it was created on the
+	// synthetic sync node and has the sync-associated tag, we expect
+	// it to be deleted but not until the initial sync is performed.
+	svc := testRegistration(ConsulSyncNodeName, "baz", "default")
+	_, err = client.Catalog().Register(svc, nil)
+	require.NoError(t, err)
+
+	// We wait until the syncer has had the time to delete the service.
+	// Since we set the sync period to 5ms we know that it's run syncFull at
+	// least once.
+	time.Sleep(100 * time.Millisecond)
+
+	// Invalid service should not be deleted.
+	bazInstances, _, err := client.Catalog().Service("baz", "", nil)
+	require.NoError(t, err)
+	require.Len(t, bazInstances, 1)
+
+	// Now we perform the initial sync.
+	s.Sync(nil)
+	// The service should get deleted.
+	retry.Run(t, func(r *retry.R) {
+		bazInstances, _, err := client.Catalog().Service("baz", "", nil)
+		require.NoError(r, err)
+		require.Len(r, bazInstances, 0)
+	})
+}
+
 // Test that when the syncer is stopped, we don't continue to call the Consul
 // API. This test was added as a regression test after a bug was discovered
 // that after the context was cancelled, we would continue to make API calls
