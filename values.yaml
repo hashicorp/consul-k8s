@@ -240,14 +240,18 @@ server:
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
 
-  # Extra annotations to attach to the server pods
-  # This should be a multi-line string mapping directly to the a map of
-  # the annotations to apply to the server pods
+  # Extra annotations to attach to the server pods.
+  # This should be a multi-line YAML string.
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
 
   service:
-    # This should be a multi-line string mapping directly to the a map of
-    # the annotations to apply to the server service
+    # Annotations to apply to the server service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
     annotations: null
 
   # extraEnvVars is a list of extra environment variables to set with the stateful set. These could be
@@ -339,8 +343,9 @@ client:
   priorityClassName: ""
 
   # Extra annotations to attach to the client pods
-  # This should be a multi-line string mapping directly to the a map of
-  # the annotations to apply to the client pods
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
 
   # extraEnvVars is a list of extra environment variables to set with the pod. These could be
@@ -420,9 +425,13 @@ ui:
   service:
     enabled: true
     type: null
-    # This should be a multi-line string mapping directly to the a map of
-    # the annotations to apply to the UI service
+
+    # Annotations to apply to the UI service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
     annotations: null
+
     # Additional ServiceSpec values
     # This should be a multi-line string mapping directly to a Kubernetes
     # ServiceSpec object.
@@ -790,7 +799,10 @@ meshGateway:
     # type: NodePort.
     nodePort: null
 
-    # Optional YAML string for additional annotations.
+    # Annotations to apply to the mesh gateway service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
     annotations: null
 
     # Optional YAML string that will be appended to the Service spec.
@@ -857,7 +869,10 @@ meshGateway:
   # Optional priorityClassName.
   priorityClassName: ""
 
-  # Optional YAML string for additional annotations.
+  # Annotations to apply to the mesh gateway deployment.
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
 
 # Control whether a test Pod manifest is generated when running helm template.
