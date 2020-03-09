@@ -7,11 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/consul/testrpc"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
@@ -20,10 +18,15 @@ func TestConsulSyncer_register(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t, t.Name(), ``)
-	defer a.Shutdown()
-	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
-	client := a.Client()
+	// Set up server, client, syncer
+	a, err := testutil.NewTestServerT(t)
+	require.NoError(err)
+	defer a.Stop()
+
+	client, err := api.NewClient(&api.Config{
+		Address: a.HTTPAddr,
+	})
+	require.NoError(err)
 
 	s, closer := testConsulSyncer(client)
 	defer closer()
@@ -57,10 +60,15 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	a := agent.NewTestAgent(t, t.Name(), ``)
-	defer a.Shutdown()
-	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
-	client := a.Client()
+	// Set up server, client, syncer
+	a, err := testutil.NewTestServerT(t)
+	require.NoError(err)
+	defer a.Stop()
+
+	client, err := api.NewClient(&api.Config{
+		Address: a.HTTPAddr,
+	})
+	require.NoError(err)
 
 	s, closer := testConsulSyncer(client)
 	defer closer()
@@ -84,7 +92,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	// Create an invalid service directly in Consul
 	svc := testRegistration(ConsulSyncNodeName, "bar", "default")
 	svc.Service.ID = serviceID("k8s-sync", "bar2")
-	_, err := client.Catalog().Register(svc, nil)
+	_, err = client.Catalog().Register(svc, nil)
 	require.NoError(err)
 
 	// Valid service should exist
@@ -115,16 +123,20 @@ func TestConsulSyncer_reapService(t *testing.T) {
 	sourceK8sNamespaceAnnotations := []string{"", "other", "default"}
 	for _, k8sNS := range sourceK8sNamespaceAnnotations {
 		t.Run(k8sNS, func(tt *testing.T) {
+			// Set up server, client, syncer
 			a, err := testutil.NewTestServerT(tt)
 			require.NoError(tt, err)
 			defer a.Stop()
+
 			client, err := api.NewClient(&api.Config{
 				Address: a.HTTPAddr,
 			})
 			require.NoError(tt, err)
+
 			s, closer := testConsulSyncer(client)
 			defer closer()
 
+			// Run the sync with a test service
 			s.Sync([]*api.CatalogRegistration{
 				testRegistration(ConsulSyncNodeName, "bar", "default"),
 			})
@@ -224,6 +236,8 @@ func TestConsulSyncer_stopsGracefully(t *testing.T) {
 	})
 	require.NoError(t, err)
 	s, closer := testConsulSyncer(client)
+
+	// Sync
 	s.Sync([]*api.CatalogRegistration{
 		testRegistration("k8s-sync", "bar", "default"),
 	})
