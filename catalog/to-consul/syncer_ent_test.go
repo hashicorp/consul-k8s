@@ -14,9 +14,11 @@ import (
 // Test that the syncer registers services in Consul namespaces.
 func TestConsulSyncer_ConsulNamespaces(t *testing.T) {
 	t.Parallel()
+
 	a, err := testutil.NewTestServerT(t)
 	require.NoError(t, err)
 	defer a.Stop()
+
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
 	})
@@ -63,9 +65,11 @@ func TestConsulSyncer_ConsulNamespaces(t *testing.T) {
 // across all Consul namespaces.
 func TestConsulSyncer_ReapConsulNamespace(t *testing.T) {
 	t.Parallel()
+
 	a, err := testutil.NewTestServerT(t)
 	require.NoError(t, err)
 	defer a.Stop()
+
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
 	})
@@ -130,9 +134,11 @@ func TestConsulSyncer_ReapConsulNamespace(t *testing.T) {
 // namespaces are enabled.
 func TestConsulSyncer_reapServiceInstanceNamespacesEnabled(t *testing.T) {
 	t.Parallel()
+
 	a, err := testutil.NewTestServerT(t)
 	require.NoError(t, err)
 	defer a.Stop()
+
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
 	})
