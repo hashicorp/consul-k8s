@@ -167,10 +167,11 @@ func TestConsulSyncer_noReapingUntilInitialSync(t *testing.T) {
 		Address: a.HTTPAddr,
 	})
 	require.NoError(t, err)
-	s, closer := testConsulSyncer(client)
-	// Set the sync period to 5ms so we know it will have run at least once
-	// after we wait 100ms.
-	s.SyncPeriod = 5 * time.Millisecond
+	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
+		// Set the sync period to 5ms so we know it will have run at least once
+		// after we wait 100ms.
+		s.SyncPeriod = 5 * time.Millisecond
+	})
 	defer closer()
 
 	// Create a service directly in Consul. Since it was created on the
