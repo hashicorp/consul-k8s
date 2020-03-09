@@ -46,7 +46,14 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
 	c.help = flags.Usage(help, c.flagSet)
-	c.sigCh = make(chan os.Signal, 1)
+
+	// Wait on an interrupt to exit. This channel must be initialized before
+	// Run() is called so that there are no race conditions where the channel
+	// is not defined.
+	if c.sigCh == nil {
+		c.sigCh = make(chan os.Signal, 1)
+		signal.Notify(c.sigCh, os.Interrupt)
+	}
 }
 
 // Run continually re-registers the service with Consul.
@@ -76,9 +83,6 @@ func (c *Command) Run(args []string) int {
 		"consul-binary", c.flagConsulBinary,
 		"sync-period", c.flagSyncPeriod,
 		"log-level", c.flagLogLevel)
-
-	// Set up channel for graceful SIGINT shutdown.
-	signal.Notify(c.sigCh, os.Interrupt)
 
 	c.consulCommand = []string{"services", "register"}
 	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
