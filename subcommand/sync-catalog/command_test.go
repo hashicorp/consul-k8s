@@ -4,7 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/agent"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -18,8 +19,8 @@ import (
 func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	t.Parallel()
 
-	k8s, testAgent := completeSetup(t)
-	defer testAgent.Shutdown()
+	k8s, testServer := completeSetup(t)
+	defer testServer.Stop()
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -33,7 +34,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	}
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-http-addr", testAgent.HTTPAddr(),
+		"-http-addr", testServer.HTTPAddr,
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -51,15 +52,20 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	t.Parallel()
 
-	k8s, testAgent := completeSetup(t)
-	defer testAgent.Shutdown()
+	k8s, testServer := completeSetup(t)
+	defer testServer.Stop()
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testServer.HTTPAddr,
+	})
+	require.NoError(t, err)
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:           ui,
 		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		consulClient: consulClient,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
@@ -68,7 +74,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -80,7 +86,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		services, _, err := testAgent.Client().Catalog().Services(nil)
+		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
 		require.Contains(r, services, "foo-default")
@@ -92,15 +98,20 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	t.Parallel()
 
-	k8s, testAgent := completeSetup(t)
-	defer testAgent.Shutdown()
+	k8s, testServer := completeSetup(t)
+	defer testServer.Stop()
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testServer.HTTPAddr,
+	})
+	require.NoError(t, err)
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:           ui,
 		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		consulClient: consulClient,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
@@ -109,7 +120,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -119,7 +130,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		services, _, err := testAgent.Client().Catalog().Services(nil)
+		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
 		require.Contains(r, services, "foo")
@@ -136,7 +147,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 
 	// check that the name of the service is now namespaced
 	retry.RunWith(timer, t, func(r *retry.R) {
-		services, _, err := testAgent.Client().Catalog().Services(nil)
+		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
 		require.Contains(r, services, "foo-default")
@@ -149,15 +160,20 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T) {
 	t.Parallel()
 
-	k8s, testAgent := completeSetup(t)
-	defer testAgent.Shutdown()
+	k8s, testServer := completeSetup(t)
+	defer testServer.Stop()
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testServer.HTTPAddr,
+	})
+	require.NoError(t, err)
 
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:           ui,
 		clientset:    k8s,
-		consulClient: testAgent.Client(),
+		consulClient: consulClient,
 		logger: hclog.New(&hclog.LoggerOptions{
 			Name:  t.Name(),
 			Level: hclog.Debug,
@@ -166,7 +182,7 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	}
 
 	// create two services in k8s
-	_, err := k8s.CoreV1().Services("bar").Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services("bar").Create(lbService("foo", "1.1.1.1"))
 	require.NoError(t, err)
 
 	_, err = k8s.CoreV1().Services("baz").Create(lbService("foo", "2.2.2.2"))
@@ -181,11 +197,11 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	// check that the name of the service is namespaced
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		svc, _, err := testAgent.Client().Catalog().Service("foo-bar", "", nil)
+		svc, _, err := consulClient.Catalog().Service("foo-bar", "", nil)
 		require.NoError(r, err)
 		require.Len(r, svc, 1)
 		require.Equal(r, "1.1.1.1", svc[0].ServiceAddress)
-		svc, _, err = testAgent.Client().Catalog().Service("foo-baz", "", nil)
+		svc, _, err = consulClient.Catalog().Service("foo-baz", "", nil)
 		require.NoError(r, err)
 		require.Len(r, svc, 1)
 		require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
@@ -239,14 +255,17 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetup(tt)
-			defer testAgent.Shutdown()
-			ui := cli.NewMockUi()
-			consulClient := testAgent.Client()
+			k8s, testServer := completeSetup(tt)
+			defer testServer.Stop()
+
+			consulClient, err := api.NewClient(&api.Config{
+				Address: testServer.HTTPAddr,
+			})
+			require.NoError(t, err)
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
 				require.NoError(tt, err)
 				_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -269,6 +288,8 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 				flags = append(flags, "-deny-k8s-namespace", deny)
 			}
 
+			// Run the command
+			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:           ui,
 				clientset:    k8s,
@@ -381,10 +402,15 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetup(tt)
-			defer testAgent.Shutdown()
+			k8s, testServer := completeSetup(tt)
+			defer testServer.Stop()
+
+			consulClient, err := api.NewClient(&api.Config{
+				Address: testServer.HTTPAddr,
+			})
+			require.NoError(t, err)
+
 			ui := cli.NewMockUi()
-			consulClient := testAgent.Client()
 
 			commonArgs := []string{
 				"-consul-write-interval", "500ms",
@@ -471,11 +497,13 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 }
 
 // Set up test consul agent and fake kubernetes cluster client
-func completeSetup(t *testing.T) (*fake.Clientset, *agent.TestAgent) {
+func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
-	a := agent.NewTestAgent(t, t.Name(), `primary_datacenter = "dc1"`)
 
-	return k8s, a
+	svr, err := testutil.NewTestServerT(t)
+	require.NoError(t, err)
+
+	return k8s, svr
 }
 
 // This function starts the command asynchronously and returns a non-blocking chan.

@@ -42,13 +42,13 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(tt *testing.T) {
-			k8s, testAgent := completeSetupEnterprise(tt)
-			defer testAgent.Stop()
+			k8s, testServer := completeSetupEnterprise(tt)
+			defer testServer.Stop()
 
 			// Run the command.
 			ui := cli.NewMockUi()
 			consulClient, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testServer.HTTPAddr,
 			})
 			require.NoError(tt, err)
 
@@ -177,13 +177,13 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetupEnterprise(tt)
-			defer testAgent.Stop()
+			k8s, testServer := completeSetupEnterprise(tt)
+			defer testServer.Stop()
 
 			// Run the command.
 			ui := cli.NewMockUi()
 			consulClient, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testServer.HTTPAddr,
 			})
 			require.NoError(tt, err)
 
@@ -448,11 +448,11 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetupEnterprise(tt)
-			defer testAgent.Stop()
+			k8s, testServer := completeSetupEnterprise(tt)
+			defer testServer.Stop()
 			ui := cli.NewMockUi()
 			consulClient, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
+				Address: testServer.HTTPAddr,
 			})
 			require.NoError(tt, err)
 
