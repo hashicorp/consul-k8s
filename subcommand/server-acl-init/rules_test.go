@@ -52,7 +52,7 @@ namespace_prefix "" {
 	}
 }
 
-func TestDNSRules(t *testing.T) {
+func TestAnonymousTokenRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
@@ -92,10 +92,10 @@ namespace_prefix "" {
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
-			dnsRules, err := cmd.dnsRules()
+			rules, err := cmd.anonymousTokenRules()
 
 			require.NoError(err)
-			require.Equal(tt.Expected, dnsRules)
+			require.Equal(tt.Expected, rules)
 		})
 	}
 }
