@@ -116,7 +116,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 
 			var datacenter, service_name, prepared_query, namespace string
 			var port int32
-			if parts[0] == "prepared_query" {
+			if strings.TrimSpace(parts[0]) == "prepared_query" {
 				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
 				prepared_query = strings.TrimSpace(parts[1])
 			} else {
