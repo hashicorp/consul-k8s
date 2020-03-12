@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.0 (Feb 21, 2020)
+
 BREAKING CHANGES:
 
 * `consul-k8s` `v0.12.0`+ is now required. The chart is passing new flags that are only available in this version.
