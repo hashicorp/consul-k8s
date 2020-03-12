@@ -4,30 +4,36 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
-	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/go-discover"
 	discoverk8s "github.com/hashicorp/go-discover/provider/k8s"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
 
+// get-consul-client-ca command talks to the Consul servers
+// and retrieves the active root CA from the API to be used
+// to talk to the Consul client agents.
 type Command struct {
 	UI cli.Ui
 
 	flags *flag.FlagSet
 
-	flagOutputFile    string
-	flagServerAddr    string
-	flagCAFile        string
-	flagTLSServerName string
-	flagLogLevel      string
+	flagOutputFile      string
+	flagServerAddr      string
+	flagCAFile          string
+	flagTLSServerName   string
+	flagPollingInterval time.Duration
+	flagLogLevel        string
 
 	once sync.Once
 	help string
@@ -35,17 +41,22 @@ type Command struct {
 	providers map[string]discover.Provider
 }
 
+const defaultConsulHTTPPort = 8500
+const defaultConsulHTTPSPort = 8501
+
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagOutputFile, "output-file", "",
-		"The path to the file where to put the Consul client's CA certificate.")
+		"The file path for writing the Consul client's CA certificate.")
 	c.flags.StringVar(&c.flagServerAddr, "server-addr", "",
-		"The address of the Consul server or the Cloud auto-join string. The server must be running with TLS enabled."+
-			"The default HTTPS port 8501 will be used if port is not provided.")
+		"The address of the Consul server or the cloud auto-join string. The server must be running with TLS enabled. "+
+			"The default HTTPS port 8501 will be used if port is not provided. The default value is http://127.0.0.1:8500.")
 	c.flags.StringVar(&c.flagCAFile, "ca-file", "",
-		"The path to the CA file to use when making requests to the Consul server. This can also be provided via the CONSUL_CACERT environment variable")
+		"The path to the CA file to use when making requests to the Consul server. This can also be provided via the CONSUL_CACERT environment variable instead if preferred. "+
+			"If both values are present, the flag value will be used.")
 	c.flags.StringVar(&c.flagTLSServerName, "tls-server-name", "",
-		"The server name to set as the SNI header when sending HTTPS requests to Consul. This can also be provided via the CONSUL_TLS_SERVER_NAME environment variable.")
+		"The server name to set as the SNI header when sending HTTPS requests to Consul. This can also be provided via the CONSUL_TLS_SERVER_NAME environment variable instead if preferred. "+
+			"If both values are present, the flag value will be used.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -89,21 +100,21 @@ func (c *Command) Run(args []string) int {
 	// Get the active CA root from Consul
 	// Wait until it gets a successful response
 	var activeRoot string
-	for activeRoot == "" {
+	backoff.Retry(func() error {
 		caRoots, _, err := consulClient.Agent().ConnectCARoots(nil)
 		if err != nil {
-			logger.Info("Error retrieving CA roots from Consul", "err", err)
-			time.Sleep(1 * time.Second)
-			continue
+			logger.Error("Error retrieving CA roots from Consul", "err", err)
+			return err
 		}
 
 		activeRoot, err = getActiveRoot(caRoots)
 		if err != nil {
-			logger.Info("Could not get an active root", "err", err)
-			time.Sleep(1 * time.Second)
-			continue
+			logger.Error("Could not get an active root", "err", err)
+			return err
 		}
-	}
+
+		return nil
+	}, backoff.NewConstantBackOff(1*time.Second))
 
 	err = ioutil.WriteFile(c.flagOutputFile, []byte(activeRoot), 0644)
 	if err != nil {
@@ -111,56 +122,37 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Successfully written Consul client CA to: %s", c.flagOutputFile))
+	c.UI.Info(fmt.Sprintf("Successfully wrote Consul client CA to: %s", c.flagOutputFile))
 	return 0
 }
 
+// consulClient returns a Consul API client.
+// It checks the server address and does the following
+//
+// 1. If the server address is a cloud auto-join URL,
+//    it calls go-discover library to discover server addresses,
+//    picks the first address from the list and assumes the default
+//    HTTPS port 8501.
+// 2. If the server address is lacking port, it assumes the
+//    the default HTTPS port 8501.
+// 3. Otherwise, it uses the address provided by the -server-addr flag
+//    or set by the CONSUL_HTTP_ADDR environment variable.
 func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
+	// Create default Consul config.
+	// This will also read any environment variables.
 	cfg := api.DefaultConfig()
 
-	// First, check if the server address is a cloud auto-join string.
-	// If it is, discover server addresses through the cloud provider.
-	if strings.Contains(c.flagServerAddr, "provider=") {
-		disco, err := c.newDiscover()
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug("using cloud auto-join with", c.flagServerAddr)
-		servers, err := disco.Addrs(c.flagServerAddr, logger.StandardLogger(&hclog.StandardLoggerOptions{
-			InferLevels: true,
-		}))
-		if err != nil {
-			return nil, err
-		}
-
-		// check if we discovered any servers
-		if len(servers) == 0 {
-			return nil, fmt.Errorf("could not discover any Consul servers with %q", c.flagServerAddr)
-		}
-
-		logger.Debug("discovered servers", strings.Join(servers, " "))
-
-		// Pick the first server from the list,
-		// ignoring the port since we need to use HTTP API
-		firstServer := strings.SplitN(servers[0], ":", 2)[0]
-		cfg.Address = fmt.Sprintf("%s:8501", firstServer)
-		cfg.Scheme = "https"
-	} else {
-		// check if the server URL is missing a port
-		host := strings.TrimPrefix(c.flagServerAddr, "https://")
-		host = strings.TrimPrefix(c.flagServerAddr, "http://")
-		parts := strings.SplitN(host, ":", 2)
-
-		// Use the default HTTPS port if port is missing.
-		// Otherwise, use the address the user has provided.
-		if len(parts) == 1 {
-			cfg.Address = fmt.Sprintf("%s:8501", c.flagServerAddr)
-			cfg.Scheme = "https"
-		} else {
-			cfg.Address = c.flagServerAddr
-		}
+	addr, err := c.consulServerAddr(logger)
+	fmt.Println("addr", addr)
+	if err != nil {
+		return nil, err
+	}
+	if addr != "" {
+		cfg.Address = addr
 	}
 
+	// Set the CA file and TLS server name if the flag is provided.
+	// This will overwrite any env variables values for these flags.
 	if c.flagCAFile != "" {
 		cfg.TLSConfig.CAFile = c.flagCAFile
 	}
@@ -171,9 +163,76 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 	return api.NewClient(cfg)
 }
 
+func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
+	// First, check if the server address is a cloud auto-join string.
+	// If it is, discover server addresses through the cloud provider.
+	// This code was adapted from
+	// https://github.com/hashicorp/consul/blob/c5fe112e59f6e8b03159ec8f2dbe7f4a026ce823/agent/retry_join.go#L55-L89.
+	if strings.Contains(c.flagServerAddr, "provider=") {
+		disco, err := c.newDiscover()
+		if err != nil {
+			return "", err
+		}
+		logger.Debug("using cloud auto-join", "server-addr", c.flagServerAddr)
+		servers, err := disco.Addrs(c.flagServerAddr, logger.StandardLogger(&hclog.StandardLoggerOptions{
+			InferLevels: true,
+		}))
+		if err != nil {
+			return "", err
+		}
+
+		// check if we discovered any servers
+		if len(servers) == 0 {
+			return "", fmt.Errorf("could not discover any Consul servers with %q", c.flagServerAddr)
+		}
+
+		logger.Debug("discovered servers", strings.Join(servers, " "))
+
+		// Pick the first server from the list,
+		// ignoring the port since we need to use HTTP API
+		firstServer := strings.SplitN(servers[0], ":", 2)[0]
+		return fmt.Sprintf("https://%s:%d", firstServer, defaultConsulHTTPSPort), nil
+	} else {
+		// parse the server address and
+		// ignore the parse error here because
+		// the address is not necessarily a valid URL
+		url, _ := url.Parse(c.flagServerAddr)
+
+		if url != nil {
+			// if server address has a scheme but is missing a port,
+			// assume the default HTTPS port if the scheme is HTTPS,
+			// otherwise use the default HTTP port.
+			if url.Scheme == "https" && url.Port() == "" {
+				url.Host = fmt.Sprintf("%s:%d", url.Host, defaultConsulHTTPSPort)
+				return url.String(), nil
+			} else if url.Scheme == "http" && url.Port() == "" {
+				url.Host = fmt.Sprintf("%s:%d", url.Host, defaultConsulHTTPPort)
+				return url.String(), nil
+			}
+		}
+
+		// If the parsed url has a scheme different from above and because of parsing
+		// ambiguities, there's no way for us to know whether someone has provided
+		// some other scheme or whether there wasn't a scheme. That's why going forward,
+		// we assume that the address didn't have a scheme.
+		// For an address without a scheme, we check if port is provided
+		parts := strings.SplitN(c.flagServerAddr, ":", 2)
+
+		// if port is missing, use the default HTTPS port and HTTPS scheme
+		if len(parts) == 1 {
+			return fmt.Sprintf("https://%s:%d", c.flagServerAddr, defaultConsulHTTPSPort), nil
+		}
+
+		// For all other cases, use the address the user has provided.
+		return c.flagServerAddr, nil
+	}
+}
+
 // newDiscover initializes the new Discover object
 // set up with all predefined providers, as well as
 // the k8s provider.
+// This code was adapted from
+// https://github.com/hashicorp/consul/blob/c5fe112e59f6e8b03159ec8f2dbe7f4a026ce823/agent/retry_join.go#L42-L53
 func (c *Command) newDiscover() (*discover.Discover, error) {
 	if c.providers == nil {
 		c.providers = make(map[string]discover.Provider)
@@ -184,8 +243,9 @@ func (c *Command) newDiscover() (*discover.Discover, error) {
 	}
 	c.providers["k8s"] = &discoverk8s.Provider{}
 
+	userAgent := fmt.Sprintf("consul-k8s/%s (https://www.consul.io/)", version.GetHumanVersion())
 	return discover.New(
-		discover.WithUserAgent(lib.UserAgent()),
+		discover.WithUserAgent(userAgent),
 		discover.WithProviders(c.providers),
 	)
 }
@@ -194,7 +254,7 @@ func (c *Command) newDiscover() (*discover.Discover, error) {
 // from the roots list, otherwise returns error.
 func getActiveRoot(roots *api.CARootList) (string, error) {
 	if roots == nil {
-		return "", fmt.Errorf("ca roots is nil")
+		return "", fmt.Errorf("ca root list is nil")
 	}
 	if roots.Roots == nil {
 		return "", fmt.Errorf("ca roots is nil")

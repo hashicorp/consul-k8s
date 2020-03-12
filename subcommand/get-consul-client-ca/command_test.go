@@ -1,38 +1,55 @@
 package getconsulclientca
 
 import (
-	"crypto"
-	"crypto/x509"
 	"fmt"
-	"github.com/hashicorp/go-discover"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/consul/tlsutil"
+	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRun_FlagsValidation(t *testing.T) {
 	t.Parallel()
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
+	cases := []struct {
+		flags  []string
+		expErr string
+	}{
+		{
+			flags:  []string{},
+			expErr: "-output-file must be set",
+		},
+		{
+			flags: []string{
+				"-output-file=output.pem",
+				"-log-level=invalid-log-level",
+			},
+			expErr: "Unknown log level: invalid-log-level",
+		},
 	}
 
-	exitCode := cmd.Run([]string{
-		"-output-file", "",
-	})
-	require.Equal(t, 1, exitCode)
-	require.Contains(t, ui.ErrorWriter.String(), "-output-file must be set")
+	for _, c := range cases {
+		t.Run(c.expErr, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+
+			exitCode := cmd.Run(c.flags)
+			require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
+		})
+	}
 }
 
 // Test that in the happy case scenario
@@ -42,6 +59,7 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")
 	require.NoError(t, err)
+	defer os.Remove(outputFile.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -62,14 +80,15 @@ func TestRun(t *testing.T) {
 		"-server-addr", a.HTTPAddr,
 		"-output-file", outputFile.Name(),
 	})
-	require.Equal(t, 0, exitCode)
+	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
 	})
 	require.NoError(t, err)
 
-	// get the actual root ca cert from consul
+	// get the actual root ca cert from consul so we can compare that
+	// with the command output
 	roots, _, err := client.Agent().ConnectCARoots(nil)
 	require.NoError(t, err)
 	require.NotNil(t, roots)
@@ -90,6 +109,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")
 	require.NoError(t, err)
+	defer os.Remove(outputFile.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -98,38 +118,38 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 
 	randomPorts := freeport.MustTake(6)
 
-	// Start the command asynchronously
-	exitCode := -1
+	// Start the consul agent asynchronously
+	var a *testutil.TestServer
 	go func() {
-		exitCode = cmd.Run([]string{
-			"-server-addr", fmt.Sprintf("http://127.0.0.1:%d", randomPorts[1]),
-			"-output-file", outputFile.Name(),
+		// start the test server after 100ms
+		time.Sleep(100 * time.Millisecond)
+		a, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			c.Ports = &testutil.TestPortConfig{
+				DNS:     randomPorts[0],
+				HTTP:    randomPorts[1],
+				HTTPS:   randomPorts[2],
+				SerfLan: randomPorts[3],
+				SerfWan: randomPorts[4],
+				Server:  randomPorts[5],
+			}
+			c.Connect = map[string]interface{}{
+				"enabled": true,
+			}
 		})
-		require.Equal(t, 0, exitCode)
+		require.NoError(t, err)
 	}()
 
-	// start the test server
-	time.Sleep(500 * time.Millisecond)
-	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-		c.Ports = &testutil.TestPortConfig{
-			DNS:     randomPorts[0],
-			HTTP:    randomPorts[1],
-			HTTPS:   randomPorts[2],
-			SerfLan: randomPorts[3],
-			SerfWan: randomPorts[4],
-			Server:  randomPorts[5],
-		}
-		c.Connect = map[string]interface{}{
-			"enabled": true,
-		}
+	exitCode := cmd.Run([]string{
+		"-server-addr", fmt.Sprintf("http://127.0.0.1:%d", randomPorts[1]),
+		"-output-file", outputFile.Name(),
 	})
-	require.NoError(t, err)
-	defer a.Stop()
+	require.Equal(t, 0, exitCode)
 
-	// wait for command to exit
+	// make sure a has been initialized by the time we call Stop()
 	retry.Run(t, func(r *retry.R) {
-		require.Equal(r, 0, exitCode)
+		require.NotNil(r, a)
 	})
+	defer a.Stop()
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
@@ -138,8 +158,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 
 	// get the actual ca cert from consul
 	var expectedCARoot string
-	timer := &retry.Timer{Timeout: 500 * time.Millisecond, Wait: 100 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		roots, _, err := client.Agent().ConnectCARoots(nil)
 		require.NoError(r, err)
 		require.NotNil(r, roots)
@@ -162,6 +181,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")
 	require.NoError(t, err)
+	defer os.Remove(outputFile.Name())
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -185,7 +205,9 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	// generate a new CA
 	ca, key := generateCA(t)
 
-	// set it as an active CA in Consul
+	// set it as an active CA in Consul,
+	// which will make Consul return both CAs -
+	// this CA as the active and the original CA as inactive.
 	retry.Run(t, func(r *retry.R) {
 		_, err = client.Connect().CASetConfig(&api.CAConfig{
 			Provider: "consul",
@@ -230,8 +252,13 @@ func TestRun_WithProvider(t *testing.T) {
 	t.Parallel()
 	outputFile, err := ioutil.TempFile("", "ca")
 	require.NoError(t, err)
+	defer os.Remove(outputFile.Name())
 
 	ui := cli.NewMockUi()
+
+	// create a fake provider
+	// that always returns the server address
+	// provided through the cloud-auto join string
 	provider := &fakeProvider{}
 	cmd := Command{
 		UI:        ui,
@@ -264,7 +291,7 @@ func TestRun_WithProvider(t *testing.T) {
 
 	// run the command
 	exitCode := cmd.Run([]string{
-		"-server-addr", "provider=fake",
+		"-server-addr", "provider=fake address=127.0.0.1",
 		"-tls-server-name", "localhost",
 		"-output-file", outputFile.Name(),
 		"-ca-file", caFile,
@@ -298,20 +325,111 @@ func TestRun_WithProvider(t *testing.T) {
 	require.Equal(t, expectedCARoot, string(actualCARoot))
 }
 
+func TestConsulServerAddr(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		cmd          *Command
+		expectedAddr string
+	}{
+		{
+			"cloud auto-join string",
+			&Command{
+				flagServerAddr: "provider=fake address=external-server-address",
+				providers:      map[string]discover.Provider{"fake": &fakeProvider{}},
+			},
+			"https://external-server-address:8501",
+		},
+		{
+			"DNS address without a port and scheme",
+			&Command{
+				flagServerAddr: "server-address",
+			},
+			"https://server-address:8501",
+		},
+		{
+			"DNS address without a port and with HTTP scheme",
+			&Command{
+				flagServerAddr: "http://server-address",
+			},
+			"http://server-address:8500",
+		},
+		{
+			"DNS address without a port and with HTTPS scheme",
+			&Command{
+				flagServerAddr: "https://server-address",
+			},
+			"https://server-address:8501",
+		},
+		{
+			"DNS address with a port and HTTP scheme",
+			&Command{
+				flagServerAddr: "http://server-address:8700",
+			},
+			"http://server-address:8700",
+		},
+		{
+			"DNS address with a port but without a scheme",
+			&Command{
+				flagServerAddr: "server-address:8500",
+			},
+			"server-address:8500",
+		},
+		{
+			"IP address without a port and scheme",
+			&Command{
+				flagServerAddr: "1.1.1.1",
+			},
+			"https://1.1.1.1:8501",
+		},
+		{
+			"IP address without a port and with HTTP scheme",
+			&Command{
+				flagServerAddr: "http://1.1.1.1",
+			},
+			"http://1.1.1.1:8500",
+		},
+		{
+			"IP address without a port and with HTTPS scheme",
+			&Command{
+				flagServerAddr: "https://1.1.1.1",
+			},
+			"https://1.1.1.1:8501",
+		},
+		{
+			"IP address with a port and HTTP scheme",
+			&Command{
+				flagServerAddr: "http://1.1.1.1:8700",
+			},
+			"http://1.1.1.1:8700",
+		},
+		{
+			"IP address with a port but without a scheme",
+			&Command{
+				flagServerAddr: "1.1.1.1:8500",
+			},
+			"1.1.1.1:8500",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			addr, err := c.cmd.consulServerAddr(hclog.New(&hclog.LoggerOptions{
+				Level:  3,
+				Output: os.Stderr,
+			}))
+			require.NoError(t, err)
+			require.Equal(t, c.expectedAddr, addr)
+		})
+	}
+}
+
 // generateCA generates Consul CA
 // and returns cert and key as pem strings.
 func generateCA(t *testing.T) (caPem, keyPem string) {
 	require := require.New(t)
 
-	sn, err := tlsutil.GenerateSerialNumber()
-	require.NoError(err)
-
-	var signer crypto.Signer
-	signer, keyPem, err = tlsutil.GeneratePrivateKey()
-	require.NoError(err)
-
-	constraints := []string{"consul", "localhost"}
-	caPem, err = tlsutil.GenerateCA(signer, sn, 1, constraints)
+	_, keyPem, caPem, _, err := cert.GenerateCA("Consul Agent CA - Test")
 	require.NoError(err)
 
 	return
@@ -336,34 +454,21 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 	require.NoError(err)
 
 	// Generate CA
-	sn, err := tlsutil.GenerateSerialNumber()
-	require.NoError(err)
-
-	s, _, err := tlsutil.GeneratePrivateKey()
-	require.NoError(err)
-
-	constraints := []string{"consul", "localhost"}
-	ca, err := tlsutil.GenerateCA(s, sn, 1, constraints)
+	signer, _, caCertPem, caCertTemplate, err := cert.GenerateCA("Consul Agent CA - Test")
 	require.NoError(err)
 
 	// Generate Server Cert
-	name := fmt.Sprintf("server.%s.%s", "dc1", "consul")
-	DNSNames := []string{name, "localhost"}
-	IPAddresses := []net.IP{net.ParseIP("127.0.0.1")}
-	extKeyUsage := []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
-
-	sn, err = tlsutil.GenerateSerialNumber()
-	require.NoError(err)
-
-	pub, priv, err := tlsutil.GenerateCert(s, ca, sn, name, 1, DNSNames, IPAddresses, extKeyUsage)
+	name := "server.dc1.consul"
+	hosts := []string{name, "localhost", "127.0.0.1"}
+	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
 	require.NoError(err)
 
 	// Write certs and key to files
-	_, err = caFile.WriteString(ca)
+	_, err = caFile.WriteString(caCertPem)
 	require.NoError(err)
-	_, err = certFile.WriteString(pub)
+	_, err = certFile.WriteString(certPem)
 	require.NoError(err)
-	_, err = certKeyFile.WriteString(priv)
+	_, err = certKeyFile.WriteString(keyPem)
 	require.NoError(err)
 
 	cleanupFunc := func() {
@@ -380,7 +485,7 @@ type fakeProvider struct {
 
 func (p *fakeProvider) Addrs(args map[string]string, l *log.Logger) ([]string, error) {
 	p.addrsNumCalls++
-	return []string{"127.0.0.1"}, nil
+	return []string{args["address"]}, nil
 }
 
 func (p *fakeProvider) Help() string {
