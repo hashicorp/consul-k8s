@@ -68,7 +68,7 @@ spec:
                   name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
                   key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
             {{- end }}
-            {{- if .Values.global.bootstrapACLs }}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -152,7 +152,7 @@ spec:
                 -k8s-namespace-mirroring-prefix={{ .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }} \
                 {{- end }}
                 {{- end }}
-                {{- if .Values.global.bootstrapACLs }}
+                {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
@@ -176,9 +176,9 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 5
-      {{- if or .Values.global.bootstrapACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- if or (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
-      {{- if .Values.global.bootstrapACLs }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
       - name: sync-acl-init
         image: {{ .Values.global.imageK8S }}
         command:

@@ -38,7 +38,7 @@ global:
   # Note: support for the catalog sync's liveness and readiness probes was added
   # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
-  # If using bootstrapACLs then must be >= 0.10.1.
+  # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
   imageK8S: "hashicorp/consul-k8s:0.12.0"
@@ -72,11 +72,6 @@ global:
     # secretKey is the key within the Kubernetes secret that holds the gossip
     # encryption key.
     secretKey: ""
-
-  # bootstrapACLs will automatically create and assign ACL tokens within
-  # the Consul cluster. This requires servers to be running inside Kubernetes.
-  # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
-  bootstrapACLs: false
 
   # Enables TLS encryption across the cluster to verify authenticity of the
   # servers and clients that connect. Note: It is HIGHLY recommended that you also
@@ -163,8 +158,17 @@ global:
     # This setting must be true in both primary and secondary datacenters.
     enabled: false
 
+  # [DEPRECATED] Use acls.manageSystemACLs instead.
+  bootstrapACLs: false
+
   # Configure ACLs.
   acls:
+
+    # If true, the Helm chart will automatically manage ACL tokens and policies
+    # for all Consul components. This requires servers to be running inside Kubernetes.
+    # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
+    manageSystemACLs: false
+
     # If true, an ACL token will be created that can be used in secondary
     # datacenters for replication. This should only be set to true in the
     # primary datacenter since the replication token must be created from that
@@ -766,15 +770,16 @@ connectInject:
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.0.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
-  # If not using global.bootstrapACLs and instead manually setting up an auth
-  # method for Connect inject, set this to the name of your auth method.
+  # If not using global.acls.manageSystemACLs and instead manually setting up an
+  # auth method for Connect inject, set this to the name of your auth method.
   overrideAuthMethodName: ""
 
   # aclInjectToken refers to a Kubernetes secret that you have created that contains
   # an ACL token for your Consul cluster which allows the Connect injector the correct
   # permissions. This is only needed if Consul namespaces [Enterprise only] and ACLs
-  # are enabled on the Consul cluster and you are not setting `global.bootstrapACLs`
-  # to `true`. This token needs to have `operator = "write"` privileges to be able to
+  # are enabled on the Consul cluster and you are not setting
+  # `global.acls.manageSystemACLs` to `true`.
+  # This token needs to have `operator = "write"` privileges to be able to
   # create Consul namespaces.
   aclInjectToken:
     secretName: null
@@ -808,7 +813,8 @@ meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
   # See https://www.consul.io/docs/connect/mesh_gateway.html
-  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using global.bootstrapACLs.
+  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using
+  # global.acls.manageSystemACLs.
   enabled: false
 
   # Globally configure which mode the gateway should run in.
@@ -892,8 +898,8 @@ meshGateway:
   dnsPolicy: null
 
   # Override the default 'mesh-gateway' service name registered in Consul.
-  # Cannot be used if bootstrapACLs is true since the ACL token generated
-  # is only for the name 'mesh-gateway'.
+  # Cannot be used if global.acls.manageSystemACLs is true since the ACL token
+  # generated is only for the name 'mesh-gateway'.
   consulServiceName: ""
 
   # Port that the gateway will run on inside the container.
