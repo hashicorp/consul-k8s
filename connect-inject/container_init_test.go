@@ -164,6 +164,35 @@ services {
 		},
 
 		{
+			"Multiple upstream services",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "db:1234, db:2345, db:3456"
+				return pod
+			},
+			`proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+    upstreams {
+      destination_type = "service" 
+      destination_name = "db"
+      local_bind_port = 1234
+    }
+    upstreams {
+      destination_type = "service" 
+      destination_name = "db"
+      local_bind_port = 2345
+    }
+    upstreams {
+      destination_type = "service" 
+      destination_name = "db"
+      local_bind_port = 3456
+    }
+  }`,
+			"",
+		},
+
+		{
 			"Upstream datacenter specified",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
@@ -208,6 +237,35 @@ services {
       destination_type = "prepared_query" 
       destination_name = "handle"
       local_bind_port = 1234
+    }
+  }`,
+			"",
+		},
+
+		{
+			"Upstream prepared queries and non-query",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationUpstreams] = "prepared_query:handle:8200, servicename:8201, prepared_query:6687bd19-5654-76be-d764:8202"
+				return pod
+			},
+			`proxy {
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+    upstreams {
+      destination_type = "prepared_query" 
+      destination_name = "handle"
+      local_bind_port = 8200
+    }
+    upstreams {
+      destination_type = "service" 
+      destination_name = "servicename"
+      local_bind_port = 8201
+    }
+    upstreams {
+      destination_type = "prepared_query" 
+      destination_name = "6687bd19-5654-76be-d764"
+      local_bind_port = 8202
     }
   }`,
 			"",
