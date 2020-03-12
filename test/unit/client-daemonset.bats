@@ -546,12 +546,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: both ACL and TLS init containers are created when global.tls.enabled=true and global.bootstrapACLs=true" {
+@test "client/DaemonSet: both ACL and TLS init containers are created when global.tls.enabled=true and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local has_acl_init_container=$(helm template \
       -x templates/client-daemonset.yaml  \
       --set 'global.tls.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | length > 0' | tee /dev/stderr)
 
@@ -560,7 +560,7 @@ load _helpers
   local has_tls_init_container=$(helm template \
       -x templates/client-daemonset.yaml  \
       --set 'global.tls.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | length > 0' | tee /dev/stderr)
 
@@ -757,23 +757,23 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "client/DaemonSet: aclconfig volume is created when global.bootstrapACLs=true" {
+@test "client/DaemonSet: aclconfig volume is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[2].name == "aclconfig"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: aclconfig volumeMount is created when global.bootstrapACLs=true" {
+@test "client/DaemonSet: aclconfig volumeMount is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[2]' | tee /dev/stderr)
 
@@ -786,21 +786,21 @@ load _helpers
   [ "${actual}" = "/consul/aclconfig" ]
 }
 
-@test "client/DaemonSet: command includes aclconfig dir when global.bootstrapACLs=true" {
+@test "client/DaemonSet: command includes aclconfig dir when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("/consul/aclconfig"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: init container is created when global.bootstrapACLs=true" {
+@test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 

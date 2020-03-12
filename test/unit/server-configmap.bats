@@ -53,13 +53,13 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "server/ConfigMap: creates acl config with .global.bootstrapACLs enabled" {
+@test "server/ConfigMap: creates acl config with .global.acls.manageSystemACLs enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.data["acl-config.json"] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -173,7 +173,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -183,7 +183,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretName=name' \
       . | tee /dev/stderr |
       yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
@@ -194,7 +194,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr |
       yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
@@ -205,7 +205,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-config-configmap.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretName=name' \
       --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr |

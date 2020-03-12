@@ -55,27 +55,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.bootstrapACLs=true" {
+@test "server/EnterpriseLicense: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/enterprise-license-job.yaml \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "server/EnterpriseLicense: init container is created when global.bootstrapACLs=true" {
+@test "server/EnterpriseLicense: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
       -x templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 

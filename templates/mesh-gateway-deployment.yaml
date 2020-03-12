@@ -1,7 +1,7 @@
 {{- if .Values.meshGateway.enabled }}
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true" }}{{ end -}}
-{{- if and .Values.global.bootstrapACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.bootstrapACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
+{{- if and (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
 {{- /* The below test checks if clients are disabled (and if so, fails). We use the conditional from other client files and prepend 'not' */ -}}
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
 apiVersion: apps/v1
@@ -118,7 +118,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-                {{- if .Values.global.bootstrapACLs }}
+                {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
                 consul-k8s acl-init \
                   -secret-name="{{ template "consul.fullname" . }}-mesh-gateway-acl-token" \
                   -k8s-namespace={{ .Release.Namespace }} \
@@ -189,7 +189,7 @@ spec:
                 EOF
 
                 consul services register \
-                  {{- if .Values.global.bootstrapACLs }}
+                  {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
                   -token-file=/consul/service/acl-token \
                   {{- end }}
                   /consul/service/service.hcl
@@ -235,7 +235,7 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             {{- end }}
-            {{- if .Values.global.bootstrapACLs }}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -325,7 +325,7 @@ spec:
             - lifecycle-sidecar
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/bin/consul
-            {{- if .Values.global.bootstrapACLs }}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - -token-file=/consul/service/acl-token
             {{- end }}
       {{- if .Values.meshGateway.priorityClassName }}
