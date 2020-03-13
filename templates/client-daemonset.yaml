@@ -173,7 +173,7 @@ spec:
                 {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
-                {{- if (.Values.client.join) and (gt (len .Values.client.join) 0) }}
+                {{- if .Values.client.join }}
                 {{- range $value := .Values.client.join }}
                 -retry-join="{{ $value }}" \
                 {{- end }}
