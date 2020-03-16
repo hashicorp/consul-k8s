@@ -658,3 +658,126 @@ load _helpers
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.acls.createReplicationToken
+
+@test "serverACLInit/Job: -create-acl-replication-token is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: -create-acl-replication-token is true when acls.createReplicationToken is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.createReplicationToken=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# global.acls.replicationToken
+
+@test "serverACLInit/Job: -acl-replication-token-file is not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the volume doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.volumes | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the volume mount doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].volumeMounts | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -acl-replication-token-file is not set when acls.replicationToken.secretName is set but secretKey is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.replicationToken.secretName=name' \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the volume doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.volumes | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the volume mount doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].volumeMounts | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -acl-replication-token-file is not set when acls.replicationToken.secretKey is set but secretName is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.replicationToken.secretKey=key' \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the volume doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.volumes | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the volume mount doesn't exist
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].volumeMounts | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -acl-replication-token-file is set when acls.replicationToken.secretKey and secretName are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.replicationToken.secretName=name' \
+      --set 'global.acls.replicationToken.secretKey=key' \
+      . | tee /dev/stderr)
+
+  # Test the -acl-replication-token-file flag is set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file=/consul/acl/tokens/acl-replication-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the volume exists
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.volumes | map(select(.name == "acl-replication-token")) | length == 1' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the volume mount exists
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].volumeMounts | map(select(.name == "acl-replication-token")) | length == 1' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
