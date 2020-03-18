@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.18.0 (Mar 18, 2020)
+
 IMPROVEMENTS:
 
 * Allow setting your own certificate authority for Consul to Consul communication
