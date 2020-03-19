@@ -196,6 +196,10 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Unable to read ACL replication token from file %q: %s", c.flagACLReplicationTokenFile, err))
 			return 1
 		}
+		if len(tokenBytes) == 0 {
+			c.UI.Error(fmt.Sprintf("ACL replication token file %q is empty", c.flagACLReplicationTokenFile))
+			return 1
+		}
 		aclReplicationToken = strings.TrimSpace(string(tokenBytes))
 	}
 
@@ -378,14 +382,8 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// The DNS policy is attached to the anonymous token.
-	// If performing ACL replication, we assume that the primary datacenter
-	// has already created the DNS policy and attached it to the anonymous
-	// token. We don't want to modify the DNS policy in secondary datacenters
-	// because it is global and we can't create separate tokens for each
-	// secondary datacenter because the anonymous token is global.
-	if c.flagAllowDNS && c.flagACLReplicationTokenFile == "" {
-		err := c.configureDNSPolicies(consulClient)
+	if c.createAnonymousPolicy() {
+		err := c.configureAnonymousPolicy(consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -580,4 +578,27 @@ func (c *Command) consulDatacenter(client *api.Client) (string, error) {
 		return "", fmt.Errorf("value of Config.Datacenter was empty string: %s", agentCfg)
 	}
 	return dc, nil
+}
+
+// createAnonymousPolicy returns whether we should create a policy for the
+// anonymous ACL token, i.e. queries without ACL tokens.
+func (c *Command) createAnonymousPolicy() bool {
+	// If c.flagACLReplicationTokenFile is set then we're in a secondary DC.
+	// In this case we assume that the primary datacenter has already created
+	// the anonymous policy and attached it to the anonymous token.
+	// We don't want to modify the anonymous policy in secondary datacenters
+	// because it is global and we can't create separate tokens for each
+	// secondary datacenter because the anonymous token is global.
+	return c.flagACLReplicationTokenFile == "" &&
+		// Consul DNS requires the anonymous policy because DNS queries don't
+		// have ACL tokens.
+		(c.flagAllowDNS ||
+			// If the connect auth method and ACL replication token are being
+			// created then we know we're using multi-dc Connect.
+			// In this case the anonymous policy is required because Connect
+			// services in Kubernetes have local tokens which are stripped
+			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
+			// token. Cross-dc API calls are needed by the Connect proxies to talk
+			// cross-dc.
+			(c.flagCreateInjectAuthMethod && c.flagCreateACLReplicationToken))
 }

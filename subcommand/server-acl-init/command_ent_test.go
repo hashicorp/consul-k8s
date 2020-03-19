@@ -249,7 +249,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 
 			// Check that the expected policies were created.
 			firstRunExpectedPolicies := []string{
-				"dns-policy",
+				"anonymous-token-policy",
 				"client-token",
 				"catalog-sync-token",
 				"connect-inject-token",
@@ -295,7 +295,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 
 			// Check that the policies have all been updated.
 			secondRunExpectedPolicies := []string{
-				"dns-policy",
+				"anonymous-token-policy",
 				"client-token",
 				"catalog-sync-token",
 				"connect-inject-token",
