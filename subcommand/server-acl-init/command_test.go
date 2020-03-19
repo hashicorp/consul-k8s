@@ -439,56 +439,129 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 	}
 }
 
-func TestRun_AllowDNS(t *testing.T) {
+// Test the conditions under which we should create the anonymous token
+// policy.
+func TestRun_AnonymousTokenPolicy(t *testing.T) {
 	t.Parallel()
-	k8s, testSvr := completeSetup(t, resourcePrefix)
-	defer testSvr.Stop()
-	require := require.New(t)
 
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
+	cases := map[string]struct {
+		Flags              []string
+		SecondaryDC        bool
+		ExpAnonymousPolicy bool
+	}{
+		"dns, primary dc": {
+			Flags:              []string{"-allow-dns"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: true,
+		},
+		"dns, secondary dc": {
+			Flags:              []string{"-allow-dns"},
+			SecondaryDC:        true,
+			ExpAnonymousPolicy: false,
+		},
+		"auth method, primary dc, no replication": {
+			Flags:              []string{"-create-inject-auth-method"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: false,
+		},
+		"auth method, primary dc, with replication": {
+			Flags:              []string{"-create-inject-auth-method", "-create-acl-replication-token"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: true,
+		},
+		"auth method, secondary dc": {
+			Flags:              []string{"-create-inject-auth-method"},
+			SecondaryDC:        true,
+			ExpAnonymousPolicy: false,
+		},
 	}
-	cmd.init()
-	cmdArgs := []string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-		"-allow-dns",
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			flags := c.Flags
+			var k8s *fake.Clientset
+			var consulHTTPAddr string
+			var consul *api.Client
+
+			if c.SecondaryDC {
+				var cleanup func()
+				bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+				k8s, consul, cleanup = mockReplicatedSetup(t, resourcePrefix,
+					bootToken)
+				defer cleanup()
+
+				tmp, err := ioutil.TempFile("", "")
+				require.NoError(t, err)
+				_, err = tmp.WriteString(bootToken)
+				require.NoError(t, err)
+				flags = append(flags, "-acl-replication-token-file", tmp.Name())
+			} else {
+				var testSvr *testutil.TestServer
+				k8s, testSvr = completeSetup(t, resourcePrefix)
+				defer testSvr.Stop()
+				consulHTTPAddr = testSvr.HTTPAddr
+			}
+			setUpK8sServiceAccount(t, k8s)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmd.init()
+			cmdArgs := append([]string{
+				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-expected-replicas=1",
+			}, flags...)
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			if !c.SecondaryDC {
+				bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+				var err error
+				consul, err = api.NewClient(&api.Config{
+					Address: consulHTTPAddr,
+					Token:   bootToken,
+				})
+				require.NoError(t, err)
+			}
+
+			anonPolicyName := "anonymous-token-policy"
+			if c.ExpAnonymousPolicy {
+				// Check that the anonymous token policy was created.
+				policy := policyExists(t, anonPolicyName, consul)
+				// Should be a global policy.
+				require.Len(t, policy.Datacenters, 0)
+
+				// Check that the anonymous token has the policy.
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: "anonymous"})
+				require.NoError(t, err)
+				require.Equal(t, "anonymous-token-policy", tokenData.Policies[0].Name)
+			} else {
+				policies, _, err := consul.ACL().PolicyList(nil)
+				require.NoError(t, err)
+				for _, p := range policies {
+					if p.Name == anonPolicyName {
+						t.Error("anon policy was created")
+					}
+				}
+			}
+
+			// Test that if the same command is re-run it doesn't error.
+			t.Run("retried", func(t *testing.T) {
+				ui := cli.NewMockUi()
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				cmd.init()
+				responseCode := cmd.Run(cmdArgs)
+				require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+			})
+		})
 	}
-	responseCode := cmd.Run(cmdArgs)
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Check that the dns policy was created.
-	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-	consul, err := api.NewClient(&api.Config{
-		Address: testSvr.HTTPAddr,
-		Token:   bootToken,
-	})
-	require.NoError(err)
-	policy := policyExists(t, "dns-policy", consul)
-	// Should be a global policy.
-	require.Len(policy.Datacenters, 0)
-
-	// Check that the anonymous token has the DNS policy.
-	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: "anonymous"})
-	require.NoError(err)
-	require.Equal("dns-policy", tokenData.Policies[0].Name)
-
-	// Test that if the same command is re-run it doesn't error.
-	t.Run("retried", func(t *testing.T) {
-		ui := cli.NewMockUi()
-		cmd := Command{
-			UI:        ui,
-			clientset: k8s,
-		}
-		cmd.init()
-		responseCode := cmd.Run(cmdArgs)
-		require.Equal(0, responseCode, ui.ErrorWriter.String())
-	})
 }
 
 func TestRun_ConnectInjectAuthMethod(t *testing.T) {
@@ -1535,39 +1608,45 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	})
 }
 
-// Test that if acl replication is enabled, we don't create a dns policy.
-func TestRun_AllowDNSFlag_IgnoredWithReplication(t *testing.T) {
-	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tokenFile, fileCleanup := writeTempFile(t, bootToken)
-	defer fileCleanup()
-	k8s, consul, cleanup := mockReplicatedSetup(t, resourcePrefix, bootToken)
-	defer cleanup()
+// Test that if acl replication is enabled, we don't create an anonymous token policy.
+func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
+	// The anonymous policy is configured when one of these flags is set.
+	cases := []string{"-allow-dns", "-create-inject-auth-method"}
+	for _, flag := range cases {
+		t.Run(flag, func(t *testing.T) {
+			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			tokenFile, fileCleanup := writeTempFile(t, bootToken)
+			defer fileCleanup()
+			k8s, consul, cleanup := mockReplicatedSetup(t, resourcePrefix, bootToken)
+			setUpK8sServiceAccount(t, k8s)
+			defer cleanup()
 
-	// Run the command.
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	cmd.init()
-	cmdArgs := []string{
-		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-		"-acl-replication-token-file", tokenFile,
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
-		"-resource-prefix=" + resourcePrefix,
-		"-allow-dns",
-	}
-	responseCode := cmd.Run(cmdArgs)
-	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmd.init()
+			cmdArgs := append([]string{
+				"-k8s-namespace=" + ns,
+				"-expected-replicas=1",
+				"-acl-replication-token-file", tokenFile,
+				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-resource-prefix=" + resourcePrefix,
+			}, flag)
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
-	// The DNS policy should not have been created.
-	policies, _, err := consul.ACL().PolicyList(nil)
-	require.NoError(t, err)
-	for _, p := range policies {
-		if p.Name == "dns-policy" {
-			require.Fail(t, "dns-policy exists")
-		}
+			// The anonymous token policy should not have been created.
+			policies, _, err := consul.ACL().PolicyList(nil)
+			require.NoError(t, err)
+			for _, p := range policies {
+				if p.Name == "anonymous-token-policy" {
+					require.Fail(t, "anonymous-token-policy exists")
+				}
+			}
+		})
 	}
 }
 
