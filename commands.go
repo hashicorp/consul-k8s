@@ -7,6 +7,7 @@ import (
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdLifecycleSidecar "github.com/hashicorp/consul-k8s/subcommand/lifecycle-sidecar"
+	cmdLoadBalancerAddress "github.com/hashicorp/consul-k8s/subcommand/load-balancer-address"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
@@ -43,6 +44,10 @@ func init() {
 
 		"delete-completed-job": func() (cli.Command, error) {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
+		},
+
+		"load-balancer-address": func() (cli.Command, error) {
+			return &cmdLoadBalancerAddress.Command{UI: ui}, nil
 		},
 
 		"version": func() (cli.Command, error) {
