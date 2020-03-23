@@ -1,6 +1,7 @@
-package loadbalanceraddress
+package serviceaddress
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -57,7 +59,7 @@ func TestRun_UnableToWriteToFile(t *testing.T) {
 
 	// Create the service.
 	k8s := fake.NewSimpleClientset()
-	_, err := k8s.CoreV1().Services(k8sNS).Create(kubeSvc(svcName, expAddress, ""))
+	_, err := k8s.CoreV1().Services(k8sNS).Create(kubeLoadBalancerSvc(svcName, expAddress, ""))
 	require.NoError(err)
 
 	// Run command with an unwriteable file.
@@ -76,39 +78,64 @@ func TestRun_UnableToWriteToFile(t *testing.T) {
 		"Unable to write address to file: open /this/filepath/does/not/exist: no such file or directory")
 }
 
-// Test running with different permutations of ingress.
-func TestRun_LoadBalancerIngressPermutations(t *testing.T) {
+// Test running with different service types.
+func TestRun_ServiceTypes(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
+	// All services will have the name "service-name"
 	cases := map[string]struct {
-		Ingress    []v1.LoadBalancerIngress
-		ExpAddress string
+		Service              *v1.Service
+		ServiceModificationF func(*v1.Service)
+		ExpErr               string
+		ExpAddress           string
 	}{
-		"ip": {
-			Ingress: []v1.LoadBalancerIngress{
-				{
-					IP: "1.2.3.4",
-				},
-			},
+		"ClusterIP": {
+			Service:    kubeClusterIPSvc("service-name"),
+			ExpAddress: "5.6.7.8",
+		},
+		"NodePort": {
+			Service: kubeNodePortSvc("service-name"),
+			ExpErr:  "services of type NodePort are not supported",
+		},
+		"LoadBalancer IP": {
+			Service:    kubeLoadBalancerSvc("service-name", "1.2.3.4", ""),
 			ExpAddress: "1.2.3.4",
 		},
-		"hostname": {
-			Ingress: []v1.LoadBalancerIngress{
-				{
-					Hostname: "example.com",
-				},
-			},
+		"LoadBalancer Hostname": {
+			Service:    kubeLoadBalancerSvc("service-name", "", "example.com"),
 			ExpAddress: "example.com",
 		},
-		"empty first ingress": {
-			Ingress: []v1.LoadBalancerIngress{
-				{},
-				{
-					IP: "1.2.3.4",
+		"LoadBalancer IP and hostname": {
+			Service:    kubeLoadBalancerSvc("service-name", "1.2.3.4", "example.com"),
+			ExpAddress: "1.2.3.4",
+		},
+		"LoadBalancer first ingress empty": {
+			Service: kubeLoadBalancerSvc("service-name", "1.2.3.4", "example.com"),
+			ServiceModificationF: func(svc *v1.Service) {
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+					{},
+					{
+						IP: "5.6.7.8",
+					},
+				}
+			},
+			ExpAddress: "5.6.7.8",
+		},
+		"ExternalName": {
+			Service: kubeExternalNameSvc("service-name"),
+			ExpErr:  "services of type ExternalName are not supported",
+		},
+		"invalid name": {
+			Service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "service-name",
+				},
+				Spec: v1.ServiceSpec{
+					Type: "invalid",
 				},
 			},
-			ExpAddress: "1.2.3.4",
+			ExpErr: "unknown service type \"invalid\"",
 		},
 	}
 
@@ -119,17 +146,10 @@ func TestRun_LoadBalancerIngressPermutations(t *testing.T) {
 
 			// Create the service.
 			k8s := fake.NewSimpleClientset()
-			svc := &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: svcName,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: c.Ingress,
-					},
-				},
+			if c.ServiceModificationF != nil {
+				c.ServiceModificationF(c.Service)
 			}
-			_, err := k8s.CoreV1().Services(k8sNS).Create(svc)
+			_, err := k8s.CoreV1().Services(k8sNS).Create(c.Service)
 			require.NoError(err)
 
 			// Run command.
@@ -148,11 +168,15 @@ func TestRun_LoadBalancerIngressPermutations(t *testing.T) {
 				"-name", svcName,
 				"-output-file", outputFile,
 			})
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
-			actAddressBytes, err := ioutil.ReadFile(outputFile)
-			require.NoError(err)
-			require.Equal(c.ExpAddress, string(actAddressBytes))
-
+			if c.ExpErr != "" {
+				require.Equal(1, responseCode)
+				require.Contains(ui.ErrorWriter.String(), c.ExpErr)
+			} else {
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
+				actAddressBytes, err := ioutil.ReadFile(outputFile)
+				require.NoError(err)
+				require.Equal(c.ExpAddress, string(actAddressBytes))
+			}
 		})
 	}
 }
@@ -194,18 +218,17 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 			k8s := fake.NewSimpleClientset()
 
 			if c.InitialService {
-				_, err := k8s.CoreV1().Services(k8sNS).Create(&v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: svcName,
-					},
-				})
+				svc := kubeLoadBalancerSvc(svcName, "", "")
+				// Reset the status to nothing.
+				svc.Status = v1.ServiceStatus{}
+				_, err := k8s.CoreV1().Services(k8sNS).Create(svc)
 				require.NoError(t, err)
 			}
 
 			// Create/update the service after delay.
 			go func() {
 				time.Sleep(c.UpdateDelay)
-				svc := kubeSvc(svcName, ip, "")
+				svc := kubeLoadBalancerSvc(svcName, ip, "")
 				var err error
 				if c.InitialService {
 					_, err = k8s.CoreV1().Services(k8sNS).Update(svc)
@@ -240,10 +263,25 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 	}
 }
 
-func kubeSvc(name string, ip string, hostname string) *v1.Service {
+func kubeLoadBalancerSvc(name string, ip string, hostname string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+		},
+		Spec: v1.ServiceSpec{
+			Type:      "LoadBalancer",
+			ClusterIP: "9.0.1.2",
+			Ports: []v1.ServicePort{
+				{
+					Name:     "http",
+					Protocol: "TCP",
+					Port:     80,
+					TargetPort: intstr.IntOrString{
+						IntVal: 8080,
+					},
+					NodePort: 32001,
+				},
+			},
 		},
 		Status: v1.ServiceStatus{
 			LoadBalancer: v1.LoadBalancerStatus{
@@ -254,6 +292,63 @@ func kubeSvc(name string, ip string, hostname string) *v1.Service {
 					},
 				},
 			},
+		},
+	}
+}
+
+func kubeNodePortSvc(name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ServiceSpec{
+			Type:      "NodePort",
+			ClusterIP: "1.2.3.4",
+			Ports: []v1.ServicePort{
+				{
+					Name:     "http",
+					Protocol: "TCP",
+					Port:     80,
+					TargetPort: intstr.IntOrString{
+						IntVal: 8080,
+					},
+					NodePort: 32000,
+				},
+			},
+		},
+	}
+}
+
+func kubeClusterIPSvc(name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ServiceSpec{
+			Type:      "ClusterIP",
+			ClusterIP: "5.6.7.8",
+			Ports: []v1.ServicePort{
+				{
+					Name:     "http",
+					Protocol: "TCP",
+					Port:     80,
+					TargetPort: intstr.IntOrString{
+						IntVal: 8080,
+					},
+				},
+			},
+		},
+	}
+}
+
+func kubeExternalNameSvc(name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ServiceSpec{
+			Type:         "ExternalName",
+			ExternalName: fmt.Sprintf("%s.example.com", name),
 		},
 	}
 }
