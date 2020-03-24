@@ -175,8 +175,7 @@ spec:
           - |
             consul-k8s acl-init \
               -secret-name="{{ template "consul.fullname" . }}-catalog-sync-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }} \
-              -init-type="sync"
+              -k8s-namespace={{ .Release.Namespace }}
       {{- end }}
       {{- if .Values.syncCatalog.nodeSelector }}
       nodeSelector:
