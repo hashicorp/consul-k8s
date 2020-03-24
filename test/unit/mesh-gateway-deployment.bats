@@ -624,7 +624,6 @@ consul services register \
   exp='consul-k8s acl-init \
   -secret-name="release-name-consul-mesh-gateway-acl-token" \
   -k8s-namespace=default \
-  -init-type="sync" \
   -token-sink-file=/consul/service/acl-token
 
 consul-k8s service-address \

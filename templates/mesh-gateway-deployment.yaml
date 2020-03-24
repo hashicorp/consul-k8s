@@ -112,7 +112,6 @@ spec:
                 consul-k8s acl-init \
                   -secret-name="{{ template "consul.fullname" . }}-mesh-gateway-acl-token" \
                   -k8s-namespace={{ .Release.Namespace }} \
-                  -init-type="sync" \
                   -token-sink-file=/consul/service/acl-token
                 {{ end }}
 
