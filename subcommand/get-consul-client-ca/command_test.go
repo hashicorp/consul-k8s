@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-discover"
-	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
@@ -32,6 +32,13 @@ func TestRun_FlagsValidation(t *testing.T) {
 		{
 			flags: []string{
 				"-output-file=output.pem",
+			},
+			expErr: "-server-addr must be set",
+		},
+		{
+			flags: []string{
+				"-output-file=output.pem",
+				"-server-addr=foo.com",
 				"-log-level=invalid-log-level",
 			},
 			expErr: "Unknown log level: invalid-log-level",
@@ -61,6 +68,9 @@ func TestRun(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
+	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	defer cleanup()
+
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
@@ -71,19 +81,28 @@ func TestRun(t *testing.T) {
 		c.Connect = map[string]interface{}{
 			"enabled": true,
 		}
+		c.CAFile = caFile
+		c.CertFile = certFile
+		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
 	defer a.Stop()
 
 	// run the command
 	exitCode := cmd.Run([]string{
-		"-server-addr", a.HTTPAddr,
+		"-server-addr", strings.Split(a.HTTPSAddr, ":")[0],
+		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
+		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
+		Address: a.HTTPSAddr,
+		Scheme:  "https",
+		TLSConfig: api.TLSConfig{
+			CAFile: caFile,
+		},
 	})
 	require.NoError(t, err)
 
@@ -111,6 +130,9 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
+	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	defer cleanup()
+
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
@@ -135,12 +157,17 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.Connect = map[string]interface{}{
 				"enabled": true,
 			}
+			c.CAFile = caFile
+			c.CertFile = certFile
+			c.KeyFile = keyFile
 		})
 		require.NoError(t, err)
 	}()
 
 	exitCode := cmd.Run([]string{
-		"-server-addr", fmt.Sprintf("http://127.0.0.1:%d", randomPorts[1]),
+		"-server-addr", "localhost",
+		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
+		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
 	})
 	require.Equal(t, 0, exitCode)
@@ -152,7 +179,11 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	defer a.Stop()
 
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
+		Address: a.HTTPSAddr,
+		Scheme:  "https",
+		TLSConfig: api.TLSConfig{
+			CAFile: caFile,
+		},
 	})
 	require.NoError(t, err)
 
@@ -183,6 +214,9 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
+	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	defer cleanup()
+
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
@@ -193,12 +227,19 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 		c.Connect = map[string]interface{}{
 			"enabled": true,
 		}
+		c.CAFile = caFile
+		c.CertFile = certFile
+		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
 	defer a.Stop()
 
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPAddr,
+		Address: a.HTTPSAddr,
+		Scheme:  "https",
+		TLSConfig: api.TLSConfig{
+			CAFile: caFile,
+		},
 	})
 	require.NoError(t, err)
 
@@ -220,7 +261,9 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	})
 
 	exitCode := cmd.Run([]string{
-		"-server-addr", a.HTTPAddr,
+		"-server-addr", strings.Split(a.HTTPSAddr, ":")[0],
+		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
+		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
 	})
 	require.Equal(t, 0, exitCode)
@@ -268,7 +311,6 @@ func TestRun_WithProvider(t *testing.T) {
 	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
 	defer cleanup()
 
-	randomPorts := freeport.MustTake(5)
 	// start the test server
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.Connect = map[string]interface{}{
@@ -277,14 +319,6 @@ func TestRun_WithProvider(t *testing.T) {
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
-		c.Ports = &testutil.TestPortConfig{
-			DNS:     randomPorts[0],
-			HTTP:    randomPorts[1],
-			HTTPS:   8501,
-			SerfLan: randomPorts[2],
-			SerfWan: randomPorts[3],
-			Server:  randomPorts[4],
-		}
 	})
 	require.NoError(t, err)
 	defer a.Stop()
@@ -292,7 +326,7 @@ func TestRun_WithProvider(t *testing.T) {
 	// run the command
 	exitCode := cmd.Run([]string{
 		"-server-addr", "provider=fake address=127.0.0.1",
-		"-tls-server-name", "localhost",
+		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-output-file", outputFile.Name(),
 		"-ca-file", caFile,
 	})
@@ -323,105 +357,6 @@ func TestRun_WithProvider(t *testing.T) {
 	actualCARoot, err := ioutil.ReadFile(outputFile.Name())
 	require.NoError(t, err)
 	require.Equal(t, expectedCARoot, string(actualCARoot))
-}
-
-func TestConsulServerAddr(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name         string
-		cmd          *Command
-		expectedAddr string
-	}{
-		{
-			"cloud auto-join string",
-			&Command{
-				flagServerAddr: "provider=fake address=external-server-address",
-				providers:      map[string]discover.Provider{"fake": &fakeProvider{}},
-			},
-			"https://external-server-address:8501",
-		},
-		{
-			"DNS address without a port and scheme",
-			&Command{
-				flagServerAddr: "server-address",
-			},
-			"https://server-address:8501",
-		},
-		{
-			"DNS address without a port and with HTTP scheme",
-			&Command{
-				flagServerAddr: "http://server-address",
-			},
-			"http://server-address:8500",
-		},
-		{
-			"DNS address without a port and with HTTPS scheme",
-			&Command{
-				flagServerAddr: "https://server-address",
-			},
-			"https://server-address:8501",
-		},
-		{
-			"DNS address with a port and HTTP scheme",
-			&Command{
-				flagServerAddr: "http://server-address:8700",
-			},
-			"http://server-address:8700",
-		},
-		{
-			"DNS address with a port but without a scheme",
-			&Command{
-				flagServerAddr: "server-address:8500",
-			},
-			"server-address:8500",
-		},
-		{
-			"IP address without a port and scheme",
-			&Command{
-				flagServerAddr: "1.1.1.1",
-			},
-			"https://1.1.1.1:8501",
-		},
-		{
-			"IP address without a port and with HTTP scheme",
-			&Command{
-				flagServerAddr: "http://1.1.1.1",
-			},
-			"http://1.1.1.1:8500",
-		},
-		{
-			"IP address without a port and with HTTPS scheme",
-			&Command{
-				flagServerAddr: "https://1.1.1.1",
-			},
-			"https://1.1.1.1:8501",
-		},
-		{
-			"IP address with a port and HTTP scheme",
-			&Command{
-				flagServerAddr: "http://1.1.1.1:8700",
-			},
-			"http://1.1.1.1:8700",
-		},
-		{
-			"IP address with a port but without a scheme",
-			&Command{
-				flagServerAddr: "1.1.1.1:8500",
-			},
-			"1.1.1.1:8500",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			addr, err := c.cmd.consulServerAddr(hclog.New(&hclog.LoggerOptions{
-				Level:  3,
-				Output: os.Stderr,
-			}))
-			require.NoError(t, err)
-			require.Equal(t, c.expectedAddr, addr)
-		})
-	}
 }
 
 // generateCA generates Consul CA

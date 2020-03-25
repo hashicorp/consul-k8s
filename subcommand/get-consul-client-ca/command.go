@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ type Command struct {
 
 	flagOutputFile      string
 	flagServerAddr      string
+	flagServerPort      string
 	flagCAFile          string
 	flagTLSServerName   string
 	flagPollingInterval time.Duration
@@ -41,16 +41,14 @@ type Command struct {
 	providers map[string]discover.Provider
 }
 
-const defaultConsulHTTPPort = 8500
-const defaultConsulHTTPSPort = 8501
-
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagOutputFile, "output-file", "",
 		"The file path for writing the Consul client's CA certificate.")
 	c.flags.StringVar(&c.flagServerAddr, "server-addr", "",
 		"The address of the Consul server or the cloud auto-join string. The server must be running with TLS enabled. "+
-			"The default HTTPS port 8501 will be used if port is not provided. The default value is http://127.0.0.1:8500.")
+			"This value is required.")
+	c.flags.StringVar(&c.flagServerPort, "server-port", "443", "The HTTPS port of the Consul server.")
 	c.flags.StringVar(&c.flagCAFile, "ca-file", "",
 		"The path to the CA file to use when making requests to the Consul server. This can also be provided via the CONSUL_CACERT environment variable instead if preferred. "+
 			"If both values are present, the flag value will be used.")
@@ -76,6 +74,11 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagOutputFile == "" {
 		c.UI.Error(fmt.Sprintf("-output-file must be set"))
+		return 1
+	}
+
+	if c.flagServerAddr == "" {
+		c.UI.Error(fmt.Sprintf("-server-addr must be set"))
 		return 1
 	}
 
@@ -127,23 +130,16 @@ func (c *Command) Run(args []string) int {
 }
 
 // consulClient returns a Consul API client.
-// It checks the server address and does the following
-//
-// 1. If the server address is a cloud auto-join URL,
-//    it calls go-discover library to discover server addresses,
-//    picks the first address from the list and assumes the default
-//    HTTPS port 8501.
-// 2. If the server address is lacking port, it assumes the
-//    the default HTTPS port 8501.
-// 3. Otherwise, it uses the address provided by the -server-addr flag
-//    or set by the CONSUL_HTTP_ADDR environment variable.
 func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 	// Create default Consul config.
 	// This will also read any environment variables.
 	cfg := api.DefaultConfig()
 
+	// change the scheme to HTTPS
+	// since we don't want to send unencrypted requests
+	cfg.Scheme = "https"
+
 	addr, err := c.consulServerAddr(logger)
-	fmt.Println("addr", addr)
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +159,14 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 	return api.NewClient(cfg)
 }
 
+// consulServerAddr returns the consul server address
+// as a string in the <server_ip_or_dns_name>:<server_port> format.
+//
+// 1. If the server address is a cloud auto-join URL,
+//    it calls go-discover library to discover server addresses,
+//    picks the first address from the list and uses the provided port.
+// 2. Otherwise, it uses the address provided by the -server-addr
+//    and the -server-port flags.
 func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 	// First, check if the server address is a cloud auto-join string.
 	// If it is, discover server addresses through the cloud provider.
@@ -190,42 +194,13 @@ func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 
 		// Pick the first server from the list,
 		// ignoring the port since we need to use HTTP API
+		// and don't care about the RPC port.
 		firstServer := strings.SplitN(servers[0], ":", 2)[0]
-		return fmt.Sprintf("https://%s:%d", firstServer, defaultConsulHTTPSPort), nil
-	} else {
-		// parse the server address and
-		// ignore the parse error here because
-		// the address is not necessarily a valid URL
-		url, _ := url.Parse(c.flagServerAddr)
-
-		if url != nil {
-			// if server address has a scheme but is missing a port,
-			// assume the default HTTPS port if the scheme is HTTPS,
-			// otherwise use the default HTTP port.
-			if url.Scheme == "https" && url.Port() == "" {
-				url.Host = fmt.Sprintf("%s:%d", url.Host, defaultConsulHTTPSPort)
-				return url.String(), nil
-			} else if url.Scheme == "http" && url.Port() == "" {
-				url.Host = fmt.Sprintf("%s:%d", url.Host, defaultConsulHTTPPort)
-				return url.String(), nil
-			}
-		}
-
-		// If the parsed url has a scheme different from above and because of parsing
-		// ambiguities, there's no way for us to know whether someone has provided
-		// some other scheme or whether there wasn't a scheme. That's why going forward,
-		// we assume that the address didn't have a scheme.
-		// For an address without a scheme, we check if port is provided
-		parts := strings.SplitN(c.flagServerAddr, ":", 2)
-
-		// if port is missing, use the default HTTPS port and HTTPS scheme
-		if len(parts) == 1 {
-			return fmt.Sprintf("https://%s:%d", c.flagServerAddr, defaultConsulHTTPSPort), nil
-		}
-
-		// For all other cases, use the address the user has provided.
-		return c.flagServerAddr, nil
+		return fmt.Sprintf("%s:%s", firstServer, c.flagServerPort), nil
 	}
+
+	// Otherwise, return serverAddr:serverPort set by the provided flags
+	return fmt.Sprintf("%s:%s", c.flagServerAddr, c.flagServerPort), nil
 }
 
 // newDiscover initializes the new Discover object
