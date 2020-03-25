@@ -219,6 +219,9 @@ server:
     # - type: secret (or "configMap")
     #   name: my-secret
     #   load: false # if true, will add to `-config-dir` to load by Consul
+    #   items: # optional items array
+    #   - key: key
+    #     path: path
 
   # Affinity Settings
   # Commenting out or setting as empty the affinity variable, will allow
