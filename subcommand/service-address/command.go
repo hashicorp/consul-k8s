@@ -1,4 +1,4 @@
-package loadbalanceraddress
+package serviceaddress
 
 import (
 	"errors"
@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -80,22 +81,43 @@ func (c *Command) Run(args []string) int {
 
 	// Run until we get an address from the service.
 	var address string
+	var unretryableErr error
 	backoff.Retry(withErrLogger(log, func() error {
 		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(c.flagServiceName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("getting service %s: %s", c.flagServiceName, err)
 		}
-		for _, ingr := range svc.Status.LoadBalancer.Ingress {
-			if ingr.IP != "" {
-				address = ingr.IP
-				return nil
-			} else if ingr.Hostname != "" {
-				address = ingr.Hostname
-				return nil
+		switch svc.Spec.Type {
+		case v1.ServiceTypeClusterIP:
+			address = svc.Spec.ClusterIP
+			return nil
+		case v1.ServiceTypeNodePort:
+			unretryableErr = errors.New("services of type NodePort are not supported")
+			return nil
+		case v1.ServiceTypeExternalName:
+			unretryableErr = errors.New("services of type ExternalName are not supported")
+			return nil
+		case v1.ServiceTypeLoadBalancer:
+			for _, ingr := range svc.Status.LoadBalancer.Ingress {
+				if ingr.IP != "" {
+					address = ingr.IP
+					return nil
+				} else if ingr.Hostname != "" {
+					address = ingr.Hostname
+					return nil
+				}
 			}
+			return fmt.Errorf("service %s has no ingress IP or hostname", c.flagServiceName)
+		default:
+			unretryableErr = fmt.Errorf("unknown service type %q", svc.Spec.Type)
+			return nil
 		}
-		return fmt.Errorf("service %s has no ingress IP or hostname", c.flagServiceName)
 	}), backoff.NewConstantBackOff(c.retryDuration))
+
+	if unretryableErr != nil {
+		c.UI.Error(fmt.Sprintf("Unable to get service address: %s", unretryableErr.Error()))
+		return 1
+	}
 
 	// Write the address to file.
 	err := ioutil.WriteFile(c.flagOutputFile, []byte(address), 0600)
@@ -145,12 +167,15 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Output Kubernetes LoadBalancer service ingress address to file"
+const synopsis = "Output Kubernetes Service address to file"
 const help = `
-Usage: consul-k8s load-balancer-address [options]
+Usage: consul-k8s service-address [options]
 
   Waits until the Kubernetes service specified by -name in namespace
-  -k8s-namespace is created and has an ingress address. Then writes the
-  address to -output-file.
-
+  -k8s-namespace is created, then writes its address to -output-file.
+  The address written depends on the service type:
+    ClusterIP - Cluster IP
+    NodePort - Not supported
+    LoadBalancer - Load balancer's IP or hostname
+    ExternalName - Not Supported
 `
