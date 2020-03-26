@@ -116,12 +116,35 @@ spec:
                   -token-sink-file=/consul/service/acl-token
                 {{ end }}
 
-                {{- if .Values.meshGateway.wanAddress.host }}
-                WAN_ADDR="{{ .Values.meshGateway.wanAddress.host }}"
-                {{- else if .Values.meshGateway.wanAddress.useNodeName }}
-                WAN_ADDR="${NODE_NAME}"
-                {{- else if .Values.meshGateway.wanAddress.useNodeIP }}
+                {{- $source := .Values.meshGateway.wanAddress.source }}
+                {{- $serviceType := .Values.meshGateway.service.type }}
+                {{- if and (eq $source "Service") (not .Values.meshGateway.service.enabled) }}{{ fail "if meshGateway.wanAddress.source=Service then meshGateway.service.enabled must be set to true" }}{{ end }}
+                {{- if or (eq $source "NodeIP") (and (eq $source "Service") (eq $serviceType "NodePort")) }}
                 WAN_ADDR="${HOST_IP}"
+                {{- else if eq $source "NodeName" }}
+                WAN_ADDR="${NODE_NAME}"
+                {{- else if and (eq $source "Service") (or (eq $serviceType "ClusterIP") (eq $serviceType "LoadBalancer")) }}
+                consul-k8s service-address \
+                  -k8s-namespace={{ .Release.Namespace }} \
+                  -name={{ template "consul.fullname" . }}-mesh-gateway \
+                  -output-file=address.txt
+                WAN_ADDR="$(cat address.txt)"
+                {{- else if eq $source "Static" }}
+                {{- if eq .Values.meshGateway.wanAddress.static "" }}{{ fail "if meshGateway.wanAddress.source=Static then meshGateway.wanAddress.static cannot be empty" }}{{ end }}
+                WAN_ADDR="{{ .Values.meshGateway.wanAddress.static }}"
+                {{- else }}
+                {{- fail "currently set meshGateway values for wanAddress.source and service.type are not supported" }}
+                {{- end }}
+
+                {{- if eq $source "Service" }}
+                {{- if eq $serviceType "NodePort" }}
+                {{- if not .Values.meshGateway.service.nodePort }}{{ fail "if meshGateway.wanAddress.source=Service and meshGateway.service.type=NodePort, meshGateway.service.nodePort must be set" }}{{ end }}
+                WAN_PORT="{{ .Values.meshGateway.service.nodePort }}"
+                {{- else }}
+                WAN_PORT="{{ .Values.meshGateway.service.port }}"
+                {{- end }}
+                {{- else }}
+                WAN_PORT="{{ .Values.meshGateway.wanAddress.port }}"
                 {{- end }}
 
                 cat > /consul/service/service.hcl << EOF
@@ -140,17 +163,9 @@ spec:
                       address = "${POD_IP}"
                       port = {{ .Values.meshGateway.containerPort }}
                     }
-                    lan_ipv4 {
-                      address = "${POD_IP}"
-                      port = {{ .Values.meshGateway.containerPort }}
-                    }
                     wan {
                       address = "${WAN_ADDR}"
-                      port = {{ .Values.meshGateway.wanAddress.port }}
-                    }
-                    wan_ipv4 {
-                      address = "${WAN_ADDR}"
-                      port = {{ .Values.meshGateway.wanAddress.port }}
+                      port = ${WAN_PORT}
                     }
                   }
                   checks = [
