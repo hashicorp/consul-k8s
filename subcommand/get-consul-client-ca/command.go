@@ -190,7 +190,7 @@ func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 			return "", fmt.Errorf("could not discover any Consul servers with %q", c.flagServerAddr)
 		}
 
-		logger.Debug("discovered servers", strings.Join(servers, " "))
+		logger.Debug("discovered servers", "servers", strings.Join(servers, " "))
 
 		// Pick the first server from the list,
 		// ignoring the port since we need to use HTTP API
