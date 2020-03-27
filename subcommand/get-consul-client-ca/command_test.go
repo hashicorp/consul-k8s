@@ -163,6 +163,11 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		})
 		require.NoError(t, err)
 	}()
+	defer func() {
+		if a != nil {
+			a.Stop()
+		}
+	}()
 
 	exitCode := cmd.Run([]string{
 		"-server-addr", "localhost",
@@ -171,12 +176,6 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-output-file", outputFile.Name(),
 	})
 	require.Equal(t, 0, exitCode)
-
-	// make sure a has been initialized by the time we call Stop()
-	retry.Run(t, func(r *retry.R) {
-		require.NotNil(r, a)
-	})
-	defer a.Stop()
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPSAddr,
