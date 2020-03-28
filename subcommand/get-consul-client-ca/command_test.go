@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -142,6 +143,8 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 
 	// Start the consul agent asynchronously
 	var a *testutil.TestServer
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		// start the test server after 100ms
 		time.Sleep(100 * time.Millisecond)
@@ -162,6 +165,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.KeyFile = keyFile
 		})
 		require.NoError(t, err)
+		wg.Done()
 	}()
 	defer func() {
 		if a != nil {
@@ -175,8 +179,9 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
 	})
-	require.Equal(t, 0, exitCode)
+	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
+	wg.Wait()
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPSAddr,
 		Scheme:  "https",
