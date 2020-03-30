@@ -7,10 +7,17 @@ Consul with Kubernetes available here:
 https://www.consul.io/docs/platform/k8s/index.html
 
 
-Your release is named {{ .Release.Name }}. To learn more about the release, try:
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release if you are using Helm 2, run:
 
   $ helm status {{ .Release.Name }}
   $ helm get {{ .Release.Name }}
+
+To learn more about the release if you are using Helm 3, run:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
 
 
 {{- if (and .Values.global.bootstrapACLs (gt (len .Values.server.extraConfig) 3)) }}

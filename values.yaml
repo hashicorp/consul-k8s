@@ -88,6 +88,13 @@ global:
   tls:
     enabled: false
 
+    # enableAutoEncrypt turns on the auto-encrypt feature on
+    # clients and servers.
+    # It also switches consul-k8s components to retrieve the CA
+    # from the servers via the API.
+    # Requires Consul 1.7.1+ and consul-k8s 0.13.0
+    enableAutoEncrypt: false
+
     # serverAdditionalDNSSANs is a list of additional DNS names to
     # set as Subject Alternative Names (SANs) in the server certificate.
     # This is useful when you need to access the Consul server(s) externally,
@@ -266,10 +273,19 @@ server:
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
 
-  # Extra annotations to attach to the server pods
-  # This should be a multi-line string mapping directly to the a map of
-  # the annotations to apply to the server pods
+  # Extra annotations to attach to the server pods.
+  # This should be a multi-line YAML string.
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
+
+  service:
+    # Annotations to apply to the server service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
+    annotations: null
 
   # extraEnvVars is a list of extra environment variables to set with the stateful set. These could be
   # used to include proxy settings required for cloud auto-join feature,
@@ -279,6 +295,40 @@ server:
     # http_proxy: http://localhost:3128,
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
+
+# Add configuration for Consul servers running externally,
+# i.e. outside of Kubernetes.
+# This information is required if Consul servers are running
+# outside of k8s and you’re setting global.tls.enableAutoEncrypt to true.
+externalServers:
+  enabled: false
+
+  # HTTPS configuration for external servers.
+  # Note: HTTP connections to the servers are
+  # not supported.
+  https:
+    # IP, DNS name, or Cloud auto-join string pointing to the external Consul servers.
+    # Note that if you’re providing the cloud auto-join string and multiple addresses
+    # can be returned, only the first address will be used.
+    # This value is required only if you would like to use
+    # a different server address from the one specified
+    # in the client.join property.
+    address: null
+
+    # The HTTPS port of the server.
+    port: 443
+
+    # tlsServerName is the server name to use as the SNI
+    # host header when connecting with HTTPS.
+    # This property is useful in case ‘externalServers.https.address’
+    # is not or can not be included in the server certificate’s SANs.
+    tlsServerName: null
+
+    # If true, the Helm chart will ignore the CA set in
+    # global.tls.caCert and will rely on the container's
+    # system CAs for TLS verification when talking to Consul servers.
+    # Otherwise, the chart will use global.tls.caCert.
+    useSystemRoots: false
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
@@ -360,8 +410,9 @@ client:
   priorityClassName: ""
 
   # Extra annotations to attach to the client pods
-  # This should be a multi-line string mapping directly to the a map of
-  # the annotations to apply to the client pods
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
 
   # extraEnvVars is a list of extra environment variables to set with the pod. These could be
@@ -441,9 +492,13 @@ ui:
   service:
     enabled: true
     type: null
-    # This should be a multi-line string mapping directly to the a map of
-    # the annotations to apply to the UI service
+
+    # Annotations to apply to the UI service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
     annotations: null
+
     # Additional ServiceSpec values
     # This should be a multi-line string mapping directly to a Kubernetes
     # ServiceSpec object.
@@ -595,11 +650,14 @@ connectInject:
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
 
-  # imageConsul and imageEnvoy can be set to Docker images for Consul and
-  # Envoy, respectively. If the Consul image is not specified, the global
-  # default will be used. If the Envoy image is not specified, an early
-  # version of Envoy will be used.
+  # The Docker image for Consul to use when performing Connect injection.
+  # Defaults to global.image.
   imageConsul: null
+
+  # The Docker image for envoy to use as the proxy sidecar when performing
+  # Connect injection. If using Consul 1.7+, the envoy version must be 1.13+.
+  # If not set, the image used depends on the consul-k8s version. For
+  # consul-k8s 0.12.0 the default is envoyproxy/envoy-alpine:v1.13.0.
   imageEnvoy: null
 
   # namespaceSelector is the selector for restricting the webhook to only
@@ -815,7 +873,10 @@ meshGateway:
     # a port.
     nodePort: null
 
-    # Optional YAML string for additional annotations.
+    # Annotations to apply to the mesh gateway service.
+    # Example:
+    #   annotations: |
+    #     "annotation-key": "annotation-value"
     annotations: null
 
     # Optional YAML string that will be appended to the Service spec.
@@ -882,7 +943,10 @@ meshGateway:
   # Optional priorityClassName.
   priorityClassName: ""
 
-  # Optional YAML string for additional annotations.
+  # Annotations to apply to the mesh gateway deployment.
+  # Example:
+  #   annotations: |
+  #     "annotation-key": "annotation-value"
   annotations: null
 
 # Control whether a test Pod manifest is generated when running helm template.

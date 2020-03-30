@@ -1,5 +1,39 @@
 ## Unreleased
 
+## 0.18.0 (Mar 18, 2020)
+
+IMPROVEMENTS:
+
+* Allow setting your own certificate authority for Consul to Consul communication
+(i.e. not Connect service to service communication) [[GH-346](https://github.com/hashicorp/consul-helm/pull/346)].
+  To use, set:
+  ```yaml
+  global:
+    tls:
+      caCert:
+        secretName: null
+        secretKey: null
+      caKey:
+        secretName: null
+        secretKey: null
+  ```
+  See `values.yaml` for more details.
+* Allow setting custom annotations for Consul server service [[GH-376](https://github.com/hashicorp/consul-helm/pull/376)]
+  To use, set:
+  ```yaml
+  server:
+    service:
+      annotations: |
+        "annotation-key": "annotation-value"
+  ```
+
+BUG FIXES:
+
+* Fix incompatibility with Helm 3.1.2. [[GH-390](https://github.com/hashicorp/consul-helm/issues/390)]
+* Ensure the Consul Enterprise license gets applied, even if servers take a long time to come up. [[GH-348](https://github.com/hashicorp/consul-helm/pull/348))
+
+## 0.17.0 (Feb 21, 2020)
+
 BREAKING CHANGES:
 
 * `consul-k8s` `v0.12.0`+ is now required. The chart is passing new flags that are only available in this version.

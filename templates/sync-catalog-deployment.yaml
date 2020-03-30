@@ -31,6 +31,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       {{- if .Values.global.tls.enabled }}
       volumes:
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.https.useSystemRoots) }}
       - name: consul-ca-cert
         secret:
           {{- if .Values.global.tls.caCert.secretName }}
@@ -41,6 +42,12 @@ spec:
           items:
           - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
             path: tls.crt
+      {{- end }}
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      - name: consul-auto-encrypt-ca-cert
+        emptyDir:
+          medium: "Memory"
+      {{- end }}
       {{- end }}
       containers:
         - name: consul-sync-catalog
@@ -79,7 +86,11 @@ spec:
             {{- end }}
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
             - name: consul-ca-cert
+            {{- end }}
               mountPath: /consul/tls/ca
               readOnly: true
           {{- end }}
@@ -165,8 +176,9 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 5
-      {{- if .Values.global.bootstrapACLs }}
+      {{- if or .Values.global.bootstrapACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
+      {{- if .Values.global.bootstrapACLs }}
       - name: sync-acl-init
         image: {{ .Values.global.imageK8S }}
         command:
@@ -176,6 +188,10 @@ spec:
             consul-k8s acl-init \
               -secret-name="{{ template "consul.fullname" . }}-catalog-sync-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
+      {{- end }}
+      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
+      {{- end }}
       {{- end }}
       {{- if .Values.syncCatalog.nodeSelector }}
       nodeSelector:
