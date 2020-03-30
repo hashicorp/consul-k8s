@@ -69,7 +69,7 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
-        - name: tls-server-cert
+        - name: consul-server-cert
           secret:
             secretName: {{ template "consul.fullname" . }}-server-cert
         {{- end }}
@@ -125,6 +125,9 @@ spec:
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 -hcl='cert_file = "/consul/tls/server/tls.crt"' \
                 -hcl='key_file = "/consul/tls/server/tls.key"' \
+                {{- if .Values.global.tls.enableAutoEncrypt }}
+                -hcl='auto_encrypt = {allow_tls = true}' \
+                {{- end }}
                 {{- if .Values.global.tls.verify }}
                 -hcl='verify_incoming_rpc = true' \
                 -hcl='verify_outgoing = true' \
@@ -167,7 +170,7 @@ spec:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca/
               readOnly: true
-            - name: tls-server-cert
+            - name: consul-server-cert
               mountPath: /consul/tls/server
               readOnly: true
             {{- end }}

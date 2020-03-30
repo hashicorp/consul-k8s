@@ -14,7 +14,8 @@ metadata:
 spec:
   {{- if .Values.global.tls.enabled }}
   volumes:
-    - name: tls-ca-cert
+    {{- if not (and .Values.externalServers.enabled .Values.externalServers.https.useSystemRoots) }}
+    - name: consul-ca-cert
       secret:
         {{- if .Values.global.tls.caCert.secretName }}
         secretName: {{ .Values.global.tls.caCert.secretName }}
@@ -24,6 +25,14 @@ spec:
         items:
         - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
           path: tls.crt
+    {{- end }}
+    - name: consul-auto-encrypt-ca-cert
+      emptyDir:
+        medium: "Memory"
+  {{- end }}
+  {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
+  initContainers:
+  {{- include "consul.getAutoEncryptClientCA" . | nindent 2 }}
   {{- end }}
   containers:
     - name: consul-test
@@ -44,9 +53,15 @@ spec:
         {{- end }}
       {{- if .Values.global.tls.enabled }}
       volumeMounts:
-        - name: tls-ca-cert
-          mountPath: /consul/tls/ca
-          readOnly: true
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      - name: consul-auto-encrypt-ca-cert
+        mountPath: /consul/tls/ca
+        readOnly: true
+      {{- else }}
+      - name: consul-ca-cert
+        mountPath: /consul/tls/ca
+        readOnly: true
+      {{- end }}
       {{- end }}
       command:
         - "/bin/sh"
