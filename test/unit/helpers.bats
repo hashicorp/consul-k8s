@@ -100,3 +100,161 @@ load _helpers
   local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v 'release: ' | tee /dev/stderr )
   [ "${actual}" = 'templates/server-acl-init-job.yaml:                -server-label-selector=component=server,app={{ template "consul.name" . }},release={{ .Release.Name }} \' ]
 }
+
+
+#--------------------------------------------------------------------
+# consul.getAutoEncryptClientCA
+# Similarly to consul.fullname tests, these tests use test-runner.yaml to test the
+# consul.getAutoEncryptClientCA helper since we need an existing template that calls
+# the consul.getAutoEncryptClientCA helper.
+
+@test "helper/consul.getAutoEncryptClientCA: get-auto-encrypt-client-ca uses server's stateful set address by default" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=release-name-consul-server")')
+  [ "${actual}" = "true" ]
+
+  # check server port
+  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: uses client.join string if externalServers.enabled is true but the address is not provided" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'client.join[0]=consul-server.com' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=\"consul-server.com\"")')
+  [ "${actual}" = "true" ]
+
+  # check the default server port is 443 if not provided
+  actual=$(echo $command | jq ' . | contains("-server-port=443")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: can set the provided server address if externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=consul.io' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=consul.io")')
+  [ "${actual}" = "true" ]
+
+  # check the default server port is 443 if not provided
+  actual=$(echo $command | jq ' . | contains("-server-port=443")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: fails if externalServers.enabled is true but neither client.join nor externalServers.https.address are provided" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "either client.join or externalServers.https.address must be set if externalServers.enabled is true" ]]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: can set the provided port if externalServers.enabled is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=consul.io' \
+      --set 'externalServers.https.port=8501' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+
+  # check server address
+  actual=$(echo $command | jq ' . | contains("-server-addr=consul.io")')
+  [ "${actual}" = "true" ]
+
+  # check the default server port is 443 if not provided
+  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
+  [ "${actual}" = "true" ]
+
+  # check server's CA cert
+  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
+  [ "${actual}" = "true" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: can set TLS server name if externalServers.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=consul.io' \
+      --set 'externalServers.https.tlsServerName=custom-server-name' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ") | contains("-tls-server-name=custom-server-name")' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: doesn't provide the CA if externalServers.enabled is true and externalServers.useSystemRoots is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=consul.io' \
+      --set 'externalServers.https.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ") | contains("-ca-file=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: doesn't mount the consul-ca-cert volume if externalServers.enabled is true and externalServers.useSystemRoots is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=consul.io' \
+      --set 'externalServers.https.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+
+  [ "${actual}" = "" ]
+}
