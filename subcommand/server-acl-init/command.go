@@ -46,6 +46,8 @@ type Command struct {
 	flagConsulCACert              string
 	flagConsulTLSServerName       string
 	flagUseHTTPS                  bool
+	flagServerHosts               []string
+	flagServerPort                uint
 
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -57,7 +59,7 @@ type Command struct {
 	flagInjectK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring injected services
 
 	flagLogLevel string
-	flagTimeout  string
+	flagTimeout  time.Duration
 
 	clientset kubernetes.Interface
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -73,14 +75,11 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.StringVar(&c.flagReleaseName, "release-name", "",
-		"Name of Consul Helm release. Deprecated: Use -server-label-selector=component=server,app=consul,release=<release-name> instead")
-	c.flags.StringVar(&c.flagServerLabelSelector, "server-label-selector", "",
-		"Selector (label query) to select Consul server statefulset pods, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2)")
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
-	c.flags.IntVar(&c.flagReplicas, "expected-replicas", 1,
-		"Number of expected Consul server replicas")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerHosts), "server-address",
+		"The address of the Consul server(s), may be provided multiple times. At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server.")
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
@@ -131,7 +130,7 @@ func (c *Command) init() {
 			"if mirroring is enabled.")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
-	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
+	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
@@ -164,29 +163,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flags.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
-	timeout, err := time.ParseDuration(c.flagTimeout)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("%q is not a valid timeout: %s", c.flagTimeout, err))
+	if len(c.flagServerHosts) == 0 {
+		c.UI.Error("-server-address must be set at least once")
 		return 1
 	}
-	if c.flagReleaseName != "" && c.flagServerLabelSelector != "" {
-		c.UI.Error("-release-name and -server-label-selector cannot both be set")
-		return 1
-	}
-	if c.flagServerLabelSelector != "" && c.flagResourcePrefix == "" {
-		c.UI.Error("if -server-label-selector is set -resource-prefix must also be set")
-		return 1
-	}
-	if c.flagReleaseName == "" && c.flagServerLabelSelector == "" {
-		c.UI.Error("-release-name or -server-label-selector must be set")
-		return 1
-	}
-	// If only the -release-name is set, we use it as the label selector.
-	if c.flagReleaseName != "" {
-		c.flagServerLabelSelector = fmt.Sprintf("app=consul,component=server,release=%s", c.flagReleaseName)
+	if c.flagResourcePrefix == "" {
+		c.UI.Error("-resource-prefix must be set")
 	}
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
@@ -204,7 +189,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var cancel context.CancelFunc
-	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), timeout)
+	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
 	// The context will only ever be intentionally ended by the timeout.
 	defer cancel()
 
@@ -231,27 +216,6 @@ func (c *Command) Run(args []string) int {
 	if c.flagUseHTTPS {
 		scheme = "https"
 	}
-	// Wait if there's a rollout of servers.
-	ssName := c.withPrefix("server")
-	err = c.untilSucceeds(fmt.Sprintf("waiting for rollout of statefulset %s", ssName), func() error {
-		// Note: We can't use the -server-label-selector flag to find the statefulset
-		// because in older versions of consul-helm it wasn't labeled with
-		// component: server. We also can't drop that label because it's required
-		// for targeting the right server Pods.
-		statefulset, err := c.clientset.AppsV1().StatefulSets(c.flagK8sNamespace).Get(ssName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if statefulset.Status.CurrentRevision == statefulset.Status.UpdateRevision {
-			return nil
-		}
-		return fmt.Errorf("rollout is in progress (CurrentRevision=%s UpdateRevision=%s)",
-			statefulset.Status.CurrentRevision, statefulset.Status.UpdateRevision)
-	})
-	if err != nil {
-		c.Log.Error(err.Error())
-		return 1
-	}
 
 	var updateServerPolicy bool
 	var bootstrapToken string
@@ -265,6 +229,7 @@ func (c *Command) Run(args []string) int {
 		bootstrapToken = aclReplicationToken
 	} else {
 		// Check if we've already been bootstrapped.
+		var err error
 		bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
 		bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
 		if err != nil {
@@ -291,12 +256,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// For all of the next operations we'll need a Consul client.
-	serverPods, err := c.getConsulServers(1, scheme)
-	if err != nil {
-		c.Log.Error(err.Error())
-		return 1
-	}
-	serverAddr := serverPods[0].Addr
+	serverAddr := fmt.Sprintf("%s:%d", c.flagServerHosts[0], c.flagServerPort)
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
@@ -544,15 +504,9 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 }
 
 // withPrefix returns the name of resource with the correct prefix based
-// on the -release-name or -resource-prefix flags.
+// on the -resource-prefix flags.
 func (c *Command) withPrefix(resource string) string {
-	if c.flagResourcePrefix != "" {
-		return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
-	}
-	// This is to support an older version of the Helm chart that only specified
-	// the -release-name flag. We ensure that this is set if -resource-prefix
-	// is not set when parsing the flags.
-	return fmt.Sprintf("%s-consul-%s", c.flagReleaseName, resource)
+	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }
 
 const synopsis = "Initialize ACLs on Consul servers and other components."

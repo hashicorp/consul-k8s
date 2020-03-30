@@ -10,17 +10,17 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
-	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -37,18 +37,14 @@ func TestRun_FlagValidation(t *testing.T) {
 	}{
 		{
 			Flags:  []string{},
-			ExpErr: "-release-name or -server-label-selector must be set",
+			ExpErr: "-server-address must be set at least once",
 		},
 		{
-			Flags:  []string{"-release-name=name", "-server-label-selector=hi"},
-			ExpErr: "-release-name and -server-label-selector cannot both be set",
+			Flags:  []string{"-server-address=localhost"},
+			ExpErr: "-resource-prefix must be set",
 		},
 		{
-			Flags:  []string{"-server-label-selector=hi"},
-			ExpErr: "if -server-label-selector is set -resource-prefix must also be set",
-		},
-		{
-			Flags:  []string{"-acl-replication-token-file=/notexist", "-server-label-selector=hi", "-resource-prefix=prefix"},
+			Flags:  []string{"-acl-replication-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
 			ExpErr: "Unable to read ACL replication token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 	}
@@ -70,57 +66,48 @@ func TestRun_FlagValidation(t *testing.T) {
 // We test with both the deprecated -release-name and the new -server-label-selector
 // flags.
 func TestRun_Defaults(t *testing.T) {
-	t.Parallel()
-	for _, flags := range [][]string{
-		{"-release-name=" + releaseName},
-		{
-			"-server-label-selector=component=server,app=consul,release=" + releaseName,
-			"-resource-prefix=" + resourcePrefix,
-		},
-	} {
-		t.Run(flags[0], func(t *testing.T) {
-			k8s, testSvr := completeSetup(t, resourcePrefix)
-			defer testSvr.Stop()
-			require := require.New(t)
+	k8s, testSvr := completeSetup(t, resourcePrefix)
+	defer testSvr.Stop()
+	require := require.New(t)
 
-			// Run the command.
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			args := append([]string{
-				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
-			}, flags...)
-			responseCode := cmd.Run(args)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-			// Test that the bootstrap kube secret is created.
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-
-			// Check that it has the right policies.
-			consul, err := api.NewClient(&api.Config{
-				Address: testSvr.HTTPAddr,
-				Token:   bootToken,
-			})
-			require.NoError(err)
-			tokenData, _, err := consul.ACL().TokenReadSelf(nil)
-			require.NoError(err)
-			require.Equal("global-management", tokenData.Policies[0].Name)
-
-			// Check that the agent policy was created.
-			agentPolicy := policyExists(t, "agent-token", consul)
-			// Should be a global policy.
-			require.Len(agentPolicy.Datacenters, 0)
-
-			// We should also test that the server's token was updated, however I
-			// couldn't find a way to test that with the test agent. Instead we test
-			// that in another test when we're using an httptest server instead of
-			// the test agent and we can assert that the /v1/agent/token/agent
-			// endpoint was called.
-		})
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
 	}
+	args := []string{
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+	}
+	responseCode := cmd.Run(args)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Test that the bootstrap kube secret is created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+
+	// Check that it has the right policies.
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+	tokenData, _, err := consul.ACL().TokenReadSelf(nil)
+	require.NoError(err)
+	require.Equal("global-management", tokenData.Policies[0].Name)
+
+	// Check that the agent policy was created.
+	agentPolicy := policyExists(t, "agent-token", consul)
+	// Should be a global policy.
+	require.Len(agentPolicy.Datacenters, 0)
+
+	// We should also test that the server's token was updated, however I
+	// couldn't find a way to test that with the test agent. Instead we test
+	// that in another test when we're using an httptest server instead of
+	// the test agent and we can assert that the /v1/agent/token/agent
+	// endpoint was called.
 }
 
 // Test the different flags that should create tokens and save them as
@@ -129,7 +116,7 @@ func TestRun_Defaults(t *testing.T) {
 func TestRun_TokensPrimaryDC(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]struct {
+	cases := []struct {
 		TokenFlag          string
 		ResourcePrefixFlag string
 		ReleaseNameFlag    string
@@ -138,16 +125,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		SecretName         string
 		LocalToken         bool
 	}{
-		"client token -release-name": {
-			TokenFlag:          "-create-client-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "client-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "release-name-consul-client-acl-token",
-			LocalToken:         true,
-		},
-		"client token -resource-prefix": {
+		{
 			TokenFlag:          "-create-client-token",
 			ResourcePrefixFlag: "my-prefix",
 			PolicyName:         "client-token",
@@ -155,16 +133,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-client-acl-token",
 			LocalToken:         true,
 		},
-		"catalog-sync token -release-name": {
-			TokenFlag:          "-create-sync-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "catalog-sync-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "release-name-consul-catalog-sync-acl-token",
-			LocalToken:         true,
-		},
-		"catalog-sync token -resource-prefix": {
+		{
 			TokenFlag:          "-create-sync-token",
 			ResourcePrefixFlag: "my-prefix",
 			PolicyName:         "catalog-sync-token",
@@ -172,16 +141,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-catalog-sync-acl-token",
 			LocalToken:         true,
 		},
-		"connect-inject-namespace token -release-name": {
-			TokenFlag:          "-create-inject-namespace-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "connect-inject-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "release-name-consul-connect-inject-acl-token",
-			LocalToken:         true,
-		},
-		"connect-inject-namespace token -resource-prefix": {
+		{
 			TokenFlag:          "-create-inject-namespace-token",
 			ResourcePrefixFlag: "my-prefix",
 			PolicyName:         "connect-inject-token",
@@ -189,16 +149,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-connect-inject-acl-token",
 			LocalToken:         true,
 		},
-		"enterprise-license token -release-name": {
-			TokenFlag:          "-create-enterprise-license-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "enterprise-license-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "release-name-consul-enterprise-license-acl-token",
-			LocalToken:         true,
-		},
-		"enterprise-license token -resource-prefix": {
+		{
 			TokenFlag:          "-create-enterprise-license-token",
 			ResourcePrefixFlag: "my-prefix",
 			PolicyName:         "enterprise-license-token",
@@ -206,16 +157,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-enterprise-license-acl-token",
 			LocalToken:         true,
 		},
-		"client-snapshot-agent token -release-name": {
-			TokenFlag:          "-create-snapshot-agent-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "client-snapshot-agent-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "release-name-consul-client-snapshot-agent-acl-token",
-			LocalToken:         true,
-		},
-		"client-snapshot-agent token -resource-prefix": {
+		{
 			TokenFlag:          "-create-snapshot-agent-token",
 			ResourcePrefixFlag: "my-prefix",
 			ReleaseNameFlag:    "release-name",
@@ -224,16 +166,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-client-snapshot-agent-acl-token",
 			LocalToken:         true,
 		},
-		"mesh-gateway token -release-name": {
-			TokenFlag:          "-create-mesh-gateway-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "mesh-gateway-token",
-			PolicyDCs:          nil,
-			SecretName:         "release-name-consul-mesh-gateway-acl-token",
-			LocalToken:         false,
-		},
-		"mesh-gateway token -resource-prefix": {
+		{
 			TokenFlag:          "-create-mesh-gateway-token",
 			ResourcePrefixFlag: "my-prefix",
 			ReleaseNameFlag:    "release-name",
@@ -242,16 +175,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretName:         "my-prefix-mesh-gateway-acl-token",
 			LocalToken:         false,
 		},
-		"acl-replication token -release-name": {
-			TokenFlag:          "-create-acl-replication-token",
-			ResourcePrefixFlag: "",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "acl-replication-token",
-			PolicyDCs:          nil,
-			SecretName:         "release-name-consul-acl-replication-acl-token",
-			LocalToken:         false,
-		},
-		"acl-replication token -resource-prefix": {
+		{
 			TokenFlag:          "-create-acl-replication-token",
 			ResourcePrefixFlag: "my-prefix",
 			ReleaseNameFlag:    "release-name",
@@ -261,8 +185,8 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:         false,
 		},
 	}
-	for testName, c := range cases {
-		t.Run(testName, func(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.TokenFlag, func(t *testing.T) {
 			prefix := c.ResourcePrefixFlag
 			if c.ResourcePrefixFlag == "" {
 				prefix = releaseName + "-consul"
@@ -280,16 +204,10 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			cmd.init()
 			cmdArgs := []string{
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-resource-prefix=" + c.ResourcePrefixFlag,
 				c.TokenFlag,
-			}
-			if c.ResourcePrefixFlag != "" {
-				// If using the -resource-prefix flag, we expect the -server-label-selector
-				// flag to also be set.
-				labelSelector := fmt.Sprintf("release=%s,component=server,app=consul", releaseName)
-				cmdArgs = append(cmdArgs, "-resource-prefix="+c.ResourcePrefixFlag, "-server-label-selector="+labelSelector)
-			} else {
-				cmdArgs = append(cmdArgs, "-release-name="+c.ReleaseNameFlag)
 			}
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
@@ -318,7 +236,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			require.Equal(c.LocalToken, tokenData.Local)
 
 			// Test that if the same command is run again, it doesn't error.
-			t.Run(testName+"-retried", func(t *testing.T) {
+			t.Run(c.TokenFlag+"-retried", func(t *testing.T) {
 				ui := cli.NewMockUi()
 				cmd := Command{
 					UI:        ui,
@@ -392,7 +310,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
 
-			k8s, consul, cleanup := mockReplicatedSetup(t, resourcePrefix, bootToken)
+			k8s, consul, secondaryAddr, cleanup := mockReplicatedSetup(t, bootToken)
 			defer cleanup()
 
 			// Run the command.
@@ -404,9 +322,9 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			cmd.init()
 			cmdArgs := []string{
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-acl-replication-token-file", tokenFile,
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address", strings.Split(secondaryAddr, ":")[0],
+				"-server-port", strings.Split(secondaryAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				c.TokenFlag,
 			}
@@ -483,8 +401,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			if c.SecondaryDC {
 				var cleanup func()
 				bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-				k8s, consul, cleanup = mockReplicatedSetup(t, resourcePrefix,
-					bootToken)
+				k8s, consul, consulHTTPAddr, cleanup = mockReplicatedSetup(t, bootToken)
 				defer cleanup()
 
 				tmp, err := ioutil.TempFile("", "")
@@ -508,10 +425,10 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
+				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
+				"-server-port", strings.Split(consulHTTPAddr, ":")[1],
 			}, flags...)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
@@ -591,10 +508,10 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			cmd.init()
 			bindingRuleSelector := "serviceaccount.name!=default"
 			cmdArgs := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-acl-binding-rule-selector=" + bindingRuleSelector,
 			}
 			cmdArgs = append(cmdArgs, c.AuthMethodFlag)
@@ -656,10 +573,10 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	commonArgs := []string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 		"-create-inject-auth-method",
 	}
 	firstRunArgs := append(commonArgs,
@@ -721,45 +638,20 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	}
 }
 
-// Test that if the server pods aren't available at first that bootstrap
+// Test that if the servers aren't available at first that bootstrap
 // still succeeds.
-func TestRun_DelayedServerPods(t *testing.T) {
+func TestRun_DelayedServers(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
-	type APICall struct {
-		Method string
-		Path   string
-	}
-	var consulAPICalls []APICall
-	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record all the API calls made.
-		consulAPICalls = append(consulAPICalls, APICall{
-			Method: r.Method,
-			Path:   r.URL.Path,
-		})
-
-		switch r.URL.Path {
-		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
-		default:
-			// Send an empty JSON response with code 200 to all calls.
-			fmt.Fprintln(w, "{}")
-		}
-	}))
-	defer consulServer.Close()
-	serverURL, err := url.Parse(consulServer.URL)
-	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
+	randomPorts := freeport.MustTake(6)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
 
 	// Start the command before the Pod exist.
 	// Run in a goroutine so we can create the Pods asynchronously
@@ -767,272 +659,79 @@ func TestRun_DelayedServerPods(t *testing.T) {
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
-			"-server-label-selector=component=server,app=consul,release=" + releaseName,
 			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
-			"-expected-replicas=1",
+			"-server-address=127.0.0.1",
+			"-server-port=" + strconv.Itoa(randomPorts[1]),
 		})
 		close(done)
 	}()
 
-	// Asynchronously create the server Pod after a delay.
+	// Asynchronously start the test server after a delay.
+	testServerReady := make(chan bool)
+	var srv *testutil.TestServer
 	go func() {
 		// Create the Pods after a delay between 100 and 500ms.
 		// It's randomized to ensure we're not relying on specific timing.
 		delay := 100 + rand.Intn(400)
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 
-		pods := k8s.CoreV1().Pods(ns)
-		_, err = pods.Create(&v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: resourcePrefix + "-server-0",
-				Labels: map[string]string{
-					"component": "server",
-					"app":       "consul",
-					"release":   releaseName,
-				},
-			},
-			Status: v1.PodStatus{
-				PodIP: serverURL.Hostname(),
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name: "consul",
-						Ports: []v1.ContainerPort{
-							{
-								Name:          "http",
-								ContainerPort: int32(port),
-							},
-						},
-					},
-				},
-			},
+		var err error
+		srv, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			c.ACL.Enabled = true
+
+			c.Ports = &testutil.TestPortConfig{
+				DNS:     randomPorts[0],
+				HTTP:    randomPorts[1],
+				HTTPS:   randomPorts[2],
+				SerfLan: randomPorts[3],
+				SerfWan: randomPorts[4],
+				Server:  randomPorts[5],
+			}
 		})
 		require.NoError(err)
-		_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: resourcePrefix + "-server",
-				Labels: map[string]string{
-					"component": "server",
-					"app":       "consul",
-					"release":   releaseName,
-				},
-			},
-			Status: appv1.StatefulSetStatus{
-				UpdateRevision:  "current",
-				CurrentRevision: "current",
-			},
-		})
-		require.NoError(err)
+		close(testServerReady)
 	}()
+
+	// Wait for server to come up
+	select {
+	case <-testServerReady:
+		defer srv.Stop()
+	case <-time.After(5 * time.Second):
+		require.FailNow("test server took longer than 5s to come up")
+	}
 
 	// Wait for the command to exit.
 	select {
 	case <-done:
 		require.Equal(0, responseCode, ui.ErrorWriter.String())
-	case <-time.After(2 * time.Second):
-		require.FailNow("command did not exit after 2s")
+	case <-time.After(5 * time.Second):
+		require.FailNow("command did not exit after 5s")
 	}
 
 	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, resourcePrefix, ns)
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 
-	// Test that the expected API calls were made.
-	require.Equal([]APICall{
-		{
-			"PUT",
-			"/v1/acl/bootstrap",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-		{
-			"PUT",
-			"/v1/agent/token/agent",
-		},
-		{
-			"GET",
-			"/v1/agent/self",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-	}, consulAPICalls)
-}
+	// Check that it has the right policies.
+	consul, err := api.NewClient(&api.Config{
+		Address: srv.HTTPAddr,
+	})
+	require.NoError(err)
+	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
+	require.NoError(err)
+	require.Equal("global-management", tokenData.Policies[0].Name)
 
-// Test that if a deployment of the statefulset is in progress we wait.
-func TestRun_InProgressDeployment(t *testing.T) {
-	t.Parallel()
-	require := require.New(t)
-	k8s := fake.NewSimpleClientset()
-
-	type APICall struct {
-		Method string
-		Path   string
-	}
-	var consulAPICalls []APICall
-	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record all the API calls made.
-		consulAPICalls = append(consulAPICalls, APICall{
-			Method: r.Method,
-			Path:   r.URL.Path,
-		})
-		switch r.URL.Path {
-		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
-		default:
-			// Send an empty JSON response with code 200 to all calls.
-			fmt.Fprintln(w, "{}")
+	// Check that the agent policy was created.
+	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
+	require.NoError(err)
+	found := false
+	for _, p := range policies {
+		if p.Name == "agent-token" {
+			found = true
+			break
 		}
-	}))
-	defer consulServer.Close()
-	serverURL, err := url.Parse(consulServer.URL)
-	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
-
-	// The pods and statefulset are created but as an in-progress deployment
-	pods := k8s.CoreV1().Pods(ns)
-	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: serverURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: appv1.StatefulSetStatus{
-			UpdateRevision:  "updated",
-			CurrentRevision: "current",
-		},
-	})
-	require.NoError(err)
-
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
 	}
-	cmd.init()
-
-	// Start the command before the Pod exist.
-	// Run in a goroutine so we can create the Pods asynchronously
-	done := make(chan bool)
-	var responseCode int
-	go func() {
-		responseCode = cmd.Run([]string{
-			"-server-label-selector=component=server,app=consul,release=" + releaseName,
-			"-resource-prefix=" + resourcePrefix,
-			"-k8s-namespace=" + ns,
-			"-expected-replicas=1",
-		})
-		close(done)
-	}()
-
-	// Asynchronously update the deployment status after a delay.
-	go func() {
-		// Update after a delay between 100 and 500ms.
-		// It's randomized to ensure we're not relying on specific timing.
-		delay := 100 + rand.Intn(400)
-		time.Sleep(time.Duration(delay) * time.Millisecond)
-		_, err = k8s.AppsV1().StatefulSets(ns).Update(&appv1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: resourcePrefix + "-server",
-				Labels: map[string]string{
-					"component": "server",
-					"app":       "consul",
-					"release":   releaseName,
-				},
-			},
-			Status: appv1.StatefulSetStatus{
-				UpdateRevision:  "updated",
-				CurrentRevision: "updated",
-			},
-		})
-		require.NoError(err)
-	}()
-
-	// Wait for the command to exit.
-	select {
-	case <-done:
-		require.Equal(0, responseCode, ui.ErrorWriter.String())
-	case <-time.After(2 * time.Second):
-		require.FailNow("command did not exit after 2s")
-	}
-
-	// Test that the bootstrap kube secret is created.
-	getBootToken(t, k8s, resourcePrefix, ns)
-
-	// Test that the expected API calls were made.
-	require.Equal([]APICall{
-		{
-			"PUT",
-			"/v1/acl/bootstrap",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-		{
-			"PUT",
-			"/v1/agent/token/agent",
-		},
-		{
-			"GET",
-			"/v1/agent/self",
-		},
-		{
-			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
-			"/v1/acl/token",
-		},
-	}, consulAPICalls)
+	require.True(found, "agent-token policy was not found")
 }
 
 // Test that if there's no leader, we retry until one is elected.
@@ -1078,51 +777,6 @@ func TestRun_NoLeader(t *testing.T) {
 	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
-	pods := k8s.CoreV1().Pods(ns)
-	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: serverURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-	// Create Consul server Statefulset.
-	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: appv1.StatefulSetStatus{
-			UpdateRevision:  "current",
-			CurrentRevision: "current",
-		},
-	})
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1130,16 +784,15 @@ func TestRun_NoLeader(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
 
 	done := make(chan bool)
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
-			"-server-label-selector=component=server,app=consul,release=" + releaseName,
 			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
-			"-expected-replicas=1",
+			"-server-address=" + serverURL.Hostname(),
+			"-server-port=" + serverURL.Port(),
 		})
 		close(done)
 	}()
@@ -1239,52 +892,6 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
-	pods := k8s.CoreV1().Pods(ns)
-	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: serverURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-	// Create the server statefulset.
-	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: appv1.StatefulSetStatus{
-			UpdateRevision:  "current",
-			CurrentRevision: "current",
-		},
-	})
-	require.NoError(err)
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1292,12 +899,11 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
 	responseCode := cmd.Run([]string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
+		"-server-address=" + serverURL.Hostname(),
+		"-server-port=" + serverURL.Port(),
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -1372,52 +978,6 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
-	port, err := strconv.Atoi(serverURL.Port())
-	require.NoError(err)
-	pods := k8s.CoreV1().Pods(ns)
-	_, err = pods.Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: serverURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-	// Create the server statefulset.
-	_, err = k8s.AppsV1().StatefulSets(ns).Create(&appv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-server",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: appv1.StatefulSetStatus{
-			UpdateRevision:  "current",
-			CurrentRevision: "current",
-		},
-	})
-	require.NoError(err)
 
 	// Create the bootstrap secret.
 	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
@@ -1436,12 +996,12 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
+
 	responseCode := cmd.Run([]string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
+		"-server-address=" + serverURL.Hostname(),
+		"-server-port=" + serverURL.Port(),
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -1484,19 +1044,18 @@ func TestRun_Timeout(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
+
 	responseCode := cmd.Run([]string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
+		"-server-address=foo",
 		"-timeout=500ms",
 	})
 	require.Equal(1, responseCode, ui.ErrorWriter.String())
 }
 
 // Test that the bootstrapping process can make calls to Consul API over HTTPS
-// when the consul agent is configured with HTTPS only (HTTP disabled).
+// when the consul agent is configured with HTTPS.
 func TestRun_HTTPS(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -1505,27 +1064,15 @@ func TestRun_HTTPS(t *testing.T) {
 	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
 	defer cleanup()
 
-	agentConfig := fmt.Sprintf(`
-		primary_datacenter = "dc1"
-		acl {
-			enabled = true
-		}
-		ca_file = "%s"
-		cert_file = "%s"
-		key_file = "%s"`, caFile, certFile, keyFile)
+	srv, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
 
-	// NOTE: We can't use testutil.TestServer for this test because the HTTP
-	// port can't be disabled (causes a seg fault).
-	a := &agent.TestAgent{
-		Name:   t.Name(),
-		HCL:    agentConfig,
-		UseTLS: true, // this also disables HTTP port
-	}
-
-	a.Start()
-	defer a.Shutdown()
-
-	createTestK8SResources(t, k8s, a.HTTPAddr(), resourcePrefix, "https", ns)
+		c.CAFile = caFile
+		c.CertFile = certFile
+		c.KeyFile = keyFile
+	})
+	require.NoError(err)
+	defer srv.Stop()
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -1533,15 +1080,15 @@ func TestRun_HTTPS(t *testing.T) {
 		UI:        ui,
 		clientset: k8s,
 	}
-	cmd.init()
+
 	responseCode := cmd.Run([]string{
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-use-https",
 		"-consul-tls-server-name", "server.dc1.consul",
 		"-consul-ca-cert", caFile,
-		"-expected-replicas=1",
+		"-server-address=127.0.0.1",
+		"-server-port=" + strings.Split(srv.HTTPSAddr, ":")[1],
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -1559,7 +1106,7 @@ func TestRun_HTTPS(t *testing.T) {
 func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	t.Parallel()
 
-	secondaryK8s, secondaryConsulClient, aclReplicationToken, clean := completeReplicatedSetup(t, resourcePrefix)
+	secondaryK8s, secondaryConsulClient, secondaryAddr, aclReplicationToken, clean := completeReplicatedSetup(t)
 	defer clean()
 
 	// completeReplicatedSetup ran the command in our primary dc so now we
@@ -1574,8 +1121,8 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	secondaryCmd.init()
 	secondaryCmdArgs := []string{
 		"-k8s-namespace=" + ns,
-		"-expected-replicas=1",
-		"-server-label-selector=component=server,app=consul,release=" + releaseName,
+		"-server-address", strings.Split(secondaryAddr, ":")[0],
+		"-server-port", strings.Split(secondaryAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
 		"-acl-replication-token-file", tokenFile,
 		"-create-client-token",
@@ -1615,7 +1162,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
-			k8s, consul, cleanup := mockReplicatedSetup(t, resourcePrefix, bootToken)
+			k8s, consul, serverAddr, cleanup := mockReplicatedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s)
 			defer cleanup()
 
@@ -1628,9 +1175,9 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			cmd.init()
 			cmdArgs := append([]string{
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-acl-replication-token-file", tokenFile,
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address", strings.Split(serverAddr, ":")[0],
+				"-server-port", strings.Split(serverAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 			}, flag)
 			responseCode := cmd.Run(cmdArgs)
@@ -1657,8 +1204,6 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *testutil.Test
 	})
 	require.NoError(t, err)
 
-	createTestK8SResources(t, k8s, svr.HTTPAddr, prefix, "http", ns)
-
 	return k8s, svr
 }
 
@@ -1668,8 +1213,8 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *testutil.Test
 // a Consul API client initialized for the secondary DC, the replication token
 // generated and a cleanup function that should be called at the end of the
 // test that cleans up resources.
-func completeReplicatedSetup(t *testing.T, prefix string) (*fake.Clientset, *api.Client, string, func()) {
-	return replicatedSetup(t, prefix, "")
+func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string, string, func()) {
+	return replicatedSetup(t, "")
 }
 
 // mockReplicatedSetup sets up two Consul servers with ACL replication.
@@ -1680,15 +1225,15 @@ func completeReplicatedSetup(t *testing.T, prefix string) (*fake.Clientset, *api
 // a Consul API client initialized for the secondary DC and a
 // cleanup function that should be called at the end of the test that cleans
 // up resources.
-func mockReplicatedSetup(t *testing.T, prefix string, bootToken string) (*fake.Clientset, *api.Client, func()) {
-	k8sClient, consulClient, _, cleanup := replicatedSetup(t, prefix, bootToken)
-	return k8sClient, consulClient, cleanup
+func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, func()) {
+	k8sClient, consulClient, serverAddr, _, cleanup := replicatedSetup(t, bootToken)
+	return k8sClient, consulClient, serverAddr, cleanup
 }
 
 // replicatedSetup is a helper function for completeReplicatedSetup and
 // mockReplicatedSetup. If bootToken is empty, it will run the server-acl-init
 // command to set up replication. Otherwise it will do it through config.
-func replicatedSetup(t *testing.T, prefix string, bootToken string) (*fake.Clientset, *api.Client, string, func()) {
+func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, string, func()) {
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		if bootToken != "" {
@@ -1700,7 +1245,6 @@ func replicatedSetup(t *testing.T, prefix string, bootToken string) (*fake.Clien
 	var aclReplicationToken string
 	if bootToken == "" {
 		primaryK8s := fake.NewSimpleClientset()
-		createTestK8SResources(t, primaryK8s, primarySvr.HTTPAddr, resourcePrefix, "http", ns)
 		require.NoError(t, err)
 
 		// Run the command to bootstrap ACLs
@@ -1712,8 +1256,8 @@ func replicatedSetup(t *testing.T, prefix string, bootToken string) (*fake.Clien
 		primaryCmd.init()
 		primaryCmdArgs := []string{
 			"-k8s-namespace=" + ns,
-			"-expected-replicas=1",
-			"-server-label-selector=component=server,app=consul,release=" + releaseName,
+			"-server-address", strings.Split(primarySvr.HTTPAddr, ":")[0],
+			"-server-port", strings.Split(primarySvr.HTTPAddr, ":")[1],
 			"-resource-prefix=" + resourcePrefix,
 			"-create-acl-replication-token",
 		}
@@ -1762,67 +1306,11 @@ func replicatedSetup(t *testing.T, prefix string, bootToken string) (*fake.Clien
 
 	// Finally, set up our kube cluster. It will use the secondary dc.
 	k8s := fake.NewSimpleClientset()
-	createTestK8SResources(t, k8s, secondarySvr.HTTPAddr, prefix, "http", ns)
 
-	return k8s, consul, aclReplicationToken, func() {
+	return k8s, consul, secondarySvr.HTTPAddr, aclReplicationToken, func() {
 		primarySvr.Stop()
 		secondarySvr.Stop()
 	}
-}
-
-// Create test k8s resources (server pods and server stateful set)
-func createTestK8SResources(t *testing.T, k8s *fake.Clientset, consulHTTPAddr, prefix, scheme, k8sNamespace string) {
-	require := require.New(t)
-	consulURL, err := url.Parse("http://" + consulHTTPAddr)
-	require.NoError(err)
-	port, err := strconv.Atoi(consulURL.Port())
-	require.NoError(err)
-
-	// Create Consul server Pod.
-	_, err = k8s.CoreV1().Pods(k8sNamespace).Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: prefix + "-server-0",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: v1.PodStatus{
-			PodIP: consulURL.Hostname(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "consul",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          scheme,
-							ContainerPort: int32(port),
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(err)
-
-	// Create Consul server Statefulset.
-	_, err = k8s.AppsV1().StatefulSets(k8sNamespace).Create(&appv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: prefix + "-server",
-			Labels: map[string]string{
-				"component": "server",
-				"app":       "consul",
-				"release":   releaseName,
-			},
-		},
-		Status: appv1.StatefulSetStatus{
-			UpdateRevision:  "current",
-			CurrentRevision: "current",
-		},
-	})
-	require.NoError(err)
 }
 
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
