@@ -1153,6 +1153,8 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 				"-server-address", strings.Split(serverAddr, ":")[0],
 				"-server-port", strings.Split(serverAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
+				"-server-address", strings.Split(serverAddr, ":")[0],
+				"-server-port", strings.Split(serverAddr, ":")[1],
 			}, flag)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
