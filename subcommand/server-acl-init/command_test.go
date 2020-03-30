@@ -1,12 +1,10 @@
 package serveraclinit
 
 import (
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,11 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/consul/tlsutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	appv1 "k8s.io/api/apps/v1"
@@ -1857,34 +1855,21 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 	require.NoError(err)
 
 	// Generate CA
-	sn, err := tlsutil.GenerateSerialNumber()
-	require.NoError(err)
-
-	s, _, err := tlsutil.GeneratePrivateKey()
-	require.NoError(err)
-
-	constraints := []string{"consul", "localhost"}
-	ca, err := tlsutil.GenerateCA(s, sn, 1, constraints)
+	signer, _, caCertPem, caCertTemplate, err := cert.GenerateCA("Consul Agent CA - Test")
 	require.NoError(err)
 
 	// Generate Server Cert
-	name := fmt.Sprintf("server.%s.%s", "dc1", "consul")
-	DNSNames := []string{name, "localhost"}
-	IPAddresses := []net.IP{net.ParseIP("127.0.0.1")}
-	extKeyUsage := []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
-
-	sn, err = tlsutil.GenerateSerialNumber()
-	require.NoError(err)
-
-	pub, priv, err := tlsutil.GenerateCert(s, ca, sn, name, 1, DNSNames, IPAddresses, extKeyUsage)
+	name := "server.dc1.consul"
+	hosts := []string{name, "localhost", "127.0.0.1"}
+	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
 	require.NoError(err)
 
 	// Write certs and key to files
-	_, err = caFile.WriteString(ca)
+	_, err = caFile.WriteString(caCertPem)
 	require.NoError(err)
-	_, err = certFile.WriteString(pub)
+	_, err = certFile.WriteString(certPem)
 	require.NoError(err)
-	_, err = certKeyFile.WriteString(priv)
+	_, err = certKeyFile.WriteString(keyPem)
 	require.NoError(err)
 
 	cleanupFunc := func() {
