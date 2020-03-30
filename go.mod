@@ -17,6 +17,7 @@ require (
 	github.com/hashicorp/consul v1.7.1
 	github.com/hashicorp/consul/api v1.4.0
 	github.com/hashicorp/consul/sdk v0.4.0
+	github.com/hashicorp/go-discover v0.0.0-20191202160150-7ec2cfbda7a2
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3 // indirect

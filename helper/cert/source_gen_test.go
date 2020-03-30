@@ -112,7 +112,7 @@ func testBundleVerify(t *testing.T, bundle *Bundle) {
 	cmd := exec.Command(
 		"openssl", "verify", "-verbose", "-CAfile", "ca.pem", "leaf.pem")
 	cmd.Dir = td
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	t.Log(string(output))
 	require.NoError(err)
 }

@@ -5,6 +5,7 @@ import (
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
+	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdLifecycleSidecar "github.com/hashicorp/consul-k8s/subcommand/lifecycle-sidecar"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
@@ -43,6 +44,10 @@ func init() {
 
 		"delete-completed-job": func() (cli.Command, error) {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
+		},
+
+		"get-consul-client-ca": func() (cli.Command, error) {
+			return &cmdGetConsulClientCA.Command{UI: ui}, nil
 		},
 
 		"version": func() (cli.Command, error) {

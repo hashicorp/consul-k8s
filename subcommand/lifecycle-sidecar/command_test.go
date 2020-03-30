@@ -161,10 +161,14 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 	cmd := Command{
 		UI: ui,
 	}
-	randomPort := freeport.MustTake(1)[0]
+
+	// we need to reserve all 6 ports to avoid potential
+	// port collisions with other tests
+	randomPorts := freeport.MustTake(6)
+
 	// Run async because we need to kill it when the test is over.
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-http-addr", fmt.Sprintf("127.0.0.1:%d", randomPort),
+		"-http-addr", fmt.Sprintf("127.0.0.1:%d", randomPorts[1]),
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
@@ -174,7 +178,12 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.Ports = &testutil.TestPortConfig{
-			HTTP: randomPort,
+			DNS:     randomPorts[0],
+			HTTP:    randomPorts[1],
+			HTTPS:   randomPorts[2],
+			SerfLan: randomPorts[3],
+			SerfWan: randomPorts[4],
+			Server:  randomPorts[5],
 		}
 	})
 	require.NoError(t, err)
