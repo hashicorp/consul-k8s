@@ -88,6 +88,13 @@ global:
   tls:
     enabled: false
 
+    # enableAutoEncrypt turns on the auto-encrypt feature on
+    # clients and servers.
+    # It also switches consul-k8s components to retrieve the CA
+    # from the servers via the API.
+    # Requires Consul 1.7.1+ and consul-k8s 0.13.0
+    enableAutoEncrypt: false
+
     # serverAdditionalDNSSANs is a list of additional DNS names to
     # set as Subject Alternative Names (SANs) in the server certificate.
     # This is useful when you need to access the Consul server(s) externally,
@@ -262,6 +269,40 @@ server:
     # http_proxy: http://localhost:3128,
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
+
+# Add configuration for Consul servers running externally,
+# i.e. outside of Kubernetes.
+# This information is required if Consul servers are running
+# outside of k8s and you’re setting global.tls.enableAutoEncrypt to true.
+externalServers:
+  enabled: false
+
+  # HTTPS configuration for external servers.
+  # Note: HTTP connections to the servers are
+  # not supported.
+  https:
+    # IP, DNS name, or Cloud auto-join string pointing to the external Consul servers.
+    # Note that if you’re providing the cloud auto-join string and multiple addresses
+    # can be returned, only the first address will be used.
+    # This value is required only if you would like to use
+    # a different server address from the one specified
+    # in the client.join property.
+    address: null
+
+    # The HTTPS port of the server.
+    port: 443
+
+    # tlsServerName is the server name to use as the SNI
+    # host header when connecting with HTTPS.
+    # This property is useful in case ‘externalServers.https.address’
+    # is not or can not be included in the server certificate’s SANs.
+    tlsServerName: null
+
+    # If true, the Helm chart will ignore the CA set in
+    # global.tls.caCert and will rely on the container's
+    # system CAs for TLS verification when talking to Consul servers.
+    # Otherwise, the chart will use global.tls.caCert.
+    useSystemRoots: false
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional

@@ -78,6 +78,7 @@ spec:
             items:
             - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
               path: tls.crt
+        {{ if not .Values.global.tls.enableAutoEncrypt }}
         - name: consul-ca-key
           secret:
             {{- if .Values.global.tls.caKey.secretName }}
@@ -88,11 +89,12 @@ spec:
             items:
             - key: {{ default "tls.key" .Values.global.tls.caKey.secretKey }}
               path: tls.key
-        - name: tls-client-cert
+        - name: consul-client-cert
           emptyDir:
             # We're using tmpfs here so that
             # client certs are not written to disk
             medium: "Memory"
+        {{- end }}
         {{- end }}
         {{- range .Values.client.extraVolumes }}
         - name: userconfig-{{ .name }}
@@ -129,6 +131,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
             - name: GOSSIP_KEY
               valueFrom:
@@ -139,8 +145,13 @@ spec:
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://localhost:8501
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: CONSUL_HTTP_SSL_VERIFY
+              value: false
+            {{- else }}
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
+            {{- end }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.client | nindent 12 }}
           command:
@@ -158,12 +169,19 @@ spec:
                 -hcl='leave_on_terminate = true' \
                 {{- if .Values.global.tls.enabled }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
+                {{- if .Values.global.tls.enableAutoEncrypt }}
+                -hcl='auto_encrypt = {tls = true}' \
+                -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\"]}" \
+                {{- else }}
                 -hcl='cert_file = "/consul/tls/client/tls.crt"' \
                 -hcl='key_file = "/consul/tls/client/tls.key"' \
+                {{- end }}
                 {{- if .Values.global.tls.verify }}
-                -hcl='verify_incoming_rpc = true' \
                 -hcl='verify_outgoing = true' \
+                {{- if not .Values.global.tls.enableAutoEncrypt }}
+                -hcl='verify_incoming_rpc = true' \
                 -hcl='verify_server_hostname = true' \
+                {{- end }}
                 {{- end }}
                 -hcl='ports { https = 8501 }' \
                 {{- if .Values.global.tls.httpsOnly }}
@@ -189,7 +207,7 @@ spec:
                 {{- end }}
                 {{- if .Values.client.join }}
                 {{- range $value := .Values.client.join }}
-                -retry-join="{{ $value }}" \
+                -retry-join={{ quote $value }} \
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
@@ -208,9 +226,11 @@ spec:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
-            - name: tls-client-cert
+            {{- if not .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-client-cert
               mountPath: /consul/tls/client
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- range .Values.client.extraVolumes }}
             - name: userconfig-{{ .name }}
@@ -267,7 +287,7 @@ spec:
                 - |
                   {{- if .Values.global.tls.enabled }}
                   curl \
-                    --cacert /consul/tls/ca/tls.crt \
+                    -k \
                     https://127.0.0.1:8501/v1/status/leader \
                   {{- else }}
                   curl http://127.0.0.1:8500/v1/status/leader \
@@ -277,7 +297,7 @@ spec:
           resources:
             {{ tpl .Values.client.resources . | nindent 12 | trim }}
           {{- end }}
-      {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled) }}
+      {{- if (or .Values.global.bootstrapACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:
       {{- if .Values.global.bootstrapACLs }}
       - name: client-acl-init
@@ -294,7 +314,7 @@ spec:
           - name: aclconfig
             mountPath: /consul/aclconfig
       {{- end }}
-      {{- if .Values.global.tls.enabled }}
+      {{- if and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt) }}
       - name: client-tls-init
         image: "{{ default .Values.global.image .Values.client.image }}"
         env:
@@ -316,7 +336,7 @@ spec:
             mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0.pem tls.crt
             mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0-key.pem tls.key
         volumeMounts:
-          - name: tls-client-cert
+          - name: consul-client-cert
             mountPath: /consul/tls/client
           - name: consul-ca-cert
             mountPath: /consul/tls/ca/cert
