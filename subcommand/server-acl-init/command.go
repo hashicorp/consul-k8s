@@ -397,7 +397,13 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
+		// If namespaces are enabled, the policy and token needs to be global
+		// to be allowed to create namespaces.
+		if c.flagEnableNamespaces {
+			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, consulClient)
+		} else {
+			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
+		}
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -411,7 +417,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+		// If namespaces are enabled, the policy and token needs to be global
+		// to be allowed to create namespaces.
+		if c.flagEnableNamespaces {
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
+		} else {
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+		}
+
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -464,6 +477,8 @@ func (c *Command) Run(args []string) int {
 			c.Log.Error("Error templating acl replication token rules", "err", err)
 			return 1
 		}
+		// Policy must be global because it replicates from the primary DC
+		// and so the primary DC needs to be able to accept the token.
 		err = c.createGlobalACL("acl-replication", rules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())

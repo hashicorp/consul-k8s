@@ -148,15 +148,13 @@ namespace "{{ .ConsulSyncDestinationNamespace }}" {
 	return c.renderRules(syncRulesTpl)
 }
 
-// This should only be set when namespaces are enabled.
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector only needs permissions to create namespaces
+	// The Connect injector only needs permissions to create namespaces.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
 `
-
 	return c.renderRules(injectRulesTpl)
 }
 
@@ -174,12 +172,12 @@ operator = "write"
 agent_prefix "" {
   policy = "read"
 }
+node_prefix "" {
+  policy = "write"
+}
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
-  node_prefix "" {
-    policy = "write"
-  }
   service_prefix "" {
     policy = "read"
     intentions = "read"
