@@ -81,6 +81,13 @@ spec:
             {{- else if (eq .type "secret") }}
             secretName: {{ .name }}
             {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
+            {{- end }}
         {{- end }}
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
