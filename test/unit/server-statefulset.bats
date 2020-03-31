@@ -258,6 +258,20 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
+@test "server/StatefulSet: adds extra secret volume with items" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.extraVolumes[0].type=secret' \
+      --set 'server.extraVolumes[0].name=foo' \
+      --set 'server.extraVolumes[0].items[0].key=key' \
+      --set 'server.extraVolumes[0].items[0].path=path' \
+      . | tee /dev/stderr |
+      yq -c '.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+  [ "${actual}" = "{\"name\":\"userconfig-foo\",\"secret\":{\"secretName\":\"foo\",\"items\":[{\"key\":\"key\",\"path\":\"path\"}]}}" ]
+}
+
 #--------------------------------------------------------------------
 # affinity
 
