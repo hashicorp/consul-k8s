@@ -312,9 +312,9 @@ operator = "write"
 agent_prefix "" {
   policy = "read"
 }
-  node_prefix "" {
-    policy = "write"
-  }
+node_prefix "" {
+  policy = "write"
+}
   service_prefix "" {
     policy = "read"
     intentions = "read"
@@ -328,10 +328,10 @@ operator = "write"
 agent_prefix "" {
   policy = "read"
 }
+node_prefix "" {
+  policy = "write"
+}
 namespace_prefix "" {
-  node_prefix "" {
-    policy = "write"
-  }
   service_prefix "" {
     policy = "read"
     intentions = "read"

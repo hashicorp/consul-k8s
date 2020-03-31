@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -564,6 +565,129 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			})
 			require.NoError(err)
 			require.Len(rules, 1)
+		})
+	}
+}
+
+// Test the tokens and policies that are created when namespaces is enabled.
+func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		TokenFlag  string
+		PolicyName string
+		PolicyDCs  []string
+		SecretName string
+		LocalToken bool
+	}{
+		"client token": {
+			TokenFlag:  "-create-client-token",
+			PolicyName: "client-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-client-acl-token",
+			LocalToken: true,
+		},
+		"catalog-sync token": {
+			TokenFlag:  "-create-sync-token",
+			PolicyName: "catalog-sync-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+			LocalToken: false,
+		},
+		"connect-inject-namespace token": {
+			TokenFlag:  "-create-inject-namespace-token",
+			PolicyName: "connect-inject-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-connect-inject-acl-token",
+			LocalToken: false,
+		},
+		"enterprise-license token": {
+			TokenFlag:  "-create-enterprise-license-token",
+			PolicyName: "enterprise-license-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-enterprise-license-acl-token",
+			LocalToken: true,
+		},
+		"client-snapshot-agent token": {
+			TokenFlag:  "-create-snapshot-agent-token",
+			PolicyName: "client-snapshot-agent-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
+			LocalToken: true,
+		},
+		"mesh-gateway token": {
+			TokenFlag:  "-create-mesh-gateway-token",
+			PolicyName: "mesh-gateway-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
+			LocalToken: false,
+		},
+		"acl-replication token": {
+			TokenFlag:  "-create-acl-replication-token",
+			PolicyName: "acl-replication-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-acl-replication-acl-token",
+			LocalToken: false,
+		},
+	}
+	for testName, c := range cases {
+		t.Run(testName, func(t *testing.T) {
+			k8s, testSvr := completeEnterpriseSetup(t, resourcePrefix, ns)
+			defer testSvr.Stop()
+			require := require.New(t)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmd.init()
+			cmdArgs := []string{
+				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-expected-replicas=1",
+				"-enable-namespaces",
+				c.TokenFlag,
+			}
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the expected policy was created.
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+				Token:   bootToken,
+			})
+			require.NoError(err)
+			policy := policyExists(t, c.PolicyName, consul)
+			require.Equal(c.PolicyDCs, policy.Datacenters)
+
+			// Test that the token was created as a Kubernetes Secret.
+			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
+			require.NoError(err)
+			require.NotNil(tokenSecret)
+			token, ok := tokenSecret.Data["token"]
+			require.True(ok)
+
+			// Test that the token has the expected policies in Consul.
+			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+			require.NoError(err)
+			require.Equal(c.PolicyName, tokenData.Policies[0].Name)
+			require.Equal(c.LocalToken, tokenData.Local)
+
+			// Test that if the same command is run again, it doesn't error.
+			t.Run(testName+"-retried", func(t *testing.T) {
+				ui := cli.NewMockUi()
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				cmd.init()
+				responseCode := cmd.Run(cmdArgs)
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
+			})
 		})
 	}
 }
