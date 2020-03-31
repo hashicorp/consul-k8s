@@ -31,6 +31,7 @@ global:
   #   # Consul Enterprise 1.5.0
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
   image: "consul:1.7.1"
+  imagePullSecrets: 
 
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as catalog sync. This can be overridden
