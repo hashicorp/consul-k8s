@@ -1,5 +1,18 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+* Add new `get-consul-client-ca` command that retrieves Consul clients' CA when auto-encrypt is enabled
+  and writes it to a file [[GH-211](https://github.com/hashicorp/consul-k8s/pull/211)].
+
+BUG FIXES:
+
+* Sync: Fix a race condition where sync would delete services at initial startup [[GH-208](https://github.com/hashicorp/consul-k8s/pull/208)]
+
+DEPRECATIONS:
+
+* Connect: deprecate the `-consul-ca-cert` flag in favor of `-ca-file` [[GH-217](https://github.com/hashicorp/consul-k8s/pull/217)]
+
 ## 0.12.0 (February 21, 2020)
 
 BREAKING CHANGES:
