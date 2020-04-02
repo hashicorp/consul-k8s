@@ -11,7 +11,7 @@ FEATURES:
 * ACLs: Support new flag `acl-init -token-sink-file` that will write the token
   to the specified file. [[GH-232](https://github.com/hashicorp/consul-k8s/pull/232)]
 * Commands: Add new command `service-address` that writes the address of the
-  specified Kubernetes service to file. If the service is of type `LoadBalancer`,
+  specified Kubernetes service to a file. If the service is of type `LoadBalancer`,
   the command will wait until the external address of the load balancer has
   been assigned. If the service is of type `ClusterIP` it will write the cluster
   IP. Services of type `NodePort` or `ExternalName` will result in an error.
@@ -34,7 +34,7 @@ IMPROVEMENTS:
   the anonymous policy will be configured to allow read access to all nodes and
   services. This is required for cross-datacenter Consul Connect requests to
   work. [[GH-230](https://github.com/hashicorp/consul-k8s/pull/230)].
-* ACLs: The anonymous policy has been renamed from `dns-policy` to `anonymous-token-policy`
+* ACLs: The policy for the anonymous token has been renamed from `dns-policy` to `anonymous-token-policy`
   since it is used for more than DNS now (see above). [[GH-230](https://github.com/hashicorp/consul-k8s/pull/230)].
 
 DEPRECATIONS:
