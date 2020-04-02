@@ -147,7 +147,7 @@ spec:
               value: https://localhost:8501
             {{- if .Values.global.tls.enableAutoEncrypt }}
             - name: CONSUL_HTTP_SSL_VERIFY
-              value: false
+              value: "false"
             {{- else }}
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt

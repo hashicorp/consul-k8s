@@ -197,7 +197,11 @@ spec:
             - name: consul-service
               mountPath: /consul/service
             {{- if .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
             - name: consul-ca-cert
+            {{- end }}
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
@@ -298,7 +302,11 @@ spec:
               mountPath: /consul/service
               readOnly: true
             {{- if .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
             - name: consul-ca-cert
+            {{- end }}
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
