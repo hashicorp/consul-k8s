@@ -1,5 +1,32 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+* Support auto-encrypt [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)].
+  Auto-encrypt is the feature of Consul that allows clients to bootstrap their own certs
+  at startup. To enable it through the Helm Chart, set:
+  ```yaml
+  global:
+    tls:
+      enabled: true
+      enableAutoEncrypt: true
+  ```
+
+FEATURES:
+
+* Add `externalServers` configuration to support configuring the Helm chart with Consul servers
+  running outside of a Kubernetes cluster [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)]. At the moment, this configuration is only used together
+  with auto-encrypt, but might be extended later for other use-cases.
+
+  To use auto-encrypt with external servers, you can set:
+  ```yaml
+  externalServers:
+    enabled: true
+  ```
+  This will tell all consul-k8s components to talk to the external servers to retrieve
+  the clients' CA. Take a look at other properties you can set for `externalServers`
+  [here](https://github.com/hashicorp/consul-helm/blob/e892588288c5c14197306cc714aabb2473f6f59e/values.yaml#L273-L305).
+
 ## 0.18.0 (Mar 18, 2020)
 
 IMPROVEMENTS:
