@@ -1,5 +1,5 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if .Values.global.bootstrapACLs }}
+{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
 {{- /* We don't render this job when server.updatePartition > 0 because that
     means a server rollout is in progress and this job won't complete unless
     the rollout is finished (which won't happen until the partition is 0).

@@ -25,7 +25,7 @@ rules:
   verbs:
   - use
 {{- end }}
-{{- if and .Values.global.bootstrapACLs .Values.global.enableConsulNamespaces }}
+{{- if and (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) .Values.global.enableConsulNamespaces }}
 - apiGroups: [""]
   resources:
     - secrets

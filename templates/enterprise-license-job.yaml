@@ -65,7 +65,7 @@ spec:
             - name:  CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end}}
-            {{- if .Values.global.bootstrapACLs }}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -99,7 +99,7 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
           {{- end }}
-      {{- if .Values.global.bootstrapACLs }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}

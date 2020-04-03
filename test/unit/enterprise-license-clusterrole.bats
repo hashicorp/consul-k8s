@@ -54,7 +54,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "enterpriseLicense/ClusterRole: rules are empty if global.bootstrapACLs and global.enablePodSecurityPolicies are false" {
+@test "enterpriseLicense/ClusterRole: rules are empty if global.acls.manageSystemACLs and global.enablePodSecurityPolicies are false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/enterprise-license-clusterrole.yaml  \
@@ -66,15 +66,15 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "enterpriseLicense/ClusterRole: allows acl token when global.bootstrapACLs is true" {
+@test "enterpriseLicense/ClusterRole: allows acl token when global.acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/enterprise-license-clusterrole.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules | map(select(.resourceNames[0] == "release-name-consul-enterprise-license-acl-token")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]

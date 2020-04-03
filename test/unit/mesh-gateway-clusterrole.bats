@@ -36,14 +36,14 @@ load _helpers
   [ "${actual}" = "podsecuritypolicies" ]
 }
 
-@test "meshGateway/ClusterRole: rules for global.bootstrapACLs=true" {
+@test "meshGateway/ClusterRole: rules for global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
@@ -83,7 +83,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'meshGateway.service.enabled=true' \
       --set 'meshGateway.service.type=LoadBalancer' \
