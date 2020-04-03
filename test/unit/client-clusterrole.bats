@@ -78,14 +78,14 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
 @test "client/ClusterRole: allows secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-clusterrole.yaml  \
       --set 'client.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
@@ -96,7 +96,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/client-clusterrole.yaml  \
       --set 'client.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1].resources[0]' | tee /dev/stderr)

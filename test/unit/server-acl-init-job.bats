@@ -11,32 +11,32 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: enabled with global.bootstrapACLs=true" {
+@test "serverACLInit/Job: enabled with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: disabled with server=false and global.bootstrapACLs=true" {
+@test "serverACLInit/Job: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: enabled with client=false global.bootstrapACLs=true" {
+@test "serverACLInit/Job: enabled with client=false global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -47,7 +47,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.updatePartition=1' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -58,7 +58,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2] | contains("-create-client-token=false")' |
       tee /dev/stderr)
@@ -69,7 +69,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2] | contains("-create-client-token=false")' |
@@ -84,7 +84,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -94,7 +94,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'dns.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
@@ -105,7 +105,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'dns.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
@@ -113,7 +113,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# aclBindingRuleSelector/global.bootstrapACLs
+# aclBindingRuleSelector/global.acls.manageSystemACLs
 
 @test "serverACLInit/Job: no acl-binding-rule-selector flag by default" {
   cd `chart_dir`
@@ -130,7 +130,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.aclBindingRuleSelector="foo"' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
@@ -144,7 +144,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -156,7 +156,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
@@ -167,7 +167,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enterpriseLicense.secretName=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
@@ -181,7 +181,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-snapshot-agent-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -191,7 +191,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-snapshot-agent-token"))' | tee /dev/stderr)
@@ -202,7 +202,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
@@ -218,7 +218,7 @@ load _helpers
   cd `chart_dir`
   local command=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -238,7 +238,7 @@ load _helpers
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \
@@ -264,7 +264,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -308,7 +308,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
       --set 'syncCatalog.consulNamespaces.mirroringK8SPrefix=k8s-' \
@@ -352,7 +352,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
@@ -395,7 +395,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
@@ -439,7 +439,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
@@ -487,7 +487,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
       --set 'connectInject.consulNamespaces.mirroringK8SPrefix=k8s-' \
@@ -531,7 +531,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -574,7 +574,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
@@ -618,7 +618,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
@@ -666,7 +666,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -676,7 +676,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.createReplicationToken=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
@@ -690,7 +690,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr)
 
   # Test the flag is not set.
@@ -713,7 +713,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretName=name' \
       . | tee /dev/stderr)
 
@@ -737,7 +737,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr)
 
@@ -761,7 +761,7 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template \
       -x templates/server-acl-init-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.replicationToken.secretName=name' \
       --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr)

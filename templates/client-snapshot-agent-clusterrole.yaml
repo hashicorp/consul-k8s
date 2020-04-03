@@ -9,11 +9,8 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-{{- if not (or .Values.global.enablePodSecurityPolicies .Values.global.bootstrapACLs) }}
-rules: []
-{{- else }}
+{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs .Values.global.enablePodSecurityPolicies) }}
 rules:
-{{- end }}
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
@@ -22,7 +19,7 @@ rules:
     verbs:
     - use
 {{- end }}
-{{- if .Values.global.bootstrapACLs }}
+{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
   - apiGroups: [""]
     resources:
       - secrets
@@ -32,5 +29,7 @@ rules:
       - get
 {{- end }}
 {{- else }}
+rules: []
+{{- end }}
 {{- end }}
 {{- end }}

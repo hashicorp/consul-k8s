@@ -9,7 +9,7 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: mesh-gateway
-{{- if or .Values.global.bootstrapACLs .Values.global.enablePodSecurityPolicies (eq .Values.meshGateway.wanAddress.source "Service") }}
+{{- if or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs .Values.global.enablePodSecurityPolicies (eq .Values.meshGateway.wanAddress.source "Service") }}
 rules:
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
@@ -19,7 +19,7 @@ rules:
     verbs:
       - use
 {{- end }}
-{{- if .Values.global.bootstrapACLs }}
+{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
   - apiGroups: [""]
     resources:
       - secrets

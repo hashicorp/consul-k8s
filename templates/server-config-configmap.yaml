@@ -13,7 +13,7 @@ metadata:
 data:
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
-  {{- if .Values.global.bootstrapACLs }}
+  {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
   acl-config.json: |-
     {
       "acl": {

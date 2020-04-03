@@ -340,7 +340,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # consulServiceName
 
-@test "meshGateway/Deployment: fails if consulServiceName is set and bootstrapACLs is true" {
+@test "meshGateway/Deployment: fails if consulServiceName is set and acls.manageSystemACLs is true" {
   cd `chart_dir`
   run helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -348,13 +348,13 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       --set 'meshGateway.consulServiceName=override' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "if global.bootstrapACLs is true, meshGateway.consulServiceName cannot be set" ]]
+  [[ "$output" =~ "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" ]]
 }
 
-@test "meshGateway/Deployment: does not fail if consulServiceName is set to mesh-gateway and bootstrapACLs is true" {
+@test "meshGateway/Deployment: does not fail if consulServiceName is set to mesh-gateway and acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -362,7 +362,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       --set 'meshGateway.consulServiceName=mesh-gateway' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr \
       | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
 
@@ -669,13 +669,13 @@ consul services register \
   [ "${actual}" = "${exp}" ]
 }
 
-@test "meshGateway/Deployment: service-init init container with global.bootstrapACLs=true" {
+@test "meshGateway/Deployment: service-init init container with acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 

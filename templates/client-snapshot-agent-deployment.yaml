@@ -37,7 +37,7 @@ spec:
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
-      {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey)) }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey)) }}
       volumes:
         {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
         - name: snapshot-config
@@ -47,7 +47,7 @@ spec:
             - key: {{ .Values.client.snapshotAgent.configSecret.secretKey }}
               path: snapshot-config.json
         {{- end }}
-        {{- if .Values.global.bootstrapACLs }}
+        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
         - name: aclconfig
           emptyDir: {}
         {{- end }}
@@ -88,7 +88,7 @@ spec:
             - name: CONSUL_HTTP_ADDR
               value: http://$(HOST_IP):8500
             {{- end }}
-            {{- if .Values.global.bootstrapACLs }}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -103,17 +103,17 @@ spec:
                 {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
                 -config-dir=/consul/config \
                 {{- end }}
-                {{- if .Values.global.bootstrapACLs}}
+                {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
                 -config-dir=/consul/aclconfig \
                 {{- end }}
-          {{- if (or .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) ) }}
+          {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) ) }}
           volumeMounts:
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             - name: snapshot-config
               readOnly: true
               mountPath: /consul/config
             {{- end }}
-            {{- if .Values.global.bootstrapACLs}}
+            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- end }}
@@ -127,9 +127,9 @@ spec:
               readOnly: true
           {{- end }}
           {{- end }}
-      {{- if (or .Values.global.bootstrapACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt)) }}
+      {{- if (or (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt)) }}
       initContainers:
-      {{- if .Values.global.bootstrapACLs }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
       - name: client-snapshot-agent-acl-init
         image: {{ .Values.global.imageK8S }}
         command:

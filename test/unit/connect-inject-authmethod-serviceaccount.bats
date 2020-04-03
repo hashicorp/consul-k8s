@@ -18,7 +18,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -34,12 +34,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "connectInjectAuthMethod/ServiceAccount: enabled with global.bootstrapACLs.enabled=true" {
+@test "connectInjectAuthMethod/ServiceAccount: enabled with global.acls.manageSystemACLs.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'connectInject.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
