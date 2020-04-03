@@ -24,6 +24,9 @@ FEATURES:
         -name=consul-mesh-gateway \
         -output-file=address.txt
 
+* Commands: Add new `get-consul-client-ca` command that retrieves Consul clients' CA when auto-encrypt is enabled
+  and writes it to a file [[GH-211](https://github.com/hashicorp/consul-k8s/pull/211)].
+
 IMPROVEMENTS:
 
 * ACLs: The following ACL tokens have been changed to local tokens rather than
@@ -37,11 +40,16 @@ IMPROVEMENTS:
 * ACLs: The policy for the anonymous token has been renamed from `dns-policy` to `anonymous-token-policy`
   since it is used for more than DNS now (see above). [[GH-230](https://github.com/hashicorp/consul-k8s/pull/230)].
 
+BUG FIXES:
+
+* Sync: Fix a race condition where sync would delete services at initial startup [[GH-208](https://github.com/hashicorp/consul-k8s/pull/208)]
+
 DEPRECATIONS:
 
 * ACLs: The flag `-init-type=sync` for the command `acl-init` has been deprecated.
   Only the flag `-init-type=client` is supported. Previously, setting `-init-type=sync`
   had no effect so this is not a breaking change. [[GH-232](https://github.com/hashicorp/consul-k8s/pull/232)]
+* Connect: deprecate the `-consul-ca-cert` flag in favor of `-ca-file` [[GH-217](https://github.com/hashicorp/consul-k8s/pull/217)]
 
 ## 0.12.0 (February 21, 2020)
 
