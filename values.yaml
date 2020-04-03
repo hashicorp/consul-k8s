@@ -149,15 +149,6 @@ global:
   # of both the catalog sync and connect injector.
   enableConsulNamespaces: false
 
-  # Configures Consul datacenter federation.
-  federation:
-    # If true, servers and mesh gateways will
-    # have mesh gateway federation enabled.
-    # Additional configuration will be needed to provide the addresses of the
-    # remote datacenter's mesh gateway to federate with.
-    # This setting must be true in both primary and secondary datacenters.
-    enabled: false
-
   # [DEPRECATED] Use acls.manageSystemACLs instead.
   bootstrapACLs: false
 
