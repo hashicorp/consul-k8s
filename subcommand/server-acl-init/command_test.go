@@ -536,7 +536,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				// Check that the anonymous token has the policy.
 				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: "anonymous"})
 				require.NoError(t, err)
-				require.Equal(t, "anonymous-token-policy", tokenData.Policies[0].Name)
+				require.Equal(t, anonPolicyName, tokenData.Policies[0].Name)
 			} else {
 				policies, _, err := consul.ACL().PolicyList(nil)
 				require.NoError(t, err)
