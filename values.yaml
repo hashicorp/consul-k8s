@@ -169,6 +169,7 @@ server:
   # has been elected. If you are not using an enterprise image
   # or if you plan to introduce the license key via another route, then set
   # these fields to null.
+  # Note: the job to apply license runs on both Helm installs and upgrades.
   enterpriseLicense:
     secretName: null
     secretKey: null

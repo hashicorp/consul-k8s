@@ -12,6 +12,8 @@ IMPROVEMENTS:
       enableAutoEncrypt: true
   ```
 
+* Run the enterprise license job on Helm upgrades, as well as installs [[GH-407](https://github.com/hashicorp/consul-helm/pull/407)].
+
 FEATURES:
 
 * Add `externalServers` configuration to support configuring the Helm chart with Consul servers
