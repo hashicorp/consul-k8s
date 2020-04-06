@@ -130,6 +130,8 @@ FEATURES:
   ```
   [[GH-388](https://github.com/hashicorp/consul-helm/pull/388)]
 
+* Support setting image pull secrets via service accounts [[GH-411](https://github.com/hashicorp/consul-helm/pull/411)].
+
 IMPROVEMENTS:
 
 * Default to the latest version of consul-k8s: `hashicorp/consul-k8s:0.13.0`
