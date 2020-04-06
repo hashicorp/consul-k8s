@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.19.0 (Apr 7, 2020)
+
 BREAKING CHANGES:
 
 * Mesh Gateways:
