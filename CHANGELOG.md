@@ -74,6 +74,19 @@ BREAKING CHANGES:
 
 FEATURES:
 
+* Add `externalServers` configuration to support configuring the Helm chart with Consul servers
+  running outside of a Kubernetes cluster [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)]. At the moment, this configuration is only used together
+  with auto-encrypt, but might be extended later for other use-cases.
+
+  To use auto-encrypt with external servers, you can set:
+  ```yaml
+  externalServers:
+    enabled: true
+  ```
+  This will tell all consul-k8s components to talk to the external servers to retrieve
+  the clients' CA. Take a look at other properties you can set for `externalServers`
+  [here](https://github.com/hashicorp/consul-helm/blob/e892588288c5c14197306cc714aabb2473f6f59e/values.yaml#L273-L305).
+
 * ACLs: Support ACL replication. ACL replication allows two or more Consul clusters
   to be federated when ACLs are enabled. One cluster is designated the primary
   and the rest are secondaries. The primary cluster replicates its ACLs to
@@ -122,6 +135,16 @@ IMPROVEMENTS:
 * Default to the latest version of consul-k8s: `hashicorp/consul-k8s:0.13.0`
 * Default to the latest version of Consul: `consul:1.7.2`
 * Allow setting specific secret keys in `server.extraVolumes` [[GH-395](https://github.com/hashicorp/consul-helm/pull/395)]
+* Support auto-encrypt [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)].
+  Auto-encrypt is the feature of Consul that allows clients to bootstrap their own certs
+  at startup. To enable it through the Helm Chart, set:
+  ```yaml
+  global:
+    tls:
+      enabled: true
+      enableAutoEncrypt: true
+  ```
+* Run the enterprise license job on Helm upgrades, as well as installs [[GH-407](https://github.com/hashicorp/consul-helm/pull/407)].
 
 BUGFIXES:
 
