@@ -156,21 +156,21 @@ global:
   acls:
 
     # If true, the Helm chart will automatically manage ACL tokens and policies
-    # for all Consul components. This requires servers to be running inside Kubernetes.
-    # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
+    # for all Consul and consul-k8s components. This requires servers to be running inside Kubernetes.
+    # Additionally, requires Consul >= 1.4 and consul-k8s >= 0.10.1.
     manageSystemACLs: false
 
     # If true, an ACL token will be created that can be used in secondary
     # datacenters for replication. This should only be set to true in the
     # primary datacenter since the replication token must be created from that
     # datacenter.
-    # In secondary datacenters, the secret will be imported from the primary
+    # In secondary datacenters, the secret needs to be imported from the primary
     # datacenter and referenced via global.acls.replicationToken.
     createReplicationToken: false
 
     # replicationToken references a secret containing the replication ACL token.
     # This token will be used by secondary datacenters to perform ACL replication
-    # and create ACL tokens and policies
+    # and create ACL tokens and policies.
     replicationToken:
       secretName: null
       secretKey: null
