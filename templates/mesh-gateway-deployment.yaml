@@ -190,7 +190,7 @@ spec:
                 }
                 EOF
 
-                consul services register \
+                /consul-bin/consul services register \
                   {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
                   -token-file=/consul/service/acl-token \
                   {{- end }}
@@ -198,6 +198,8 @@ spec:
           volumeMounts:
             - name: consul-service
               mountPath: /consul/service
+            - name: consul-bin
+              mountPath: /consul-bin
             {{- if .Values.global.tls.enabled }}
             {{- if .Values.global.tls.enableAutoEncrypt }}
             - name: consul-auto-encrypt-ca-cert
@@ -303,6 +305,8 @@ spec:
             - name: consul-service
               mountPath: /consul/service
               readOnly: true
+            - name: consul-bin
+              mountPath: /consul-bin
             {{- if .Values.global.tls.enabled }}
             {{- if .Values.global.tls.enableAutoEncrypt }}
             - name: consul-auto-encrypt-ca-cert
@@ -334,7 +338,7 @@ spec:
             - consul-k8s
             - lifecycle-sidecar
             - -service-config=/consul/service/service.hcl
-            - -consul-binary=/bin/consul
+            - -consul-binary=/consul-bin/consul
             {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
             - -token-file=/consul/service/acl-token
             {{- end }}
