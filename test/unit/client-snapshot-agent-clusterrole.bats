@@ -59,7 +59,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
 @test "client/SnapshotAgentClusterRole: allows secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
@@ -67,7 +67,7 @@ load _helpers
       -x templates/client-snapshot-agent-clusterrole.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
@@ -79,7 +79,7 @@ load _helpers
       -x templates/client-snapshot-agent-clusterrole.yaml  \
       --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[1].resources[0]' | tee /dev/stderr)

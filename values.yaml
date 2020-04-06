@@ -38,7 +38,7 @@ global:
   # Note: support for the catalog sync's liveness and readiness probes was added
   # to consul-k8s 0.6.0. If using an older consul-k8s version, you may need to
   # remove these checks to make the sync work.
-  # If using bootstrapACLs then must be >= 0.10.1.
+  # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
   imageK8S: "hashicorp/consul-k8s:0.12.0"
@@ -72,11 +72,6 @@ global:
     # secretKey is the key within the Kubernetes secret that holds the gossip
     # encryption key.
     secretKey: ""
-
-  # bootstrapACLs will automatically create and assign ACL tokens within
-  # the Consul cluster. This requires servers to be running inside Kubernetes.
-  # Additionally requires Consul >= 1.4 and consul-k8s >= 0.10.1.
-  bootstrapACLs: false
 
   # Enables TLS encryption across the cluster to verify authenticity of the
   # servers and clients that connect. Note: It is HIGHLY recommended that you also
@@ -154,6 +149,32 @@ global:
   # of both the catalog sync and connect injector.
   enableConsulNamespaces: false
 
+  # [DEPRECATED] Use acls.manageSystemACLs instead.
+  bootstrapACLs: false
+
+  # Configure ACLs.
+  acls:
+
+    # If true, the Helm chart will automatically manage ACL tokens and policies
+    # for all Consul and consul-k8s components. This requires servers to be running inside Kubernetes.
+    # Additionally, requires Consul >= 1.4 and consul-k8s >= 0.10.1.
+    manageSystemACLs: false
+
+    # If true, an ACL token will be created that can be used in secondary
+    # datacenters for replication. This should only be set to true in the
+    # primary datacenter since the replication token must be created from that
+    # datacenter.
+    # In secondary datacenters, the secret needs to be imported from the primary
+    # datacenter and referenced via global.acls.replicationToken.
+    createReplicationToken: false
+
+    # replicationToken references a secret containing the replication ACL token.
+    # This token will be used by secondary datacenters to perform ACL replication
+    # and create ACL tokens and policies.
+    replicationToken:
+      secretName: null
+      secretKey: null
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
@@ -218,6 +239,9 @@ server:
     # - type: secret (or "configMap")
     #   name: my-secret
     #   load: false # if true, will add to `-config-dir` to load by Consul
+    #   items: # optional items array
+    #   - key: key
+    #     path: path
 
   # Affinity Settings
   # Commenting out or setting as empty the affinity variable, will allow
@@ -741,15 +765,16 @@ connectInject:
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.0.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
-  # If not using global.bootstrapACLs and instead manually setting up an auth
-  # method for Connect inject, set this to the name of your auth method.
+  # If not using global.acls.manageSystemACLs and instead manually setting up an
+  # auth method for Connect inject, set this to the name of your auth method.
   overrideAuthMethodName: ""
 
   # aclInjectToken refers to a Kubernetes secret that you have created that contains
   # an ACL token for your Consul cluster which allows the Connect injector the correct
   # permissions. This is only needed if Consul namespaces [Enterprise only] and ACLs
-  # are enabled on the Consul cluster and you are not setting `global.bootstrapACLs`
-  # to `true`. This token needs to have `operator = "write"` privileges to be able to
+  # are enabled on the Consul cluster and you are not setting
+  # `global.acls.manageSystemACLs` to `true`.
+  # This token needs to have `operator = "write"` privileges to be able to
   # create Consul namespaces.
   aclInjectToken:
     secretName: null
@@ -783,7 +808,8 @@ meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
   # See https://www.consul.io/docs/connect/mesh_gateway.html
-  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using global.bootstrapACLs.
+  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using
+  # global.acls.manageSystemACLs.
   enabled: false
 
   # Globally configure which mode the gateway should run in.
@@ -799,46 +825,53 @@ meshGateway:
   # Number of replicas for the Deployment.
   replicas: 2
 
-  # What gets registered as wan address for the gateway.
+  # What gets registered as WAN address for the gateway.
   wanAddress:
-    # Port that gets registered.
+    # source configures where to retrieve the WAN address (and possibly port)
+    # for the mesh gateway from.
+    # Can be set to either: Service, NodeIP, NodeName or Static.
+    #
+    # Service - Determine the address based on the service type.
+    #   If service.type=LoadBalancer use the external IP or hostname of
+    #   the service. Use the port set by service.port.
+    #   If service.type=NodePort use the Node IP. The port will be set to
+    #   service.nodePort so service.nodePort cannot be null.
+    #   If service.type=ClusterIP use the ClusterIP. The port will be set to
+    #   service.port.
+    #   service.type=ExternalName is not supported.
+    # NodeIP - The node IP as provided by the Kubernetes downward API.
+    # NodeName - The name of the node as provided by the Kubernetes downward
+    #   API. This is useful if the node names are DNS entries that
+    #   are routable from other datacenters.
+    # Static - Use the address hardcoded in meshGateway.wanAddress.static.
+    source: "Service"
+
+    # Port that gets registered for WAN traffic.
+    # If source is set to "Service" then this setting will have no effect.
+    # See the documentation for source as to which port will be used in that
+    # case.
     port: 443
 
-    # If true, each Gateway Pod will advertise its NodeIP
-    # (as provided by the Kubernetes downward API) as the wan address.
-    # This is useful if the node IPs are routable from other DCs.
-    # useNodeName and host must be false and "" respectively.
-    useNodeIP: true
-
-    # If true, each Gateway Pod will advertise its NodeName
-    # (as provided by the Kubernetes downward API) as the wan address.
-    # This is useful if the node names are DNS entries that are
-    # routable from other DCs.
-    # meshGateway.wanAddress.port will be used as the port for the wan address.
-    # useNodeIP and host must be false and "" respectively.
-    useNodeName: false
-
-    # If set, each gateway Pod will use this host as its wan address.
-    # Users must ensure that this address routes to the Gateway pods,
-    # for example via a DNS entry that routes to the Service fronting the Deployment.
-    # meshGateway.wanAddress.port will be used as the port for the wan address.
-    # useNodeIP and useNodeName must be false.
-    host: ""
+    # If source is set to "Static" then this value will be used as the WAN
+    # address of the mesh gateways. This is useful if you've configured a
+    # DNS entry to point to your mesh gateways.
+    static: ""
 
   # The service option configures the Service that fronts the Gateway Deployment.
   service:
     # Whether to create a Service or not.
-    enabled: false
+    enabled: true
 
     # Type of service, ex. LoadBalancer, ClusterIP.
-    type: ClusterIP
+    type: LoadBalancer
 
     # Port that the service will be exposed on.
     # The targetPort will be set to meshGateway.containerPort.
     port: 443
 
-    # Optional nodePort of the service. Can be used in conjunction with
-    # type: NodePort.
+    # Optionally hardcode the nodePort of the service if using type: NodePort.
+    # If not set and using type: NodePort, Kubernetes will automatically assign
+    # a port.
     nodePort: null
 
     # Annotations to apply to the mesh gateway service.
@@ -860,12 +893,12 @@ meshGateway:
   dnsPolicy: null
 
   # Override the default 'mesh-gateway' service name registered in Consul.
-  # Cannot be used if bootstrapACLs is true since the ACL token generated
-  # is only for the name 'mesh-gateway'.
+  # Cannot be used if global.acls.manageSystemACLs is true since the ACL token
+  # generated is only for the name 'mesh-gateway'.
   consulServiceName: ""
 
   # Port that the gateway will run on inside the container.
-  containerPort: 443
+  containerPort: 8443
 
   # Optional hostPort for the gateway to be exposed on.
   # This can be used with wanAddress.port and wanAddress.useNodeIP

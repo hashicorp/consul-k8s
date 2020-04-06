@@ -1,5 +1,5 @@
 {{- if and (not .Values.connectInject.certs.secretName) (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if .Values.global.bootstrapACLs }}
+{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

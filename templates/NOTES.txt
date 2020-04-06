@@ -20,7 +20,7 @@ To learn more about the release if you are using Helm 3, run:
   $ helm get all {{ .Release.Name }}
 
 
-{{- if (and .Values.global.bootstrapACLs (gt (len .Values.server.extraConfig) 3)) }}
+{{- if (and (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) (gt (len .Values.server.extraConfig) 3)) }}
 Warning: Defining server extraConfig potentially disrupts the automatic ACL
          bootstrapping required settings. This may cause future issues if
          there are conflicts.

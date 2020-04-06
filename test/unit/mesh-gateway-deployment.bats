@@ -244,25 +244,6 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
-# BootstrapACLs
-
-@test "meshGateway/Deployment: global.BootstrapACLs enabled creates init container and secret" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'global.bootstrapACLs=true' \
-      . | tee /dev/stderr )
-  local init_container=$(echo "${actual}" | yq -r '.spec.template.spec.initContainers[1].name' | tee /dev/stderr)
-  [ "${init_container}" = "mesh-gateway-acl-init" ]
-
-  local secret=$(echo "${actual}" | yq -r '.spec.template.spec.containers[0].env[2].name' | tee /dev/stderr)
-  [ "${secret}" = "CONSUL_HTTP_TOKEN" ]
-}
-
-#--------------------------------------------------------------------
 # envoyImage
 
 @test "meshGateway/Deployment: envoy image has default" {
@@ -325,7 +306,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # containerPort
 
-@test "meshGateway/Deployment: containerPort defaults to 443" {
+@test "meshGateway/Deployment: containerPort defaults to 8443" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -335,10 +316,9 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq  '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  [[ $(echo "$actual" | yq -r '.command[2]')  =~ '-address="${POD_IP}:443"' ]]
-  [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "443" ]
-  [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "443" ]
-  [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "443" ]
+  [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "8443" ]
+  [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "8443" ]
+  [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "8443" ]
 }
 
 @test "meshGateway/Deployment: containerPort can be overridden" {
@@ -348,93 +328,19 @@ key2: value2' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'meshGateway.containerPort=8443' \
+      --set 'meshGateway.containerPort=9443' \
       . | tee /dev/stderr \
       | yq  '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  [[ $(echo "$actual" | yq -r '.command[2]')  =~ '-address="${POD_IP}:8443"' ]]
-  [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "8443" ]
-  [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "8443" ]
-  [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "8443" ]
-}
-
-#--------------------------------------------------------------------
-# wanAddress
-
-@test "meshGateway/Deployment: wanAddress.port defaults to 443" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'meshGateway.wanAddress.useNodeIP=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:443"' ]]
-}
-
-@test "meshGateway/Deployment: wanAddress uses NodeIP by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:443"' ]]
-}
-
-@test "meshGateway/Deployment: wanAddress.useNodeIP" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'meshGateway.wanAddress.useNodeIP=true' \
-      --set 'meshGateway.wanAddress.port=4444' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${HOST_IP}:4444"' ]]
-}
-
-@test "meshGateway/Deployment: wanAddress.useNodeName" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'meshGateway.wanAddress.useNodeIP=false' \
-      --set 'meshGateway.wanAddress.useNodeName=true' \
-      --set 'meshGateway.wanAddress.port=4444' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="${NODE_NAME}:4444"' ]]
-}
-
-@test "meshGateway/Deployment: wanAddress.host" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'meshGateway.wanAddress.useNodeIP=false' \
-      --set 'meshGateway.wanAddress.useNodeName=false' \
-      --set 'meshGateway.wanAddress.host=myhost' \
-      --set 'meshGateway.wanAddress.port=4444' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  [[ "${actual}" =~ '-wan-address="myhost:4444"' ]]
+  [ $(echo "$actual" | yq -r '.ports[0].containerPort')  = "9443" ]
+  [ $(echo "$actual" | yq -r '.livenessProbe.tcpSocket.port')  = "9443" ]
+  [ $(echo "$actual" | yq -r '.readinessProbe.tcpSocket.port')  = "9443" ]
 }
 
 #--------------------------------------------------------------------
 # consulServiceName
 
-@test "meshGateway/Deployment: fails if consulServiceName is set and bootstrapACLs is true" {
+@test "meshGateway/Deployment: fails if consulServiceName is set and acls.manageSystemACLs is true" {
   cd `chart_dir`
   run helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -442,13 +348,13 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       --set 'meshGateway.consulServiceName=override' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "if global.bootstrapACLs is true, meshGateway.consulServiceName cannot be set" ]]
+  [[ "$output" =~ "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" ]]
 }
 
-@test "meshGateway/Deployment: does not fail if consulServiceName is set to mesh-gateway and bootstrapACLs is true" {
+@test "meshGateway/Deployment: does not fail if consulServiceName is set to mesh-gateway and acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -456,11 +362,10 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
       --set 'meshGateway.consulServiceName=mesh-gateway' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr \
       | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
 
-  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="mesh-gateway"' ]]
   [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"mesh-gateway\"' ]]
 }
 
@@ -475,7 +380,6 @@ key2: value2' \
       . | tee /dev/stderr \
       | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
 
-  [[ $(echo "${actual}" | yq -r '.command[2]' ) =~ '-service="overridden"' ]]
   [[ $(echo "${actual}" | yq -r '.lifecycle.preStop.exec.command' ) =~ '-id=\"overridden\"' ]]
 }
 
@@ -711,4 +615,599 @@ key2: value2' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
+}
+
+##--------------------------------------------------------------------
+## service-init init container
+
+@test "meshGateway/Deployment: service-init init container" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container with acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s acl-init \
+  -secret-name="release-name-consul-mesh-gateway-acl-token" \
+  -k8s-namespace=default \
+  -token-sink-file=/consul/service/acl-token
+
+consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  -token-file=/consul/service/acl-token \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container with global.federation.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  meta {
+    consul-wan-federation = "1"
+  }
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container containerPort and wanAddress.port can be changed" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.containerPort=8888' \
+      --set 'meshGateway.wanAddress.source=NodeIP' \
+      --set 'meshGateway.wanAddress.port=9999' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='WAN_ADDR="${HOST_IP}"
+WAN_PORT="9999"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8888
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8888
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8888"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=NodeIP" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=NodeIP' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='WAN_ADDR="${HOST_IP}"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=NodeName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=NodeName' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='WAN_ADDR="${NODE_NAME}"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Static fails if wanAddress.static is empty" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Static' \
+      --set 'meshGateway.wanAddress.static=' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "if meshGateway.wanAddress.source=Static then meshGateway.wanAddress.static cannot be empty" ]]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Static" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Static' \
+      --set 'meshGateway.wanAddress.static=example.com' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='WAN_ADDR="example.com"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Service fails if service.enable is false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Service' \
+      --set 'meshGateway.service.enabled=false' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "if meshGateway.wanAddress.source=Service then meshGateway.service.enabled must be set to true" ]]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Service, type=LoadBalancer" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Service' \
+      --set 'meshGateway.wanAddress.port=ignored' \
+      --set 'meshGateway.service.enabled=true' \
+      --set 'meshGateway.service.type=LoadBalancer' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Service, type=NodePort" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Service' \
+      --set 'meshGateway.service.enabled=true' \
+      --set 'meshGateway.service.nodePort=9999' \
+      --set 'meshGateway.service.type=NodePort' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='WAN_ADDR="${HOST_IP}"
+WAN_PORT="9999"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Service, type=NodePort fails if service.nodePort is null" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Service' \
+      --set 'meshGateway.service.enabled=true' \
+      --set 'meshGateway.service.type=NodePort' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "if meshGateway.wanAddress.source=Service and meshGateway.service.type=NodePort, meshGateway.service.nodePort must be set" ]]
+}
+
+@test "meshGateway/Deployment: service-init init container wanAddress.source=Service, type=ClusterIP" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.wanAddress.source=Service' \
+      --set 'meshGateway.wanAddress.port=ignored' \
+      --set 'meshGateway.service.enabled=true' \
+      --set 'meshGateway.service.type=ClusterIP' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "mesh-gateway"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
+}
+@test "meshGateway/Deployment: service-init init container consulServiceName can be changed" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.consulServiceName=new-name' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
+
+  exp='consul-k8s service-address \
+  -k8s-namespace=default \
+  -name=release-name-consul-mesh-gateway \
+  -output-file=address.txt
+WAN_ADDR="$(cat address.txt)"
+WAN_PORT="443"
+
+cat > /consul/service/service.hcl << EOF
+service {
+  kind = "mesh-gateway"
+  name = "new-name"
+  port = 8443
+  address = "${POD_IP}"
+  tagged_addresses {
+    lan {
+      address = "${POD_IP}"
+      port = 8443
+    }
+    wan {
+      address = "${WAN_ADDR}"
+      port = ${WAN_PORT}
+    }
+  }
+  checks = [
+    {
+      name = "Mesh Gateway Listening"
+      interval = "10s"
+      tcp = "${POD_IP}:8443"
+      deregister_critical_service_after = "6h"
+    }
+  ]
+}
+EOF
+
+consul services register \
+  /consul/service/service.hcl'
+
+  [ "${actual}" = "${exp}" ]
 }
