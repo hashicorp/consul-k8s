@@ -52,7 +52,7 @@ namespace_prefix "" {
 	}
 }
 
-func TestDNSRules(t *testing.T) {
+func TestAnonymousTokenRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
@@ -92,10 +92,10 @@ namespace_prefix "" {
 				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
-			dnsRules, err := cmd.dnsRules()
+			rules, err := cmd.anonymousTokenRules()
 
 			require.NoError(err)
-			require.Equal(tt.Expected, dnsRules)
+			require.Equal(tt.Expected, rules)
 		})
 	}
 }
@@ -294,6 +294,61 @@ operator = "write"`,
 
 			require.NoError(err)
 			require.Equal(tt.Expected, injectorRules)
+		})
+	}
+}
+
+func TestReplicationTokenRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		EnableNamespaces bool
+		Expected         string
+	}{
+		{
+			"Namespaces are disabled",
+			false,
+			`acl = "write"
+operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
+node_prefix "" {
+  policy = "write"
+}
+  service_prefix "" {
+    policy = "read"
+    intentions = "read"
+  }`,
+		},
+		{
+			"Namespaces are enabled",
+			true,
+			`acl = "write"
+operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
+node_prefix "" {
+  policy = "write"
+}
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "read"
+    intentions = "read"
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+			replicationTokenRules, err := cmd.aclReplicationRules()
+			require.NoError(err)
+			require.Equal(tt.Expected, replicationTokenRules)
 		})
 	}
 }

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,25 +25,27 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                        *flag.FlagSet
-	k8s                          *k8sflags.K8SFlags
-	flagReleaseName              string
-	flagServerLabelSelector      string
-	flagResourcePrefix           string
-	flagReplicas                 int
-	flagK8sNamespace             string
-	flagAllowDNS                 bool
-	flagCreateClientToken        bool
-	flagCreateSyncToken          bool
-	flagCreateInjectToken        bool
-	flagCreateInjectAuthMethod   bool
-	flagBindingRuleSelector      string
-	flagCreateEntLicenseToken    bool
-	flagCreateSnapshotAgentToken bool
-	flagCreateMeshGatewayToken   bool
-	flagConsulCACert             string
-	flagConsulTLSServerName      string
-	flagUseHTTPS                 bool
+	flags                         *flag.FlagSet
+	k8s                           *k8sflags.K8SFlags
+	flagReleaseName               string
+	flagServerLabelSelector       string
+	flagResourcePrefix            string
+	flagReplicas                  int
+	flagK8sNamespace              string
+	flagAllowDNS                  bool
+	flagCreateClientToken         bool
+	flagCreateSyncToken           bool
+	flagCreateInjectToken         bool
+	flagCreateInjectAuthMethod    bool
+	flagBindingRuleSelector       string
+	flagCreateEntLicenseToken     bool
+	flagCreateSnapshotAgentToken  bool
+	flagCreateMeshGatewayToken    bool
+	flagCreateACLReplicationToken bool
+	flagACLReplicationTokenFile   string
+	flagConsulCACert              string
+	flagConsulTLSServerName       string
+	flagUseHTTPS                  bool
 
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -99,6 +103,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway")
+	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
+		"Toggle for creating a token for ACL replication between datacenters")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
@@ -123,6 +129,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagInjectK8SNSMirroringPrefix, "inject-k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul by Connect inject "+
 			"if mirroring is enabled.")
+	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
+		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "10m",
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -180,6 +188,20 @@ func (c *Command) Run(args []string) int {
 	if c.flagReleaseName != "" {
 		c.flagServerLabelSelector = fmt.Sprintf("app=consul,component=server,release=%s", c.flagReleaseName)
 	}
+	var aclReplicationToken string
+	if c.flagACLReplicationTokenFile != "" {
+		// Load the ACL replication token from file.
+		tokenBytes, err := ioutil.ReadFile(c.flagACLReplicationTokenFile)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to read ACL replication token from file %q: %s", c.flagACLReplicationTokenFile, err))
+			return 1
+		}
+		if len(tokenBytes) == 0 {
+			c.UI.Error(fmt.Sprintf("ACL replication token file %q is empty", c.flagACLReplicationTokenFile))
+			return 1
+		}
+		aclReplicationToken = strings.TrimSpace(string(tokenBytes))
+	}
 
 	var cancel context.CancelFunc
 	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), timeout)
@@ -231,29 +253,40 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Check if we've already been bootstrapped.
-	bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
-	bootstrapToken, err := c.getBootstrapToken(bootTokenSecretName)
-	if err != nil {
-		c.Log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
-		return 1
-	}
-
 	var updateServerPolicy bool
-	if bootstrapToken != "" {
-		c.Log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
+	var bootstrapToken string
 
-		// Mark that we should update the server ACL policy in case
-		// there are namespace related config changes. Because of the
-		// organization of the server token creation code, the policy
-		// otherwise won't be updated.
-		updateServerPolicy = true
+	if c.flagACLReplicationTokenFile != "" {
+		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
+		// since they will be performing replication.
+		// We can use the replication token as our bootstrap token because it
+		// has permissions to create policies and tokens.
+		c.Log.Info("ACL replication is enabled so skipping ACL bootstrapping")
+		bootstrapToken = aclReplicationToken
 	} else {
-		c.Log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-		bootstrapToken, err = c.bootstrapServers(bootTokenSecretName, scheme)
+		// Check if we've already been bootstrapped.
+		bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
+		bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.Log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
 			return 1
+		}
+
+		if bootstrapToken != "" {
+			c.Log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
+
+			// Mark that we should update the server ACL policy in case
+			// there are namespace related config changes. Because of the
+			// organization of the server token creation code, the policy
+			// otherwise won't be updated.
+			updateServerPolicy = true
+		} else {
+			c.Log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+			bootstrapToken, err = c.bootstrapServers(bootTokenSecretName, scheme)
+			if err != nil {
+				c.Log.Error(err.Error())
+				return 1
+			}
 		}
 	}
 
@@ -277,6 +310,13 @@ func (c *Command) Run(args []string) int {
 		c.Log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
+
+	consulDC, err := c.consulDatacenter(consulClient)
+	if err != nil {
+		c.Log.Error("Error getting datacenter name", "err", err)
+		return 1
+	}
+	c.Log.Info("Current datacenter", "datacenter", consulDC)
 
 	// With the addition of namespaces, the ACL policies associated
 	// with the server tokens may need to be updated if Enterprise Consul
@@ -335,15 +375,15 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createACL("client", agentRules, consulClient)
+		err = c.createLocalACL("client", agentRules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
 		}
 	}
 
-	if c.flagAllowDNS {
-		err := c.configureDNSPolicies(consulClient)
+	if c.createAnonymousPolicy() {
+		err := c.configureAnonymousPolicy(consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -357,7 +397,13 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createACL("catalog-sync", syncRules, consulClient)
+		// If namespaces are enabled, the policy and token needs to be global
+		// to be allowed to create namespaces.
+		if c.flagEnableNamespaces {
+			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, consulClient)
+		} else {
+			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
+		}
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -371,7 +417,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createACL("connect-inject", injectRules, consulClient)
+		// If namespaces are enabled, the policy and token needs to be global
+		// to be allowed to create namespaces.
+		if c.flagEnableNamespaces {
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
+		} else {
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+		}
+
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -379,7 +432,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateEntLicenseToken {
-		err := c.createACL("enterprise-license", entLicenseRules, consulClient)
+		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -387,7 +440,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateSnapshotAgentToken {
-		err := c.createACL("client-snapshot-agent", snapshotAgentRules, consulClient)
+		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -401,7 +454,9 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createACL("mesh-gateway", meshGatewayRules, consulClient)
+		// Mesh gateways require a global policy/token because they must
+		// discover services in other datacenters.
+		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -410,6 +465,21 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateInjectAuthMethod {
 		err := c.configureConnectInject(consulClient)
+		if err != nil {
+			c.Log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateACLReplicationToken {
+		rules, err := c.aclReplicationRules()
+		if err != nil {
+			c.Log.Error("Error templating acl replication token rules", "err", err)
+			return 1
+		}
+		// Policy must be global because it replicates from the primary DC
+		// and so the primary DC needs to be able to accept the token.
+		err = c.createGlobalACL("acl-replication", rules, consulDC, consulClient)
 		if err != nil {
 			c.Log.Error(err.Error())
 			return 1
@@ -495,3 +565,55 @@ Usage: consul-k8s server-acl-init [options]
   and safe to run multiple times.
 
 `
+
+// consulDatacenter returns the current datacenter name using the
+// /agent/self API endpoint.
+func (c *Command) consulDatacenter(client *api.Client) (string, error) {
+	var agentCfg map[string]map[string]interface{}
+	err := c.untilSucceeds("calling /agent/self to get datacenter",
+		func() error {
+			var opErr error
+			agentCfg, opErr = client.Agent().Self()
+			return opErr
+		})
+	if err != nil {
+		return "", err
+	}
+	if _, ok := agentCfg["Config"]; !ok {
+		return "", fmt.Errorf("/agent/self response did not contain Config key: %s", agentCfg)
+	}
+	if _, ok := agentCfg["Config"]["Datacenter"]; !ok {
+		return "", fmt.Errorf("/agent/self response did not contain Config.Datacenter key: %s", agentCfg)
+	}
+	dc, ok := agentCfg["Config"]["Datacenter"].(string)
+	if !ok {
+		return "", fmt.Errorf("could not cast Config.Datacenter as string: %s", agentCfg)
+	}
+	if dc == "" {
+		return "", fmt.Errorf("value of Config.Datacenter was empty string: %s", agentCfg)
+	}
+	return dc, nil
+}
+
+// createAnonymousPolicy returns whether we should create a policy for the
+// anonymous ACL token, i.e. queries without ACL tokens.
+func (c *Command) createAnonymousPolicy() bool {
+	// If c.flagACLReplicationTokenFile is set then we're in a secondary DC.
+	// In this case we assume that the primary datacenter has already created
+	// the anonymous policy and attached it to the anonymous token.
+	// We don't want to modify the anonymous policy in secondary datacenters
+	// because it is global and we can't create separate tokens for each
+	// secondary datacenter because the anonymous token is global.
+	return c.flagACLReplicationTokenFile == "" &&
+		// Consul DNS requires the anonymous policy because DNS queries don't
+		// have ACL tokens.
+		(c.flagAllowDNS ||
+			// If the connect auth method and ACL replication token are being
+			// created then we know we're using multi-dc Connect.
+			// In this case the anonymous policy is required because Connect
+			// services in Kubernetes have local tokens which are stripped
+			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
+			// token. Cross-dc API calls are needed by the Connect proxies to talk
+			// cross-dc.
+			(c.flagCreateInjectAuthMethod && c.flagCreateACLReplicationToken))
+}

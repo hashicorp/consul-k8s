@@ -1,9 +1,44 @@
 ## UNRELEASED
 
+FEATURES:
+
+* ACLs: Support new flag `server-acl-init -create-acl-replication-token` that creates
+  an ACL token with permissions to perform ACL replication. [[GH-210](https://github.com/hashicorp/consul-k8s/pull/210)]
+* ACLs: Support ACL replication from another datacenter. If `-acl-replication-token-file`
+  is set, the `server-acl-init` command will skip ACL bootstrapping and instead
+  will use the token in that file to create policies and tokens. This enables
+  the `server-acl-init` command to be run in secondary datacenters. [[GH-226](https://github.com/hashicorp/consul-k8s/pull/226)]
+* ACLs: Support new flag `acl-init -token-sink-file` that will write the token
+  to the specified file. [[GH-232](https://github.com/hashicorp/consul-k8s/pull/232)]
+* Commands: Add new command `service-address` that writes the address of the
+  specified Kubernetes service to a file. If the service is of type `LoadBalancer`,
+  the command will wait until the external address of the load balancer has
+  been assigned. If the service is of type `ClusterIP` it will write the cluster
+  IP. Services of type `NodePort` or `ExternalName` will result in an error.
+  [[GH-234](https://github.com/hashicorp/consul-k8s/pull/234) and [GH-235](https://github.com/hashicorp/consul-k8s/pull/235)]
+  
+  Example usage:
+  
+      consul-k8s service-address \
+        -k8s-namespace=default \
+        -name=consul-mesh-gateway \
+        -output-file=address.txt
+
+* Commands: Add new `get-consul-client-ca` command that retrieves Consul clients' CA when auto-encrypt is enabled
+  and writes it to a file [[GH-211](https://github.com/hashicorp/consul-k8s/pull/211)].
+
 IMPROVEMENTS:
 
-* Add new `get-consul-client-ca` command that retrieves Consul clients' CA when auto-encrypt is enabled
-  and writes it to a file [[GH-211](https://github.com/hashicorp/consul-k8s/pull/211)].
+* ACLs: The following ACL tokens have been changed to local tokens rather than
+  global tokens because they only need to be valid in their local datacenter:
+  `client`, `enterprise-license`, `snapshot-agent`. In addition, if Consul
+  Enterprise namespaces are not enabled, the `catalog-sync` token will be local. [[GH-226](https://github.com/hashicorp/consul-k8s/pull/226)]
+* ACLs: If running with `-create-acl-replication-token=true` and `-create-inject-auth-method=true`,
+  the anonymous policy will be configured to allow read access to all nodes and
+  services. This is required for cross-datacenter Consul Connect requests to
+  work. [[GH-230](https://github.com/hashicorp/consul-k8s/pull/230)].
+* ACLs: The policy for the anonymous token has been renamed from `dns-policy` to `anonymous-token-policy`
+  since it is used for more than DNS now (see above). [[GH-230](https://github.com/hashicorp/consul-k8s/pull/230)].
 
 BUG FIXES:
 
@@ -11,6 +46,9 @@ BUG FIXES:
 
 DEPRECATIONS:
 
+* ACLs: The flag `-init-type=sync` for the command `acl-init` has been deprecated.
+  Only the flag `-init-type=client` is supported. Previously, setting `-init-type=sync`
+  had no effect so this is not a breaking change. [[GH-232](https://github.com/hashicorp/consul-k8s/pull/232)]
 * Connect: deprecate the `-consul-ca-cert` flag in favor of `-ca-file` [[GH-217](https://github.com/hashicorp/consul-k8s/pull/217)]
 
 ## 0.12.0 (February 21, 2020)
