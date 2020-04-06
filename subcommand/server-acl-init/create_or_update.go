@@ -10,14 +10,40 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// createACL creates a policy with rules and name, creates an ACL token for that
-// policy and then writes the token to a Kubernetes secret.
-func (c *Command) createACL(name, rules string, consulClient *api.Client) error {
+// createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
+// the policy is only valid for this datacenter and the token is a local token.
+func (c *Command) createLocalACL(name, rules, dc string, consulClient *api.Client) error {
+	return c.createACL(name, rules, true, dc, consulClient)
+}
+
+// createGlobalACL creates a global policy and acl token. The policy is valid
+// for all datacenters and the token is global. dc must be passed because the
+// policy name may have the datacenter name appended.
+func (c *Command) createGlobalACL(name, rules, dc string, consulClient *api.Client) error {
+	return c.createACL(name, rules, false, dc, consulClient)
+}
+
+// createACL creates a policy with rules and name. If localToken is true then
+// the token will be a local token and the policy will be scoped to only dc.
+// If localToken is false, the policy will be global.
+// The token will be written to a Kubernetes secret.
+func (c *Command) createACL(name, rules string, localToken bool, dc string, consulClient *api.Client) error {
 	// Create policy with the given rules.
+	policyName := fmt.Sprintf("%s-token", name)
+	if c.flagACLReplicationTokenFile != "" {
+		// If performing ACL replication, we must ensure policy names are
+		// globally unique so we append the datacenter name.
+		policyName += fmt.Sprintf("-%s", dc)
+	}
+	var datacenters []string
+	if localToken && dc != "" {
+		datacenters = append(datacenters, dc)
+	}
 	policyTmpl := api.ACLPolicy{
-		Name:        fmt.Sprintf("%s-token", name),
-		Description: fmt.Sprintf("%s Token Policy", name),
+		Name:        policyName,
+		Description: fmt.Sprintf("%s Token Policy", policyName),
 		Rules:       rules,
+		Datacenters: datacenters,
 	}
 	err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 		func() error {
@@ -38,8 +64,9 @@ func (c *Command) createACL(name, rules string, consulClient *api.Client) error 
 
 	// Create token for the policy if the secret did not exist previously.
 	tokenTmpl := api.ACLToken{
-		Description: fmt.Sprintf("%s Token", name),
+		Description: fmt.Sprintf("%s Token", policyTmpl.Name),
 		Policies:    []*api.ACLTokenPolicyLink{{Name: policyTmpl.Name}},
+		Local:       localToken,
 	}
 	var token string
 	err = c.untilSucceeds(fmt.Sprintf("creating token for policy %s", policyTmpl.Name),

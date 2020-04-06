@@ -54,10 +54,22 @@ namespace_prefix "" {
 	return c.renderRules(agentRulesTpl)
 }
 
-func (c *Command) dnsRules() (string, error) {
-	// DNS rules need to have access to all namespaces
-	// to be able to resolve services in any namespace.
-	dnsRulesTpl := `
+func (c *Command) anonymousTokenRules() (string, error) {
+	// For Consul DNS and cross-datacenter Consul Connect,
+	// the anonymous token needs to have read access to
+	// services in all namespaces.
+	// For Consul DNS this is needed because in a DNS request
+	// no token can be presented so the anonymous policy will
+	// be used and DNS needs to be able to resolve all services.
+	// For cross-dc Consul Connect, each Kubernetes pod has a
+	// local ACL token returned from the Kubernetes auth method.
+	// When making cross-dc requests, the sidecar proxies need read
+	// access to services in the other dc. When the API call
+	// to read cross-dc services is forwarded to the remote dc, the
+	// local ACL token is stripped and the request continues without
+	// ACL token. Thus the anonymous policy must
+	// allow reading all services.
+	anonTokenRulesTpl := `
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
@@ -72,7 +84,7 @@ namespace_prefix "" {
 {{- end }}
 `
 
-	return c.renderRules(dnsRulesTpl)
+	return c.renderRules(anonTokenRulesTpl)
 }
 
 // This assumes users are using the default name for the service, i.e.
@@ -136,16 +148,45 @@ namespace "{{ .ConsulSyncDestinationNamespace }}" {
 	return c.renderRules(syncRulesTpl)
 }
 
-// This should only be set when namespaces are enabled.
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector only needs permissions to create namespaces
+	// The Connect injector only needs permissions to create namespaces.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
 `
-
 	return c.renderRules(injectRulesTpl)
+}
+
+func (c *Command) aclReplicationRules() (string, error) {
+	// NOTE: The node_prefix and agent_prefix rules are not required for ACL
+	// replication. They're added so that this token can be used as an ACL
+	// replication token, an agent token and for the server-acl-init command
+	// where we need agent:read to get the current datacenter.
+	// This allows us to only pass one token between
+	// datacenters during federation since in order to start ACL replication,
+	// we need a token with both replication and agent permissions.
+	aclReplicationRulesTpl := `
+acl = "write"
+operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
+node_prefix "" {
+  policy = "write"
+}
+{{- if .EnableNamespaces }}
+namespace_prefix "" {
+{{- end }}
+  service_prefix "" {
+    policy = "read"
+    intentions = "read"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+`
+	return c.renderRules(aclReplicationRulesTpl)
 }
 
 func (c *Command) renderRules(tmpl string) (string, error) {
