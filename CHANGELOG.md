@@ -1,18 +1,76 @@
 ## Unreleased
 
-IMPROVEMENTS:
+BREAKING CHANGES:
 
-* Support auto-encrypt [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)].
-  Auto-encrypt is the feature of Consul that allows clients to bootstrap their own certs
-  at startup. To enable it through the Helm Chart, set:
-  ```yaml
-  global:
-    tls:
+* Mesh Gateways:
+  * `meshGateway.wanAddress` - The following values are no longer supported:
+  
+       ```yaml
+       meshGateway:
+         wanAddress:
+           useNodeIP: true
+           useNodeName: false
+           host: ""
+       ```
+    
+    Instead, if previously setting `useNodeIP: true`, now you must set:
+       ```yaml
+       meshGateway:
+         wanAddress:
+           source: "NodeIP"
+       ```
+    
+    If previously setting `useNodeName: true`, now you must set:
+       ```yaml
+       meshGateway:
+         wanAddress:
+           source: "NodeName"
+       ```
+    
+    If previously setting `host: "example.com"`, now you must set:
+       ```yaml
+       meshGateway:
+         wanAddress:
+           source: "Static"
+           static: "example.com"
+       ```
+    where `meshGateway.wanAddress.static` is set to the previous `host` value.
+  
+  * `meshGateway.service.enabled` now defaults to `true`. If
+    previously you were enabling mesh gateways but not enabling the service,
+    you must now explicitly set this to `false`:
+    
+    Previously:
+    ```yaml
+    meshGateway:
       enabled: true
-      enableAutoEncrypt: true
-  ```
+    ```
+    
+    Now:
+    ```yaml
+    meshGateway:
+      enabled: true
+      service:
+        enabled: false
+    ```
+    
+  * `meshGateway.service.type` now defaults to `LoadBalancer` instead of `ClusterIP`.
+    To set to `ClusterIP` use:
+    ```yaml
+    meshGateway:
+      service:
+        type: ClusterIP
+    ```
 
-* Run the enterprise license job on Helm upgrades, as well as installs [[GH-407](https://github.com/hashicorp/consul-helm/pull/407)].
+  * `meshGateway.containerPort` now defaults to `8443` instead of `443`. This is
+    to support running in Google Kubernetes Engine by default. This change should
+    have no effect because the service's targetPort will change accordingly so
+    you will still be able to route to the mesh gateway as before.
+    If you wish to keep the port as `443` you must set:
+    ```yaml
+    meshGateway:
+      containerPort: 443
+    ```
 
 FEATURES:
 
@@ -28,6 +86,88 @@ FEATURES:
   This will tell all consul-k8s components to talk to the external servers to retrieve
   the clients' CA. Take a look at other properties you can set for `externalServers`
   [here](https://github.com/hashicorp/consul-helm/blob/e892588288c5c14197306cc714aabb2473f6f59e/values.yaml#L273-L305).
+
+* ACLs: Support ACL replication. ACL replication allows two or more Consul clusters
+  to be federated when ACLs are enabled. One cluster is designated the primary
+  and the rest are secondaries. The primary cluster replicates its ACLs to
+  the secondaries. [[GH-368](https://github.com/hashicorp/consul-helm/pull/368)]
+  
+  NOTE: This feature requires that the clusters are federated.
+  
+  Primary cluster:
+  
+  ```yaml
+  global:
+    acls:
+      manageSystemACLs: true
+      createReplicationToken: true
+  ```
+
+  The replication acl token Kubernetes secret is exported from the primary cluster
+  into the secondaries and then referenced in their Helm config:
+  
+  ```yaml
+  global:
+    acls:
+      manageSystemACLs: true
+      replicationToken:
+        secretName: name
+        secretKey: key
+  ```
+
+* Mesh Gateways: Automatically set mesh gateway addresses when using a Kubernetes
+  Load Balancer service. 
+  To use, set:
+  
+  ```yaml
+  meshGateway:
+    enabled: true
+    service:
+      enabled: true
+      type: "LoadBalancer"
+    wanAddress:
+      source: "Service"
+  ```
+  [[GH-388](https://github.com/hashicorp/consul-helm/pull/388)]
+
+IMPROVEMENTS:
+
+* Default to the latest version of consul-k8s: `hashicorp/consul-k8s:0.13.0`
+* Default to the latest version of Consul: `consul:1.7.2`
+* Allow setting specific secret keys in `server.extraVolumes` [[GH-395](https://github.com/hashicorp/consul-helm/pull/395)]
+* Support auto-encrypt [[GH-375](https://github.com/hashicorp/consul-helm/pull/375)].
+  Auto-encrypt is the feature of Consul that allows clients to bootstrap their own certs
+  at startup. To enable it through the Helm Chart, set:
+  ```yaml
+  global:
+    tls:
+      enabled: true
+      enableAutoEncrypt: true
+  ```
+* Run the enterprise license job on Helm upgrades, as well as installs [[GH-407](https://github.com/hashicorp/consul-helm/pull/407)].
+
+BUGFIXES:
+
+* Mesh Gateways: Mesh gateways are no longer de-registered when their node's Consul
+  client restarts. [[GH-380](https://github.com/hashicorp/consul-helm/pull/380)]
+
+DEPRECATIONS:
+
+* `global.bootstrapACLs` is deprecated. Instead, set `global.acls.manageSystemACLs`.
+   `global.bootstrapACLs` will be supported for the next three releases.
+
+   Previously:
+   ```yaml
+   global:
+     bootstrapACLs: true
+   ```
+
+   Now:
+   ```yaml
+   global:
+     acls:
+       manageSystemACLs: true
+   ```
 
 ## 0.18.0 (Mar 18, 2020)
 

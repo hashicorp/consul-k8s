@@ -92,7 +92,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs and snapshotAgent.configSecret
+# global.acls.manageSystemACLs and snapshotAgent.configSecret
 
 @test "client/SnapshotAgentDeployment: no initContainer by default" {
   cd `chart_dir`
@@ -104,12 +104,12 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates initContainer when global.bootstrapACLs=true" {
+@test "client/SnapshotAgentDeployment: populates initContainer when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -125,12 +125,12 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates volumes when global.bootstrapACLs=true" {
+@test "client/SnapshotAgentDeployment: populates volumes when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -158,12 +158,12 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "client/SnapshotAgentDeployment: populates container volumeMounts when global.bootstrapACLs=true" {
+@test "client/SnapshotAgentDeployment: populates container volumeMounts when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -314,7 +314,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |

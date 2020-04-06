@@ -11,32 +11,32 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/ClusterRoleBinding: enabled with global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/ClusterRoleBinding: enabled with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-clusterrolebinding.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInitCleanup/ClusterRoleBinding: disabled with server=false and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/ClusterRoleBinding: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-clusterrolebinding.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/ClusterRoleBinding: enabled with client=false and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/ClusterRoleBinding: enabled with client=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-clusterrolebinding.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)

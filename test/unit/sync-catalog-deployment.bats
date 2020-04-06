@@ -341,25 +341,25 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
+# global.acls.manageSystemACLs
 
-@test "syncCatalog/Deployment: CONSUL_HTTP_TOKEN env variable created when global.bootstrapACLs=true" {
+@test "syncCatalog/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "syncCatalog/Deployment: init container is created when global.bootstrapACLs=true" {
+@test "syncCatalog/Deployment: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
       -x templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
 
@@ -480,7 +480,7 @@ load _helpers
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -668,9 +668,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# namespaces + global.bootstrapACLs
+# namespaces + global.acls.manageSystemACLs
 
-@test "syncCatalog/Deployment: cross namespace policy is not added when global.bootstrapACLs=false" {
+@test "syncCatalog/Deployment: cross namespace policy is not added when global.acls.manageSystemACLs=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml \
@@ -681,13 +681,13 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "syncCatalog/Deployment: cross namespace policy is added when global.bootstrapACLs=true" {
+@test "syncCatalog/Deployment: cross namespace policy is added when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml \
       --set 'syncCatalog.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-cross-namespace-acl-policy"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]

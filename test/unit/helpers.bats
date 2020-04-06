@@ -87,6 +87,9 @@ load _helpers
   [ "${actual}" = "release-name-override-test" ]
 }
 
+#--------------------------------------------------------------------
+# template consul.fullname
+#
 # This test ensures that we use {{ template "consul.fullname" }} everywhere instead of
 # {{ .Release.Name }} because that's required in order to support the name
 # override settings fullnameOverride and global.name. In some cases, we need to
@@ -100,7 +103,6 @@ load _helpers
   local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v 'release: ' | tee /dev/stderr )
   [ "${actual}" = 'templates/server-acl-init-job.yaml:                -server-label-selector=component=server,app={{ template "consul.name" . }},release={{ .Release.Name }} \' ]
 }
-
 
 #--------------------------------------------------------------------
 # consul.getAutoEncryptClientCA
@@ -257,4 +259,22 @@ load _helpers
       yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
 
   [ "${actual}" = "" ]
+}
+
+#--------------------------------------------------------------------
+# bootstrapACLs deprecation
+#
+# Test that every place global.bootstrapACLs is used, global.acls.manageSystemACLs
+# is also used.
+# If this test is failing, you've used either only global.bootstrapACLs or
+# only global.acls.manageSystemACLs instead of using the backwards compatible:
+#     or global.acls.manageSystemACLs global.bootstrapACLs
+@test "helper/bootstrapACLs: used alongside manageSystemACLs" {
+  cd `chart_dir`
+
+  diff=$(diff <(grep -r '\.Values\.global\.bootstrapACLs' templates/*) <(grep -r 'or \.Values\.global\.acls\.manageSystemACLs \.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
+  [ "$diff" = "" ]
+
+  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r 'or \.Values\.global\.acls\.manageSystemACLs \.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
+  [ "$diff" = "" ]
 }

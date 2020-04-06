@@ -258,6 +258,20 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
+@test "server/StatefulSet: adds extra secret volume with items" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.extraVolumes[0].type=secret' \
+      --set 'server.extraVolumes[0].name=foo' \
+      --set 'server.extraVolumes[0].items[0].key=key' \
+      --set 'server.extraVolumes[0].items[0].path=path' \
+      . | tee /dev/stderr |
+      yq -c '.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+  [ "${actual}" = "{\"name\":\"userconfig-foo\",\"secret\":{\"secretName\":\"foo\",\"items\":[{\"key\":\"key\",\"path\":\"path\"}]}}" ]
+}
+
 #--------------------------------------------------------------------
 # affinity
 
@@ -661,6 +675,104 @@ load _helpers
   # check that the volume uses the provided secret key
   actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
+}
+
+#--------------------------------------------------------------------
+# global.federation.enabled
+
+@test "server/StatefulSet: mesh gateway federation enabled when federation.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.federation.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("connect { enable_mesh_gateway_wan_federation = true }")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: mesh gateway federation not enabled when federation.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.federation.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("connect { enable_mesh_gateway_wan_federation = true }")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# global.acls.replicationToken
+
+@test "server/StatefulSet: acl replication token config is not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the ACL_REPLICATION_TOKEN environment variable is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN")) | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: acl replication token config is not set when acls.replicationToken.secretName is set but secretKey is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.acls.replicationToken.secretName=name' \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the ACL_REPLICATION_TOKEN environment variable is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN")) | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: acl replication token config is not set when acls.replicationToken.secretKey is set but secretName is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.acls.replicationToken.secretKey=key' \
+      . | tee /dev/stderr)
+
+  # Test the flag is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  # Test the ACL_REPLICATION_TOKEN environment variable is not set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN")) | length == 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: acl replication token config is set when acls.replicationToken.secretKey and secretName are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.acls.replicationToken.secretName=name' \
+      --set 'global.acls.replicationToken.secretKey=key' \
+      . | tee /dev/stderr)
+
+  # Test the flag is set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[0].command | any(contains("-hcl=\"acl { tokens { agent = \\\"${ACL_REPLICATION_TOKEN}\\\", replication = \\\"${ACL_REPLICATION_TOKEN}\\\" } }\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  # Test the ACL_REPLICATION_TOKEN environment variable is set.
+  local actual=$(echo "$object" |
+    yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = '[{"name":"ACL_REPLICATION_TOKEN","valueFrom":{"secretKeyRef":{"name":"name","key":"key"}}}]' ]
 }
 
 #--------------------------------------------------------------------

@@ -11,32 +11,32 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/Job: enabled with global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/Job: enabled with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInitCleanup/Job: disabled with server=false and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/Job: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInitCleanup/Job: enabled with client=true and global.bootstrapACLs=true" {
+@test "serverACLInitCleanup/Job: enabled with client=true and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -47,7 +47,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       --set 'server.updatePartition=1' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -58,7 +58,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'global.bootstrapACLs=true' \
+      --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -c '.spec.template.spec.containers[0].args' | tee /dev/stderr)
   [ "${actual}" = '["delete-completed-job","-k8s-namespace=default","release-name-consul-server-acl-init"]' ]
