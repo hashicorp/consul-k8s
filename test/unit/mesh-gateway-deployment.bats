@@ -663,7 +663,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -718,7 +718,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   -token-file=/consul/service/acl-token \
   /consul/service/service.hcl'
 
@@ -772,7 +772,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -820,7 +820,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -866,7 +866,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -912,7 +912,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -973,7 +973,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -1040,7 +1040,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -1089,7 +1089,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -1157,7 +1157,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
@@ -1206,7 +1206,7 @@ service {
 }
 EOF
 
-consul services register \
+/consul-bin/consul services register \
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
