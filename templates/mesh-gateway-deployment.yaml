@@ -136,8 +136,8 @@ spec:
                 consul-k8s service-address \
                   -k8s-namespace={{ .Release.Namespace }} \
                   -name={{ template "consul.fullname" . }}-mesh-gateway \
-                  -output-file=address.txt
-                WAN_ADDR="$(cat address.txt)"
+                  -output-file=/tmp/address.txt
+                WAN_ADDR="$(cat /tmp/address.txt)"
                 {{- else if eq $source "Static" }}
                 {{- if eq .Values.meshGateway.wanAddress.static "" }}{{ fail "if meshGateway.wanAddress.source=Static then meshGateway.wanAddress.static cannot be empty" }}{{ end }}
                 WAN_ADDR="{{ .Values.meshGateway.wanAddress.static }}"

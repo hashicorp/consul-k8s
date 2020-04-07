@@ -632,8 +632,8 @@ key2: value2' \
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
@@ -687,8 +687,8 @@ EOF
 consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
@@ -738,8 +738,8 @@ EOF
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
@@ -1009,8 +1009,8 @@ EOF
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
@@ -1126,8 +1126,8 @@ EOF
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
@@ -1175,8 +1175,8 @@ EOF
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-mesh-gateway \
-  -output-file=address.txt
-WAN_ADDR="$(cat address.txt)"
+  -output-file=/tmp/address.txt
+WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
 
 cat > /consul/service/service.hcl << EOF
