@@ -32,6 +32,18 @@ global:
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
   image: "consul:1.7.1"
 
+  # array of objects containing image pull secret names that will be applied to
+  # each service account.
+  # This can be used to reference image pull secrets if using
+  # a custom consul or consul-k8s Docker image.
+  # See https://kubernetes.io/docs/concepts/containers/images/#using-a-private-registry.
+  #
+  # Example:
+  #   imagePullSecrets:
+  #   - name: pull-secret-name
+  #   - name: pull-secret-name-2
+  imagePullSecrets: []
+
   # imageK8S is the name (and tag) of the consul-k8s Docker image that
   # is used for functionality such as catalog sync. This can be overridden
   # per component.
