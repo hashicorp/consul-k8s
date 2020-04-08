@@ -13,6 +13,8 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete
     "helm.sh/hook-delete-policy": hook-succeeded
+    {{- /* Hook weight needs to be 1 so that the service account is provisioned first */}}
+    "helm.sh/hook-weight": "1"
 spec:
   template:
     metadata:
