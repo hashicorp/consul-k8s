@@ -15,6 +15,7 @@ import (
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,26 +26,32 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                         *flag.FlagSet
-	k8s                           *k8sflags.K8SFlags
-	flagResourcePrefix            string
-	flagK8sNamespace              string
-	flagAllowDNS                  bool
-	flagCreateClientToken         bool
-	flagCreateSyncToken           bool
-	flagCreateInjectToken         bool
-	flagCreateInjectAuthMethod    bool
-	flagBindingRuleSelector       string
-	flagCreateEntLicenseToken     bool
-	flagCreateSnapshotAgentToken  bool
-	flagCreateMeshGatewayToken    bool
+	flags              *flag.FlagSet
+	k8s                *k8sflags.K8SFlags
+
+	flagResourcePrefix string
+	flagK8sNamespace   string
+
+	flagAllowDNS                 bool
+	flagCreateClientToken        bool
+	flagCreateSyncToken          bool
+	flagCreateInjectToken        bool
+	flagCreateInjectAuthMethod   bool
+	flagBindingRuleSelector      string
+	flagCreateEntLicenseToken    bool
+	flagCreateSnapshotAgentToken bool
+	flagCreateMeshGatewayToken   bool
+
+	// Flags to configure Consul client
+	flagServerAddresses         []string
+	flagServerPort          uint
+	flagConsulCACert        string
+	flagConsulTLSServerName string
+	flagUseHTTPS            bool
+
+	// Flags for ACL replication
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
-	flagConsulCACert              string
-	flagConsulTLSServerName       string
-	flagUseHTTPS                  bool
-	flagServerAddresses           []string
-	flagServerPort                uint
 
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -68,15 +75,14 @@ type Command struct {
 
 	once sync.Once
 	help string
+
+	providers map[string]discover.Provider
 }
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP or DNS name of the Consul server(s), may be provided multiple times. At least one value is required.")
-	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
@@ -99,14 +105,18 @@ func (c *Command) init() {
 		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway")
-	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
-		"Toggle for creating a token for ACL replication between datacenters")
+
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or cloud auto-join string of the Consul server(s), may be provided multiple times." +
+		"At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
+
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
 	c.flags.StringVar(&c.flagConsulSyncDestinationNamespace, "consul-sync-destination-namespace", "default",
@@ -125,6 +135,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagInjectK8SNSMirroringPrefix, "inject-k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul by Connect inject "+
 			"if mirroring is enabled.")
+
+	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
+		"Toggle for creating a token for ACL replication between datacenters")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
@@ -171,6 +184,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-resource-prefix must be set")
 		return 1
 	}
+
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
 		// Load the ACL replication token from file.
