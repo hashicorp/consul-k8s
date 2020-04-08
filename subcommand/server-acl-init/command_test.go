@@ -48,6 +48,10 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags:  []string{"-acl-replication-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
 			ExpErr: "Unable to read ACL replication token from file \"/notexist\": open /notexist: no such file or directory",
 		},
+		{
+			Flags:  []string{"-bootstrap-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
+			ExpErr: "Unable to read bootstrap token from file \"/notexist\": open /notexist: no such file or directory",
+		},
 	}
 
 	for _, c := range cases {
@@ -336,6 +340,104 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				require.NoError(r, err)
 				require.Equal(r, c.PolicyName, tokenData.Policies[0].Name)
 				require.Equal(r, c.LocalToken, tokenData.Local)
+			})
+		})
+	}
+}
+
+// Test creating each token type when the bootstrap token is provided.
+func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		TokenFlag  string
+		PolicyName string
+		SecretName string
+	}{
+		{
+			TokenFlag:  "-create-client-token",
+			PolicyName: "client-token",
+			SecretName: resourcePrefix + "-client-acl-token",
+		},
+		{
+			TokenFlag:  "-create-sync-token",
+			PolicyName: "catalog-sync-token",
+			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+		},
+		{
+			TokenFlag:  "-create-inject-namespace-token",
+			PolicyName: "connect-inject-token",
+			SecretName: resourcePrefix + "-connect-inject-acl-token",
+		},
+		{
+			TokenFlag:  "-create-enterprise-license-token",
+			PolicyName: "enterprise-license-token",
+			SecretName: resourcePrefix + "-enterprise-license-acl-token",
+		},
+		{
+			TokenFlag:  "-create-snapshot-agent-token",
+			PolicyName: "client-snapshot-agent-token",
+			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
+		},
+		{
+			TokenFlag:  "-create-mesh-gateway-token",
+			PolicyName: "mesh-gateway-token",
+			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
+		},
+		{
+			TokenFlag:  "-create-acl-replication-token",
+			PolicyName: "acl-replication-token",
+			SecretName: resourcePrefix + "-acl-replication-acl-token",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.TokenFlag, func(t *testing.T) {
+			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			tokenFile, fileCleanup := writeTempFile(t, bootToken)
+			defer fileCleanup()
+
+			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := []string{
+				"-k8s-namespace", ns,
+				"-bootstrap-token-file", tokenFile,
+				"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
+				"-resource-prefix", resourcePrefix,
+				c.TokenFlag,
+			}
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			consul, err := api.NewClient(&api.Config{
+				Address: testAgent.HTTPAddr,
+				Token:   bootToken,
+			})
+			require.NoError(t, err)
+
+			// Check that the expected policy was created.
+			retry.Run(t, func(r *retry.R) {
+				policyExists(r, c.PolicyName, consul)
+			})
+
+			retry.Run(t, func(r *retry.R) {
+				// Test that the token was created as a Kubernetes Secret.
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
+				require.NoError(r, err)
+				require.NotNil(r, tokenSecret)
+				token, ok := tokenSecret.Data["token"]
+				require.True(r, ok)
+
+				// Test that the token has the expected policies in Consul.
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+				require.NoError(r, err)
+				require.Equal(r, c.PolicyName, tokenData.Policies[0].Name)
 			})
 		})
 	}
@@ -1010,6 +1112,71 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	}, consulAPICalls)
 }
 
+// Test if there is a provided bootstrap we skip bootstrapping of the servers
+// and continue on to the next step.
+func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	k8s := fake.NewSimpleClientset()
+
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tokenFile, fileCleanup := writeTempFile(t, bootToken)
+	defer fileCleanup()
+
+	type APICall struct {
+		Method string
+		Path   string
+	}
+	var consulAPICalls []APICall
+
+	// Start the Consul server.
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record all the API calls made.
+		consulAPICalls = append(consulAPICalls, APICall{
+			Method: r.Method,
+			Path:   r.URL.Path,
+		})
+		switch r.URL.Path {
+		case "/v1/agent/self":
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+		default:
+			// Send an empty JSON response with code 200 to all calls.
+			fmt.Fprintln(w, "{}")
+		}
+	}))
+	defer consulServer.Close()
+
+	// Create the Server Pods.
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(err)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+
+	responseCode := cmd.Run([]string{
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address=" + serverURL.Hostname(),
+		"-server-port=" + serverURL.Port(),
+		"-bootstrap-token-file=" + tokenFile,
+		"-create-client-token=false", // disable client token, so there are less calls
+	})
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Test that the expected API calls were made.
+	require.Equal([]APICall{
+		// We only expect the calls to get the datacenter
+		{
+			"GET",
+			"/v1/agent/self",
+		},
+	}, consulAPICalls)
+}
+
 // Test that we exit after timeout.
 func TestRun_Timeout(t *testing.T) {
 	t.Parallel()
@@ -1173,7 +1340,9 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 	}
 }
 
-func TestRun_DefaultWithCloudAutoJoin(t *testing.T) {
+// Test that when the -server-address contains a cloud-auto join string,
+// we are still able to bootstrap ACLs.
+func TestRun_CloudAutoJoin(t *testing.T) {
 	t.Parallel()
 
 	k8s, testSvr := completeSetup(t)
@@ -1222,6 +1391,20 @@ func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
+	})
+	require.NoError(t, err)
+
+	return k8s, svr
+}
+
+// Set up test consul agent and kubernetes cluster.
+// The consul agent is bootstrapped with the master token.
+func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientset, *testutil.TestServer) {
+	k8s := fake.NewSimpleClientset()
+
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.Master = masterToken
 	})
 	require.NoError(t, err)
 

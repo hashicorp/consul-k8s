@@ -11,9 +11,9 @@ import (
 )
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-func (c *Command) bootstrapServers(bootTokenSecretName, scheme string) (string, error) {
+func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName, scheme string) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
-	firstServerAddr := fmt.Sprintf("%s:%d", c.flagServerAddresses[0], c.flagServerPort)
+	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
 	consulClient, err := api.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  scheme,
@@ -93,7 +93,7 @@ func (c *Command) bootstrapServers(bootTokenSecretName, scheme string) (string, 
 	}
 
 	// Create new tokens for each server and apply them.
-	if err := c.setServerTokens(consulClient, string(bootstrapToken), scheme); err != nil {
+	if err := c.setServerTokens(consulClient, serverAddresses, string(bootstrapToken), scheme); err != nil {
 		return "", err
 	}
 	return string(bootstrapToken), nil
@@ -101,14 +101,14 @@ func (c *Command) bootstrapServers(bootTokenSecretName, scheme string) (string, 
 
 // setServerTokens creates policies and associated ACL token for each server
 // and then provides the token to the server.
-func (c *Command) setServerTokens(consulClient *api.Client, bootstrapToken, scheme string) error {
+func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []string, bootstrapToken, scheme string) error {
 	agentPolicy, err := c.setServerPolicy(consulClient)
 	if err != nil {
 		return err
 	}
 
 	// Create agent token for each server agent.
-	for _, host := range c.flagServerAddresses {
+	for _, host := range serverAddresses {
 		var token *api.ACLToken
 
 		// We create a new client for each server because we need to call each
@@ -156,7 +156,7 @@ func (c *Command) setServerTokens(consulClient *api.Client, bootstrapToken, sche
 func (c *Command) setServerPolicy(consulClient *api.Client) (api.ACLPolicy, error) {
 	agentRules, err := c.agentRules()
 	if err != nil {
-		c.Log.Error("Error templating server agent rules", "err", err)
+		c.log.Error("Error templating server agent rules", "err", err)
 		return api.ACLPolicy{}, err
 	}
 
