@@ -638,7 +638,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	}
 
 	// Start the command before the server is up.
-	// Run in a goroutine so we can create the Pods asynchronously
+	// Run in a goroutine so we can start the server asynchronously
 	done := make(chan bool)
 	var responseCode int
 	go func() {
@@ -865,7 +865,6 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
 
@@ -951,7 +950,6 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
 
