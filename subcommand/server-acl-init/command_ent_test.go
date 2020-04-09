@@ -3,6 +3,7 @@
 package serveraclinit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -21,7 +22,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt, resourcePrefix, ns)
+			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
@@ -33,10 +34,10 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			}
 			cmd.init()
 			args := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-create-inject-auth-method",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", consulDestNamespace,
@@ -62,7 +63,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			require.Len(methods, 1)
 
 			// Check the ACL auth method is created in the expected namespace.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			actMethod, _, err := consul.ACL().AuthMethodRead(authMethodName, namespaceQuery)
 			require.NoError(err)
 			require.NotNil(actMethod)
@@ -141,7 +142,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t, resourcePrefix, ns)
+			k8s, testAgent := completeEnterpriseSetup(t)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
@@ -153,10 +154,10 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			}
 			cmd.init()
 			args := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-create-inject-auth-method",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
@@ -175,7 +176,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			require.NoError(err)
 
 			// Check the ACL auth method is as expected.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, nil)
 			require.NoError(err)
 			require.NotNil(method, authMethodName+" not found")
@@ -208,13 +209,14 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	k8sNamespaceFlags := []string{"default", "other"}
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t, resourcePrefix, k8sNamespaceFlag)
+			k8s, testAgent := completeEnterpriseSetup(t)
 			defer testAgent.Stop()
 			require := require.New(t)
 
 			ui := cli.NewMockUi()
 			firstRunArgs := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace", k8sNamespaceFlag,
 				"-create-client-token",
@@ -224,7 +226,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-create-inject-namespace-token",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
-				"-expected-replicas=1",
 			}
 			// Our second run, we're going to update from namespaces disabled to
 			// namespaces enabled with a single destination ns.
@@ -501,16 +502,16 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			k8s, testAgent := completeEnterpriseSetup(tt, resourcePrefix, ns)
+			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
 			setUpK8sServiceAccount(tt, k8s)
 
 			ui := cli.NewMockUi()
 			defaultArgs := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-create-inject-auth-method",
 			}
 
@@ -543,7 +544,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			require.NoError(err)
 
 			// Check the ACL auth method is as expected.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{
 				Namespace: c.AuthMethodExpectedNS,
 			})
@@ -632,7 +633,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
-			k8s, testSvr := completeEnterpriseSetup(t, resourcePrefix, ns)
+			k8s, testSvr := completeEnterpriseSetup(t)
 			defer testSvr.Stop()
 			require := require.New(t)
 
@@ -644,10 +645,10 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := []string{
-				"-server-label-selector=component=server,app=consul,release=" + releaseName,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-expected-replicas=1",
 				"-enable-namespaces",
 				c.TokenFlag,
 			}
@@ -693,15 +694,13 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 }
 
 // Set up test consul agent and kubernetes cluster.
-func completeEnterpriseSetup(t *testing.T, prefix string, k8sNamespace string) (*fake.Clientset, *testutil.TestServer) {
+func completeEnterpriseSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 	})
 	require.NoError(t, err)
-
-	createTestK8SResources(t, k8s, svr.HTTPAddr, prefix, "http", k8sNamespace)
 
 	return k8s, svr
 }
