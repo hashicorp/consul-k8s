@@ -27,7 +27,6 @@ import (
 )
 
 var ns = "default"
-var releaseName = "release-name"
 var resourcePrefix = "release-name-consul"
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -66,7 +65,9 @@ func TestRun_FlagValidation(t *testing.T) {
 // We test with both the deprecated -release-name and the new -server-label-selector
 // flags.
 func TestRun_Defaults(t *testing.T) {
-	k8s, testSvr := completeSetup(t, resourcePrefix)
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
 	defer testSvr.Stop()
 	require := require.New(t)
 
@@ -111,87 +112,70 @@ func TestRun_Defaults(t *testing.T) {
 }
 
 // Test the different flags that should create tokens and save them as
-// Kubernetes secrets. We test using the -release-name flag vs using the
-// -resource-prefix flag.
+// Kubernetes secrets.
 func TestRun_TokensPrimaryDC(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		TokenFlag          string
-		ResourcePrefixFlag string
-		ReleaseNameFlag    string
-		PolicyName         string
-		PolicyDCs          []string
-		SecretName         string
-		LocalToken         bool
+		TokenFlag  string
+		PolicyName string
+		PolicyDCs  []string
+		SecretName string
+		LocalToken bool
 	}{
 		{
-			TokenFlag:          "-create-client-token",
-			ResourcePrefixFlag: "my-prefix",
-			PolicyName:         "client-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "my-prefix-client-acl-token",
-			LocalToken:         true,
+			TokenFlag:  "-create-client-token",
+			PolicyName: "client-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-client-acl-token",
+			LocalToken: true,
 		},
 		{
-			TokenFlag:          "-create-sync-token",
-			ResourcePrefixFlag: "my-prefix",
-			PolicyName:         "catalog-sync-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "my-prefix-catalog-sync-acl-token",
-			LocalToken:         true,
+			TokenFlag:  "-create-sync-token",
+			PolicyName: "catalog-sync-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+			LocalToken: true,
 		},
 		{
-			TokenFlag:          "-create-inject-namespace-token",
-			ResourcePrefixFlag: "my-prefix",
-			PolicyName:         "connect-inject-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "my-prefix-connect-inject-acl-token",
-			LocalToken:         true,
+			TokenFlag:  "-create-inject-namespace-token",
+			PolicyName: "connect-inject-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-connect-inject-acl-token",
+			LocalToken: true,
 		},
 		{
-			TokenFlag:          "-create-enterprise-license-token",
-			ResourcePrefixFlag: "my-prefix",
-			PolicyName:         "enterprise-license-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "my-prefix-enterprise-license-acl-token",
-			LocalToken:         true,
+			TokenFlag:  "-create-enterprise-license-token",
+			PolicyName: "enterprise-license-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-enterprise-license-acl-token",
+			LocalToken: true,
 		},
 		{
-			TokenFlag:          "-create-snapshot-agent-token",
-			ResourcePrefixFlag: "my-prefix",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "client-snapshot-agent-token",
-			PolicyDCs:          []string{"dc1"},
-			SecretName:         "my-prefix-client-snapshot-agent-acl-token",
-			LocalToken:         true,
+			TokenFlag:  "-create-snapshot-agent-token",
+			PolicyName: "client-snapshot-agent-token",
+			PolicyDCs:  []string{"dc1"},
+			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
+			LocalToken: true,
 		},
 		{
-			TokenFlag:          "-create-mesh-gateway-token",
-			ResourcePrefixFlag: "my-prefix",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "mesh-gateway-token",
-			PolicyDCs:          nil,
-			SecretName:         "my-prefix-mesh-gateway-acl-token",
-			LocalToken:         false,
+			TokenFlag:  "-create-mesh-gateway-token",
+			PolicyName: "mesh-gateway-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
+			LocalToken: false,
 		},
 		{
-			TokenFlag:          "-create-acl-replication-token",
-			ResourcePrefixFlag: "my-prefix",
-			ReleaseNameFlag:    "release-name",
-			PolicyName:         "acl-replication-token",
-			PolicyDCs:          nil,
-			SecretName:         "my-prefix-acl-replication-acl-token",
-			LocalToken:         false,
+			TokenFlag:  "-create-acl-replication-token",
+			PolicyName: "acl-replication-token",
+			PolicyDCs:  nil,
+			SecretName: resourcePrefix + "-acl-replication-acl-token",
+			LocalToken: false,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.TokenFlag, func(t *testing.T) {
-			prefix := c.ResourcePrefixFlag
-			if c.ResourcePrefixFlag == "" {
-				prefix = releaseName + "-consul"
-			}
-			k8s, testSvr := completeSetup(t, prefix)
+			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
 			require := require.New(t)
 
@@ -206,14 +190,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-				"-resource-prefix=" + c.ResourcePrefixFlag,
+				"-resource-prefix=" + resourcePrefix,
 				c.TokenFlag,
 			}
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the expected policy was created.
-			bootToken := getBootToken(t, k8s, prefix, ns)
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
 				Address: testSvr.HTTPAddr,
 				Token:   bootToken,
@@ -265,42 +249,42 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlag:  "-create-client-token",
 			PolicyName: "client-token-dc2",
 			PolicyDCs:  []string{"dc2"},
-			SecretName: "release-name-consul-client-acl-token",
+			SecretName: resourcePrefix + "-client-acl-token",
 			LocalToken: true,
 		},
 		{
 			TokenFlag:  "-create-sync-token",
 			PolicyName: "catalog-sync-token-dc2",
 			PolicyDCs:  []string{"dc2"},
-			SecretName: "release-name-consul-catalog-sync-acl-token",
+			SecretName: resourcePrefix + "-catalog-sync-acl-token",
 			LocalToken: true,
 		},
 		{
 			TokenFlag:  "-create-inject-namespace-token",
 			PolicyName: "connect-inject-token-dc2",
 			PolicyDCs:  []string{"dc2"},
-			SecretName: "release-name-consul-connect-inject-acl-token",
+			SecretName: resourcePrefix + "-connect-inject-acl-token",
 			LocalToken: true,
 		},
 		{
 			TokenFlag:  "-create-enterprise-license-token",
 			PolicyName: "enterprise-license-token-dc2",
 			PolicyDCs:  []string{"dc2"},
-			SecretName: "release-name-consul-enterprise-license-acl-token",
+			SecretName: resourcePrefix + "-enterprise-license-acl-token",
 			LocalToken: true,
 		},
 		{
 			TokenFlag:  "-create-snapshot-agent-token",
 			PolicyName: "client-snapshot-agent-token-dc2",
 			PolicyDCs:  []string{"dc2"},
-			SecretName: "release-name-consul-client-snapshot-agent-acl-token",
+			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
 			LocalToken: true,
 		},
 		{
 			TokenFlag:  "-create-mesh-gateway-token",
 			PolicyName: "mesh-gateway-token-dc2",
 			PolicyDCs:  nil,
-			SecretName: "release-name-consul-mesh-gateway-acl-token",
+			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
 			LocalToken: false,
 		},
 	}
@@ -411,7 +395,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				flags = append(flags, "-acl-replication-token-file", tmp.Name())
 			} else {
 				var testSvr *testutil.TestServer
-				k8s, testSvr = completeSetup(t, resourcePrefix)
+				k8s, testSvr = completeSetup(t)
 				defer testSvr.Stop()
 				consulHTTPAddr = testSvr.HTTPAddr
 			}
@@ -494,7 +478,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	for testName, c := range cases {
 		t.Run(testName, func(tt *testing.T) {
 
-			k8s, testSvr := completeSetup(tt, resourcePrefix)
+			k8s, testSvr := completeSetup(tt)
 			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
@@ -561,7 +545,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 // Test that ACL binding rules are updated if the rule selector changes.
 func TestRun_BindingRuleUpdates(t *testing.T) {
 	t.Parallel()
-	k8s, testSvr := completeSetup(t, resourcePrefix)
+	k8s, testSvr := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s)
 	defer testSvr.Stop()
 	require := require.New(t)
@@ -598,7 +582,7 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	// Validate the binding rule.
 	{
 		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := releaseName + "-consul-k8s-auth-method"
+		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(err)
 		require.Len(rules, 1)
@@ -624,7 +608,7 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	// Check the binding rule is changed expected.
 	{
 		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := releaseName + "-consul-k8s-auth-method"
+		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(err)
 		require.Len(rules, 1)
@@ -653,7 +637,7 @@ func TestRun_DelayedServers(t *testing.T) {
 		clientset: k8s,
 	}
 
-	// Start the command before the Pod exist.
+	// Start the command before the server is up.
 	// Run in a goroutine so we can create the Pods asynchronously
 	done := make(chan bool)
 	var responseCode int
@@ -715,23 +699,15 @@ func TestRun_DelayedServers(t *testing.T) {
 	// Check that it has the right policies.
 	consul, err := api.NewClient(&api.Config{
 		Address: srv.HTTPAddr,
+		Token:   bootToken,
 	})
 	require.NoError(err)
-	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: bootToken})
+	tokenData, _, err := consul.ACL().TokenReadSelf(nil)
 	require.NoError(err)
 	require.Equal("global-management", tokenData.Policies[0].Name)
 
 	// Check that the agent policy was created.
-	policies, _, err := consul.ACL().PolicyList(&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	found := false
-	for _, p := range policies {
-		if p.Name == "agent-token" {
-			found = true
-			break
-		}
-	}
-	require.True(found, "agent-token policy was not found")
+	policyExists(t, "agent-token", consul)
 }
 
 // Test that if there's no leader, we retry until one is elected.
@@ -1087,7 +1063,7 @@ func TestRun_HTTPS(t *testing.T) {
 		"-use-https",
 		"-consul-tls-server-name", "server.dc1.consul",
 		"-consul-ca-cert", caFile,
-		"-server-address=127.0.0.1",
+		"-server-address=" + strings.Split(srv.HTTPSAddr, ":")[0],
 		"-server-port=" + strings.Split(srv.HTTPSAddr, ":")[1],
 	})
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
@@ -1196,7 +1172,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 }
 
 // Set up test consul agent and kubernetes cluster.
-func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *testutil.TestServer) {
+func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -1210,9 +1186,10 @@ func completeSetup(t *testing.T, prefix string) (*fake.Clientset, *testutil.Test
 // completeReplicatedSetup sets up two Consul servers with ACL replication
 // using the server-acl-init command to start the replication.
 // Returns the Kubernetes client for the secondary DC,
-// a Consul API client initialized for the secondary DC, the replication token
-// generated and a cleanup function that should be called at the end of the
-// test that cleans up resources.
+// a Consul API client initialized for the secondary DC,
+// the address of the secondary Consul server,
+// the replication token generated and a cleanup function
+// that should be called at the end of the test that cleans up resources.
 func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string, string, func()) {
 	return replicatedSetup(t, "")
 }
@@ -1222,7 +1199,8 @@ func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string
 // command to set up replication but do it in config using the bootstrap
 // token. See completeReplicatedSetup for a complete setup using the command.
 // Returns the Kubernetes client for the secondary DC,
-// a Consul API client initialized for the secondary DC and a
+// a Consul API client initialized for the secondary DC,
+// the address of the secondary Consul server, and a
 // cleanup function that should be called at the end of the test that cleans
 // up resources.
 func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, func()) {
@@ -1233,6 +1211,11 @@ func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.
 // replicatedSetup is a helper function for completeReplicatedSetup and
 // mockReplicatedSetup. If bootToken is empty, it will run the server-acl-init
 // command to set up replication. Otherwise it will do it through config.
+// Returns the Kubernetes client for the secondary DC,
+// a Consul API client initialized for the secondary DC,
+// ACL replication token, the address of the secondary Consul server, and a
+// cleanup function that should be called at the end of the test that cleans
+// up resources.
 func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, string, func()) {
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true

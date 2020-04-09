@@ -27,10 +27,7 @@ type Command struct {
 
 	flags                         *flag.FlagSet
 	k8s                           *k8sflags.K8SFlags
-	flagReleaseName               string
-	flagServerLabelSelector       string
 	flagResourcePrefix            string
-	flagReplicas                  int
 	flagK8sNamespace              string
 	flagAllowDNS                  bool
 	flagCreateClientToken         bool
@@ -46,7 +43,7 @@ type Command struct {
 	flagConsulCACert              string
 	flagConsulTLSServerName       string
 	flagUseHTTPS                  bool
-	flagServerHosts               []string
+	flagServerAddresses           []string
 	flagServerPort                uint
 
 	// Flags to support namespaces
@@ -77,9 +74,9 @@ func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerHosts), "server-address",
-		"The address of the Consul server(s), may be provided multiple times. At least one value is required.")
-	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP or DNS name of the Consul server(s), may be provided multiple times. At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
@@ -166,12 +163,13 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
-	if len(c.flagServerHosts) == 0 {
+	if len(c.flagServerAddresses) == 0 {
 		c.UI.Error("-server-address must be set at least once")
 		return 1
 	}
 	if c.flagResourcePrefix == "" {
 		c.UI.Error("-resource-prefix must be set")
+		return 1
 	}
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
@@ -256,7 +254,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// For all of the next operations we'll need a Consul client.
-	serverAddr := fmt.Sprintf("%s:%d", c.flagServerHosts[0], c.flagServerPort)
+	serverAddr := fmt.Sprintf("%s:%d", c.flagServerAddresses[0], c.flagServerPort)
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
@@ -504,7 +502,7 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 }
 
 // withPrefix returns the name of resource with the correct prefix based
-// on the -resource-prefix flags.
+// on the -resource-prefix flag.
 func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }

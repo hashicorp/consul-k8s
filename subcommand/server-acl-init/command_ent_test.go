@@ -63,7 +63,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			require.Len(methods, 1)
 
 			// Check the ACL auth method is created in the expected namespace.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			actMethod, _, err := consul.ACL().AuthMethodRead(authMethodName, namespaceQuery)
 			require.NoError(err)
 			require.NotNil(actMethod)
@@ -176,7 +176,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			require.NoError(err)
 
 			// Check the ACL auth method is as expected.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, nil)
 			require.NoError(err)
 			require.NotNil(method, authMethodName+" not found")
@@ -544,7 +544,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			require.NoError(err)
 
 			// Check the ACL auth method is as expected.
-			authMethodName := releaseName + "-consul-k8s-auth-method"
+			authMethodName := resourcePrefix + "-k8s-auth-method"
 			method, _, err := consul.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{
 				Namespace: c.AuthMethodExpectedNS,
 			})
