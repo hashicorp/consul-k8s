@@ -1211,7 +1211,7 @@ func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.
 // command to set up replication. Otherwise it will do it through config.
 // Returns the Kubernetes client for the secondary DC,
 // a Consul API client initialized for the secondary DC,
-// ACL replication token, the address of the secondary Consul server, and a
+// the address of the secondary Consul server, ACL replication token, and a
 // cleanup function that should be called at the end of the test that cleans
 // up resources.
 func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, string, func()) {
