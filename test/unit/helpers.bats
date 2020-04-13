@@ -101,7 +101,7 @@ load _helpers
   cd `chart_dir`
   # Grep for uses of .Release.Name that aren't using it as a label.
   local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v 'release: ' | tee /dev/stderr )
-  [ "${actual}" = '' ]
+  [ "${actual}" = 'templates/server-acl-init-job.yaml:                -server-label-selector=component=server,app={{ template "consul.name" . }},release={{ .Release.Name }} \' ]
 }
 
 #--------------------------------------------------------------------
