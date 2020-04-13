@@ -169,7 +169,7 @@ global:
 
     # If true, the Helm chart will automatically manage ACL tokens and policies
     # for all Consul and consul-k8s components. This requires servers to be running inside Kubernetes.
-    # Additionally, requires Consul >= 1.4 and consul-k8s >= 0.14.0.
+    # Additionally, requires Consul >= 1.4 and consul-k8s >= 0.10.1.
     manageSystemACLs: false
 
     # If true, an ACL token will be created that can be used in secondary

@@ -77,25 +77,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: server address is set to the DNS names of the server stateful set" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  actual=$(echo $command | jq -r '. | any(contains("-server-address=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # dns
 
@@ -249,8 +230,8 @@ load _helpers
   actual=$(echo $command | jq -r '. | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $command | jq -r '. | any(contains("-server-port=8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+    actual=$(echo $command | jq -r '. | any(contains("-consul-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+    [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: can overwrite CA secret with the provided one" {
