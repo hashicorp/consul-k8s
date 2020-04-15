@@ -43,7 +43,7 @@ type Command struct {
 	flagCreateSnapshotAgentToken bool
 	flagCreateMeshGatewayToken   bool
 
-	// Flags to configure Consul client
+	// Flags to configure Consul connection
 	flagServerAddresses     []string
 	flagServerPort          uint
 	flagConsulCACert        string
