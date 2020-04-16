@@ -68,7 +68,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			require.NoError(err)
 			require.NotNil(actMethod)
 			require.Equal("kubernetes", actMethod.Type)
-			require.Equal("Kubernetes AuthMethod", actMethod.Description)
+			require.Equal("Kubernetes Auth Method", actMethod.Description)
 			require.NotContains(actMethod.Config, "MapNamespaces")
 			require.NotContains(actMethod.Config, "ConsulNamespacePrefix")
 
@@ -181,7 +181,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			require.NoError(err)
 			require.NotNil(method, authMethodName+" not found")
 			require.Equal("kubernetes", method.Type)
-			require.Equal("Kubernetes AuthMethod", method.Description)
+			require.Equal("Kubernetes Auth Method", method.Description)
 			require.Contains(method.Config, "MapNamespaces")
 			require.Contains(method.Config, "ConsulNamespacePrefix")
 			require.Equal(true, method.Config["MapNamespaces"])

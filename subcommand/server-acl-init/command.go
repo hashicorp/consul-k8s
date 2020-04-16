@@ -33,15 +33,23 @@ type Command struct {
 	flagResourcePrefix string
 	flagK8sNamespace   string
 
-	flagAllowDNS                 bool
-	flagCreateClientToken        bool
-	flagCreateSyncToken          bool
-	flagCreateInjectToken        bool
-	flagCreateInjectAuthMethod   bool
-	flagBindingRuleSelector      string
-	flagCreateEntLicenseToken    bool
+	flagAllowDNS bool
+
+	flagCreateClientToken bool
+
+	flagCreateSyncToken bool
+
+	flagCreateInjectToken      bool
+	flagCreateInjectAuthMethod bool
+	flagInjectAuthMethodHost   string
+	flagInjectAuthMethodCACert string
+	flagBindingRuleSelector    string
+
+	flagCreateEntLicenseToken bool
+
 	flagCreateSnapshotAgentToken bool
-	flagCreateMeshGatewayToken   bool
+
+	flagCreateMeshGatewayToken bool
 
 	// Flags to configure Consul connection
 	flagServerAddresses     []string
@@ -97,14 +105,22 @@ func (c *Command) init() {
 		"Toggle for creating a client agent token. Default is true.")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token.")
+
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
 		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
+	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
+		"Kubernetes Host config parameter for the auth method."+
+			"If not provided, the default cluster Kuberentes service will be used.")
+	c.flags.StringVar(&c.flagInjectAuthMethodCACert, "inject-auth-method-ca-cert", "",
+		"Base64-encoded PEM-encoded CA Certificate for the auth method."+
+			"If not provided, the CA cert from the service account for this auth method will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
+
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
 	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,

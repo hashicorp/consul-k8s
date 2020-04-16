@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -186,14 +187,29 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 		return api.ACLAuthMethod{}, err
 	}
 
+	kubernetesHost := "https://kubernetes.default.svc"
+	kubernetesCACert := string(saSecret.Data["ca.crt"])
+
+	// Check if custom auth method Host and CACert are provided
+	if c.flagInjectAuthMethodHost != "" {
+		kubernetesHost = c.flagInjectAuthMethodHost
+	}
+	if c.flagInjectAuthMethodCACert != "" {
+		kubernetesCACertBytes, err := base64.StdEncoding.DecodeString(c.flagInjectAuthMethodCACert)
+		if err != nil {
+			return api.ACLAuthMethod{}, err
+		}
+		kubernetesCACert = string(kubernetesCACertBytes)
+	}
+
 	// Now we're ready to set up Consul's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
 		Name:        authMethodName,
-		Description: "Kubernetes AuthMethod",
+		Description: "Kubernetes Auth Method",
 		Type:        "kubernetes",
 		Config: map[string]interface{}{
-			"Host":              "https://kubernetes.default.svc",
-			"CACert":            string(saSecret.Data["ca.crt"]),
+			"Host":              kubernetesHost,
+			"CACert":            kubernetesCACert,
 			"ServiceAccountJWT": string(saSecret.Data["token"]),
 		},
 	}

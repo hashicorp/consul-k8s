@@ -33,6 +33,8 @@ var ns = "default"
 var resourcePrefix = "release-name-consul"
 
 func TestRun_FlagValidation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		Flags  []string
 		ExpErr string
@@ -570,14 +572,47 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 
 func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	t.Parallel()
+
+	// Generate CA
+	_, _, caCertPem, _, err := cert.GenerateCA("Kubernetes CA - Test")
+	require.NoError(t, err)
+
 	cases := map[string]struct {
-		AuthMethodFlag string
+		flags          []string
+		expectedHost   string
+		expectedCACert string
 	}{
 		"-create-inject-token flag": {
-			AuthMethodFlag: "-create-inject-token",
+			flags:        []string{"-create-inject-token"},
+			expectedHost: "https://kubernetes.default.svc",
 		},
 		"-create-inject-auth-method flag": {
-			AuthMethodFlag: "-create-inject-auth-method",
+			flags:        []string{"-create-inject-auth-method"},
+			expectedHost: "https://kubernetes.default.svc",
+		},
+		"-inject-auth-method-host flag": {
+			flags: []string{
+				"-create-inject-auth-method",
+				"-inject-auth-method-host=https://my-kube.com",
+			},
+			expectedHost: "https://my-kube.com",
+		},
+		"-inject-auth-method-ca-cert flag": {
+			flags: []string{
+				"-create-inject-auth-method",
+				"-inject-auth-method-ca-cert=" + base64.StdEncoding.EncodeToString([]byte(caCertPem)),
+			},
+			expectedHost:   "https://kubernetes.default.svc",
+			expectedCACert: caCertPem,
+		},
+		"-inject-auth-method-host and -inject-auth-method-ca-cert flags": {
+			flags: []string{
+				"-create-inject-auth-method",
+				"-inject-auth-method-host=https://my-kube.com",
+				"-inject-auth-method-ca-cert=" + base64.StdEncoding.EncodeToString([]byte(caCertPem)),
+			},
+			expectedHost:   "https://my-kube.com",
+			expectedCACert: caCertPem,
 		},
 	}
 	for testName, c := range cases {
@@ -587,6 +622,9 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
+			if c.expectedCACert != "" {
+				caCert = c.expectedCACert
+			}
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -603,7 +641,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-acl-binding-rule-selector=" + bindingRuleSelector,
 			}
-			cmdArgs = append(cmdArgs, c.AuthMethodFlag)
+			cmdArgs = append(cmdArgs, c.flags...)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -618,7 +656,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
 			require.Contains(authMethod.Config, "Host")
-			require.Equal(authMethod.Config["Host"], "https://kubernetes.default.svc")
+			require.Equal(authMethod.Config["Host"], c.expectedHost)
 			require.Contains(authMethod.Config, "CACert")
 			require.Equal(authMethod.Config["CACert"], caCert)
 			require.Contains(authMethod.Config, "ServiceAccountJWT")
