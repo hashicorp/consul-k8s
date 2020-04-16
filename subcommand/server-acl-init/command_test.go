@@ -618,7 +618,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				&api.QueryOptions{Token: bootToken})
 			require.NoError(err)
 			require.Contains(authMethod.Config, "Host")
-			require.Equal(authMethod.Config["Host"], "https://1.2.3.4:443")
+			require.Equal(authMethod.Config["Host"], "https://kubernetes.default.svc")
 			require.Contains(authMethod.Config, "CACert")
 			require.Equal(authMethod.Config["CACert"], caCert)
 			require.Contains(authMethod.Config, "ServiceAccountJWT")

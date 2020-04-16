@@ -157,21 +157,10 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 }
 
 func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod, error) {
-	var kubeSvc *apiv1.Service
-	err := c.untilSucceeds("getting kubernetes service IP",
-		func() error {
-			var err error
-			kubeSvc, err = c.clientset.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
-			return err
-		})
-	if err != nil {
-		return api.ACLAuthMethod{}, err
-	}
-
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
 	saName := c.withPrefix("connect-injector-authmethod-svc-account")
-	err = c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
+	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
 			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(saName, metav1.GetOptions{})
@@ -203,7 +192,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 		Description: "Kubernetes AuthMethod",
 		Type:        "kubernetes",
 		Config: map[string]interface{}{
-			"Host":              fmt.Sprintf("https://%s:443", kubeSvc.Spec.ClusterIP),
+			"Host":              "https://kubernetes.default.svc",
 			"CACert":            string(saSecret.Data["ca.crt"]),
 			"ServiceAccountJWT": string(saSecret.Data["token"]),
 		},
