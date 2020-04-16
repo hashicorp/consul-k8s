@@ -3,7 +3,6 @@ package getconsulclientca
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -11,12 +10,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-discover"
 	"github.com/mitchellh/cli"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -303,13 +304,17 @@ func TestRun_WithProvider(t *testing.T) {
 
 	ui := cli.NewMockUi()
 
-	// create a fake provider
+	// create a mock provider
 	// that always returns the server address
 	// provided through the cloud-auto join string
-	provider := &fakeProvider{}
+	provider := new(mocks.MockProvider)
+	// create stubs for our MockProvider so that it returns
+	// the address of the test agent
+	provider.On("Addrs", mock.Anything, mock.Anything).Return([]string{"127.0.0.1"}, nil)
+
 	cmd := Command{
 		UI:        ui,
-		providers: map[string]discover.Provider{"fake": provider},
+		providers: map[string]discover.Provider{"mock": provider},
 	}
 
 	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
@@ -329,7 +334,7 @@ func TestRun_WithProvider(t *testing.T) {
 
 	// run the command
 	exitCode := cmd.Run([]string{
-		"-server-addr", "provider=fake address=127.0.0.1",
+		"-server-addr", "provider=mock",
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-output-file", outputFile.Name(),
 		"-ca-file", caFile,
@@ -337,7 +342,7 @@ func TestRun_WithProvider(t *testing.T) {
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	// check that the provider has been called
-	require.Equal(t, 1, provider.addrsNumCalls, "provider's Addrs method was not called")
+	provider.AssertNumberOfCalls(t, "Addrs", 1)
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPSAddr,
@@ -416,17 +421,4 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 		os.Remove(certKeyFile.Name())
 	}
 	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
-}
-
-type fakeProvider struct {
-	addrsNumCalls int
-}
-
-func (p *fakeProvider) Addrs(args map[string]string, l *log.Logger) ([]string, error) {
-	p.addrsNumCalls++
-	return []string{args["address"]}, nil
-}
-
-func (p *fakeProvider) Help() string {
-	return "fake-provider help"
 }

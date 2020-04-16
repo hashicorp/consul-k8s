@@ -104,16 +104,16 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
-		"Selector string for connectInject ACL Binding Rule")
+		"Selector string for connectInject ACL Binding Rule.")
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
 	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,
 		"[Enterprise Only] Toggle for creating a token for the Consul snapshot agent deployment.")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
-		"Toggle for creating a token for a Connect mesh gateway")
+		"Toggle for creating a token for a Connect mesh gateway.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s), may be provided multiple times."+
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times."+
 			"At least one value is required.")
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
@@ -143,7 +143,7 @@ func (c *Command) init() {
 			"if mirroring is enabled.")
 
 	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
-		"Toggle for creating a token for ACL replication between datacenters")
+		"Toggle for creating a token for ACL replication between datacenters.")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
 
@@ -244,7 +244,7 @@ func (c *Command) Run(args []string) int {
 
 	serverAddresses := c.flagServerAddresses
 	// Check if the provided addresses contain a cloud-auto join string.
-	// If yes, call go-discover to discover addresses of the Consul servers.
+	// If yes, call godiscover to discover addresses of the Consul servers.
 	if len(c.flagServerAddresses) == 1 && strings.Contains(c.flagServerAddresses[0], "provider=") {
 		var err error
 		serverAddresses, err = godiscover.ConsulServerAddresses(c.flagServerAddresses[0], c.providers, c.log)

@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -16,12 +15,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-discover"
 	"github.com/mitchellh/cli"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -759,7 +760,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	testServerReady := make(chan bool)
 	var srv *testutil.TestServer
 	go func() {
-		// Create the Pods after a delay between 100 and 500ms.
+		// Start the servers after a delay between 100 and 500ms.
 		// It's randomized to ensure we're not relying on specific timing.
 		delay := 100 + rand.Intn(400)
 		time.Sleep(time.Duration(delay) * time.Millisecond)
@@ -854,7 +855,6 @@ func TestRun_NoLeader(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
 
@@ -1146,7 +1146,6 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 	}))
 	defer consulServer.Close()
 
-	// Create the Server Pods.
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(err)
 
@@ -1168,6 +1167,7 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Test that the expected API calls were made.
+	// We expect not to see the call to /v1/acl/bootstrap.
 	require.Equal([]APICall{
 		// We only expect the calls to get the datacenter
 		{
@@ -1349,22 +1349,32 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 	defer testSvr.Stop()
 	require := require.New(t)
 
-	provider := &fakeProvider{}
+	// create a mock provider
+	// that always returns the server address
+	// provided through the cloud-auto join string
+	provider := new(mocks.MockProvider)
+	// create stubs for our MockProvider so that it returns
+	// the address of the test agent
+	provider.On("Addrs", mock.Anything, mock.Anything).Return([]string{"127.0.0.1"}, nil)
+
 	// Run the command.
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		providers: map[string]discover.Provider{"fake": provider},
+		providers: map[string]discover.Provider{"mock": provider},
 	}
 	args := []string{
 		"-k8s-namespace=" + ns,
 		"-resource-prefix=" + resourcePrefix,
-		"-server-address", "provider=fake address=127.0.0.1",
+		"-server-address", "provider=mock",
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 	}
 	responseCode := cmd.Run(args)
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// check that the provider has been called
+	provider.AssertNumberOfCalls(t, "Addrs", 1)
 
 	// Test that the bootstrap kube secret is created.
 	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
@@ -1651,19 +1661,6 @@ func writeTempFile(t *testing.T, contents string) (string, func()) {
 	return file.Name(), func() {
 		os.Remove(file.Name())
 	}
-}
-
-type fakeProvider struct {
-	addrsNumCalls int
-}
-
-func (p *fakeProvider) Addrs(args map[string]string, l *log.Logger) ([]string, error) {
-	p.addrsNumCalls++
-	return []string{args["address"]}, nil
-}
-
-func (p *fakeProvider) Help() string {
-	return "fake-provider help"
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
