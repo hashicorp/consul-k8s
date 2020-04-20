@@ -85,3 +85,48 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		`Error writing token to file "/this/filepath/does/not/exist": open /this/filepath/does/not/exist: no such file or directory`,
 	)
 }
+
+// Test that if the command is run twice it succeeds. This test is the result
+// of a bug that we discovered where the command failed on second runs because
+// the token file only had read permissions (0400).
+func TestRun_TokenSinkFileTwice(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	tmpDir, err := ioutil.TempDir("", "")
+	require.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Set up k8s with the secret.
+	token := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	k8sNS := "default"
+	secretName := "secret-name"
+	k8s := fake.NewSimpleClientset()
+	k8s.CoreV1().Secrets(k8sNS).Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			"token": []byte(token),
+		},
+	})
+
+	sinkFile := filepath.Join(tmpDir, "acl-token")
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: k8s,
+	}
+
+	// Run twice.
+	for i := 0; i < 2; i++ {
+		code := cmd.Run([]string{
+			"-k8s-namespace", k8sNS,
+			"-token-sink-file", sinkFile,
+		})
+		require.Equal(0, code, ui.ErrorWriter.String())
+
+		bytes, err := ioutil.ReadFile(sinkFile)
+		require.NoError(err)
+		require.Equal(token, string(bytes), "exp: %s, got: %s", token, string(bytes))
+	}
+}
