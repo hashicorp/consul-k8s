@@ -289,7 +289,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagBootstrapTokenFile != "" {
 		// If bootstrap token is provided, we skip server bootstrapping and use
 		// the provided token to create policies and tokens for the rest of the components.
-		c.log.Info("Bootstrap token is provided so skipping ACL bootstrapping")
+		c.log.Info("Bootstrap token is provided so skipping Consul server ACL bootstrapping")
 		bootstrapToken = providedBootstrapToken
 	} else if c.flagACLReplicationTokenFile != "" {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
