@@ -296,7 +296,7 @@ func (c *Command) Run(args []string) int {
 		// since they will be performing replication.
 		// We can use the replication token as our bootstrap token because it
 		// has permissions to create policies and tokens.
-		c.log.Info("ACL replication is enabled so skipping ACL bootstrapping")
+		c.log.Info("ACL replication is enabled so skipping Consul server ACL bootstrapping")
 		bootstrapToken = aclReplicationToken
 	} else {
 		// Check if we've already been bootstrapped.
