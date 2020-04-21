@@ -45,6 +45,7 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Sync: Fix a race condition where sync would delete services at initial startup [[GH-208](https://github.com/hashicorp/consul-k8s/pull/208)]
+* Connect: Fix upstream annotation parsing when multiple prepared queries are separated by spaces [[GH-224](https://github.com/hashicorp/consul-k8s/issues/224)]
 
 DEPRECATIONS:
 
