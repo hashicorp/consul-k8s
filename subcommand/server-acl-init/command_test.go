@@ -573,10 +573,6 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	t.Parallel()
 
-	// Generate CA
-	_, _, caCertPem, _, err := cert.GenerateCA("Kubernetes CA - Test")
-	require.NoError(t, err)
-
 	cases := map[string]struct {
 		flags          []string
 		expectedHost   string
@@ -596,23 +592,6 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 				"-inject-auth-method-host=https://my-kube.com",
 			},
 			expectedHost: "https://my-kube.com",
-		},
-		"-inject-auth-method-ca-cert flag": {
-			flags: []string{
-				"-create-inject-auth-method",
-				"-inject-auth-method-ca-cert=" + base64.StdEncoding.EncodeToString([]byte(caCertPem)),
-			},
-			expectedHost:   "https://kubernetes.default.svc",
-			expectedCACert: caCertPem,
-		},
-		"-inject-auth-method-host and -inject-auth-method-ca-cert flags": {
-			flags: []string{
-				"-create-inject-auth-method",
-				"-inject-auth-method-host=https://my-kube.com",
-				"-inject-auth-method-ca-cert=" + base64.StdEncoding.EncodeToString([]byte(caCertPem)),
-			},
-			expectedHost:   "https://my-kube.com",
-			expectedCACert: caCertPem,
 		},
 	}
 	for testName, c := range cases {
@@ -1360,8 +1339,6 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 				"-server-address", strings.Split(serverAddr, ":")[0],
 				"-server-port", strings.Split(serverAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
-				"-server-address", strings.Split(serverAddr, ":")[0],
-				"-server-port", strings.Split(serverAddr, ":")[1],
 			}, flag)
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
