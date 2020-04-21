@@ -114,7 +114,7 @@ func (c *Command) init() {
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
 	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
-			"If not provided, the default cluster Kuberentes service will be used.")
+			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagInjectAuthMethodCACert, "inject-auth-method-ca-cert", "",
 		"Base64-encoded PEM-encoded CA Certificate for the auth method."+
 			"If not provided, the CA cert from the service account for this auth method will be used.")
