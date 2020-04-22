@@ -58,7 +58,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, cons
 	secretName := c.withPrefix(name + "-acl-token")
 	_, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(secretName, metav1.GetOptions{})
 	if err == nil {
-		c.Log.Info(fmt.Sprintf("Secret %q already exists", secretName))
+		c.log.Info(fmt.Sprintf("Secret %q already exists", secretName))
 		return nil
 	}
 
@@ -107,7 +107,7 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 	// updated to be namespace aware.
 	if isPolicyExistsErr(err, policy.Name) {
 		if c.flagEnableNamespaces {
-			c.Log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
+			c.log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
 
 			// The policy ID is required in any PolicyUpdate call, so first we need to
 			// get the existing policy to extract its ID.
@@ -134,7 +134,7 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 			_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
 			return err
 		} else {
-			c.Log.Info(fmt.Sprintf("Policy %q already exists, skipping update", policy.Name))
+			c.log.Info(fmt.Sprintf("Policy %q already exists, skipping update", policy.Name))
 			return nil
 		}
 	}
@@ -169,7 +169,7 @@ func (c *Command) checkAndCreateNamespace(ns string, consulClient *api.Client) e
 		if err != nil {
 			return err
 		}
-		c.Log.Info("created consul namespace", "name", consulNamespace.Name)
+		c.log.Info("created consul namespace", "name", consulNamespace.Name)
 	}
 
 	return nil

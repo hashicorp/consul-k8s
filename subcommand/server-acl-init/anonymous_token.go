@@ -9,7 +9,7 @@ import (
 func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 	anonRules, err := c.anonymousTokenRules()
 	if err != nil {
-		c.Log.Error("Error templating anonymous token rules", "err", err)
+		c.log.Error("Error templating anonymous token rules", "err", err)
 		return err
 	}
 
