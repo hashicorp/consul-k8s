@@ -11,10 +11,12 @@ import (
 	"sync"
 	"time"
 
+	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,26 +27,39 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                         *flag.FlagSet
-	k8s                           *k8sflags.K8SFlags
-	flagResourcePrefix            string
-	flagK8sNamespace              string
-	flagAllowDNS                  bool
-	flagCreateClientToken         bool
-	flagCreateSyncToken           bool
-	flagCreateInjectToken         bool
-	flagCreateInjectAuthMethod    bool
-	flagBindingRuleSelector       string
-	flagCreateEntLicenseToken     bool
-	flagCreateSnapshotAgentToken  bool
-	flagCreateMeshGatewayToken    bool
+	flags *flag.FlagSet
+	k8s   *k8sflags.K8SFlags
+
+	flagResourcePrefix string
+	flagK8sNamespace   string
+
+	flagAllowDNS bool
+
+	flagCreateClientToken bool
+
+	flagCreateSyncToken bool
+
+	flagCreateInjectToken      bool
+	flagCreateInjectAuthMethod bool
+	flagInjectAuthMethodHost   string
+	flagBindingRuleSelector    string
+
+	flagCreateEntLicenseToken bool
+
+	flagCreateSnapshotAgentToken bool
+
+	flagCreateMeshGatewayToken bool
+
+	// Flags to configure Consul connection
+	flagServerAddresses     []string
+	flagServerPort          uint
+	flagConsulCACert        string
+	flagConsulTLSServerName string
+	flagUseHTTPS            bool
+
+	// Flags for ACL replication
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
-	flagConsulCACert              string
-	flagConsulTLSServerName       string
-	flagUseHTTPS                  bool
-	flagServerAddresses           []string
-	flagServerPort                uint
 
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
@@ -55,58 +70,71 @@ type Command struct {
 	flagEnableInjectK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul for Connect inject
 	flagInjectK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring injected services
 
+	// Flag to support a custom bootstrap token
+	flagBootstrapTokenFile string
+
 	flagLogLevel string
 	flagTimeout  time.Duration
 
 	clientset kubernetes.Interface
+
 	// cmdTimeout is cancelled when the command timeout is reached.
 	cmdTimeout    context.Context
 	retryDuration time.Duration
 
-	// Log
-	Log hclog.Logger
+	// log
+	log hclog.Logger
 
 	once sync.Once
 	help string
+
+	providers map[string]discover.Provider
 }
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
-	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP or DNS name of the Consul server(s), may be provided multiple times. At least one value is required.")
-	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
-		"Name of Kubernetes namespace where the servers are deployed")
+		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
+
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
 	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
-		"Toggle for creating a client agent token")
+		"Toggle for creating a client agent token. Default is true.")
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
-		"Toggle for creating a catalog sync token")
+		"Toggle for creating a catalog sync token.")
+
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
 		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
+	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
+		"Kubernetes Host config parameter for the auth method."+
+			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
-		"Selector string for connectInject ACL Binding Rule")
+		"Selector string for connectInject ACL Binding Rule.")
+
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
-		"Toggle for creating a token for the enterprise license job")
+		"Toggle for creating a token for the enterprise license job.")
 	c.flags.BoolVar(&c.flagCreateSnapshotAgentToken, "create-snapshot-agent-token", false,
-		"Toggle for creating a token for the Consul snapshot agent deployment (enterprise only)")
+		"[Enterprise Only] Toggle for creating a token for the Consul snapshot agent deployment.")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
-		"Toggle for creating a token for a Connect mesh gateway")
-	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
-		"Toggle for creating a token for ACL replication between datacenters")
+		"Toggle for creating a token for a Connect mesh gateway.")
+
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times."+
+			"At least one value is required.")
+	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"Path to the PEM-encoded CA certificate of the Consul cluster.")
 	c.flags.StringVar(&c.flagConsulTLSServerName, "consul-tls-server-name", "",
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
+
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
 	c.flags.StringVar(&c.flagConsulSyncDestinationNamespace, "consul-sync-destination-namespace", "default",
@@ -125,8 +153,16 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagInjectK8SNSMirroringPrefix, "inject-k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul by Connect inject "+
 			"if mirroring is enabled.")
+
+	c.flags.BoolVar(&c.flagCreateACLReplicationToken, "create-acl-replication-token", false,
+		"Toggle for creating a token for ACL replication between datacenters.")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
+
+	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
+		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
+			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
+
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -171,6 +207,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-resource-prefix must be set")
 		return 1
 	}
+
 	var aclReplicationToken string
 	if c.flagACLReplicationTokenFile != "" {
 		// Load the ACL replication token from file.
@@ -186,6 +223,21 @@ func (c *Command) Run(args []string) int {
 		aclReplicationToken = strings.TrimSpace(string(tokenBytes))
 	}
 
+	var providedBootstrapToken string
+	if c.flagBootstrapTokenFile != "" {
+		// Load the bootstrap token from file.
+		tokenBytes, err := ioutil.ReadFile(c.flagBootstrapTokenFile)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to read bootstrap token from file %q: %s", c.flagBootstrapTokenFile, err))
+			return 1
+		}
+		if len(tokenBytes) == 0 {
+			c.UI.Error(fmt.Sprintf("Bootstrap token file %q is empty", c.flagBootstrapTokenFile))
+			return 1
+		}
+		providedBootstrapToken = strings.TrimSpace(string(tokenBytes))
+	}
+
 	var cancel context.CancelFunc
 	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
 	// The context will only ever be intentionally ended by the timeout.
@@ -197,15 +249,27 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
 		return 1
 	}
-	c.Log = hclog.New(&hclog.LoggerOptions{
+	c.log = hclog.New(&hclog.LoggerOptions{
 		Level:  level,
 		Output: os.Stderr,
 	})
 
+	serverAddresses := c.flagServerAddresses
+	// Check if the provided addresses contain a cloud-auto join string.
+	// If yes, call godiscover to discover addresses of the Consul servers.
+	if len(c.flagServerAddresses) == 1 && strings.Contains(c.flagServerAddresses[0], "provider=") {
+		var err error
+		serverAddresses, err = godiscover.ConsulServerAddresses(c.flagServerAddresses[0], c.providers, c.log)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+			return 1
+		}
+	}
+
 	// The ClientSet might already be set if we're in a test.
 	if c.clientset == nil {
 		if err := c.configureKubeClient(); err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -218,12 +282,17 @@ func (c *Command) Run(args []string) int {
 	var updateServerPolicy bool
 	var bootstrapToken string
 
-	if c.flagACLReplicationTokenFile != "" {
+	if c.flagBootstrapTokenFile != "" {
+		// If bootstrap token is provided, we skip server bootstrapping and use
+		// the provided token to create policies and tokens for the rest of the components.
+		c.log.Info("Bootstrap token is provided so skipping Consul server ACL bootstrapping")
+		bootstrapToken = providedBootstrapToken
+	} else if c.flagACLReplicationTokenFile != "" {
 		// If ACL replication is enabled, we don't need to ACL bootstrap the servers
 		// since they will be performing replication.
 		// We can use the replication token as our bootstrap token because it
 		// has permissions to create policies and tokens.
-		c.Log.Info("ACL replication is enabled so skipping ACL bootstrapping")
+		c.log.Info("ACL replication is enabled so skipping Consul server ACL bootstrapping")
 		bootstrapToken = aclReplicationToken
 	} else {
 		// Check if we've already been bootstrapped.
@@ -231,12 +300,12 @@ func (c *Command) Run(args []string) int {
 		bootTokenSecretName := c.withPrefix("bootstrap-acl-token")
 		bootstrapToken, err = c.getBootstrapToken(bootTokenSecretName)
 		if err != nil {
-			c.Log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
+			c.log.Error(fmt.Sprintf("Unexpected error looking for preexisting bootstrap Secret: %s", err))
 			return 1
 		}
 
 		if bootstrapToken != "" {
-			c.Log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
+			c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
 
 			// Mark that we should update the server ACL policy in case
 			// there are namespace related config changes. Because of the
@@ -244,17 +313,17 @@ func (c *Command) Run(args []string) int {
 			// otherwise won't be updated.
 			updateServerPolicy = true
 		} else {
-			c.Log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-			bootstrapToken, err = c.bootstrapServers(bootTokenSecretName, scheme)
+			c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
+			bootstrapToken, err = c.bootstrapServers(serverAddresses, bootTokenSecretName, scheme)
 			if err != nil {
-				c.Log.Error(err.Error())
+				c.log.Error(err.Error())
 				return 1
 			}
 		}
 	}
 
 	// For all of the next operations we'll need a Consul client.
-	serverAddr := fmt.Sprintf("%s:%d", c.flagServerAddresses[0], c.flagServerPort)
+	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
 	consulClient, err := api.NewClient(&api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
@@ -265,16 +334,16 @@ func (c *Command) Run(args []string) int {
 		},
 	})
 	if err != nil {
-		c.Log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
+		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
 
 	consulDC, err := c.consulDatacenter(consulClient)
 	if err != nil {
-		c.Log.Error("Error getting datacenter name", "err", err)
+		c.log.Error("Error getting datacenter name", "err", err)
 		return 1
 	}
-	c.Log.Info("Current datacenter", "datacenter", consulDC)
+	c.log.Info("Current datacenter", "datacenter", consulDC)
 
 	// With the addition of namespaces, the ACL policies associated
 	// with the server tokens may need to be updated if Enterprise Consul
@@ -283,7 +352,7 @@ func (c *Command) Run(args []string) int {
 	if updateServerPolicy {
 		_, err = c.setServerPolicy(consulClient)
 		if err != nil {
-			c.Log.Error("Error updating the server ACL policy", "err", err)
+			c.log.Error("Error updating the server ACL policy", "err", err)
 			return 1
 		}
 	}
@@ -305,7 +374,7 @@ func (c *Command) Run(args []string) int {
 				return c.createOrUpdateACLPolicy(policyTmpl, consulClient)
 			})
 		if err != nil {
-			c.Log.Error("Error creating or updating the cross namespace policy", "err", err)
+			c.log.Error("Error creating or updating the cross namespace policy", "err", err)
 			return 1
 		}
 
@@ -321,7 +390,7 @@ func (c *Command) Run(args []string) int {
 		}
 		_, _, err = consulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
 		if err != nil {
-			c.Log.Error("Error updating the default namespace to include the cross namespace policy", "err", err)
+			c.log.Error("Error updating the default namespace to include the cross namespace policy", "err", err)
 			return 1
 		}
 	}
@@ -329,13 +398,13 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateClientToken {
 		agentRules, err := c.agentRules()
 		if err != nil {
-			c.Log.Error("Error templating client agent rules", "err", err)
+			c.log.Error("Error templating client agent rules", "err", err)
 			return 1
 		}
 
 		err = c.createLocalACL("client", agentRules, consulDC, consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -343,7 +412,7 @@ func (c *Command) Run(args []string) int {
 	if c.createAnonymousPolicy() {
 		err := c.configureAnonymousPolicy(consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -351,7 +420,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateSyncToken {
 		syncRules, err := c.syncRules()
 		if err != nil {
-			c.Log.Error("Error templating sync rules", "err", err)
+			c.log.Error("Error templating sync rules", "err", err)
 			return 1
 		}
 
@@ -363,7 +432,7 @@ func (c *Command) Run(args []string) int {
 			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
 		}
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -371,7 +440,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateInjectToken {
 		injectRules, err := c.injectRules()
 		if err != nil {
-			c.Log.Error("Error templating inject rules", "err", err)
+			c.log.Error("Error templating inject rules", "err", err)
 			return 1
 		}
 
@@ -384,7 +453,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -392,7 +461,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateEntLicenseToken {
 		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -400,7 +469,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateSnapshotAgentToken {
 		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -408,7 +477,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateMeshGatewayToken {
 		meshGatewayRules, err := c.meshGatewayRules()
 		if err != nil {
-			c.Log.Error("Error templating dns rules", "err", err)
+			c.log.Error("Error templating dns rules", "err", err)
 			return 1
 		}
 
@@ -416,7 +485,7 @@ func (c *Command) Run(args []string) int {
 		// discover services in other datacenters.
 		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -424,7 +493,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateInjectAuthMethod {
 		err := c.configureConnectInject(consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
@@ -432,19 +501,19 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateACLReplicationToken {
 		rules, err := c.aclReplicationRules()
 		if err != nil {
-			c.Log.Error("Error templating acl replication token rules", "err", err)
+			c.log.Error("Error templating acl replication token rules", "err", err)
 			return 1
 		}
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
 		err = c.createGlobalACL("acl-replication", rules, consulDC, consulClient)
 		if err != nil {
-			c.Log.Error(err.Error())
+			c.log.Error(err.Error())
 			return 1
 		}
 	}
 
-	c.Log.Info("server-acl-init completed successfully")
+	c.log.Info("server-acl-init completed successfully")
 	return 0
 }
 
@@ -484,11 +553,11 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 	for {
 		err := op()
 		if err == nil {
-			c.Log.Info(fmt.Sprintf("Success: %s", opName))
+			c.log.Info(fmt.Sprintf("Success: %s", opName))
 			break
 		}
-		c.Log.Error(fmt.Sprintf("Failure: %s", opName), "err", err)
-		c.Log.Info("Retrying in " + c.retryDuration.String())
+		c.log.Error(fmt.Sprintf("Failure: %s", opName), "err", err)
+		c.log.Info("Retrying in " + c.retryDuration.String())
 		// Wait on either the retry duration (in which case we continue) or the
 		// overall command timeout.
 		select {

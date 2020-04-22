@@ -10,11 +10,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/version"
+	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-discover"
-	discoverk8s "github.com/hashicorp/go-discover/provider/k8s"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -175,55 +174,16 @@ func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 		return fmt.Sprintf("%s:%s", c.flagServerAddr, c.flagServerPort), nil
 	}
 
-	// If it's a cloud-auto join string, discover server addresses through the cloud provider.
-	// This code was adapted from
-	// https://github.com/hashicorp/consul/blob/c5fe112e59f6e8b03159ec8f2dbe7f4a026ce823/agent/retry_join.go#L55-L89.
-	disco, err := c.newDiscover()
+	servers, err := godiscover.ConsulServerAddresses(c.flagServerAddr, c.providers, logger)
 	if err != nil {
 		return "", err
 	}
-	logger.Debug("using cloud auto-join", "server-addr", c.flagServerAddr)
-	servers, err := disco.Addrs(c.flagServerAddr, logger.StandardLogger(&hclog.StandardLoggerOptions{
-		InferLevels: true,
-	}))
-	if err != nil {
-		return "", err
-	}
-
-	// check if we discovered any servers
-	if len(servers) == 0 {
-		return "", fmt.Errorf("could not discover any Consul servers with %q", c.flagServerAddr)
-	}
-
-	logger.Debug("discovered servers", "servers", strings.Join(servers, " "))
 
 	// Pick the first server from the list,
 	// ignoring the port since we need to use HTTP API
 	// and don't care about the RPC port.
 	firstServer := strings.SplitN(servers[0], ":", 2)[0]
 	return fmt.Sprintf("%s:%s", firstServer, c.flagServerPort), nil
-}
-
-// newDiscover initializes the new Discover object
-// set up with all predefined providers, as well as
-// the k8s provider.
-// This code was adapted from
-// https://github.com/hashicorp/consul/blob/c5fe112e59f6e8b03159ec8f2dbe7f4a026ce823/agent/retry_join.go#L42-L53
-func (c *Command) newDiscover() (*discover.Discover, error) {
-	if c.providers == nil {
-		c.providers = make(map[string]discover.Provider)
-	}
-
-	for k, v := range discover.Providers {
-		c.providers[k] = v
-	}
-	c.providers["k8s"] = &discoverk8s.Provider{}
-
-	userAgent := fmt.Sprintf("consul-k8s/%s (https://www.consul.io/)", version.GetHumanVersion())
-	return discover.New(
-		discover.WithUserAgent(userAgent),
-		discover.WithProviders(c.providers),
-	)
 }
 
 // getActiveRoot returns the currently active root

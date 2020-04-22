@@ -723,8 +723,6 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 }
 
 // Set up test consul agent and fake kubernetes cluster client
-// todo: use this setup method everywhere. The old one (completeSetup) uses
-// the test agent instead of the testserver.
 func completeSetupEnterprise(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 	svr, err := testutil.NewTestServerT(t)
