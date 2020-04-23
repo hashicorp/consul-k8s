@@ -76,17 +76,17 @@ This template is for an init container.
       consul-k8s get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         {{- if .Values.externalServers.enabled }}
-        {{- if not (or .Values.externalServers.https.address .Values.client.join)}}{{ fail "either client.join or externalServers.https.address must be set if externalServers.enabled is true" }}{{ end -}}
-        {{- if .Values.externalServers.https.address }}
-        -server-addr={{ .Values.externalServers.https.address }} \
+        {{- if not (or .Values.externalServers.hosts .Values.client.join)}}{{ fail "either client.join or externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+        {{- if .Values.externalServers.hosts }}
+        -server-addr={{ quote (first .Values.externalServers.hosts) }} \
         {{- else }}
         -server-addr={{ quote (first .Values.client.join) }} \
         {{- end }}
-        -server-port={{ .Values.externalServers.https.port }} \
-        {{- if .Values.externalServers.https.tlsServerName }}
-        -tls-server-name={{ .Values.externalServers.https.tlsServerName }} \
+        -server-port={{ .Values.externalServers.httpsPort }} \
+        {{- if .Values.externalServers.tlsServerName }}
+        -tls-server-name={{ .Values.externalServers.tlsServerName }} \
         {{- end }}
-        {{- if not .Values.externalServers.https.useSystemRoots }}
+        {{- if not .Values.externalServers.useSystemRoots }}
         -ca-file=/consul/tls/ca/tls.crt
         {{- end }}
         {{- else }}
@@ -95,7 +95,7 @@ This template is for an init container.
         -ca-file=/consul/tls/ca/tls.crt
         {{- end }}
   volumeMounts:
-    {{- if not (and .Values.externalServers.enabled .Values.externalServers.https.useSystemRoots) }}
+    {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
     - name: consul-ca-cert
       mountPath: /consul/tls/ca
     {{- end }}

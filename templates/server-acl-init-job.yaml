@@ -97,15 +97,17 @@ spec:
 
               consul-k8s server-acl-init \
                 {{- if .Values.externalServers.enabled }}
-                {{- if not (or .Values.externalServers.https.address .Values.client.join)}}{{ fail "either client.join or externalServers.https.address must be set if externalServers.enabled is true" }}{{ end -}}
-                {{- if .Values.externalServers.https.address }}
-                -server-address={{ .Values.externalServers.https.address }} \
+                {{- if not (or .Values.externalServers.hosts .Values.client.join)}}{{ fail "either client.join or externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+                {{- if .Values.externalServers.hosts }}
+                {{- range .Values.externalServers.hosts }}
+                -server-address={{ . }} \
+                {{- end }}
                 {{- else }}
                 {{- range .Values.client.join }}
                 -server-address={{ . }} \
                 {{- end }}
                 {{- end }}
-                -server-port={{ .Values.externalServers.https.port }} \
+                -server-port={{ .Values.externalServers.httpsPort }} \
                 {{- else }}
                 {{- range $index := until (.Values.server.replicas | int) }}
                 -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
@@ -115,7 +117,7 @@ spec:
                 -k8s-namespace={{ .Release.Namespace }} \
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
-                {{- if not (and .Values.externalServers.enabled .Values.externalServers.https.useSystemRoots) }}
+                {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
                 -consul-ca-cert=/consul/tls/ca/tls.crt \
                 {{- end }}
                 {{- if not .Values.externalServers.enabled }}
@@ -130,8 +132,8 @@ spec:
                 {{- end }}
                 {{- if .Values.connectInject.enabled }}
                 -create-inject-auth-method=true \
-                {{- if .Values.connectInject.overrideAuthMethodHost }}
-                -inject-auth-method-host={{ .Values.connectInject.overrideAuthMethodHost }} \
+                {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
+                -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
                 {{- end }}
                 {{- end }}
                 {{- if .Values.meshGateway.enabled }}

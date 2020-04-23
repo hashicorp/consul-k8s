@@ -61,7 +61,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.https.address=foo.com' \
+      --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -836,7 +836,7 @@ load _helpers
 #--------------------------------------------------------------------
 # externalServers.enabled
 
-@test "serverACLInit/Job: fails if external servers are enabled but neither externalServers.https.address nor client.join are set" {
+@test "serverACLInit/Job: fails if external servers are enabled but neither externalServers.hosts nor client.join are set" {
   cd `chart_dir`
   run helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -844,23 +844,23 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "either client.join or externalServers.https.address must be set if externalServers.enabled is true" ]]
+  [[ "$output" =~ "either client.join or externalServers.hosts must be set if externalServers.enabled is true" ]]
 }
 
-@test "serverACLInit/Job: sets server address if externalServers.https.address is set" {
+@test "serverACLInit/Job: sets server address if externalServers.hosts are set" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.https.address=foo.com' \
+      --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-server-address=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: sets server address to the client.join value if externalServers.https.address is not set" {
+@test "serverACLInit/Job: sets server address to the client.join value if externalServers.hosts are not set" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -873,7 +873,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: prefers externalServers.https.address when both externalServers.https.address and client.join are set" {
+@test "serverACLInit/Job: prefers externalServers.hosts when both externalServers.hosts and client.join are set" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -881,40 +881,40 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'client.join[0]=1.1.1.1' \
-      --set 'externalServers.https.address=foo.com' \
+      --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-server-address=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: port 443 is used by default" {
+@test "serverACLInit/Job: port 8501 is used by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: can override externalServers.httpsPort" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.httpsPort=443' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-server-port=443"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: can override externalServers.https.port" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
-      --set 'externalServers.https.port=8501' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: doesn't set server port to 8501 if TLS is enabled and externalServers.enabled is true" {
+@test "serverACLInit/Job: uses only the port from externalServers.httpsPort if TLS is enabled and externalServers.enabled is false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -922,13 +922,14 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.httpsPort=443' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: doesn't set the CA cert if TLS is enabled and externalServers.https.useSystemRoots is true" {
+@test "serverACLInit/Job: doesn't set the CA cert if TLS is enabled and externalServers.useSystemRoots is true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -936,14 +937,14 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
-      --set 'externalServers.https.useSystemRoots=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.enabled is true but externalServers.https.useSystemRoots is false" {
+@test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.enabled is true but externalServers.useSystemRoots is false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -951,22 +952,22 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
-      --set 'externalServers.https.useSystemRoots=false' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.useSystemRoots=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.https.useSystemRoots is true but externalServers.enabled is false" {
+@test "serverACLInit/Job: sets the CA cert if TLS is enabled and externalServers.useSystemRoots is true but externalServers.enabled is false" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=false' \
-      --set 'client.join[0]=1.1.1.1' \
-      --set 'externalServers.https.useSystemRoots=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1098,14 +1099,23 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-#--------------------------------------------------------------------
-# connectInject.overrideAuthMethodHost
-
-@test "serverACLInit/Job: doesn't set auth method host default" {
+@test "serverACLInit/Job: doesn't set auth method host by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: doesn't set auth method host by default when externalServers.k8sAuthMethodHost is provided but externalServers.enabled is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.k8sAuthMethodHost=foo.com' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host"))' | tee /dev/stderr)
@@ -1118,7 +1128,10 @@ load _helpers
       -x templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.overrideAuthMethodHost=foo.com' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo.com' \
+      --set 'externalServers.k8sAuthMethodHost=foo.com' \
       . | tee /dev/stderr|
       yq '.spec.template.spec.containers[0].command | any(contains("-inject-auth-method-host=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]

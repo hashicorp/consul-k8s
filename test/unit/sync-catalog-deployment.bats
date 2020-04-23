@@ -488,7 +488,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "syncCatalog/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.https.useSystemRoots=true" {
+@test "syncCatalog/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/sync-catalog-deployment.yaml  \
@@ -496,8 +496,8 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.https.address=foo.com' \
-      --set 'externalServers.https.useSystemRoots=true' \
+      --set 'externalServers.hosts[0]=foo.com' \
+      --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
