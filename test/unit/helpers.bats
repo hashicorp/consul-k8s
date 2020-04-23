@@ -138,6 +138,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'client.join[0]=consul-server.com' \
       . | tee /dev/stderr |
@@ -162,6 +163,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.https.address=consul.io' \
       . | tee /dev/stderr |
@@ -197,6 +199,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.https.address=consul.io' \
       --set 'externalServers.https.port=8501' \
@@ -222,6 +225,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.https.address=consul.io' \
       --set 'externalServers.https.tlsServerName=custom-server-name' \
@@ -237,6 +241,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.https.address=consul.io' \
       --set 'externalServers.https.useSystemRoots=true' \
@@ -252,6 +257,7 @@ load _helpers
       -x templates/tests/test-runner.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.https.address=consul.io' \
       --set 'externalServers.https.useSystemRoots=true' \
