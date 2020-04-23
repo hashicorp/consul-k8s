@@ -1,5 +1,29 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+
+* ACLs: Remove `-expected-replicas`, `-release-name`, and `-server-label-selector` flags
+  in favor of the new required `-server-address` flag [[GH-238](https://github.com/hashicorp/consul-k8s/pull/238)].
+
+FEATURES:
+
+* ACLs: The `server-acl-init` command can now run against Consul servers running outside of k8s [[GH-243](https://github.com/hashicorp/consul-k8s/pull/243)]:
+  * Add `-bootstrap-token-file` flag to provide your own bootstrap token. If set, the command will
+    skip ACL bootstrapping.
+  * `-server-address` flag can also take a [cloud auto-join](https://www.consul.io/docs/agent/cloud-auto-join.html)
+    string to discover server addresses.
+  * Add `-inject-auth-method-host` flag to allow configuring the location of the Kubernetes API server
+    for the Kubernetes auth method. This is useful because during the login workflow
+    Consul servers are talking to the Kubernetes API to verify the service account token.
+    When Consul servers are external to the Kubernetes cluster,
+    we no longer know the address of the Kubernetes API server that is accessible
+    from the external Consul servers.
+
+IMPROVEMENTS:
+
+* ACLs: Add `-server-address` and `-server-port` flags
+  so that we don't need to discover server pod IPs and ports through the Kubernetes API [[GH-238](https://github.com/hashicorp/consul-k8s/pull/238)].
+
 BUG FIXES:
 
 * Connect: Fix upstream annotation parsing when multiple prepared queries are separated by spaces [[GH-224](https://github.com/hashicorp/consul-k8s/issues/224)]
