@@ -87,7 +87,7 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 }
 
 // Test that if the command is run twice it succeeds. This test is the result
-// of a bug that we discovered where the command failed on second runs because
+// of a bug that we discovered where the command failed on subsequent runs because
 // the token file only had read permissions (0400).
 func TestRun_TokenSinkFileTwice(t *testing.T) {
 	t.Parallel()
