@@ -63,3 +63,35 @@ load _helpers
       yq -c '.spec.template.spec.containers[0].args' | tee /dev/stderr)
   [ "${actual}" = '["delete-completed-job","-k8s-namespace=default","release-name-consul-server-acl-init"]' ]
 }
+
+@test "serverACLInitCleanup/Job: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled set to false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-cleanup-job.yaml  \
+      --set 'server.enabled=false' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.https.address=foo.com' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInitCleanup/Job: fails if both externalServers.enabled=true and server.enabled=true" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/server-acl-init-cleanup-job.yaml  \
+      --set 'server.enabled=true' \
+      --set 'externalServers.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "only one of server.enabled or externalServers.enabled can be set" ]]
+}
+
+@test "serverACLInitCleanup/Job: fails if both externalServers.enabled=true and server.enabled not set to false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/server-acl-init-cleanup-job.yaml  \
+      --set 'externalServers.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "only one of server.enabled or externalServers.enabled can be set" ]]
+}
