@@ -7,7 +7,7 @@ BREAKING CHANGES:
 
 FEATURES:
 
-* ACLs: The `server-acl-init` can now run against Consul servers running outside of k8s [[GH-243](https://github.com/hashicorp/consul-k8s/pull/243)]:
+* ACLs: The `server-acl-init` command can now run against Consul servers running outside of k8s [[GH-243](https://github.com/hashicorp/consul-k8s/pull/243)]:
   * Add `-bootstrap-token-file` flag to provide your own bootstrap token. If set, the command will
     skip server bootstrapping and will continue to create other policies and tokens.
   * `-server-address` flag can also take a [cloud auto-join](https://www.consul.io/docs/agent/cloud-auto-join.html)
