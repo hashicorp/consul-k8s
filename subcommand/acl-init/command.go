@@ -104,7 +104,9 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		// Write the data out as a file
+		// Write the data out as a file.
+		// Must be 0644 because this is written by the consul-k8s user but needs
+		// to be readable by the consul user.
 		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error writing config file: %s", err))
@@ -113,7 +115,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagTokenSinkFile != "" {
-		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0400)
+		// Must be 0600 in case this command is re-run. In that case we need
+		// to have permissions to overwrite our file.
+		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0600)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
 			return 1
