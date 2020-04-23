@@ -325,36 +325,40 @@ server:
 externalServers:
   # If true, the Helm chart will be configured to talk to the external servers.
   # If setting this to true, you must also set server.enabled to false.
-  # Note that if you are setting client.join property, https.address property is not required.
   enabled: false
 
-  # HTTPS configuration for external servers.
-  # Note: HTTP connections to the servers are
-  # not supported.
-  https:
-    # IP, DNS name, or Cloud auto-join string pointing to the external Consul servers.
-    # Port must be provided separately with the externalServers.https.port property.
-    # Note that if you’re providing the cloud auto-join string and multiple addresses
-    # can be returned, only the first address will be used.
-    # This value is required only if you would like to use
-    # a different server address from the one specified
-    # in the client.join property.
-    address: null
+  # An array of external Consul server hosts that clients will use to join with servers
+  # as well as for HTTP/HTTPS connections from the components in this Helm chart.
+  # Valid values include IPs, DNS names, or Cloud auto-join string.
+  # Ports must be provided separately below.
+  hosts: []
 
-    # The HTTPS port of the server.
-    port: 443
+  # The Serf LAN port that the clients will use to join the server cluster.
+  serfLANPort: 8301
 
-    # tlsServerName is the server name to use as the SNI
-    # host header when connecting with HTTPS.
-    # This property is useful in case ‘externalServers.https.address’
-    # is not or can not be included in the server certificate’s SANs.
-    tlsServerName: null
+  # The HTTPS port of the Consul servers.
+  httpsPort: 8501
 
-    # If true, the Helm chart will ignore the CA set in
-    # global.tls.caCert and will rely on the container's
-    # system CAs for TLS verification when talking to Consul servers.
-    # Otherwise, the chart will use global.tls.caCert.
-    useSystemRoots: false
+  # tlsServerName is the server name to use as the SNI
+  # host header when connecting with HTTPS.
+  tlsServerName: null
+
+  # If true, the Helm chart will ignore the CA set in
+  # global.tls.caCert and will rely on the container's
+  # system CAs for TLS verification when talking to Consul servers.
+  # Otherwise, the chart will use global.tls.caCert.
+  useSystemRoots: false
+
+  # If you are setting global.acls.manageSystemACLs and connectInject.enabled to true,
+  # set k8sAuthMethodHost to the address of the Kubernetes API server.
+  # This address must to be reachable from the Consul servers.
+  # Please see https://www.consul.io/docs/acl/auth-methods/kubernetes.html.
+  # Requires consul-k8s >= 0.14.0.
+  #
+  # You could retrieve this value from your kubeconfig by running:
+  #   kubectl config view \
+  #        -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
+  k8sAuthMethodHost: null
 
 # Client, when enabled, configures Consul clients to run on every node
 # within the Kube cluster. The current deployment model follows a traditional
@@ -362,6 +366,8 @@ externalServers:
 client:
   enabled: "-"
   image: null
+
+  # [DEPRECATED] Please use externalServers.hosts and externalServers.serfLANPort.
   join: null
 
   # dataDirectoryHostPath is an absolute path to a directory on the host machine
@@ -795,13 +801,6 @@ connectInject:
   # If you are not using global.acls.manageSystemACLs and instead manually setting up an
   # auth method for Connect inject, set this to the name of your auth method.
   overrideAuthMethodName: ""
-
-  # If you are using global.acls.manageSystemACLs but also setting externalServers.enabled
-  # to true, set overrideAuthMethodHost to the address of the Kubernetes API server.
-  # This address must to be reachable from the Consul servers.
-  # Please see https://www.consul.io/docs/acl/auth-methods/kubernetes.html.
-  # Requires consul-k8s >= 0.14.0.
-  overrideAuthMethodHost: ""
 
   # aclInjectToken refers to a Kubernetes secret that you have created that contains
   # an ACL token for your Consul cluster which allows the Connect injector the correct

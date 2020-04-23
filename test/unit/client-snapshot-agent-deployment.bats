@@ -322,15 +322,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/SnapshotAgentDeployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.https.useSystemRoots=true" {
+@test "client/SnapshotAgentDeployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.https.address=foo.com' \
-      --set 'externalServers.https.useSystemRoots=true' \
+      --set 'externalServers.hosts[0]=foo.com' \
+      --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]

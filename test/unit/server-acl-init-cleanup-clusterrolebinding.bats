@@ -50,7 +50,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.https.address=foo.com' \
+      --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

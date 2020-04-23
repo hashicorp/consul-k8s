@@ -75,7 +75,7 @@ load _helpers
 #--------------------------------------------------------------------
 # retry-join
 
-@test "client/DaemonSet: retry join gets populated" {
+@test "client/DaemonSet: retry join gets populated by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
@@ -83,6 +83,61 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command | any(contains("-retry-join"))' | tee /dev/stderr)
 
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: retry join gets populated when client.join is set" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'client.join[0]=1.1.1.1' \
+      --set 'client.join[1]=2.2.2.2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: retry join gets populated when externalServers.hosts is set" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.hosts[1]=2.2.2.2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1:8301\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2:8301\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: can set non-default serf LAN port for external servers" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=1.1.1.1' \
+      --set 'externalServers.hosts[1]=2.2.2.2' \
+      --set 'externalServers.serfLANPort=5555' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1:5555\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2:5555\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
