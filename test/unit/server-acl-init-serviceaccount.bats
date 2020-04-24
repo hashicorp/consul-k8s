@@ -43,6 +43,19 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "serverACLInit/ServiceAccount: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-serviceaccount.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo.com' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.imagePullSecrets
 

@@ -1,5 +1,101 @@
 ## Unreleased
 
+BREAKING CHANGES:
+
+* External Servers [[GH-430](https://github.com/hashicorp/consul-helm/pull/430)]:
+  * `externalServers.https.address` moved to `externalServers.hosts`
+    and changed its type from `string` to `array`.
+  * `externalServers.https.port` moved to `externalServers.httpsPort`
+    and its default value changed from `443` to `8501`.
+  * `externalServers.https.tlsServerName` moved to `externalServers.tlsServerName`.
+  * `externalServers.https.useSystemRoots` moved to `externalServers.useSystemRoots`.
+
+  For example, if previously setting `externalServers` like so:
+
+    ```yaml
+    externalServers:
+      enabled: true
+      https:
+        address: "example.com"
+        port: 443
+        tlsServerName: null
+        useSystemRoots: false
+    ```
+
+  Now you need to change it to the following:
+
+    ```yaml
+    externalServers:
+      enabled: true
+      hosts: ["example.com"]
+      httpsPort: 443
+      tlsServerName: null
+      useSystemRoots: false
+    ```
+
+* Auto-encrypt: You can no longer re-use `client.join` property if using auto-encrypt
+  with `externalServers.enabled` set to `true`. You must provide Consul server HTTPS address
+  via `externalServers.hosts` and `externalServers.httpsPort`.
+
+  For example, if previously setting:
+
+    ```yaml
+    tls:
+      enabled: true
+      enabledAutoEncrypt: true
+    externalServers:
+      enabled: true
+    client:
+      join: ["consul.example.com"]
+    ``` 
+
+  Now you need to change it to:
+
+  ```yaml
+    tls:
+      enabled: true
+      enabledAutoEncrypt: true
+    externalServers:
+      enabled: true
+      hosts: ["consul.example.com"]
+    client:
+      join: ["consul.example.com"]
+    ``` 
+
+FEATURES:
+
+* Support managing ACLs when running Consul servers externally to Kubernetes:
+
+    * ACLs: Support providing your own bootstrap token [[GH-420](https://github.com/hashicorp/consul-helm/pull/420)].
+      If provided, the `server-acl-init` job will skip server ACL bootstrapping.
+
+      Example:
+
+        ```yaml
+        global:
+          acls:
+            manageSystemACLs: true
+            bootstrapToken:
+              secretName: bootstrap-token
+              secretKey: token
+        ```
+
+    * External Servers: Add `externalServers.k8sAuthMethodHost` to allow configuring a custom location
+      of the Kubernetes API server for the auth method created in Consul [[GH-420](https://github.com/hashicorp/consul-helm/pull/420)].
+      The Kubernetes API server provided here must be reachable from the external Consul servers.
+
+      Example:
+
+        ```yaml
+        externalServers:
+          enabled: true
+          k8sAuthMethodHost: https://kubernetes-api.example.com:443
+        ```
+
+IMPROVEMENTS:
+
+* Default to the latest version of consul-k8s: hashicorp/consul-k8s:0.14.0
+
 ## 0.19.0 (Apr 7, 2020)
 
 BREAKING CHANGES:

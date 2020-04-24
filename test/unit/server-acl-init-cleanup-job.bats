@@ -63,3 +63,16 @@ load _helpers
       yq -c '.spec.template.spec.containers[0].args' | tee /dev/stderr)
   [ "${actual}" = '["delete-completed-job","-k8s-namespace=default","release-name-consul-server-acl-init"]' ]
 }
+
+@test "serverACLInitCleanup/Job: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled set to false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-cleanup-job.yaml  \
+      --set 'server.enabled=false' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo.com' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
