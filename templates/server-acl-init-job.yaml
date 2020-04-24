@@ -1,4 +1,6 @@
-{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (and $serverEnabled .Values.externalServers.enabled) }}{{ fail "only one of server.enabled or externalServers.enabled can be set" }}{{ end -}}
+{{- if (or $serverEnabled .Values.externalServers.enabled) }}
 {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
 {{- /* We don't render this job when server.updatePartition > 0 because that
     means a server rollout is in progress and this job won't complete unless
@@ -32,7 +34,7 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
-      {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey)) }}
+      {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
       volumes:
         {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
@@ -46,7 +48,14 @@ spec:
               - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
                 path: tls.crt
         {{- end }}
-        {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+        {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+        - name: bootstrap-token
+          secret:
+            secretName: {{ .Values.global.acls.bootstrapToken.secretName }}
+            items:
+              - key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+                path: bootstrap-token
+        {{- else if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
         - name: acl-replication-token
           secret:
             secretName: {{ .Values.global.acls.replicationToken.secretName }}
@@ -63,14 +72,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey)) }}
+          {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
           volumeMounts:
             {{- if .Values.global.tls.enabled }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
-            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+            - name: bootstrap-token
+              mountPath: /consul/acl/tokens
+              readOnly: true
+            {{- else if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
             - name: acl-replication-token
               mountPath: /consul/acl/tokens
               readOnly: true
@@ -80,14 +93,30 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
+              CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
               consul-k8s server-acl-init \
-                -server-label-selector=component=server,app={{ template "consul.name" . }},release={{ .Release.Name }} \
-                -resource-prefix={{ template "consul.fullname" . }} \
+                {{- if .Values.externalServers.enabled }}
+                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+                {{- range .Values.externalServers.hosts }}
+                -server-address={{ . }} \
+                {{- end }}
+                -server-port={{ .Values.externalServers.httpsPort }} \
+                {{- else }}
+                {{- range $index := until (.Values.server.replicas | int) }}
+                -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
+                {{- end }}
+                {{- end }}
+                -resource-prefix=${CONSUL_FULLNAME} \
                 -k8s-namespace={{ .Release.Namespace }} \
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
+                {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
                 -consul-ca-cert=/consul/tls/ca/tls.crt \
-                -consul-tls-server-name=server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }} \
+                {{- end }}
+                {{- if not .Values.externalServers.enabled }}
+                -server-port=8501 \
+                {{- end }}
                 {{- end }}
                 {{- if .Values.syncCatalog.enabled }}
                 -create-sync-token=true \
@@ -97,6 +126,9 @@ spec:
                 {{- end }}
                 {{- if .Values.connectInject.enabled }}
                 -create-inject-auth-method=true \
+                {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
+                -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
+                {{- end }}
                 {{- end }}
                 {{- if .Values.meshGateway.enabled }}
                 -create-mesh-gateway-token=true \
@@ -116,7 +148,9 @@ spec:
                 {{- if .Values.global.acls.createReplicationToken }}
                 -create-acl-replication-token=true \
                 {{- end }}
-                {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+                -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
+                {{- else if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 -acl-replication-token-file=/consul/acl/tokens/acl-replication-token \
                 {{- end }}
                 {{- if .Values.global.enableConsulNamespaces }}
@@ -147,7 +181,6 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- end }}
-                -expected-replicas={{ .Values.server.replicas }}
 {{- end }}
 {{- end }}
 {{- end }}

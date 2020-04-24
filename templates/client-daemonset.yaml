@@ -207,7 +207,7 @@ spec:
                 {{- end }}
                 {{- if .Values.client.join }}
                 {{- range $value := .Values.client.join }}
-                -retry-join={{ quote $value }} \
+                -retry-join={{ $value }} \
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}

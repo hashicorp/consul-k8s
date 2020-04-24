@@ -14,7 +14,7 @@ metadata:
 spec:
   {{- if .Values.global.tls.enabled }}
   volumes:
-    {{- if not (and .Values.externalServers.enabled .Values.externalServers.https.useSystemRoots) }}
+    {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
     - name: consul-ca-cert
       secret:
         {{- if .Values.global.tls.caCert.secretName }}
