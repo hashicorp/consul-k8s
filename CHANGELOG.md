@@ -15,7 +15,7 @@ BREAKING CHANGES:
     ```yaml
     externalServers:
       https:
-        address: example.com
+        address: "example.com"
         port: 443
         tlsServerName: null
         useSystemRoots: false
@@ -25,7 +25,7 @@ BREAKING CHANGES:
 
     ```yaml
     externalServers:
-      hosts: [example.com]
+      hosts: ["example.com"]
       httpsPort: 443
       tlsServerName: null
       useSystemRoots: false

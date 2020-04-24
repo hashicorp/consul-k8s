@@ -8,14 +8,19 @@
 # bootstrap ACLs, and create Kubernetes secrets and Helm config file
 # to install this Helm chart.
 
-set -e
+set -euo pipefail
 
 : "${subscription_id?subscription_id environment variable required}"
 : "${resource_group?resource_group environment variable required}"
 : "${managed_app_name?managed_app_name environment variable required}"
 : "${cluster_name?cluster_name environment variable required}"
 
-echo "-> Fetching cluster configuration from Azure"
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[0;93m'
+NOCOLOR='\033[0m'
+
+echo -e "${YELLOW}-> Fetching cluster configuration from Azure${NOCOLOR}"
 cluster_resource=$(az resource show --ids "/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.Solutions/applications/${managed_app_name}/customconsulClusters/${cluster_name}" --api-version 2018-09-01-preview)
 cluster_config_file_base64=$(echo "${cluster_resource}" | jq -r .properties.consulConfigFile)
 ca_file_base64=$(echo "${cluster_resource}" | jq -r .properties.consulCaFile)
@@ -27,7 +32,7 @@ echo "Writing CA certificate chain to ca.pem"
 echo "${ca_file_base64}" | base64 --decode > ca.pem
 echo
 
-echo "-> Bootstrapping ACLs"
+echo -e "${YELLOW}-> Bootstrapping ACLs${NOCOLOR}"
 
 # Extract the URL for the servers.
 # First, check if the external endpoint is enabled and if yes, use the external endpoint URL.
@@ -41,12 +46,12 @@ fi
 
 # Call Consul bootstrap API and save the bootstrap secret
 # to a Kubernetes secret if successful.
-output=$(curl -sX PUT "${server_url}"/v1/acl/bootstrap)
+output=$(curl --connect-timeout 30 -sSX PUT "${server_url}"/v1/acl/bootstrap)
 if grep -i "permission denied" <<< "$output"; then
   echo "ACL system already bootstrapped."
-  echo "Please update 'global.acls.bootstrapToken' values in the generated Helm config to point to the Kubernetes secret containing the bootstrap token."
+  echo -e "${RED}Please update 'global.acls.bootstrapToken' values in the generated Helm config to point to the Kubernetes secret containing the bootstrap token.${NOCOLOR}"
 elif  grep -i "ACL support disabled" <<< "$output"; then
-  echo "ACLs not enabled on this cluster."
+  echo -e "${RED}ACLs not enabled on this cluster.${NOCOLOR}"
   exit 1
 else
   echo "Successfully bootstrapped ACLs"
@@ -56,11 +61,11 @@ else
 fi
 
 echo
-echo "-> Creating Kubernetes secret ${managed_app_name}-consul-ca-cert"
+echo -e "${YELLOW}-> Creating Kubernetes secret ${managed_app_name}-consul-ca-cert${NOCOLOR}"
 kubectl create secret generic "${managed_app_name}"-consul-ca-cert --from-file='tls.crt=./ca.pem'
 
 echo
-echo "-> Creating Kubernetes secret ${managed_app_name}-gossip-key"
+echo -e "${YELLOW}-> Creating Kubernetes secret ${managed_app_name}-gossip-key${NOCOLOR}"
 gossip_key=$(jq -r .encrypt consul.json)
 kubectl create secret generic "${managed_app_name}"-gossip-key --from-literal=key="${gossip_key}"
 
@@ -69,10 +74,11 @@ kube_api_server=$(kubectl config view -o jsonpath="{.clusters[?(@.name == \"$(ku
 consul_version=$(echo "${cluster_resource}" | jq -r .properties.consulInitialVersion | cut -d'v' -f2)
 
 echo
-echo "-> Writing Helm config to config.yaml"
+echo -e "${YELLOW}-> Writing Helm config to config.yaml${NOCOLOR}"
 cat > config.yaml << EOF
 global:
   enabled: false
+  name: consul
   image: hashicorp/consul-enterprise:${consul_version}-ent
   datacenter: $(jq -r .datacenter consul.json)
   acls:
@@ -97,7 +103,7 @@ externalServers:
   k8sAuthMethodHost: ${kube_api_server}
 client:
   enabled: true
-  # If you are using Kubenet in your AKS cluster,
+  # If you are using Kubenet in your AKS cluster (the default network),
   # uncomment the line below.
   # exposeGossipPorts: true
 connectInject:
@@ -107,4 +113,4 @@ syncCatalog:
 EOF
 
 echo
-echo "Done"
+echo -e "${GREEN}Done${GREEN}"
