@@ -205,22 +205,9 @@ spec:
                 {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
-                {{- if or .Values.client.join (and .Values.externalServers.enabled .Values.externalServers.hosts) }}
                 {{- if .Values.client.join }}
                 {{- range $value := .Values.client.join }}
                 -retry-join={{ $value }} \
-                {{- end }}
-                {{- else }}
-                {{- if .Values.externalServers.serfLANPort }}
-                {{- $serfPort := (.Values.externalServers.serfLANPort | int) -}}
-                {{- range $host := .Values.externalServers.hosts }}
-                -retry-join={{ printf "%s:%d" $host $serfPort }} \
-                {{- end }}
-                {{- else }}
-                {{- range $host := .Values.externalServers.hosts }}
-                -retry-join={{ $host }} \
-                {{- end }}
-                {{- end }}
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}

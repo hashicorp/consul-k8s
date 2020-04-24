@@ -836,7 +836,7 @@ load _helpers
 #--------------------------------------------------------------------
 # externalServers.enabled
 
-@test "serverACLInit/Job: fails if external servers are enabled but neither externalServers.hosts nor client.join are set" {
+@test "serverACLInit/Job: fails if external servers are enabled but externalServers.hosts are not set" {
   cd `chart_dir`
   run helm template \
       -x templates/server-acl-init-job.yaml  \
@@ -844,7 +844,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "either client.join or externalServers.hosts must be set if externalServers.enabled is true" ]]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
 }
 
 @test "serverACLInit/Job: sets server address if externalServers.hosts are set" {
@@ -854,33 +854,6 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo.com' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=foo.com"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: sets server address to the client.join value if externalServers.hosts are not set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=1.1.1.1"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "serverACLInit/Job: prefers externalServers.hosts when both externalServers.hosts and client.join are set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=1.1.1.1' \
       --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-server-address=foo.com"))' | tee /dev/stderr)

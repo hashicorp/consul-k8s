@@ -44,30 +44,40 @@ else
   server_url=$(echo "${cluster_resource}" | jq -r .properties.consulPrivateEndpointUrl)
 fi
 
+# Use managed_app_name as a resource prefix for Kubernetes resources
+# We need to convert it to lower case because of Kubernetes resource restrictions.
+# https://kubernetes.io/docs/concepts/overview/working-with-objects/names/
+kube_resource_prefix=$(echo "${managed_app_name}" | tr '[:upper:]' '[:lower:]')
+
 # Call Consul bootstrap API and save the bootstrap secret
 # to a Kubernetes secret if successful.
 output=$(curl --connect-timeout 30 -sSX PUT "${server_url}"/v1/acl/bootstrap)
 if grep -i "permission denied" <<< "$output"; then
   echo "ACL system already bootstrapped."
   echo -e "${RED}Please update 'global.acls.bootstrapToken' values in the generated Helm config to point to the Kubernetes secret containing the bootstrap token.${NOCOLOR}"
+  echo -e "${RED}You can create a secret like so:${NOCOLOR}"
+  echo -e "${RED}kubectl create secret generic ${kube_resource_prefix}-bootstrap-token \${NOCOLOR}"
+  echo -e "${RED}   --from-literal="token=<your bootstrap secret>"${NOCOLOR}"
 elif  grep -i "ACL support disabled" <<< "$output"; then
   echo -e "${RED}ACLs not enabled on this cluster.${NOCOLOR}"
   exit 1
 else
-  echo "Successfully bootstrapped ACLs"
-  echo "Creating Kubernetes secret for the bootstrap token ${managed_app_name}-bootstrap-token"
-  kubectl create secret generic "${managed_app_name}"-bootstrap-token \
+  echo "Successfully bootstrapped ACLs. Writing ACL bootstrap output to acls.json"
+  echo "$output" > acls.json
+
+  echo "Creating Kubernetes secret for the bootstrap token ${kube_resource_prefix}-bootstrap-token"
+  kubectl create secret generic "${kube_resource_prefix}"-bootstrap-token \
           --from-literal="token=$(echo "${output}" | jq -r .SecretID)"
 fi
 
 echo
-echo -e "${YELLOW}-> Creating Kubernetes secret ${managed_app_name}-consul-ca-cert${NOCOLOR}"
-kubectl create secret generic "${managed_app_name}"-consul-ca-cert --from-file='tls.crt=./ca.pem'
+echo -e "${YELLOW}-> Creating Kubernetes secret ${kube_resource_prefix}-consul-ca-cert${NOCOLOR}"
+kubectl create secret generic "${kube_resource_prefix}"-consul-ca-cert --from-file='tls.crt=./ca.pem'
 
 echo
-echo -e "${YELLOW}-> Creating Kubernetes secret ${managed_app_name}-gossip-key${NOCOLOR}"
+echo -e "${YELLOW}-> Creating Kubernetes secret ${kube_resource_prefix}-gossip-key${NOCOLOR}"
 gossip_key=$(jq -r .encrypt consul.json)
-kubectl create secret generic "${managed_app_name}"-gossip-key --from-literal=key="${gossip_key}"
+kubectl create secret generic "${kube_resource_prefix}"-gossip-key --from-literal=key="${gossip_key}"
 
 retry_join=$(jq -r --compact-output .retry_join consul.json)
 kube_api_server=$(kubectl config view -o jsonpath="{.clusters[?(@.name == \"$(kubectl config current-context)\")].cluster.server}")
@@ -84,16 +94,16 @@ global:
   acls:
     manageSystemACLs: true
     bootstrapToken:
-      secretName: ${managed_app_name}-bootstrap-token
+      secretName: ${kube_resource_prefix}-bootstrap-token
       secretKey: token
   gossipEncryption:
-    secretName: ${managed_app_name}-gossip-key
+    secretName: ${kube_resource_prefix}-gossip-key
     secretKey: key
   tls:
     enabled: true
     enableAutoEncrypt: true
     caCert:
-      secretName: ${managed_app_name}-consul-ca-cert
+      secretName: ${kube_resource_prefix}-consul-ca-cert
       secretKey: tls.crt
 externalServers:
   enabled: true
@@ -106,6 +116,7 @@ client:
   # If you are using Kubenet in your AKS cluster (the default network),
   # uncomment the line below.
   # exposeGossipPorts: true
+  join: ${retry_join}
 connectInject:
   enabled: true
 syncCatalog:

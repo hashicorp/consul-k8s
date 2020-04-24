@@ -97,15 +97,9 @@ spec:
 
               consul-k8s server-acl-init \
                 {{- if .Values.externalServers.enabled }}
-                {{- if not (or .Values.externalServers.hosts .Values.client.join)}}{{ fail "either client.join or externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-                {{- if .Values.externalServers.hosts }}
+                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
                 {{- range .Values.externalServers.hosts }}
                 -server-address={{ . }} \
-                {{- end }}
-                {{- else }}
-                {{- range .Values.client.join }}
-                -server-address={{ . }} \
-                {{- end }}
                 {{- end }}
                 -server-port={{ .Values.externalServers.httpsPort }} \
                 {{- else }}

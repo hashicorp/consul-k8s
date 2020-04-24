@@ -14,6 +14,7 @@ BREAKING CHANGES:
 
     ```yaml
     externalServers:
+      enabled: true
       https:
         address: "example.com"
         port: 443
@@ -25,11 +26,41 @@ BREAKING CHANGES:
 
     ```yaml
     externalServers:
+      enabled: true
       hosts: ["example.com"]
       httpsPort: 443
       tlsServerName: null
       useSystemRoots: false
     ```
+
+* Auto-encrypt: You can no longer re-use `client.join` property if using auto-encrypt
+  with `externalServers.enabled` set to `true`. You must provide Consul server HTTPS address
+  via `externalServers.hosts` and `externalServers.httpsPort`.
+
+  For example, if previously setting:
+
+    ```yaml
+    tls:
+      enabled: true
+      enabledAutoEncrypt: true
+    externalServers:
+      enabled: true
+    client:
+      join: ["consul.example.com"]
+    ``` 
+
+  Now you need to change it to:
+
+  ```yaml
+    tls:
+      enabled: true
+      enabledAutoEncrypt: true
+    externalServers:
+      enabled: true
+      hosts: ["consul.example.com"]
+    client:
+      join: ["consul.example.com"]
+    ``` 
 
 FEATURES:
 
@@ -64,11 +95,6 @@ FEATURES:
 IMPROVEMENTS:
 
 * Default to the latest version of consul-k8s: hashicorp/consul-k8s:0.14.0
-
-DEPRECATIONS:
-
-* `client.join` has been deprecated. Please use `externalServers.hosts` and `externalServers.serfLANPort` instead.
-   `client.join` will be supported for the next three releases.
 
 ## 0.19.0 (Apr 7, 2020)
 
