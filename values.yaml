@@ -334,7 +334,7 @@ externalServers:
   hosts: []
 
   # The Serf LAN port that the clients will use to join the server cluster.
-  serfLANPort: 8301
+  serfLANPort: null
 
   # The HTTPS port of the Consul servers.
   httpsPort: 8501

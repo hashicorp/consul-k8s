@@ -97,10 +97,10 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=1.1.1.1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=2.2.2.2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -115,10 +115,38 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1:8301\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=1.1.1.1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2:8301\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=2.2.2.2"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: retry join can be set to a cloud-auto join string" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]="provider=my-cloud config=val"' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: retry join can be set to a go-sockaddr" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]="{{ GetPrivateIP }}""' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"{{ GetPrivateIP }}\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -134,10 +162,10 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1:5555\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=1.1.1.1:5555"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2:5555\""))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=2.2.2.2:5555"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
