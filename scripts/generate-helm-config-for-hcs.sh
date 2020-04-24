@@ -56,8 +56,8 @@ if grep -i "permission denied" <<< "$output"; then
   echo "ACL system already bootstrapped."
   echo -e "${RED}Please update 'global.acls.bootstrapToken' values in the generated Helm config to point to the Kubernetes secret containing the bootstrap token.${NOCOLOR}"
   echo -e "${RED}You can create a secret like so:${NOCOLOR}"
-  echo -e "${RED}kubectl create secret generic ${kube_resource_prefix}-bootstrap-token \${NOCOLOR}"
-  echo -e "${RED}   --from-literal="token=<your bootstrap secret>"${NOCOLOR}"
+  echo -e "${RED}kubectl create secret generic ${kube_resource_prefix}-bootstrap-token \ ${NOCOLOR}"
+  echo -e "${RED}   --from-literal='token=<your bootstrap secret>'${NOCOLOR}"
 elif  grep -i "ACL support disabled" <<< "$output"; then
   echo -e "${RED}ACLs not enabled on this cluster.${NOCOLOR}"
   exit 1

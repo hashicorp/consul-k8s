@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.20.0 (Apr 24, 2020)
+
 BREAKING CHANGES:
 
 * External Servers [[GH-430](https://github.com/hashicorp/consul-helm/pull/430)]:
@@ -95,6 +97,10 @@ FEATURES:
 IMPROVEMENTS:
 
 * Default to the latest version of consul-k8s: hashicorp/consul-k8s:0.14.0
+
+BUG FIXES:
+
+* `tls-init-cleanup` can run even if pre-install fails [[GH-419](https://github.com/hashicorp/consul-helm/pull/419)].
 
 ## 0.19.0 (Apr 7, 2020)
 
