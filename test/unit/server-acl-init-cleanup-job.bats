@@ -76,22 +76,3 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-@test "serverACLInitCleanup/Job: fails if both externalServers.enabled=true and server.enabled=true" {
-  cd `chart_dir`
-  run helm template \
-      -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'server.enabled=true' \
-      --set 'externalServers.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "only one of server.enabled or externalServers.enabled can be set" ]]
-}
-
-@test "serverACLInitCleanup/Job: fails if both externalServers.enabled=true and server.enabled not set to false" {
-  cd `chart_dir`
-  run helm template \
-      -x templates/server-acl-init-cleanup-job.yaml  \
-      --set 'externalServers.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "only one of server.enabled or externalServers.enabled can be set" ]]
-}

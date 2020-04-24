@@ -132,31 +132,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: uses client.join string if externalServers.enabled is true but the hosts are not provided" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -x templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'client.join[0]=consul-server.com' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-server-addr=\"consul-server.com\"")')
-  [ "${actual}" = "true" ]
-
-  # check the default server port is 443 if not provided
-  actual=$(echo $command | jq ' . | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo $command | jq ' . | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-}
-
 @test "helper/consul.getAutoEncryptClientCA: can set the provided server hosts if externalServers.enabled is true" {
   cd `chart_dir`
   local command=$(helm template \
@@ -182,7 +157,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: fails if externalServers.enabled is true but neither client.join nor externalServers.hosts[0] are provided" {
+@test "helper/consul.getAutoEncryptClientCA: fails if externalServers.enabled is true but externalServers.hosts are not provided" {
   cd `chart_dir`
   run helm template \
       -x templates/tests/test-runner.yaml  \
@@ -190,7 +165,7 @@ load _helpers
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'externalServers.enabled=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "either client.join or externalServers.hosts must be set if externalServers.enabled is true" ]]
+  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
 }
 
 @test "helper/consul.getAutoEncryptClientCA: can set the provided port if externalServers.enabled is true" {

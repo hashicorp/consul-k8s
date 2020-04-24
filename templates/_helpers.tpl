@@ -76,12 +76,8 @@ This template is for an init container.
       consul-k8s get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         {{- if .Values.externalServers.enabled }}
-        {{- if not (or .Values.externalServers.hosts .Values.client.join)}}{{ fail "either client.join or externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-        {{- if .Values.externalServers.hosts }}
+        {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
-        {{- else }}
-        -server-addr={{ quote (first .Values.client.join) }} \
-        {{- end }}
         -server-port={{ .Values.externalServers.httpsPort }} \
         {{- if .Values.externalServers.tlsServerName }}
         -tls-server-name={{ .Values.externalServers.tlsServerName }} \

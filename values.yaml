@@ -327,14 +327,15 @@ externalServers:
   # If setting this to true, you must also set server.enabled to false.
   enabled: false
 
-  # An array of external Consul server hosts that clients will use to join with servers
-  # as well as for HTTP/HTTPS connections from the components in this Helm chart.
+  # An array of external Consul server hosts that are used to make
+  # HTTPS connections from the components in this Helm chart.
   # Valid values include IPs, DNS names, or Cloud auto-join string.
-  # Ports must be provided separately below.
+  # The port must be provided separately below.
+  # NOTE: client.join must also be set to the hosts that should be
+  # used to join the cluster. In most cases the client.join values
+  # should be the same, however they may be different if you
+  # wish to use separate hosts for the HTTPS connections.
   hosts: []
-
-  # The Serf LAN port that the clients will use to join the server cluster.
-  serfLANPort: null
 
   # The HTTPS port of the Consul servers.
   httpsPort: 8501
@@ -366,8 +367,6 @@ externalServers:
 client:
   enabled: "-"
   image: null
-
-  # [DEPRECATED] Please use externalServers.hosts and externalServers.serfLANPort.
   join: null
 
   # dataDirectoryHostPath is an absolute path to a directory on the host machine
