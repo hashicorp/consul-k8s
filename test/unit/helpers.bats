@@ -194,6 +194,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "helper/consul.getAutoEncryptClientCA: can pass cloud auto-join string to server address via externalServers.hosts" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/tests/test-runner.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=provider=my-cloud config=val' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | any(contains("-server-addr=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "helper/consul.getAutoEncryptClientCA: can set TLS server name if externalServers.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
