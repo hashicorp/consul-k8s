@@ -856,7 +856,20 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=foo.com"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=\"foo.com\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: can pass cloud auto-join string to server address via externalServers.hosts" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=provider=my-cloud config=val' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-server-address=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
