@@ -99,7 +99,7 @@ spec:
                 {{- if .Values.externalServers.enabled }}
                 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
                 {{- range .Values.externalServers.hosts }}
-                -server-address={{ . }} \
+                -server-address={{ quote . }} \
                 {{- end }}
                 -server-port={{ .Values.externalServers.httpsPort }} \
                 {{- else }}

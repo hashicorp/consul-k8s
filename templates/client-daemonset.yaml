@@ -207,12 +207,12 @@ spec:
                 {{- end }}
                 {{- if .Values.client.join }}
                 {{- range $value := .Values.client.join }}
-                -retry-join={{ $value }} \
+                -retry-join={{ quote $value }} \
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
                 {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join=${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc \
+                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
                 {{- end }}
                 {{- end }}
                 {{- end }}
