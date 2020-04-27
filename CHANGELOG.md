@@ -1,5 +1,13 @@
 ## Unreleased
 
+## 0.20.1 (Apr 27, 2020)
+
+BUG FIXES
+
+* Fix a bug where `client.join` and `externalServers.hosts` values containing spaces are
+  not quoted properly, for example, when providing [cloud auto-join](https://www.consul.io/docs/agent/cloud-auto-join.html) strings
+  [[GH-435](https://github.com/hashicorp/consul-helm/pull/435)].
+
 ## 0.20.0 (Apr 24, 2020)
 
 BREAKING CHANGES:
