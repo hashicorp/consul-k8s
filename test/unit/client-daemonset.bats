@@ -77,12 +77,19 @@ load _helpers
 
 @test "client/DaemonSet: retry join gets populated by default" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local command=$(helm template \
       -x templates/client-daemonset.yaml  \
       --set 'server.replicas=3' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command | any(contains("-retry-join"))' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -97,10 +104,24 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=1.1.1.1"))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=2.2.2.2"))' | tee /dev/stderr)
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"2.2.2.2\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: can provide cloud auto-join string to client.join" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'client.join[0]=provider=my-cloud config=val' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command')
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
