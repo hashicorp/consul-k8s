@@ -81,7 +81,6 @@ kubectl create secret generic "${kube_resource_prefix}"-gossip-key --from-litera
 
 retry_join=$(jq -r --compact-output .retry_join consul.json)
 kube_api_server=$(kubectl config view -o jsonpath="{.clusters[?(@.name == \"$(kubectl config current-context)\")].cluster.server}")
-consul_version=$(echo "${cluster_resource}" | jq -r .properties.consulInitialVersion | cut -d'v' -f2)
 
 echo
 echo -e "${YELLOW}-> Writing Helm config to config.yaml${NOCOLOR}"
@@ -89,7 +88,6 @@ cat > config.yaml << EOF
 global:
   enabled: false
   name: consul
-  image: hashicorp/consul-enterprise:${consul_version}-ent
   datacenter: $(jq -r .datacenter consul.json)
   acls:
     manageSystemACLs: true
