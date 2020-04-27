@@ -38,6 +38,20 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
+  update-helm-charts-index:
+    docker:
+      - image: circleci/golang:latest
+    steps:
+      - run:
+          name: update helm-charts index
+          command: |
+            curl --show-error --silent --fail --user "${CIRCLE_TOKEN}:" \
+                -X POST \
+                -H 'Content-Type: application/json' \
+                -H 'Accept: application/json' \
+                -d "{\"branch\": \"master\",\"parameters\":{\"SOURCE_REPO\": \"${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}\",\"SOURCE_TAG\": \"${CIRCLE_TAG}\"}}" \
+                "${CIRCLE_ENDPOINT}/${CIRCLE_PROJECT}/pipeline"
+
 workflows:
   version: 2
   test:
@@ -49,3 +63,12 @@ workflows:
           filters:
             branches:
               only: master
+  update-helm-charts-index:
+    jobs:
+      - update-helm-charts-index:
+          context: helm-charts-trigger
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
