@@ -160,12 +160,10 @@ spec:
                 service {
                   kind = "mesh-gateway"
                   name = "{{ .Values.meshGateway.consulServiceName }}"
-                  {{- if .Values.global.federation }}
                   {{- if .Values.global.federation.enabled }}
                   meta {
                     consul-wan-federation = "1"
                   }
-                  {{- end }}
                   {{- end }}
                   port = {{ .Values.meshGateway.containerPort }}
                   address = "${POD_IP}"

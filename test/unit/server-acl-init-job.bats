@@ -86,6 +86,15 @@ load _helpers
   [[ "$output" =~ "only one of server.enabled or externalServers.enabled can be set" ]]
 }
 
+@test "serverACLInit/Job: fails if createReplicationToken=true but manageSystemACLs=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.createReplicationToken=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "if global.acls.createReplicationToken is true, global.acls.manageSystemACLs must be true" ]]
+}
+
 @test "serverACLInit/Job: does not set -create-client-token=false when client is enabled (the default)" {
   cd `chart_dir`
   local actual=$(helm template \
