@@ -13,6 +13,7 @@ import (
 
 	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
@@ -94,7 +95,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
-		"Prefix to use for Kubernetes resources. If not set, the \"<release-name>-consul\" prefix is used, where <release-name> is the value set by the -release-name flag.")
+		"Prefix to use for Kubernetes resources.")
 	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 
@@ -506,7 +507,7 @@ func (c *Command) Run(args []string) int {
 		}
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
-		err = c.createGlobalACL("acl-replication", rules, consulDC, consulClient)
+		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -528,7 +529,7 @@ func (c *Command) getBootstrapToken(secretName string) (string, error) {
 		}
 		return "", err
 	}
-	token, ok := secret.Data["token"]
+	token, ok := secret.Data[common.ACLTokenSecretKey]
 	if !ok {
 		return "", fmt.Errorf("secret %q does not have data key 'token'", secretName)
 	}
