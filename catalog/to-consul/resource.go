@@ -78,6 +78,9 @@ type ServiceResource struct {
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
 
+	// LoadBalancerEndpointsSync set to true (default false) will sync ServiceTypeLoadBalancer endpoints.
+	LoadBalancerEndpointsSync bool
+
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
 	// ip address will be used instead.
@@ -295,6 +298,9 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
+	if t.LoadBalancerEndpointsSync {
+		return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP || svc.Spec.Type == apiv1.ServiceTypeLoadBalancer
+	}
 	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
 }
 
