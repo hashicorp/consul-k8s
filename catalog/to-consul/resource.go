@@ -478,11 +478,15 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	case apiv1.ServiceTypeLoadBalancer:
 		seen := map[string]struct{}{}
 		if t.LoadBalancerEndpointsSync {
-			endpoints, err := t.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Log.Warn("error getting LoadBalancer endpoints", "error", err)
+			if t.endpointsMap == nil {
 				return
 			}
+
+			endpoints := t.endpointsMap[key]
+			if endpoints == nil {
+				return
+			}
+
 			for _, subset := range endpoints.Subsets {
 				// if LoadBalancerEndpointsSync is true use the endpoint port instead
 				// of the service port because we're registering each endpoint
