@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -474,28 +474,79 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For LoadBalancer type services, we create a service instance for
 	// each LoadBalancer entry. We only support entries that have an IP
 	// address assigned (not hostnames).
+	// If LoadBalancerEndpointsSync is true sync LB endpoints instead of loadbalancer ingress.
 	case apiv1.ServiceTypeLoadBalancer:
 		seen := map[string]struct{}{}
-		for _, ingress := range svc.Status.LoadBalancer.Ingress {
-			addr := ingress.IP
-			if addr == "" {
-				addr = ingress.Hostname
+		if t.LoadBalancerEndpointsSync {
+			endpoints, err := t.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Log.Warn("error getting LoadBalancer endpoints", "error", err)
+				return
 			}
-			if addr == "" {
-				continue
-			}
+			for _, subset := range endpoints.Subsets {
+				// if LoadBalancerEndpointsSync is true use the endpoint port instead
+				// of the service port because we're registering each endpoint
+				// as a separate service instance.
+				epPort := baseService.Port
+				if overridePortName != "" {
+					// If we're supposed to use a specific named port, find it.
+					for _, p := range subset.Ports {
+						if overridePortName == p.Name {
+							epPort = int(p.Port)
+							break
+						}
+					}
+				} else if overridePortNumber == 0 {
+					// Otherwise we'll just use the first port in the list
+					// (unless the port number was overridden by an annotation).
+					for _, p := range subset.Ports {
+						epPort = int(p.Port)
+						break
+					}
+				}
+				for _, subsetAddr := range subset.Addresses {
+					addr := subsetAddr.IP
+					if addr == "" {
+						continue
+					}
+					if _, ok := seen[addr]; ok {
+						continue
+					}
+					seen[addr] = struct{}{}
 
-			if _, ok := seen[addr]; ok {
-				continue
-			}
-			seen[addr] = struct{}{}
+					r := baseNode
+					rs := baseService
+					r.Service = &rs
+					r.Service.ID = serviceID(r.Service.Service, addr)
+					r.Service.Address = addr
+					r.Service.Port = epPort
 
-			r := baseNode
-			rs := baseService
-			r.Service = &rs
-			r.Service.ID = serviceID(r.Service.Service, addr)
-			r.Service.Address = addr
-			t.consulMap[key] = append(t.consulMap[key], &r)
+					t.consulMap[key] = append(t.consulMap[key], &r)
+				}
+			}
+		} else {
+			for _, ingress := range svc.Status.LoadBalancer.Ingress {
+				addr := ingress.IP
+				if addr == "" {
+					addr = ingress.Hostname
+				}
+				if addr == "" {
+					continue
+				}
+
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
+
+				r := baseNode
+				rs := baseService
+				r.Service = &rs
+				r.Service.ID = serviceID(r.Service.Service, addr)
+				r.Service.Address = addr
+
+				t.consulMap[key] = append(t.consulMap[key], &r)
+			}
 		}
 
 	// For NodePort services, we create a service instance for each
