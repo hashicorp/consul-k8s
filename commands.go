@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
@@ -57,6 +58,10 @@ func init() {
 
 		"version": func() (cli.Command, error) {
 			return &cmdVersion.Command{UI: ui, Version: version.GetHumanVersion()}, nil
+		},
+
+		"create-federation-secret": func() (cli.Command, error) {
+			return &cmdCreateFederationSecret.Command{UI: ui}, nil
 		},
 	}
 }

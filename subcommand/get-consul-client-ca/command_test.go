@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -70,7 +71,7 @@ func TestRun(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
 	defer cleanup()
 
 	ui := cli.NewMockUi()
@@ -132,7 +133,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
 	defer cleanup()
 
 	ui := cli.NewMockUi()
@@ -219,7 +220,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
 	defer cleanup()
 
 	ui := cli.NewMockUi()
@@ -317,7 +318,7 @@ func TestRun_WithProvider(t *testing.T) {
 		providers: map[string]discover.Provider{"mock": provider},
 	}
 
-	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
+	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
 	defer cleanup()
 
 	// start the test server
@@ -377,48 +378,4 @@ func generateCA(t *testing.T) (caPem, keyPem string) {
 	require.NoError(err)
 
 	return
-}
-
-// generateServerCerts generates Consul CA
-// and a server certificate and saves them to temp files.
-// It returns file names in this order:
-// CA certificate, server certificate, and server key.
-// Note that it's the responsibility of the caller to
-// remove the temporary files created by this function.
-func generateServerCerts(t *testing.T) (string, string, string, func()) {
-	require := require.New(t)
-
-	caFile, err := ioutil.TempFile("", "ca")
-	require.NoError(err)
-
-	certFile, err := ioutil.TempFile("", "cert")
-	require.NoError(err)
-
-	certKeyFile, err := ioutil.TempFile("", "key")
-	require.NoError(err)
-
-	// Generate CA
-	signer, _, caCertPem, caCertTemplate, err := cert.GenerateCA("Consul Agent CA - Test")
-	require.NoError(err)
-
-	// Generate Server Cert
-	name := "server.dc1.consul"
-	hosts := []string{name, "localhost", "127.0.0.1"}
-	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
-	require.NoError(err)
-
-	// Write certs and key to files
-	_, err = caFile.WriteString(caCertPem)
-	require.NoError(err)
-	_, err = certFile.WriteString(certPem)
-	require.NoError(err)
-	_, err = certKeyFile.WriteString(keyPem)
-	require.NoError(err)
-
-	cleanupFunc := func() {
-		os.Remove(caFile.Name())
-		os.Remove(certFile.Name())
-		os.Remove(certKeyFile.Name())
-	}
-	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
 }

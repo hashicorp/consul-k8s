@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +90,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, cons
 					Name: secretName,
 				},
 				Data: map[string][]byte{
-					"token": []byte(token),
+					common.ACLTokenSecretKey: []byte(token),
 				},
 			}
 			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(secret)
