@@ -5,8 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	v1 "k8s.io/api/batch/v1"
@@ -24,7 +23,7 @@ type Command struct {
 	UI cli.Ui
 
 	flags         *flag.FlagSet
-	k8s           *k8sflags.K8SFlags
+	k8s           *flags.K8SFlags
 	flagNamespace string
 	flagTimeout   string
 
@@ -39,7 +38,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.k8s = &k8sflags.K8SFlags{}
+	c.k8s = &flags.K8SFlags{}
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the job is deployed")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "30m",

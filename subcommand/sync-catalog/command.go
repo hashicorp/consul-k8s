@@ -15,9 +15,8 @@ import (
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +31,7 @@ type Command struct {
 
 	flags                     *flag.FlagSet
 	http                      *flags.HTTPFlags
-	k8s                       *k8sflags.K8SFlags
+	k8s                       *flags.K8SFlags
 	flagListen                string
 	flagToConsul              bool
 	flagToK8S                 bool
@@ -134,9 +133,8 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
 	c.http = &flags.HTTPFlags{}
-	c.k8s = &k8sflags.K8SFlags{}
-	flags.Merge(c.flags, c.http.ClientFlags())
-	flags.Merge(c.flags, c.http.ServerFlags())
+	c.k8s = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.http.Flags())
 	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)

@@ -16,8 +16,8 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -119,8 +119,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
 
 	c.http = &flags.HTTPFlags{}
-	flags.Merge(c.flagSet, c.http.ClientFlags())
-	flags.Merge(c.flagSet, c.http.ServerFlags())
+	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 }
 
