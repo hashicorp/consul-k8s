@@ -103,7 +103,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "ingressGateways/Deployment: sets TLS flags when global.tls.enabled" {
+@test "ingressGateways/Deployment: sets TLS env variables when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
       -x templates/ingress-gateways-deployment.yaml  \
@@ -118,6 +118,23 @@ load _helpers
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_GRPC_ADDR") | .value' | tee /dev/stderr)
   [ "${actual}" = 'https://$(HOST_IP):8502' ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+}
+
+@test "ingressGateways/Deployment: sets TLS env variables in lifecycle sidecar when global.tls.enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -x templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'https://$(HOST_IP):8501' ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
@@ -203,6 +220,33 @@ load _helpers
       . | tee /dev/stderr |
       yq -s '.[0].spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
+}
+
+#--------------------------------------------------------------------
+# global.acls.manageSystemACLs
+
+@test "ingressGateways/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -s '[.[0].spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: lifecycle-sidecar uses -token-file flag when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-token-file=/consul/service/acl-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

@@ -477,7 +477,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "meshGateway/Deployment: sets TLS flags when global.tls.enabled" {
+@test "meshGateway/Deployment: sets TLS env variables when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
@@ -487,16 +487,31 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  local actual
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
   [ "${actual}" = 'https://$(HOST_IP):8501' ]
 
-    local actual
-    actual=$(echo $env | jq -r '. | select(.name == "CONSUL_GRPC_ADDR") | .value' | tee /dev/stderr)
-    [ "${actual}" = 'https://$(HOST_IP):8502' ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_GRPC_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'https://$(HOST_IP):8502' ]
 
-  actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
+}
+
+@test "meshGateway/Deployment: sets TLS env variables in lifecycle sidecar when global.tls.enabled" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
+  [ "${actual}" = 'https://$(HOST_IP):8501' ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
 @test "meshGateway/Deployment: can overwrite CA secret with the provided one" {

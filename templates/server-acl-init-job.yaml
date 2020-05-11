@@ -158,6 +158,23 @@ spec:
                 {{- end }}
                 {{- end }}
 
+                {{- if .Values.terminatingGateways.enabled }}
+                {{- if .Values.global.enableConsulNamespaces }}
+                {{- $root := . }}
+                {{- range .Values.terminatingGateways.gateways }}
+                {{- if (or $root.Values.terminatingGateways.defaults.consulNamespace .consulNamespace) }}
+                -terminating-gateway-name="{{ .name }}.{{ (default $root.Values.terminatingGateways.defaults.consulNamespace .consulNamespace) }}" \
+                {{- else }}
+                -terminating-gateway-name="{{ .name }}" \
+                {{- end }}
+                {{- end }}
+                {{- else }}
+                {{- range .Values.terminatingGateways.gateways }}
+                -terminating-gateway-name="{{ .name }}" \
+                {{- end }}
+                {{- end }}
+                {{- end }}
+
                 {{- if .Values.connectInject.aclBindingRuleSelector }}
                 -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }} \
                 {{- end }}

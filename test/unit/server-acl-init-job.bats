@@ -391,6 +391,112 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# terminatingGateways.enabled
+
+@test "serverACLInit/Job: terminating gateways acl options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true (single default gateway)" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: able to define multiple terminating gateways" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=gateway1' \
+      --set 'terminatingGateways.gateways[1].name=gateway2' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'contains("-terminating-gateway-name=\"gateway1\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'contains("-terminating-gateway-name=\"gateway2\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'indices("-terminating-gateway-name") | length' | tee /dev/stderr)
+  [ "${actual}" = 2 ]
+}
+
+@test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, default namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway.default\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, no default namespace set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'terminatingGateways.defaults.consulNamespace=' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: multiple terminating gateways with namespaces enabled provides the correct flag format" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'terminatingGateways.defaults.consulNamespace=default-namespace' \
+      --set 'terminatingGateways.gateways[0].name=gateway1' \
+      --set 'terminatingGateways.gateways[1].name=gateway2' \
+      --set 'terminatingGateways.gateways[1].consulNamespace=namespace2' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'contains("-terminating-gateway-name=\"gateway1.default-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'contains("-terminating-gateway-name=\"gateway2.namespace2\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'indices("-terminating-gateway-name") | length' | tee /dev/stderr)
+  [ "${actual}" = 2 ]
+}
+
+#--------------------------------------------------------------------
 # global.tls.enabled
 
 @test "serverACLInit/Job: sets TLS flags when global.tls.enabled" {

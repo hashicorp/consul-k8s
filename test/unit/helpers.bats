@@ -270,6 +270,6 @@ load _helpers
   diff=$(diff <(grep -r '\.Values\.global\.bootstrapACLs' templates/*) <(grep -r -e 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
   [ "$diff" = "" ]
 
-  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
+  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r -e 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
   [ "$diff" = "" ]
 }
