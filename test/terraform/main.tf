@@ -21,7 +21,7 @@ resource "google_container_cluster" "cluster" {
   initial_node_count = 3
   location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
-  node_version       = data.google_container_engine_versions.main.latest_node_version
+  node_version       = data.google_container_engine_versions.main.latest_master_version
 }
 
 resource "null_resource" "kubectl" {
