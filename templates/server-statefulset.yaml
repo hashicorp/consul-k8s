@@ -1,5 +1,7 @@
 # StatefulSet to run the actual Consul server cluster.
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if and .Values.global.federation.enabled (not .Values.global.tls.enabled) }}{{ fail "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" }}{{ end }}
+{{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -168,10 +170,8 @@ spec:
                 {{- if .Values.server.connect }}
                 -hcl="connect { enabled = true }" \
                 {{- end }}
-                {{- if .Values.global.federation }}
                 {{- if .Values.global.federation.enabled }}
                 -hcl="connect { enable_mesh_gateway_wan_federation = true }" \
-                {{- end }}
                 {{- end }}
                 {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \

@@ -680,11 +680,23 @@ load _helpers
 #--------------------------------------------------------------------
 # global.federation.enabled
 
+@test "server/StatefulSet: fails when federation.enabled=true and tls.enabled=false" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'global.federation.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" ]]
+}
+
 @test "server/StatefulSet: mesh gateway federation enabled when federation.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
       --set 'global.federation.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | join(" ") | contains("connect { enable_mesh_gateway_wan_federation = true }")' | tee /dev/stderr)
   [ "${actual}" = "true" ]

@@ -159,13 +159,11 @@ spec:
                 cat > /consul/service/service.hcl << EOF
                 service {
                   kind = "mesh-gateway"
-                  name = "{{ default "mesh-gateway" .Values.meshGateway.consulServiceName }}"
-                  {{- if .Values.global.federation }}
+                  name = "{{ .Values.meshGateway.consulServiceName }}"
                   {{- if .Values.global.federation.enabled }}
                   meta {
                     consul-wan-federation = "1"
                   }
-                  {{- end }}
                   {{- end }}
                   port = {{ .Values.meshGateway.containerPort }}
                   address = "${POD_IP}"
@@ -295,7 +293,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ default "mesh-gateway" .Values.meshGateway.consulServiceName }}\""]
+                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""]
 
         # lifecycle-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
