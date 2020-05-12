@@ -1,5 +1,9 @@
 ## Unreleased
 
+IMPROVEMENTS
+
+* ACLs: Restrict permissions for the `server-acl-init` job [[GH-454](https://github.com/hashicorp/consul-helm/pull/454)].
+
 ## 0.20.1 (Apr 27, 2020)
 
 BUG FIXES
