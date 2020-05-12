@@ -235,7 +235,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            {{- if .Values.meshGateway.wanAddress.useNodeName }}
+            {{- if eq .Values.meshGateway.wanAddress.source "NodeName" }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

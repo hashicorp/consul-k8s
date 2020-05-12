@@ -875,12 +875,18 @@ EOF
 
 @test "meshGateway/Deployment: service-init init container wanAddress.source=NodeName" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local obj=$(helm template \
       -x templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'meshGateway.wanAddress.source=NodeName' \
-      . | tee /dev/stderr |
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$obj" |
+      yq -r '.spec.template.spec.containers[0].env | map(select(.name == "NODE_NAME")) | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$obj" |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='WAN_ADDR="${NODE_NAME}"
