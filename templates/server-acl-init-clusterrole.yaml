@@ -13,19 +13,9 @@ metadata:
 rules:
   - apiGroups: [""]
     resources:
-      - pods
-    verbs:
-      - list
-  - apiGroups: [""]
-    resources:
       - secrets
     verbs:
       - create
-      - get
-  - apiGroups: ["apps"]
-    resources:
-      - statefulsets
-    verbs:
       - get
 {{- if .Values.connectInject.enabled }}
   - apiGroups: [""]
