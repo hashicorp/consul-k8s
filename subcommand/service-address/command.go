@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -103,7 +104,13 @@ func (c *Command) Run(args []string) int {
 					address = ingr.IP
 					return nil
 				} else if ingr.Hostname != "" {
-					address = ingr.Hostname
+					// todo: for now we're resolving this hostname to an IP
+					// because Consul doesn't yet support hostnames for its mesh
+					// gateway addresses. We will want to remove this when it's
+					// supported because in the case of EKS (the only cloud
+					// that returns hostnames for its LBs) the IPs may change
+					// so only the hostname is safe.
+					address, unretryableErr = resolveHostname(ingr.Hostname)
 					return nil
 				}
 			}
@@ -147,6 +154,26 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("-output-file must be set")
 	}
 	return nil
+}
+
+// resolveHostname returns the first ipv4 address for host.
+func resolveHostname(host string) (string, error) {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return "", fmt.Errorf("unable to resolve hostname: %s", err)
+	}
+	if len(ips) < 1 {
+		return "", fmt.Errorf("hostname %q had no resolveable IPs", host)
+	}
+
+	for _, ip := range ips {
+		v4 := ip.To4()
+		if v4 == nil {
+			continue
+		}
+		return ip.String(), nil
+	}
+	return "", fmt.Errorf("hostname %q had no ipv4 IPs", host)
 }
 
 // withErrLogger runs op and logs if op returns an error.
