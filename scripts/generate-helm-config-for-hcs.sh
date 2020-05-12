@@ -117,8 +117,6 @@ client:
   join: ${retry_join}
 connectInject:
   enabled: true
-syncCatalog:
-  enabled: true
 EOF
 
 echo
