@@ -1,10 +1,23 @@
 ## Unreleased
 
+## 0.21.0 (May 14, 2020)
+
 FEATURES
+
+* Add experimental support for multi-datacenter federation via
+
+    ```yaml
+    global:
+      federation:
+        enabled: true
+    ```
+  
+  This requires Consul 1.8.0+ (which as of this release is only available as
+  a beta. To use the beta, set `global.image: consul:1.8.0-beta1`)
 
 * Add new Helm value `global.federation.createFederationSecret` that will
   create a Kubernetes secret in primary datacenters that can be exported to secondary
-  datacenters to ease federation ([GH-447](https://github.com/hashicorp/consul-helm/pull/447)).
+  datacenters to help bootstrap secondary clusters for federation ([GH-447](https://github.com/hashicorp/consul-helm/pull/447)).
 
 IMPROVEMENTS
 
@@ -14,7 +27,7 @@ IMPROVEMENTS
 
 BUG FIXES
 
-* Fix missing NODE_NAME environment variable when setting `meshGateway.wanAddress.source=NodeName`
+* Fix missing `NODE_NAME` environment variable when setting `meshGateway.wanAddress.source=NodeName`
   [[GH-453](https://github.com/hashicorp/consul-helm/pull/453)].
 
 ## 0.20.1 (Apr 27, 2020)
