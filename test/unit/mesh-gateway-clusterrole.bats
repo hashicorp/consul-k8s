@@ -11,13 +11,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/ClusterRole: enabled with meshGateway, connectInject and client.grpc enabled" {
+@test "meshGateway/ClusterRole: enabled with meshGateway, connectInject enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -29,7 +28,6 @@ load _helpers
       -x templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
@@ -42,7 +40,6 @@ load _helpers
       -x templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.rules[0].resources[0]' | tee /dev/stderr)
@@ -70,7 +67,6 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.wanAddress.source=NodeIP' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.rules' | tee /dev/stderr)
   [ "${actual}" = "[]" ]
@@ -82,7 +78,6 @@ load _helpers
       -x templates/mesh-gateway-clusterrole.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'meshGateway.service.enabled=true' \

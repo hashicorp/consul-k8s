@@ -118,7 +118,6 @@ load _helpers
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=remote' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.data["proxy-defaults-config.json"]' | yq -r '.config_entries.bootstrap[0].mesh_gateway.mode' | tee /dev/stderr)
   [ "${actual}" = "remote" ]
@@ -132,7 +131,6 @@ load _helpers
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -146,7 +144,6 @@ load _helpers
       --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=null' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -160,7 +157,6 @@ load _helpers
       --set 'connectInject.centralConfig.proxyDefaults=""' \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.globalMode=remote' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq -r '.data["proxy-defaults-config.json"]' | yq -r '.config_entries.bootstrap[0].mesh_gateway.mode' | tee /dev/stderr)
   [ "${actual}" = "remote" ]

@@ -11,13 +11,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/ClusterRoleBinding: enabled with meshGateway, connectInject and client.grpc enabled" {
+@test "meshGateway/ClusterRoleBinding: enabled with meshGateway, connectInject enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-clusterrolebinding.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -29,7 +28,6 @@ load _helpers
       -x templates/mesh-gateway-clusterrolebinding.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       --name 'release-name' \
       . | tee /dev/stderr |
       yq -r '.subjects[0].name' | tee /dev/stderr)

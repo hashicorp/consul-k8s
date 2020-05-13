@@ -11,13 +11,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "meshGateway/ServiceAccount: enabled with meshGateway, connectInject and client.grpc enabled" {
+@test "meshGateway/ServiceAccount: enabled with meshGateway, connectInject enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/mesh-gateway-serviceaccount.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
