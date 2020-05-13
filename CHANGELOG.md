@@ -10,7 +10,7 @@ BREAKING CHANGES:
 FEATURES:
 
 * Add new `create-federation-secret` command that will create a Kubernetes secret
-  containing data needed for secondary datacenters to federate. [[GH-253](https://github.com/hashicorp/consul-k8s/pull/253)]
+  containing data needed for secondary datacenters to federate. This command should be run only in the primary datacenter. [[GH-253](https://github.com/hashicorp/consul-k8s/pull/253)]
 
 ## 0.14.0 (April 23, 2020)
 
