@@ -78,10 +78,41 @@ func TestRun_UnableToWriteToFile(t *testing.T) {
 		"Unable to write address to file: open /this/filepath/does/not/exist: no such file or directory")
 }
 
+func TestRun_UnresolvableHostname(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	k8sNS := "default"
+	svcName := "service-name"
+
+	// Create the service.
+	k8s := fake.NewSimpleClientset()
+	_, err := k8s.CoreV1().Services(k8sNS).Create(kubeLoadBalancerSvc(svcName, "", "unresolvable"))
+	require.NoError(err)
+
+	// Run command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: k8s,
+	}
+	tmpDir, err := ioutil.TempDir("", "")
+	require.NoError(err)
+	defer os.RemoveAll(tmpDir)
+	outputFile := filepath.Join(tmpDir, "address.txt")
+
+	responseCode := cmd.Run([]string{
+		"-k8s-namespace", k8sNS,
+		"-name", svcName,
+		"-output-file", outputFile,
+	})
+	require.Equal(1, responseCode)
+	require.Contains(ui.ErrorWriter.String(), "Unable to get service address: unable to resolve hostname:")
+}
+
 // Test running with different service types.
 func TestRun_ServiceTypes(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	// All services will have the name "service-name"
 	cases := map[string]struct {
@@ -103,8 +134,8 @@ func TestRun_ServiceTypes(t *testing.T) {
 			ExpAddress: "1.2.3.4",
 		},
 		"LoadBalancer Hostname": {
-			Service:    kubeLoadBalancerSvc("service-name", "", "example.com"),
-			ExpAddress: "example.com",
+			Service:    kubeLoadBalancerSvc("service-name", "", "localhost"),
+			ExpAddress: "127.0.0.1",
 		},
 		"LoadBalancer IP and hostname": {
 			Service:    kubeLoadBalancerSvc("service-name", "1.2.3.4", "example.com"),
@@ -140,7 +171,8 @@ func TestRun_ServiceTypes(t *testing.T) {
 	}
 
 	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, func(tt *testing.T) {
+			require := require.New(tt)
 			k8sNS := "default"
 			svcName := "service-name"
 
