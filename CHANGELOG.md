@@ -1,5 +1,17 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+
+* The `service-address` command now resolves load balancer hostnames to the
+  first IP. Previously it would use the hostname directly.
+  This is a stop-gap measure because Consul currently only supports
+  IP addresses for mesh gateways. [[GH-260](https://github.com/hashicorp/consul-k8s/pull/260)]
+
+FEATURES:
+
+* Add new `create-federation-secret` command that will create a Kubernetes secret
+  containing data needed for secondary datacenters to federate. This command should be run only in the primary datacenter. [[GH-253](https://github.com/hashicorp/consul-k8s/pull/253)]
+
 ## 0.14.0 (April 23, 2020)
 
 BREAKING CHANGES:
