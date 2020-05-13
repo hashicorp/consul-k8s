@@ -97,6 +97,9 @@ spec:
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
               consul-k8s server-acl-init \
+                -resource-prefix=${CONSUL_FULLNAME} \
+                -k8s-namespace={{ .Release.Namespace }} \
+
                 {{- if .Values.externalServers.enabled }}
                 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
                 {{- range .Values.externalServers.hosts }}
@@ -108,8 +111,7 @@ spec:
                 -server-address="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
                 {{- end }}
                 {{- end }}
-                -resource-prefix=${CONSUL_FULLNAME} \
-                -k8s-namespace={{ .Release.Namespace }} \
+
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
                 {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
@@ -119,43 +121,72 @@ spec:
                 -server-port=8501 \
                 {{- end }}
                 {{- end }}
+
                 {{- if .Values.syncCatalog.enabled }}
                 -create-sync-token=true \
                 {{- end }}
+
                 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
                 -allow-dns=true \
                 {{- end }}
+
                 {{- if .Values.connectInject.enabled }}
                 -create-inject-auth-method=true \
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
                 {{- end }}
                 {{- end }}
+
                 {{- if .Values.meshGateway.enabled }}
                 -create-mesh-gateway-token=true \
                 {{- end }}
+
+                {{- if .Values.ingressGateways.enabled }}
+                {{- if .Values.global.enableConsulNamespaces }}
+                {{- $root := . }}
+                {{- range .Values.ingressGateways.gateways }}
+                {{- if (or $root.Values.ingressGateways.defaults.consulNamespace .consulNamespace) }}
+                -ingress-gateway-name="{{ .name }}.{{ (default $root.Values.ingressGateways.defaults.consulNamespace .consulNamespace) }}" \
+                {{- else }}
+                -ingress-gateway-name="{{ .name }}" \
+                {{- end }}
+                {{- end }}
+                {{- else }}
+                {{- range .Values.ingressGateways.gateways }}
+                -ingress-gateway-name="{{ .name }}" \
+                {{- end }}
+                {{- end }}
+                {{- end }}
+
                 {{- if .Values.connectInject.aclBindingRuleSelector }}
                 -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }} \
                 {{- end }}
+
                 {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey) }}
                 -create-enterprise-license-token=true \
                 {{- end }}
+
                 {{- if .Values.client.snapshotAgent.enabled }}
                 -create-snapshot-agent-token=true \
                 {{- end }}
+
                 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
                 -create-client-token=false \
                 {{- end }}
+
                 {{- if .Values.global.acls.createReplicationToken }}
                 -create-acl-replication-token=true \
                 {{- end }}
+
                 {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
                 -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
                 {{- else if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
                 -acl-replication-token-file=/consul/acl/tokens/acl-replication-token \
                 {{- end }}
+
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \
+
                 {{- /* syncCatalog must be enabled to set sync flags */}}
                 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
                 {{- if .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
@@ -168,6 +199,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- end }}
+
                 {{- /* connectInject must be enabled to set inject flags */}}
                 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
                 -create-inject-namespace-token=true \
@@ -181,6 +213,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- end }}
+
                 {{- end }}
           resources:
             requests:

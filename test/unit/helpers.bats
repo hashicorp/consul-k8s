@@ -267,9 +267,9 @@ load _helpers
 @test "helper/bootstrapACLs: used alongside manageSystemACLs" {
   cd `chart_dir`
 
-  diff=$(diff <(grep -r '\.Values\.global\.bootstrapACLs' templates/*) <(grep -r 'or \.Values\.global\.acls\.manageSystemACLs \.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
+  diff=$(diff <(grep -r '\.Values\.global\.bootstrapACLs' templates/*) <(grep -r -e 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
   [ "$diff" = "" ]
 
-  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r 'or \.Values\.global\.acls\.manageSystemACLs \.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
+  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
   [ "$diff" = "" ]
 }

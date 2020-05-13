@@ -258,6 +258,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# meshGateway.enabled
+
+@test "serverACLInit/Job: mesh gateway acl option disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-mesh-gateway-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "serverACLInit/Job: mesh gateway acl option enabled with .meshGateway.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -265,10 +279,115 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-mesh-gateway-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# ingressGateways.enabled
+
+@test "serverACLInit/Job: ingress gateways acl options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true (single default gateway)" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: able to define multiple ingress gateways" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.gateways[0].name=gateway1' \
+      --set 'ingressGateways.gateways[1].name=gateway2' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'contains("-ingress-gateway-name=\"gateway1\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'contains("-ingress-gateway-name=\"gateway2\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'indices("-ingress-gateway-name") | length' | tee /dev/stderr)
+  [ "${actual}" = 2 ]
+}
+
+@test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true, namespaces enabled, default namespace" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway.default\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true, namespaces enabled, no default namespace set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'ingressGateways.defaults.consulNamespace=' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: multiple ingress gateways with namespaces enabled provides the correct flag format" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'ingressGateways.defaults.consulNamespace=default-namespace' \
+      --set 'ingressGateways.gateways[0].name=gateway1' \
+      --set 'ingressGateways.gateways[1].name=gateway2' \
+      --set 'ingressGateways.gateways[1].consulNamespace=namespace2' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'contains("-ingress-gateway-name=\"gateway1.default-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'contains("-ingress-gateway-name=\"gateway2.namespace2\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'indices("-ingress-gateway-name") | length' | tee /dev/stderr)
+  [ "${actual}" = 2 ]
 }
 
 #--------------------------------------------------------------------
