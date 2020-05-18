@@ -104,7 +104,7 @@ func (c *Command) init() {
 		"If true, all valid ClusterIP services in K8S are synced by default. If false, "+
 			"ClusterIP services are not synced to Consul.")
 	c.flags.BoolVar(&c.flagSyncLBEndpoints, "sync-lb-services-endpoints", false,
-		"If true, will sync in Consul ServiceTypeLoadBalancer endpoints. If false, "+
+		"If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. If false, "+
 			"LoadBalancer endpoints are not synced to Consul.")
 	c.flags.StringVar(&c.flagNodePortSyncType, "node-port-sync-type", "ExternalOnly",
 		"Defines the type of sync for NodePort services. Valid options are ExternalOnly, "+
