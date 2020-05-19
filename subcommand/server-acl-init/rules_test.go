@@ -160,6 +160,153 @@ namespace_prefix "" {
 	}
 }
 
+func TestIngressGatewayRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		GatewayName      string
+		GatewayNamespace string
+		EnableNamespaces bool
+		Expected         string
+	}{
+		{
+			"Namespaces are disabled",
+			"ingress-gateway",
+			"",
+			false,
+			`
+  service "ingress-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }`,
+		},
+		{
+			"Namespaces are enabled",
+			"gateway",
+			"default",
+			true,
+			`
+namespace "default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`,
+		},
+		{
+			"Namespaces are enabled, non-default namespace",
+			"gateway",
+			"non-default",
+			true,
+			`
+namespace "non-default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+
+			ingressGatewayRules, err := cmd.ingressGatewayRules(tt.GatewayName, tt.GatewayNamespace)
+
+			require.NoError(err)
+			require.Equal(tt.Expected, ingressGatewayRules)
+		})
+	}
+}
+
+func TestTerminatingGatewayRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		GatewayName      string
+		GatewayNamespace string
+		EnableNamespaces bool
+		Expected         string
+	}{
+		{
+			"Namespaces are disabled",
+			"terminating-gateway",
+			"",
+			false,
+			`
+  service "terminating-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }`,
+		},
+		{
+			"Namespaces are enabled",
+			"gateway",
+			"default",
+			true,
+			`
+namespace "default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`,
+		},
+		{
+			"Namespaces are enabled, non-default namespace",
+			"gateway",
+			"non-default",
+			true,
+			`
+namespace "non-default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+
+			terminatingGatewayRules, err := cmd.terminatingGatewayRules(tt.GatewayName, tt.GatewayNamespace)
+
+			require.NoError(err)
+			require.Equal(tt.Expected, terminatingGatewayRules)
+		})
+	}
+}
+
 func TestSyncRules(t *testing.T) {
 	cases := []struct {
 		Name                           string

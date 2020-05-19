@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,9 +102,9 @@ func (c *Command) Run(args []string) int {
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("failed to sync service", "output", string(output), "err", err)
+			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err)
 		} else {
-			logger.Info("successfully synced service", "output", string(output))
+			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
