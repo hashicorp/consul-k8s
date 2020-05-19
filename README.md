@@ -24,14 +24,23 @@ The versions required are:
 
 ## Usage
 
-For now, we do not host a chart repository. To use the charts, you must
-download this repository and unpack it into a directory. Either
-[download a tagged release](https://github.com/hashicorp/consul-helm/releases) or
-use `git checkout` to a tagged release.
-Assuming this repository was unpacked into the directory `consul-helm`, the chart can
-then be installed directly:
+Detailed installatiion instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
-    helm install ./consul-helm
+Add the HashiCorp Helm Repository:
+
+    $ helm repo add hashicorp https://helm.releases.hashicorp.com
+    hashicorp" has been added to your repositories
+
+Ensure you have access to the consul chart: 
+
+    $ helm search repo hashicorp/consul
+    NAME                CHART VERSION   APP VERSION DESCRIPTION
+    hashicorp/consul    0.20.1          1.7.2       Official HashiCorp Consul Chart
+
+Now you're ready to install Consul! To install Consul with the default configuration using Helm 3 run:
+
+    $ helm install consul hashicorp/consul --set global.name=consul
+    NAME: consul
 
 Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
