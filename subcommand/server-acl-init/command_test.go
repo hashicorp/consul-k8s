@@ -126,64 +126,100 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		TokenFlag  string
-		PolicyName string
-		PolicyDCs  []string
-		SecretName string
-		LocalToken bool
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		PolicyDCs   []string
+		SecretNames []string
+		LocalToken  bool
 	}{
 		{
-			TokenFlag:  "-create-client-token",
-			PolicyName: "client-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-client-acl-token",
+			TestName:    "Client token",
+			TokenFlags:  []string{"-create-client-token"},
+			PolicyNames: []string{"client-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Sync token",
+			TokenFlags:  []string{"-create-sync-token"},
+			PolicyNames: []string{"catalog-sync-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Inject namespace token",
+			TokenFlags:  []string{"-create-inject-namespace-token"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Enterprise license token",
+			TokenFlags:  []string{"-create-enterprise-license-token"},
+			PolicyNames: []string{"enterprise-license-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Snapshot agent token",
+			TokenFlags:  []string{"-create-snapshot-agent-token"},
+			PolicyNames: []string{"client-snapshot-agent-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Mesh gateway token",
+			TokenFlags:  []string{"-create-mesh-gateway-token"},
+			PolicyNames: []string{"mesh-gateway-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			LocalToken:  false,
+		},
+		{
+			TestName: "Ingress gateway tokens",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"gateway-ingress-gateway-token",
+				"another-gateway-ingress-gateway-token"},
+			PolicyDCs: []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+				resourcePrefix + "-gateway-ingress-gateway-acl-token",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 			LocalToken: true,
 		},
 		{
-			TokenFlag:  "-create-sync-token",
-			PolicyName: "catalog-sync-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+			TestName: "Terminating gateway tokens",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"gateway-terminating-gateway-token",
+				"another-gateway-terminating-gateway-token"},
+			PolicyDCs: []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+				resourcePrefix + "-gateway-terminating-gateway-acl-token",
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
 			LocalToken: true,
 		},
 		{
-			TokenFlag:  "-create-inject-namespace-token",
-			PolicyName: "connect-inject-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-connect-inject-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-enterprise-license-token",
-			PolicyName: "enterprise-license-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-enterprise-license-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-snapshot-agent-token",
-			PolicyName: "client-snapshot-agent-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-mesh-gateway-token",
-			PolicyName: "mesh-gateway-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
-			LocalToken: false,
-		},
-		{
-			TokenFlag:  "-create-acl-replication-token",
-			PolicyName: "acl-replication-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-acl-replication-acl-token",
-			LocalToken: false,
+			TestName:    "ACL replication token",
+			TokenFlags:  []string{"-create-acl-replication-token"},
+			PolicyNames: []string{"acl-replication-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+			LocalToken:  false,
 		},
 	}
 	for _, c := range cases {
-		t.Run(c.TokenFlag, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
 			require := require.New(t)
@@ -195,13 +231,13 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				clientset: k8s,
 			}
 			cmd.init()
-			cmdArgs := []string{
+			cmdArgs := append([]string{
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
-				c.TokenFlag,
-			}
+			}, c.TokenFlags...)
+
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -212,24 +248,27 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				Token:   bootToken,
 			})
 			require.NoError(err)
-			policy := policyExists(t, c.PolicyName, consul)
-			require.Equal(c.PolicyDCs, policy.Datacenters)
 
-			// Test that the token was created as a Kubernetes Secret.
-			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
-			require.NoError(err)
-			require.NotNil(tokenSecret)
-			token, ok := tokenSecret.Data["token"]
-			require.True(ok)
+			for i := range c.PolicyNames {
+				policy := policyExists(t, c.PolicyNames[i], consul)
+				require.Equal(c.PolicyDCs, policy.Datacenters)
 
-			// Test that the token has the expected policies in Consul.
-			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-			require.NoError(err)
-			require.Equal(c.PolicyName, tokenData.Policies[0].Name)
-			require.Equal(c.LocalToken, tokenData.Local)
+				// Test that the token was created as a Kubernetes Secret.
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+				require.NoError(err)
+				require.NotNil(tokenSecret)
+				token, ok := tokenSecret.Data["token"]
+				require.True(ok)
+
+				// Test that the token has the expected policies in Consul.
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+				require.NoError(err)
+				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+				require.Equal(c.LocalToken, tokenData.Local)
+			}
 
 			// Test that if the same command is run again, it doesn't error.
-			t.Run(c.TokenFlag+"-retried", func(t *testing.T) {
+			t.Run(c.TestName+"-retried", func(t *testing.T) {
 				ui := cli.NewMockUi()
 				cmd := Command{
 					UI:        ui,
@@ -248,57 +287,92 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		TokenFlag  string
-		PolicyName string
-		PolicyDCs  []string
-		SecretName string
-		LocalToken bool
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		PolicyDCs   []string
+		SecretNames []string
+		LocalToken  bool
 	}{
 		{
-			TokenFlag:  "-create-client-token",
-			PolicyName: "client-token-dc2",
-			PolicyDCs:  []string{"dc2"},
-			SecretName: resourcePrefix + "-client-acl-token",
+			TestName:    "Client token",
+			TokenFlags:  []string{"-create-client-token"},
+			PolicyNames: []string{"client-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Sync token",
+			TokenFlags:  []string{"-create-sync-token"},
+			PolicyNames: []string{"catalog-sync-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Inject namespace token",
+			TokenFlags:  []string{"-create-inject-namespace-token"},
+			PolicyNames: []string{"connect-inject-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Enterprise license token",
+			TokenFlags:  []string{"-create-enterprise-license-token"},
+			PolicyNames: []string{"enterprise-license-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Snapshot agent token",
+			TokenFlags:  []string{"-create-snapshot-agent-token"},
+			PolicyNames: []string{"client-snapshot-agent-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Mesh gateway token",
+			TokenFlags:  []string{"-create-mesh-gateway-token"},
+			PolicyNames: []string{"mesh-gateway-token-dc2"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			LocalToken:  false,
+		},
+		{
+			TestName: "Ingress gateway tokens",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{"ingress-ingress-gateway-token-dc2",
+				"gateway-ingress-gateway-token-dc2",
+				"another-gateway-ingress-gateway-token-dc2"},
+			PolicyDCs: []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+				resourcePrefix + "-gateway-ingress-gateway-acl-token",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
 			LocalToken: true,
 		},
 		{
-			TokenFlag:  "-create-sync-token",
-			PolicyName: "catalog-sync-token-dc2",
-			PolicyDCs:  []string{"dc2"},
-			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+			TestName: "Terminating gateway tokens",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-token-dc2",
+				"gateway-terminating-gateway-token-dc2",
+				"another-gateway-terminating-gateway-token-dc2"},
+			PolicyDCs: []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+				resourcePrefix + "-gateway-terminating-gateway-acl-token",
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
 			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-inject-namespace-token",
-			PolicyName: "connect-inject-token-dc2",
-			PolicyDCs:  []string{"dc2"},
-			SecretName: resourcePrefix + "-connect-inject-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-enterprise-license-token",
-			PolicyName: "enterprise-license-token-dc2",
-			PolicyDCs:  []string{"dc2"},
-			SecretName: resourcePrefix + "-enterprise-license-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-snapshot-agent-token",
-			PolicyName: "client-snapshot-agent-token-dc2",
-			PolicyDCs:  []string{"dc2"},
-			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
-			LocalToken: true,
-		},
-		{
-			TokenFlag:  "-create-mesh-gateway-token",
-			PolicyName: "mesh-gateway-token-dc2",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
-			LocalToken: false,
 		},
 	}
 	for _, c := range cases {
-		t.Run(c.TokenFlag, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
@@ -313,36 +387,36 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				clientset: k8s,
 			}
 			cmd.init()
-			cmdArgs := []string{
+			cmdArgs := append([]string{
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
 				"-server-address", strings.Split(secondaryAddr, ":")[0],
 				"-server-port", strings.Split(secondaryAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
-				c.TokenFlag,
-			}
+			}, c.TokenFlags...)
+
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
 			// Check that the expected policy was created.
 			retry.Run(t, func(r *retry.R) {
-				policy := policyExists(r, c.PolicyName, consul)
-				require.Equal(r, c.PolicyDCs, policy.Datacenters)
-			})
+				for i := range c.PolicyNames {
+					policy := policyExists(r, c.PolicyNames[i], consul)
+					require.Equal(r, c.PolicyDCs, policy.Datacenters)
 
-			retry.Run(t, func(r *retry.R) {
-				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
-				require.NoError(r, err)
-				require.NotNil(r, tokenSecret)
-				token, ok := tokenSecret.Data["token"]
-				require.True(r, ok)
+					// Test that the token was created as a Kubernetes Secret.
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+					require.NoError(r, err)
+					require.NotNil(r, tokenSecret)
+					token, ok := tokenSecret.Data["token"]
+					require.True(r, ok)
 
-				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-				require.NoError(r, err)
-				require.Equal(r, c.PolicyName, tokenData.Policies[0].Name)
-				require.Equal(r, c.LocalToken, tokenData.Local)
+					// Test that the token has the expected policies in Consul.
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+					require.NoError(r, err)
+					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+					require.Equal(r, c.LocalToken, tokenData.Local)
+				}
 			})
 		})
 	}
@@ -353,48 +427,80 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		TokenFlag  string
-		PolicyName string
-		SecretName string
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		SecretNames []string
 	}{
 		{
-			TokenFlag:  "-create-client-token",
-			PolicyName: "client-token",
-			SecretName: resourcePrefix + "-client-acl-token",
+			TestName:    "Client token",
+			TokenFlags:  []string{"-create-client-token"},
+			PolicyNames: []string{"client-token"},
+			SecretNames: []string{resourcePrefix + "-client-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-sync-token",
-			PolicyName: "catalog-sync-token",
-			SecretName: resourcePrefix + "-catalog-sync-acl-token",
+			TestName:    "Sync token",
+			TokenFlags:  []string{"-create-sync-token"},
+			PolicyNames: []string{"catalog-sync-token"},
+			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-inject-namespace-token",
-			PolicyName: "connect-inject-token",
-			SecretName: resourcePrefix + "-connect-inject-acl-token",
+			TestName:    "Inject token",
+			TokenFlags:  []string{"-create-inject-namespace-token"},
+			PolicyNames: []string{"connect-inject-token"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-enterprise-license-token",
-			PolicyName: "enterprise-license-token",
-			SecretName: resourcePrefix + "-enterprise-license-acl-token",
+			TestName:    "Enterprise license token",
+			TokenFlags:  []string{"-create-enterprise-license-token"},
+			PolicyNames: []string{"enterprise-license-token"},
+			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-snapshot-agent-token",
-			PolicyName: "client-snapshot-agent-token",
-			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
+			TestName:    "Snapshot agent token",
+			TokenFlags:  []string{"-create-snapshot-agent-token"},
+			PolicyNames: []string{"client-snapshot-agent-token"},
+			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-mesh-gateway-token",
-			PolicyName: "mesh-gateway-token",
-			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
+			TestName:    "Mesh gateway token",
+			TokenFlags:  []string{"-create-mesh-gateway-token"},
+			PolicyNames: []string{"mesh-gateway-token"},
+			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
 		},
 		{
-			TokenFlag:  "-create-acl-replication-token",
-			PolicyName: "acl-replication-token",
-			SecretName: resourcePrefix + "-acl-replication-acl-token",
+			TestName: "Ingress gateway tokens",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"gateway-ingress-gateway-token",
+				"another-gateway-ingress-gateway-token"},
+			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+				resourcePrefix + "-gateway-ingress-gateway-acl-token",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+		},
+		{
+			TestName: "Terminating gateway tokens",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"gateway-terminating-gateway-token",
+				"another-gateway-terminating-gateway-token"},
+			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+				resourcePrefix + "-gateway-terminating-gateway-acl-token",
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+		},
+		{
+			TestName:    "ACL replication token",
+			TokenFlags:  []string{"-create-acl-replication-token"},
+			PolicyNames: []string{"acl-replication-token"},
+			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 		},
 	}
 	for _, c := range cases {
-		t.Run(c.TokenFlag, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
@@ -407,14 +513,14 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 				UI:        ui,
 				clientset: k8s,
 			}
-			cmdArgs := []string{
+			cmdArgs := append([]string{
 				"-k8s-namespace", ns,
 				"-bootstrap-token-file", tokenFile,
 				"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix", resourcePrefix,
-				c.TokenFlag,
-			}
+			}, c.TokenFlags...)
+
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
@@ -426,21 +532,21 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 
 			// Check that the expected policy was created.
 			retry.Run(t, func(r *retry.R) {
-				policyExists(r, c.PolicyName, consul)
-			})
+				for i := range c.PolicyNames {
+					policyExists(r, c.PolicyNames[i], consul)
 
-			retry.Run(t, func(r *retry.R) {
-				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
-				require.NoError(r, err)
-				require.NotNil(r, tokenSecret)
-				token, ok := tokenSecret.Data["token"]
-				require.True(r, ok)
+					// Test that the token was created as a Kubernetes Secret.
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+					require.NoError(r, err)
+					require.NotNil(r, tokenSecret)
+					token, ok := tokenSecret.Data["token"]
+					require.True(r, ok)
 
-				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-				require.NoError(r, err)
-				require.Equal(r, c.PolicyName, tokenData.Policies[0].Name)
+					// Test that the token has the expected policies in Consul.
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+					require.NoError(r, err)
+					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+				}
 			})
 		})
 	}
@@ -1408,6 +1514,57 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 	agentPolicy := policyExists(t, "agent-token", consul)
 	// Should be a global policy.
 	require.Len(agentPolicy.Datacenters, 0)
+}
+
+func TestRun_GatewayErrors(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		flags []string
+	}{
+		"ingress empty name": {
+			flags: []string{"-ingress-gateway-name="},
+		},
+		"ingress namespace": {
+			flags: []string{"-ingress-gateway-name=name.namespace"},
+		},
+		"ingress dot": {
+			flags: []string{"-ingress-gateway-name=name."},
+		},
+		"terminating empty name": {
+			flags: []string{"-terminating-gateway-name="},
+		},
+		"terminating namespace": {
+			flags: []string{"-terminating-gateway-name=name.namespace"},
+		},
+		"terminating dot": {
+			flags: []string{"-terminating-gateway-name=name."},
+		},
+	}
+	for testName, c := range cases {
+		t.Run(testName, func(tt *testing.T) {
+
+			k8s, testSvr := completeSetup(tt)
+			defer testSvr.Stop()
+			require := require.New(tt)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := []string{
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+			}
+			cmdArgs = append(cmdArgs, c.flags...)
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(1, responseCode, ui.ErrorWriter.String())
+		})
+	}
 }
 
 // Set up test consul agent and kubernetes cluster.
