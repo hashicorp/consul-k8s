@@ -13,6 +13,12 @@ type rulesData struct {
 	SyncK8SNSMirroringPrefix       string
 }
 
+type gatewayRulesData struct {
+	rulesData
+	GatewayName      string
+	GatewayNamespace string
+}
+
 const snapshotAgentRules = `acl = "write"
 key "consul-snapshot/lock" {
    policy = "write"
@@ -121,6 +127,51 @@ namespace_prefix "" {
 	return c.renderRules(meshGatewayRulesTpl)
 }
 
+func (c *Command) ingressGatewayRules(name, namespace string) (string, error) {
+	ingressGatewayRulesTpl := `
+{{- if .EnableNamespaces }}
+namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+  service "{{ .GatewayName }}" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+`
+
+	return c.renderGatewayRules(ingressGatewayRulesTpl, name, namespace)
+}
+
+// Creating a separate terminating gateway rule function because
+// eventually this may need to be created with permissions for
+// all of the services it represents, though that is not part
+// of the initial implementation
+func (c *Command) terminatingGatewayRules(name, namespace string) (string, error) {
+	terminatingGatewayRulesTpl := `
+{{- if .EnableNamespaces }}
+namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+  service "{{ .GatewayName }}" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+`
+
+	return c.renderGatewayRules(terminatingGatewayRulesTpl, name, namespace)
+}
+
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
   node "k8s-sync" {
@@ -189,25 +240,41 @@ namespace_prefix "" {
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
+func (c *Command) rulesData() rulesData {
+	return rulesData{
+		EnableNamespaces:               c.flagEnableNamespaces,
+		ConsulSyncDestinationNamespace: c.flagConsulSyncDestinationNamespace,
+		EnableSyncK8SNSMirroring:       c.flagEnableSyncK8SNSMirroring,
+		SyncK8SNSMirroringPrefix:       c.flagSyncK8SNSMirroringPrefix,
+	}
+}
+
 func (c *Command) renderRules(tmpl string) (string, error) {
+	return c.renderRulesGeneric(tmpl, c.rulesData())
+}
+
+func (c *Command) renderGatewayRules(tmpl, gatewayName, gatewayNamespace string) (string, error) {
+	// Populate the data that will be used in the template.
+	// Not all templates will need all of the fields.
+	data := gatewayRulesData{
+		rulesData:        c.rulesData(),
+		GatewayName:      gatewayName,
+		GatewayNamespace: gatewayNamespace,
+	}
+
+	return c.renderRulesGeneric(tmpl, data)
+}
+
+func (c *Command) renderRulesGeneric(tmpl string, data interface{}) (string, error) {
 	// Check that it's a valid template
 	compiled, err := template.New("root").Parse(strings.TrimSpace(tmpl))
 	if err != nil {
 		return "", err
 	}
 
-	// Populate the data that will be used in the template.
-	// Not all templates will need all of the fields.
-	data := rulesData{
-		EnableNamespaces:               c.flagEnableNamespaces,
-		ConsulSyncDestinationNamespace: c.flagConsulSyncDestinationNamespace,
-		EnableSyncK8SNSMirroring:       c.flagEnableSyncK8SNSMirroring,
-		SyncK8SNSMirroringPrefix:       c.flagSyncK8SNSMirroringPrefix,
-	}
-
 	// Render the template
 	var buf bytes.Buffer
-	err = compiled.Execute(&buf, &data)
+	err = compiled.Execute(&buf, data)
 	if err != nil {
 		// Discard possible partial results on error return
 		return "", err

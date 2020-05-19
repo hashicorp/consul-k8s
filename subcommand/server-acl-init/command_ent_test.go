@@ -226,6 +226,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-create-inject-namespace-token",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
+				"-ingress-gateway-name=gw",
+				"-ingress-gateway-name=anothergw",
+				"-terminating-gateway-name=gw",
+				"-terminating-gateway-name=anothergw",
 			}
 			// Our second run, we're going to update from namespaces disabled to
 			// namespaces enabled with a single destination ns.
@@ -258,6 +262,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
+				"gw-ingress-gateway-token",
+				"anothergw-ingress-gateway-token",
+				"gw-terminating-gateway-token",
+				"anothergw-terminating-gateway-token",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -305,6 +313,10 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
 				"cross-namespace-policy",
+				"gw-ingress-gateway-token",
+				"anothergw-ingress-gateway-token",
+				"gw-terminating-gateway-token",
+				"anothergw-terminating-gateway-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -575,60 +587,86 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		TokenFlag  string
-		PolicyName string
-		PolicyDCs  []string
-		SecretName string
-		LocalToken bool
+		TokenFlags  []string
+		PolicyNames []string
+		PolicyDCs   []string
+		SecretNames []string
+		LocalToken  bool
 	}{
 		"client token": {
-			TokenFlag:  "-create-client-token",
-			PolicyName: "client-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-client-acl-token",
-			LocalToken: true,
+			TokenFlags:  []string{"-create-client-token"},
+			PolicyNames: []string{"client-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			LocalToken:  true,
 		},
 		"catalog-sync token": {
-			TokenFlag:  "-create-sync-token",
-			PolicyName: "catalog-sync-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-catalog-sync-acl-token",
-			LocalToken: false,
+			TokenFlags:  []string{"-create-sync-token"},
+			PolicyNames: []string{"catalog-sync-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			LocalToken:  false,
 		},
 		"connect-inject-namespace token": {
-			TokenFlag:  "-create-inject-namespace-token",
-			PolicyName: "connect-inject-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-connect-inject-acl-token",
-			LocalToken: false,
+			TokenFlags:  []string{"-create-inject-namespace-token"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
 		},
 		"enterprise-license token": {
-			TokenFlag:  "-create-enterprise-license-token",
-			PolicyName: "enterprise-license-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-enterprise-license-acl-token",
-			LocalToken: true,
+			TokenFlags:  []string{"-create-enterprise-license-token"},
+			PolicyNames: []string{"enterprise-license-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			LocalToken:  true,
 		},
 		"client-snapshot-agent token": {
-			TokenFlag:  "-create-snapshot-agent-token",
-			PolicyName: "client-snapshot-agent-token",
-			PolicyDCs:  []string{"dc1"},
-			SecretName: resourcePrefix + "-client-snapshot-agent-acl-token",
-			LocalToken: true,
+			TokenFlags:  []string{"-create-snapshot-agent-token"},
+			PolicyNames: []string{"client-snapshot-agent-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			LocalToken:  true,
 		},
 		"mesh-gateway token": {
-			TokenFlag:  "-create-mesh-gateway-token",
-			PolicyName: "mesh-gateway-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-mesh-gateway-acl-token",
-			LocalToken: false,
+			TokenFlags:  []string{"-create-mesh-gateway-token"},
+			PolicyNames: []string{"mesh-gateway-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			LocalToken:  false,
+		},
+		"ingress gateway tokens": {
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"gateway-ingress-gateway-token",
+				"another-gateway-ingress-gateway-token"},
+			PolicyDCs: []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+				resourcePrefix + "-gateway-ingress-gateway-acl-token",
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+			LocalToken: true,
+		},
+		"terminating gateway tokens": {
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"gateway-terminating-gateway-token",
+				"another-gateway-terminating-gateway-token"},
+			PolicyDCs: []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+				resourcePrefix + "-gateway-terminating-gateway-acl-token",
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+			LocalToken: true,
 		},
 		"acl-replication token": {
-			TokenFlag:  "-create-acl-replication-token",
-			PolicyName: "acl-replication-token",
-			PolicyDCs:  nil,
-			SecretName: resourcePrefix + "-acl-replication-acl-token",
-			LocalToken: false,
+			TokenFlags:  []string{"-create-acl-replication-token"},
+			PolicyNames: []string{"acl-replication-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+			LocalToken:  false,
 		},
 	}
 	for testName, c := range cases {
@@ -644,14 +682,14 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				clientset: k8s,
 			}
 			cmd.init()
-			cmdArgs := []string{
+			cmdArgs := append([]string{
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-enable-namespaces",
-				c.TokenFlag,
-			}
+			}, c.TokenFlags...)
+
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
@@ -662,24 +700,247 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				Token:   bootToken,
 			})
 			require.NoError(err)
-			policy := policyExists(t, c.PolicyName, consul)
-			require.Equal(c.PolicyDCs, policy.Datacenters)
 
-			// Test that the token was created as a Kubernetes Secret.
-			tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretName, metav1.GetOptions{})
-			require.NoError(err)
-			require.NotNil(tokenSecret)
-			token, ok := tokenSecret.Data["token"]
-			require.True(ok)
+			for i := range c.PolicyNames {
+				policy := policyExists(t, c.PolicyNames[i], consul)
+				require.Equal(c.PolicyDCs, policy.Datacenters)
 
-			// Test that the token has the expected policies in Consul.
-			tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-			require.NoError(err)
-			require.Equal(c.PolicyName, tokenData.Policies[0].Name)
-			require.Equal(c.LocalToken, tokenData.Local)
+				// Test that the token was created as a Kubernetes Secret.
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+				require.NoError(err)
+				require.NotNil(tokenSecret)
+				token, ok := tokenSecret.Data["token"]
+				require.True(ok)
+
+				// Test that the token has the expected policies in Consul.
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+				require.NoError(err)
+				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+				require.Equal(c.LocalToken, tokenData.Local)
+			}
 
 			// Test that if the same command is run again, it doesn't error.
 			t.Run(testName+"-retried", func(t *testing.T) {
+				ui := cli.NewMockUi()
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				cmd.init()
+				responseCode := cmd.Run(cmdArgs)
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
+			})
+		})
+	}
+}
+
+// Test the parsing the namespace from gateway names
+func TestRun_GatewayNamespaceParsing(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		TestName         string
+		TokenFlags       []string
+		PolicyNames      []string
+		ExpectedPolicies []string
+	}{
+		{
+			TestName: "Ingress gateway tokens, namespaces not provided",
+			TokenFlags: []string{"-ingress-gateway-name=ingress",
+				"-ingress-gateway-name=gateway",
+				"-ingress-gateway-name=another-gateway"},
+			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"gateway-ingress-gateway-token",
+				"another-gateway-ingress-gateway-token"},
+			ExpectedPolicies: []string{`
+namespace "default" {
+  service "ingress" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "default" {
+  service "another-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`},
+		},
+		{
+			TestName: "Ingress gateway tokens, namespaces provided",
+			TokenFlags: []string{"-ingress-gateway-name=ingress.",
+				"-ingress-gateway-name=gateway.namespace1",
+				"-ingress-gateway-name=another-gateway.namespace2"},
+			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"gateway-ingress-gateway-token",
+				"another-gateway-ingress-gateway-token"},
+			ExpectedPolicies: []string{`
+namespace "default" {
+  service "ingress" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "namespace1" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "namespace2" {
+  service "another-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}`},
+		},
+		{
+			TestName: "Terminating gateway tokens, namespaces not provided",
+			TokenFlags: []string{"-terminating-gateway-name=terminating",
+				"-terminating-gateway-name=gateway",
+				"-terminating-gateway-name=another-gateway"},
+			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"gateway-terminating-gateway-token",
+				"another-gateway-terminating-gateway-token"},
+			ExpectedPolicies: []string{`
+namespace "default" {
+  service "terminating" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "default" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "default" {
+  service "another-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`},
+		},
+		{
+			TestName: "Terminating gateway tokens, namespaces provided",
+			TokenFlags: []string{"-terminating-gateway-name=terminating.",
+				"-terminating-gateway-name=gateway.namespace1",
+				"-terminating-gateway-name=another-gateway.namespace2"},
+			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"gateway-terminating-gateway-token",
+				"another-gateway-terminating-gateway-token"},
+			ExpectedPolicies: []string{`
+namespace "default" {
+  service "terminating" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "namespace1" {
+  service "gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`, `
+namespace "namespace2" {
+  service "another-gateway" {
+     policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.TestName, func(t *testing.T) {
+			k8s, testSvr := completeEnterpriseSetup(t)
+			defer testSvr.Stop()
+			require := require.New(t)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmd.init()
+			cmdArgs := append([]string{
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-resource-prefix=" + resourcePrefix,
+				"-enable-namespaces=true",
+			}, c.TokenFlags...)
+
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the expected policy was created.
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+				Token:   bootToken,
+			})
+			require.NoError(err)
+
+			for i := range c.PolicyNames {
+				policy := policyExists(t, c.PolicyNames[i], consul)
+
+				fullPolicy, _, err := consul.ACL().PolicyRead(policy.ID, nil)
+				require.NoError(err)
+				require.Equal(c.ExpectedPolicies[i], fullPolicy.Rules)
+			}
+
+			// Test that if the same command is run again, it doesn't error.
+			t.Run(c.TestName+"-retried", func(t *testing.T) {
 				ui := cli.NewMockUi()
 				cmd := Command{
 					UI:        ui,

@@ -49,7 +49,9 @@ type Command struct {
 
 	flagCreateSnapshotAgentToken bool
 
-	flagCreateMeshGatewayToken bool
+	flagCreateMeshGatewayToken  bool
+	flagIngressGatewayNames     []string
+	flagTerminatingGatewayNames []string
 
 	// Flags to configure Consul connection
 	flagServerAddresses     []string
@@ -124,6 +126,14 @@ func (c *Command) init() {
 		"[Enterprise Only] Toggle for creating a token for the Consul snapshot agent deployment.")
 	c.flags.BoolVar(&c.flagCreateMeshGatewayToken, "create-mesh-gateway-token", false,
 		"Toggle for creating a token for a Connect mesh gateway.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagIngressGatewayNames), "ingress-gateway-name",
+		"Name of an ingress gateway that needs an acl token. May be specified multiple times. "+
+			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
+			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
+	c.flags.Var((*flags.AppendSliceValue)(&c.flagTerminatingGatewayNames), "terminating-gateway-name",
+		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
+			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
+			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times."+
@@ -138,7 +148,7 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
-	c.flags.StringVar(&c.flagConsulSyncDestinationNamespace, "consul-sync-destination-namespace", "default",
+	c.flags.StringVar(&c.flagConsulSyncDestinationNamespace, "consul-sync-destination-namespace", consulDefaultNamespace,
 		"[Enterprise Only] Indicates which Consul namespace that catalog sync will register services into. If "+
 			"'-enable-sync-k8s-namespace-mirroring' is true, this is not used.")
 	c.flags.BoolVar(&c.flagEnableSyncK8SNSMirroring, "enable-sync-k8s-namespace-mirroring", false, "[Enterprise Only] "+
@@ -146,7 +156,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagSyncK8SNSMirroringPrefix, "sync-k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul by catalog sync "+
 			"if mirroring is enabled.")
-	c.flags.StringVar(&c.flagConsulInjectDestinationNamespace, "consul-inject-destination-namespace", "default",
+	c.flags.StringVar(&c.flagConsulInjectDestinationNamespace, "consul-inject-destination-namespace", consulDefaultNamespace,
 		"[Enterprise Only] Indicates which Consul namespace that the Connect injector will register services into. If "+
 			"'-enable-inject-k8s-namespace-mirroring' is true, this is not used.")
 	c.flags.BoolVar(&c.flagEnableInjectK8SNSMirroring, "enable-inject-k8s-namespace-mirroring", false, "[Enterprise Only] "+
@@ -386,7 +396,7 @@ func (c *Command) Run(args []string) int {
 			},
 		}
 		consulNamespace := api.Namespace{
-			Name: "default",
+			Name: consulDefaultNamespace,
 			ACLs: &aclConfig,
 		}
 		_, _, err = consulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
@@ -491,6 +501,118 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if len(c.flagIngressGatewayNames) > 0 {
+		// Create a token for each ingress gateway name. Each gateway needs a
+		// separate token because users may need to attach different policies
+		// to each gateway token depending on what the services it represents
+		for _, name := range c.flagIngressGatewayNames {
+			if name == "" {
+				c.log.Error("Ingress gateway names cannot be empty")
+				return 1
+			}
+
+			// Parse optional namespace, erroring if a user
+			// provides a namespace when not enabling namespaces.
+			var namespace string
+			if c.flagEnableNamespaces {
+				parts := strings.SplitN(strings.TrimSpace(name), ".", 2)
+				if len(parts) > 1 {
+					// Name and namespace were provided
+					name = parts[0]
+
+					// Use default namespace if provided flag is of the
+					// form "name."
+					if parts[1] != "" {
+						namespace = parts[1]
+					} else {
+						namespace = consulDefaultNamespace
+					}
+				} else {
+					// Use the default Consul namespace
+					namespace = consulDefaultNamespace
+				}
+			} else if strings.ContainsAny(name, ".") {
+				c.log.Error("Gateway names shouldn't include a namespace if Consul namespaces aren't enabled",
+					"gateway-name", name)
+				return 1
+			}
+
+			// Define the gateway rules
+			ingressGatewayRules, err := c.ingressGatewayRules(name, namespace)
+			if err != nil {
+				c.log.Error("Error templating ingress gateway rules", "gateway-name", name,
+					"namespace", namespace, "err", err)
+				return 1
+			}
+
+			// The names in the Helm chart are specified by users and so may not contain
+			// the words "ingress-gateway". We need to create unique names for tokens
+			// across all gateway types and so must suffix with `-ingress-gateway`.
+			tokenName := fmt.Sprintf("%s-ingress-gateway", name)
+			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, consulClient)
+			if err != nil {
+				c.log.Error(err.Error())
+				return 1
+			}
+		}
+	}
+
+	if len(c.flagTerminatingGatewayNames) > 0 {
+		// Create a token for each terminating gateway name. Each gateway needs a
+		// separate token because users may need to attach different policies
+		// to each gateway token depending on what the services it represents
+		for _, name := range c.flagTerminatingGatewayNames {
+			if name == "" {
+				c.log.Error("Terminating gateway names cannot be empty")
+				return 1
+			}
+
+			// Parse optional namespace. This does not protect against a user
+			// that provides a namespace with namespaces not enabled.
+			var namespace string
+			if c.flagEnableNamespaces {
+				parts := strings.SplitN(strings.TrimSpace(name), ".", 2)
+				if len(parts) > 1 {
+					// Name and namespace were provided
+					name = parts[0]
+
+					// Use default namespace if provided flag is of the
+					// form "name."
+					if parts[1] != "" {
+						namespace = parts[1]
+					} else {
+						namespace = consulDefaultNamespace
+					}
+				} else {
+					// Use the default Consul namespace
+					namespace = consulDefaultNamespace
+				}
+			} else if strings.ContainsAny(name, ".") {
+				c.log.Error("Gateway names shouldn't include a namespace if Consul namespaces aren't enabled",
+					"gateway-name", name)
+				return 1
+			}
+
+			// Define the gateway rules
+			terminatingGatewayRules, err := c.terminatingGatewayRules(name, namespace)
+			if err != nil {
+				c.log.Error("Error templating terminating gateway rules", "gateway-name", name,
+					"namespace", namespace, "err", err)
+				return 1
+			}
+
+			// The names in the Helm chart are specified by users and so may not contain
+			// the words "ingress-gateway". We need to create unique names for tokens
+			// across all gateway types and so must suffix with `-terminating-gateway`.
+			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
+			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, consulClient)
+			if err != nil {
+				c.log.Error(err.Error())
+				return 1
+			}
+		}
+	}
+
 	if c.flagCreateInjectAuthMethod {
 		err := c.configureConnectInject(consulClient)
 		if err != nil {
@@ -577,17 +699,6 @@ func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }
 
-const synopsis = "Initialize ACLs on Consul servers and other components."
-const help = `
-Usage: consul-k8s server-acl-init [options]
-
-  Bootstraps servers with ACLs and creates policies and ACL tokens for other
-  components as Kubernetes Secrets.
-  It will run indefinitely until all tokens have been created. It is idempotent
-  and safe to run multiple times.
-
-`
-
 // consulDatacenter returns the current datacenter name using the
 // /agent/self API endpoint.
 func (c *Command) consulDatacenter(client *api.Client) (string, error) {
@@ -639,3 +750,15 @@ func (c *Command) createAnonymousPolicy() bool {
 			// cross-dc.
 			(c.flagCreateInjectAuthMethod && c.flagCreateACLReplicationToken))
 }
+
+const consulDefaultNamespace = "default"
+const synopsis = "Initialize ACLs on Consul servers and other components."
+const help = `
+Usage: consul-k8s server-acl-init [options]
+
+  Bootstraps servers with ACLs and creates policies and ACL tokens for other
+  components as Kubernetes Secrets.
+  It will run indefinitely until all tokens have been created. It is idempotent
+  and safe to run multiple times.
+
+`
