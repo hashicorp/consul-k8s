@@ -298,10 +298,9 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	if t.LoadBalancerEndpointsSync {
-		return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP || svc.Spec.Type == apiv1.ServiceTypeLoadBalancer
-	}
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort ||
+		svc.Spec.Type == apiv1.ServiceTypeClusterIP ||
+		(t.LoadBalancerEndpointsSync && svc.Spec.Type == apiv1.ServiceTypeLoadBalancer)
 }
 
 // generateRegistrations generates the necessary Consul registrations for
