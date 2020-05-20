@@ -1,5 +1,11 @@
 ## Unreleased
 
+BREAKING CHANGES:
+
+* Mesh Gateway: `meshGateway.enableHealthChecks` is no longer supported. This config
+  option was to work around an issue where mesh gateways would not listen on their
+  bind ports until a Connect service was registered. This issue was fixed in Consul 1.6.2. ([GH-464](https://github.com/hashicorp/consul-helm/pull/464))
+
 ## 0.21.0 (May 14, 2020)
 
 FEATURES

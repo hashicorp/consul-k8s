@@ -266,7 +266,6 @@ spec:
             - connect
             - envoy
             - -mesh-gateway
-          {{- if .Values.meshGateway.enableHealthChecks }}
           livenessProbe:
             tcpSocket:
               port: {{ .Values.meshGateway.containerPort }}
@@ -283,7 +282,6 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 5
-          {{- end }}
           ports:
             - name: gateway
               containerPort: {{ .Values.meshGateway.containerPort }}
