@@ -963,11 +963,6 @@ meshGateway:
   # agent.
   hostPort: null
 
-  # If there are no connect-enabled services running, then the gateway
-  # will fail health checks. You may disable health checks as a temporary
-  # workaround.
-  enableHealthChecks: true
-
   resources: |
     requests:
       memory: "128Mi"
