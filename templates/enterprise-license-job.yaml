@@ -99,6 +99,13 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
           {{- end }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
       {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
       initContainers:
       - name: ent-license-acl-init
@@ -110,6 +117,13 @@ spec:
             consul-k8s acl-init \
               -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
       {{- end }}
 {{- end }}
 {{- end }}

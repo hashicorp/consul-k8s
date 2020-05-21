@@ -52,5 +52,12 @@ spec:
               curl -s -X DELETE --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
                 https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-server-cert \
                 -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
+          resources:
+            requests:
+              memory: "25Mi"
+              cpu: "50m"
+            limits:
+              memory: "25Mi"
+              cpu: "50m"
 {{- end }}
 {{- end }}

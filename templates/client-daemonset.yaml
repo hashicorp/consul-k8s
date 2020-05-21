@@ -317,6 +317,13 @@ spec:
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
       {{- end }}
       {{- if and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt) }}
       - name: client-tls-init
@@ -348,6 +355,13 @@ spec:
           - name: consul-ca-key
             mountPath: /consul/tls/ca/key
             readOnly: true
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
       {{- end }}
       {{- end }}
       {{- if .Values.client.nodeSelector }}

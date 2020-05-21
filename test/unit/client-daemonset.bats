@@ -150,16 +150,16 @@ load _helpers
 #--------------------------------------------------------------------
 # resources
 
-@test "client/DaemonSet: no resources defined by default" {
+@test "client/DaemonSet: resources defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
-@test "client/DaemonSet: resources can be set" {
+@test "client/DaemonSet: resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
@@ -170,7 +170,7 @@ load _helpers
 }
 
 # Test support for the deprecated method of setting a YAML string.
-@test "client/DaemonSet: resources can be set with string" {
+@test "client/DaemonSet: resources can be overridden with string" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
