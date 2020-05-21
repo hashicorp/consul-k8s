@@ -475,59 +475,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// address assigned (not hostnames).
 	// If LoadBalancerEndpointsSync is true sync LB endpoints instead of loadbalancer ingress.
 	case apiv1.ServiceTypeLoadBalancer:
-		seen := map[string]struct{}{}
 		if t.LoadBalancerEndpointsSync {
-			if t.endpointsMap == nil {
-				return
-			}
-
-			endpoints := t.endpointsMap[key]
-			if endpoints == nil {
-				return
-			}
-
-			for _, subset := range endpoints.Subsets {
-				// if LoadBalancerEndpointsSync is true use the endpoint port instead
-				// of the service port because we're registering each endpoint
-				// as a separate service instance.
-				epPort := baseService.Port
-				if overridePortName != "" {
-					// If we're supposed to use a specific named port, find it.
-					for _, p := range subset.Ports {
-						if overridePortName == p.Name {
-							epPort = int(p.Port)
-							break
-						}
-					}
-				} else if overridePortNumber == 0 {
-					// Otherwise we'll just use the first port in the list
-					// (unless the port number was overridden by an annotation).
-					for _, p := range subset.Ports {
-						epPort = int(p.Port)
-						break
-					}
-				}
-				for _, subsetAddr := range subset.Addresses {
-					addr := subsetAddr.IP
-					if addr == "" {
-						continue
-					}
-					if _, ok := seen[addr]; ok {
-						continue
-					}
-					seen[addr] = struct{}{}
-
-					r := baseNode
-					rs := baseService
-					r.Service = &rs
-					r.Service.ID = serviceID(r.Service.Service, addr)
-					r.Service.Address = addr
-					r.Service.Port = epPort
-
-					t.consulMap[key] = append(t.consulMap[key], &r)
-				}
-			}
+			t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, false)
 		} else {
+			seen := map[string]struct{}{}
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
 				addr := ingress.IP
 				if addr == "" {
@@ -626,63 +577,74 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For ClusterIP services, we register a service instance
 	// for each endpoint.
 	case apiv1.ServiceTypeClusterIP:
-		if t.endpointsMap == nil {
-			return
-		}
+		t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, true)
+	}
+}
 
-		endpoints := t.endpointsMap[key]
-		if endpoints == nil {
-			return
-		}
+func (t *ServiceResource) registerServiceInstance(
+	baseNode consulapi.CatalogRegistration,
+	baseService consulapi.AgentService,
+	key string,
+	overridePortName string,
+	overridePortNumber int,
+	useHostname bool) {
 
-		seen := map[string]struct{}{}
-		for _, subset := range endpoints.Subsets {
-			// For ClusterIP services, we use the endpoint port instead
-			// of the service port because we're registering each endpoint
-			// as a separate service instance.
-			epPort := baseService.Port
-			if overridePortName != "" {
-				// If we're supposed to use a specific named port, find it.
-				for _, p := range subset.Ports {
-					if overridePortName == p.Name {
-						epPort = int(p.Port)
-						break
-					}
-				}
-			} else if overridePortNumber == 0 {
-				// Otherwise we'll just use the first port in the list
-				// (unless the port number was overridden by an annotation).
-				for _, p := range subset.Ports {
+	if t.endpointsMap == nil {
+		return
+	}
+
+	endpoints := t.endpointsMap[key]
+	if endpoints == nil {
+		return
+	}
+
+	seen := map[string]struct{}{}
+	for _, subset := range endpoints.Subsets {
+		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
+		// of the service port because we're registering each endpoint
+		// as a separate service instance.
+		epPort := baseService.Port
+		if overridePortName != "" {
+			// If we're supposed to use a specific named port, find it.
+			for _, p := range subset.Ports {
+				if overridePortName == p.Name {
 					epPort = int(p.Port)
 					break
 				}
 			}
-			for _, subsetAddr := range subset.Addresses {
-				addr := subsetAddr.IP
-				if addr == "" {
-					addr = subsetAddr.Hostname
-				}
-				if addr == "" {
-					continue
-				}
-
-				// Its not clear whether K8S guarantees ready addresses to
-				// be unique so we maintain a set to prevent duplicates just
-				// in case.
-				if _, ok := seen[addr]; ok {
-					continue
-				}
-				seen[addr] = struct{}{}
-
-				r := baseNode
-				rs := baseService
-				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
-				r.Service.Address = addr
-				r.Service.Port = epPort
-
-				t.consulMap[key] = append(t.consulMap[key], &r)
+		} else if overridePortNumber == 0 {
+			// Otherwise we'll just use the first port in the list
+			// (unless the port number was overridden by an annotation).
+			for _, p := range subset.Ports {
+				epPort = int(p.Port)
+				break
 			}
+		}
+		for _, subsetAddr := range subset.Addresses {
+			addr := subsetAddr.IP
+			if addr == "" && useHostname {
+				addr = subsetAddr.Hostname
+			}
+			if addr == "" {
+				continue
+			}
+
+			// Its not clear whether K8S guarantees ready addresses to
+			// be unique so we maintain a set to prevent duplicates just
+			// in case.
+			if _, ok := seen[addr]; ok {
+				continue
+			}
+			seen[addr] = struct{}{}
+
+			r := baseNode
+			rs := baseService
+			r.Service = &rs
+			r.Service.ID = serviceID(r.Service.Service, addr)
+			r.Service.Address = addr
+			r.Service.Port = epPort
+
+			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
 }
