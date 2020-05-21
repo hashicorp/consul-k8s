@@ -163,10 +163,21 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/client-daemonset.yaml  \
-      --set 'client.resources=foo' \
+      --set 'client.resources.foo=bar' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = "foo" ]
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+# Test support for the deprecated method of setting a YAML string.
+@test "client/DaemonSet: resources can be set with string" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml  \
+      --set 'client.resources=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }
 
 #--------------------------------------------------------------------

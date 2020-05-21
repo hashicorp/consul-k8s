@@ -96,10 +96,21 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
-      --set 'server.resources=foo' \
+      --set 'server.resources.foo=bar' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = "foo" ]
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+# Test support for the deprecated method of setting a YAML string.
+@test "server/StatefulSet: resources can be set with string" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-statefulset.yaml  \
+      --set 'server.resources=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }
 
 #--------------------------------------------------------------------
