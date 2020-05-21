@@ -212,7 +212,11 @@ spec:
           image: {{ .Values.meshGateway.imageEnvoy | quote }}
           {{- if .Values.meshGateway.resources }}
           resources:
+            {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
             {{ tpl .Values.meshGateway.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.meshGateway.resources | nindent 12 }}
+            {{- end }}
           {{- end }}
           volumeMounts:
           - name: consul-bin
