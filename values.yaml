@@ -251,12 +251,16 @@ server:
   # via the extraConfig setting.
   connect: true
 
-  # Resource requests, limits, etc. for the server cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec.
-  # By default no direct resource request is made.
+  # Resource settings for Server agents.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
-  #       YAML map.
-  resources: null
+  # YAML map.
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
 
   # updatePartition is used to control a careful rolling update of Consul
   # servers. This should be done particularly when changing the version
@@ -411,12 +415,16 @@ client:
   # also changes the clients' advertised IP to the hostIP rather than podIP.
   exposeGossipPorts: false
 
-  # Resource requests, limits, etc. for the client cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec.
-  # By default no direct resource request is made.
+  # Resource settings for Client agents.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
-  #       YAML map.
-  resources: null
+  # YAML map.
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
 
   # extraConfig is a raw string of extra configuration to set with the
   # client. This should be JSON.
@@ -511,6 +519,15 @@ client:
     configSecret:
       secretName: null
       secretKey: null
+
+    # Resource settings for snapshot agent pods.
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
@@ -689,6 +706,15 @@ syncCatalog:
   #   beta.kubernetes.io/arch: amd64
   nodeSelector: null
 
+  # Resource settings for sync catalog pods.
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "50Mi"
+      cpu: "50m"
+
   # Log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   logLevel: info
 
@@ -707,6 +733,15 @@ connectInject:
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
   imageConsul: null
+
+  # Resource settings for connect inject pods.
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "50Mi"
+      cpu: "50m"
 
   # The Docker image for envoy to use as the proxy sidecar when performing
   # Connect injection. If using Consul 1.7+, the envoy version must be 1.13+.
@@ -967,14 +1002,14 @@ meshGateway:
 
   # Resource settings for mesh gateway pods.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
-  #       YAML map.
+  # YAML map.
   resources:
     requests:
-      memory: "128Mi"
-      cpu: "250m"
+      memory: "100Mi"
+      cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "500m"
+      memory: "100Mi"
+      cpu: "100m"
 
   # By default, we set an anti affinity so that two gateway pods won't be
   # on the same node. NOTE: Gateways require that Consul client agents are
