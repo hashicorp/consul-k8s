@@ -21,9 +21,14 @@ type initContainerCommandData struct {
 	// WriteServiceDefaults controls whether a service-defaults config is
 	// written for this service.
 	WriteServiceDefaults bool
-	Upstreams            []initContainerCommandUpstreamData
-	Tags                 string
-	Meta                 map[string]string
+	// ConsulNamespace is the Consul namespace to register the service
+	// and proxy in. An empty string indicates namespaces are not
+	// enabled in Consul (necessary for OSS).
+	ConsulNamespace           string
+	NamespaceMirroringEnabled bool
+	Upstreams                 []initContainerCommandUpstreamData
+	Tags                      string
+	Meta                      map[string]string
 
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
@@ -31,15 +36,16 @@ type initContainerCommandData struct {
 }
 
 type initContainerCommandUpstreamData struct {
-	Name       string
-	LocalPort  int32
-	Datacenter string
-	Query      string
+	Name                    string
+	LocalPort               int32
+	ConsulUpstreamNamespace string
+	Datacenter              string
+	Query                   string
 }
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	protocol := h.DefaultProtocol
 	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
 		protocol = annoProtocol
@@ -50,13 +56,16 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	// would then override any global proxy-defaults config. Now, we only
 	// write the config if a protocol is explicitly set.
 	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
+
 	data := initContainerCommandData{
-		ServiceName:          pod.Annotations[annotationService],
-		ProxyServiceName:     fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
-		ServiceProtocol:      protocol,
-		AuthMethod:           h.AuthMethod,
-		WriteServiceDefaults: writeServiceDefaults,
-		ConsulCACert:         h.ConsulCACert,
+		ServiceName:               pod.Annotations[annotationService],
+		ProxyServiceName:          fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
+		ServiceProtocol:           protocol,
+		AuthMethod:                h.AuthMethod,
+		WriteServiceDefaults:      writeServiceDefaults,
+		ConsulNamespace:           h.consulNamespace(k8sNamespace),
+		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
+		ConsulCACert:              h.ConsulCACert,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -86,7 +95,7 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		// this in an HCL config file and HCL arrays are json formatted.
 		jsonTags, err := json.Marshal(tags)
 		if err != nil {
-			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
+			h.Log.Error("Error json marshaling tags", "err", err, "Tags", tags)
 		} else {
 			data.Tags = string(jsonTags)
 		}
@@ -105,14 +114,25 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 		for _, raw := range strings.Split(raw, ",") {
 			parts := strings.SplitN(raw, ":", 3)
 
-			var datacenter, service_name, prepared_query string
+			var datacenter, service_name, prepared_query, namespace string
 			var port int32
-			if parts[0] == "prepared_query" {
+			if strings.TrimSpace(parts[0]) == "prepared_query" {
 				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
 				prepared_query = strings.TrimSpace(parts[1])
 			} else {
 				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
-				service_name = strings.TrimSpace(parts[0])
+
+				// Parse the namespace if provided
+				if data.ConsulNamespace != "" {
+					pieces := strings.SplitN(parts[0], ".", 2)
+					service_name = pieces[0]
+
+					if len(pieces) > 1 {
+						namespace = pieces[1]
+					}
+				} else {
+					service_name = strings.TrimSpace(parts[0])
+				}
 
 				// parse the optional datacenter
 				if len(parts) > 2 {
@@ -121,12 +141,19 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 			}
 
 			if port > 0 {
-				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
+				upstream := initContainerCommandUpstreamData{
 					Name:       service_name,
 					LocalPort:  port,
 					Datacenter: datacenter,
 					Query:      prepared_query,
-				})
+				}
+
+				// Add namespace to upstream
+				if namespace != "" {
+					upstream.ConsulUpstreamNamespace = namespace
+				}
+
+				data.Upstreams = append(data.Upstreams, upstream)
 			}
 		}
 	}
@@ -225,6 +252,9 @@ services {
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  {{- if .ConsulNamespace }}
+  namespace = "{{ .ConsulNamespace }}"
+  {{- end }}
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
@@ -253,6 +283,9 @@ services {
       destination_type = "prepared_query" 
       destination_name = "{{ .Query}}"
       {{- end}}
+      {{- if .ConsulUpstreamNamespace }}
+      destination_namespace = "{{ .ConsulUpstreamNamespace }}"
+      {{- end}}
       local_bind_port = {{ .LocalPort }}
       {{- if .Datacenter }}
       datacenter = "{{ .Datacenter }}"
@@ -279,6 +312,9 @@ services {
   name = "{{ .ServiceName }}"
   address = "${POD_IP}"
   port = {{ .ServicePort }}
+  {{- if .ConsulNamespace }}
+  namespace = "{{ .ConsulNamespace }}"
+  {{- end }}
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
@@ -298,23 +334,40 @@ cat <<EOF >/consul/connect-inject/service-defaults.hcl
 kind = "service-defaults"
 name = "{{ .ServiceName }}"
 protocol = "{{ .ServiceProtocol }}"
+{{- if .ConsulNamespace }}
+namespace = "{{ .ConsulNamespace }}"
+{{- end }}
 EOF
 {{- end }}
+
 {{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
   -token-sink-file="/consul/connect-inject/acl-token" \
+  {{- if.ConsulNamespace }}
+  {{- if .NamespaceMirroringEnabled }}
+  {{- /* If namespace mirroring is enabled, the auth method is
+         defined in the default namespace */}}
+  -namespace="default" \
+  {{- else }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 {{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
        as non-root user consul-k8s. */}}
 chmod 444 /consul/connect-inject/acl-token
 {{- end }}
+
 {{- if .WriteServiceDefaults }}
 {{- /* We use -cas and -modify-index 0 so that if a service-defaults config
        already exists for this service, we don't override it */}}
 /bin/consul config write -cas -modify-index 0 \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   /consul/connect-inject/service-defaults.hcl || true
 {{- end }}
@@ -323,6 +376,9 @@ chmod 444 /consul/connect-inject/acl-token
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
@@ -330,6 +386,9 @@ chmod 444 /consul/connect-inject/acl-token
   -proxy-id="${PROXY_SERVICE_ID}" \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 

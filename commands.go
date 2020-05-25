@@ -4,10 +4,13 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
+	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdLifecycleSidecar "github.com/hashicorp/consul-k8s/subcommand/lifecycle-sidecar"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
+	cmdServiceAddress "github.com/hashicorp/consul-k8s/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
 	"github.com/hashicorp/consul-k8s/version"
@@ -45,8 +48,20 @@ func init() {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
 		},
 
+		"service-address": func() (cli.Command, error) {
+			return &cmdServiceAddress.Command{UI: ui}, nil
+		},
+
+		"get-consul-client-ca": func() (cli.Command, error) {
+			return &cmdGetConsulClientCA.Command{UI: ui}, nil
+		},
+
 		"version": func() (cli.Command, error) {
 			return &cmdVersion.Command{UI: ui, Version: version.GetHumanVersion()}, nil
+		},
+
+		"create-federation-secret": func() (cli.Command, error) {
+			return &cmdCreateFederationSecret.Command{UI: ui}, nil
 		},
 	}
 }

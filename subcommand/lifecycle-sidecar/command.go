@@ -4,16 +4,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
-	"github.com/hashicorp/consul/command/services"
-	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
-	"github.com/prometheus/common/log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
+	"github.com/prometheus/common/log"
 )
 
 type Command struct {
@@ -21,20 +21,23 @@ type Command struct {
 
 	http              *flags.HTTPFlags
 	flagServiceConfig string
-	flagSyncPeriod    string
+	flagConsulBinary  string
+	flagSyncPeriod    time.Duration
 	flagSet           *flag.FlagSet
 	flagLogLevel      string
 
-	once         sync.Once
-	help         string
-	consulClient *api.Client
-	sigCh        chan os.Signal
+	consulCommand []string
+
+	once  sync.Once
+	help  string
+	sigCh chan os.Signal
 }
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagServiceConfig, "service-config", "", "Path to the service config file")
-	c.flagSet.StringVar(&c.flagSyncPeriod, "sync-period", "10s", "Time between syncing the service registration. Defaults to 10s.")
+	c.flagSet.StringVar(&c.flagConsulBinary, "consul-binary", "consul", "Path to a consul binary")
+	c.flagSet.DurationVar(&c.flagSyncPeriod, "sync-period", 10*time.Second, "Time between syncing the service registration. Defaults to 10s.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\". Defaults to info.")
@@ -43,7 +46,14 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
 	c.help = flags.Usage(help, c.flagSet)
-	c.sigCh = make(chan os.Signal, 1)
+
+	// Wait on an interrupt to exit. This channel must be initialized before
+	// Run() is called so that there are no race conditions where the channel
+	// is not defined.
+	if c.sigCh == nil {
+		c.sigCh = make(chan os.Signal, 1)
+		signal.Notify(c.sigCh, os.Interrupt)
+	}
 }
 
 // Run continually re-registers the service with Consul.
@@ -56,41 +66,27 @@ func (c *Command) Run(args []string) int {
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
-	syncPeriod, logLevel, err := c.validateFlags()
+
+	err := c.validateFlags()
 	if err != nil {
 		c.UI.Error("Error: " + err.Error())
 		return 1
 	}
+
 	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  logLevel,
+		Level:  hclog.LevelFromString(c.flagLogLevel),
 		Output: os.Stderr,
 	})
 
-	// Set up Consul client (may already exist in tests).
-	if c.consulClient == nil {
-		var err error
-		c.consulClient, err = c.http.APIClient()
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating Consul client: %s", err))
-			return 1
-		}
-	}
+	// Log initial configuration
+	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
+		"consul-binary", c.flagConsulBinary,
+		"sync-period", c.flagSyncPeriod,
+		"log-level", c.flagLogLevel)
 
-	// This config file should have been written by the init Pod.
-	// Its existence is checked in validateFlags().
-	svcs, err := services.ServicesFromFiles([]string{c.flagServiceConfig})
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error: %s", err))
-		return 1
-	}
-	if len(svcs) != 2 {
-		c.UI.Error(fmt.Sprintf(
-			"Error: expected 2 services to be defined in %s, found %d", c.flagServiceConfig, len(svcs)))
-		return 1
-	}
-
-	// Set up channel for graceful SIGINT shutdown.
-	signal.Notify(c.sigCh, os.Interrupt)
+	c.consulCommand = []string{"services", "register"}
+	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
+	c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
 
 	// The main work loop. We continually re-register our service every
 	// syncPeriod. Consul is smart enough to know when the service hasn't changed
@@ -100,18 +96,19 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		for _, svc := range svcs {
-			err := c.consulClient.Agent().ServiceRegister(svc)
-			if err != nil {
-				logger.Error("failed to sync service", "id", svc.ID, "err", err)
-			} else {
-				logger.Info("successfully synced service", "id", svc.ID)
-			}
+		cmd := exec.Command(c.flagConsulBinary, c.consulCommand...)
+
+		// Run the command and record the stdout and stderr output
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			logger.Error("failed to sync service", "output", string(output), "err", err)
+		} else {
+			logger.Info("successfully synced service", "output", string(output))
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
 		select {
-		case <-time.After(syncPeriod):
+		case <-time.After(c.flagSyncPeriod):
 			continue
 		case <-c.sigCh:
 			log.Info("SIGINT received, shutting down")
@@ -120,29 +117,48 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
-// validateFlags validates the flags and returns the parsed syncPeriod and
-// logLevel.
-func (c *Command) validateFlags() (syncPeriod time.Duration, logLevel hclog.Level, err error) {
+// validateFlags validates the flags and returns the logLevel.
+func (c *Command) validateFlags() error {
 	if c.flagServiceConfig == "" {
-		err = errors.New("-service-config must be set")
-		return
+		return errors.New("-service-config must be set")
 	}
-	syncPeriod, err = time.ParseDuration(c.flagSyncPeriod)
-	if err != nil {
-		err = fmt.Errorf("-sync-period is invalid: %s", err)
-		return
+	if c.flagConsulBinary == "" {
+		return errors.New("-consul-binary must be set")
 	}
-	_, err = os.Stat(c.flagServiceConfig)
+	if c.flagSyncPeriod == 0 {
+		// if sync period is 0, then the select loop will
+		// always pick the first case, and it'll be impossible
+		// to terminate the command gracefully with SIGINT.
+		return errors.New("-sync-period must be greater than 0")
+	}
+
+	_, err := os.Stat(c.flagServiceConfig)
 	if os.IsNotExist(err) {
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
-		return
+		return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
 	}
-	logLevel = hclog.LevelFromString(c.flagLogLevel)
+	_, err = exec.LookPath(c.flagConsulBinary)
+	if err != nil {
+		return fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
+	}
+	logLevel := hclog.LevelFromString(c.flagLogLevel)
 	if logLevel == hclog.NoLevel {
-		err = fmt.Errorf("unknown log level: %s", c.flagLogLevel)
-		return
+		return fmt.Errorf("unknown log level: %s", c.flagLogLevel)
 	}
-	return
+
+	return nil
+}
+
+// parseConsulFlags creates Consul client command flags
+// from command's HTTP flags and returns them as an array of strings.
+func (c *Command) parseConsulFlags() []string {
+	var consulCommandFlags []string
+	c.http.ClientFlags().VisitAll(func(f *flag.Flag) {
+		if f.Value.String() != "" {
+			consulCommandFlags = append(consulCommandFlags, fmt.Sprintf("-%s=%s", f.Name, f.Value.String()))
+		}
+	})
+	return consulCommandFlags
 }
 
 // interrupt sends os.Interrupt signal to the command

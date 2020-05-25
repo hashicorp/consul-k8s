@@ -51,6 +51,7 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 		Command: []string{
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
+			"-consul-binary", "/consul/connect-inject/consul",
 		},
 	}, container)
 }
@@ -157,6 +158,7 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 		Command: []string{
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
+			"-consul-binary", "/consul/connect-inject/consul",
 		},
 	}, container)
 }
