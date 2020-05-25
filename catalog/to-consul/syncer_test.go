@@ -91,7 +91,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 
 	// Create an invalid service directly in Consul
 	svc := testRegistration(ConsulSyncNodeName, "bar", "default")
-	svc.Service.ID = serviceID("k8s-sync", "bar2")
+	svc.Service.ID = serviceID("k8s-sync", "bar2", []string{"k8s"})
 	_, err = client.Catalog().Register(svc, nil)
 	require.NoError(err)
 
@@ -109,7 +109,7 @@ func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	})
 
 	// Verify the settings
-	require.Equal(serviceID("k8s-sync", "bar"), service.ServiceID)
+	require.Equal(serviceID("k8s-sync", "bar", []string{"k8s"}), service.ServiceID)
 	require.Equal("k8s-sync", service.Node)
 	require.Equal("bar", service.ServiceName)
 	require.Equal("127.0.0.1", service.Address)
@@ -258,7 +258,7 @@ func testRegistration(node, service, k8sSrcNamespace string) *api.CatalogRegistr
 		NodeMeta:       map[string]string{ConsulSourceKey: TestConsulK8STag},
 		SkipNodeUpdate: true,
 		Service: &api.AgentService{
-			ID:      serviceID(node, service),
+			ID:      serviceID(node, service, []string{"k8s"}),
 			Service: service,
 			Tags:    []string{TestConsulK8STag},
 			Meta: map[string]string{
