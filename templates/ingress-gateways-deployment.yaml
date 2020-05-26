@@ -142,7 +142,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-                {{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+                {{- if $root.Values.global.acls.manageSystemACLs }}
                 consul-k8s acl-init \
                   -secret-name="{{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway-acl-token" \
                   -k8s-namespace={{ $root.Release.Namespace }} \
@@ -238,7 +238,7 @@ spec:
                 EOF
 
                 /consul-bin/consul services register \
-                  {{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+                  {{- if $root.Values.global.acls.manageSystemACLs }}
                   -token-file=/consul/service/acl-token \
                   {{- end }}
                   /consul/service/service.hcl
@@ -288,7 +288,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+            {{- if $root.Values.global.acls.manageSystemACLs }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -396,7 +396,7 @@ spec:
             - lifecycle-sidecar
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
-            {{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+            {{- if $root.Values.global.acls.manageSystemACLs }}
             - -token-file=/consul/service/acl-token
             {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}

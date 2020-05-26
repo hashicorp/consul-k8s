@@ -65,7 +65,7 @@ spec:
             - name:  CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end}}
-            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+            {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_HTTP_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -106,7 +106,7 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+      {{- if .Values.global.acls.manageSystemACLs }}
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}

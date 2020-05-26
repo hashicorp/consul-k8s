@@ -389,7 +389,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.bootstrapACLs
 # global.acls.manageSystemACLs
 
 @test "syncCatalog/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {

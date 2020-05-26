@@ -95,6 +95,16 @@ load _helpers
   [[ "$output" =~ "if global.acls.createReplicationToken is true, global.acls.manageSystemACLs must be true" ]]
 }
 
+# We removed bootstrapACLs, and now fail in case anyone is still using it.
+@test "serverACLInit/Job: fails if global.bootstrapACLs is true" {
+  cd `chart_dir`
+  run helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.bootstrapACLs=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.bootstrapACLs is removed, use global.acls.manageSystemACLs instead" ]]
+}
+
 @test "serverACLInit/Job: does not set -create-client-token=false when client is enabled (the default)" {
   cd `chart_dir`
   local actual=$(helm template \

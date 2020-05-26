@@ -255,21 +255,3 @@ load _helpers
 
   [ "${actual}" = "" ]
 }
-
-#--------------------------------------------------------------------
-# bootstrapACLs deprecation
-#
-# Test that every place global.bootstrapACLs is used, global.acls.manageSystemACLs
-# is also used.
-# If this test is failing, you've used either only global.bootstrapACLs or
-# only global.acls.manageSystemACLs instead of using the backwards compatible:
-#     or global.acls.manageSystemACLs global.bootstrapACLs
-@test "helper/bootstrapACLs: used alongside manageSystemACLs" {
-  cd `chart_dir`
-
-  diff=$(diff <(grep -r '\.Values\.global\.bootstrapACLs' templates/*) <(grep -r -e 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
-  [ "$diff" = "" ]
-
-  diff=$(diff <(grep -r '\.Values\.global\.acls\.manageSystemACLs' templates/*) <(grep -r -e 'or [\$root]*\.Values\.global\.acls\.manageSystemACLs [\$root]*\.Values\.global\.bootstrapACLs' templates/*) | tee /dev/stderr)
-  [ "$diff" = "" ]
-}

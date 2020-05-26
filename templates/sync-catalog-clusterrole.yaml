@@ -29,7 +29,7 @@ rules:
       - nodes
     verbs:
       - get
-{{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+{{- if .Values.global.acls.manageSystemACLs }}
   - apiGroups: [""]
     resources:
       - secrets

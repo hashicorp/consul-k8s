@@ -165,9 +165,6 @@ global:
   # of both the catalog sync and connect injector.
   enableConsulNamespaces: false
 
-  # [DEPRECATED] Use acls.manageSystemACLs instead.
-  bootstrapACLs: false
-
   # Configure ACLs.
   acls:
 

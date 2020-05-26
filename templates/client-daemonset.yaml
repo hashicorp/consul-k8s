@@ -109,7 +109,7 @@ spec:
             secretName: {{ .name }}
             {{- end }}
         {{- end }}
-        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+        {{- if .Values.global.acls.manageSystemACLs }}
         - name: aclconfig
           emptyDir: {}
         {{- end }}
@@ -201,7 +201,7 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+                {{- if .Values.global.acls.manageSystemACLs }}
                 -config-dir=/consul/aclconfig \
                 {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
@@ -241,7 +241,7 @@ spec:
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
             {{- end }}
-            {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+            {{- if .Values.global.acls.manageSystemACLs }}
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- end }}
@@ -305,9 +305,9 @@ spec:
             {{- toYaml .Values.client.resources | nindent 12 }}
             {{- end }}
           {{- end }}
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
+      {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs) }}
+      {{- if .Values.global.acls.manageSystemACLs }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
         command:
