@@ -119,10 +119,24 @@ spec:
                 {{- end }}
                 {{- if .Values.connectInject.certs.secretName }}
                 -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
-                -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }}
+                -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }} \
                 {{- else }}
                 -tls-auto=${CONSUL_FULLNAME}-connect-injector-cfg \
-                -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc
+                -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc \
+                {{- end }}
+                {{- $resources := .Values.connectInject.sidecarProxy.resources }}
+                {{- /* kindIs is used here to differentiate between null and 0 */}}
+                {{- if not (kindIs "invalid" $resources.limits.memory) }}
+                -default-sidecar-proxy-memory-limit={{ $resources.limits.memory }} \
+                {{- end }}
+                {{- if not (kindIs "invalid" $resources.requests.memory) }}
+                -default-sidecar-proxy-memory-request={{ $resources.requests.memory }} \
+                {{- end }}
+                {{- if not (kindIs "invalid" $resources.limits.cpu) }}
+                -default-sidecar-proxy-cpu-limit={{ $resources.limits.cpu }} \
+                {{- end }}
+                {{- if not (kindIs "invalid" $resources.requests.cpu) }}
+                -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
                 {{- end }}
           livenessProbe:
             httpGet:
