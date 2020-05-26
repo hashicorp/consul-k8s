@@ -89,7 +89,7 @@ func TestHandlerEnvoySidecar_AuthMethod(t *testing.T) {
 	require.Equal(preStopCommand, `/bin/sh -ec /consul/connect-inject/consul services deregister \
   -token-file="/consul/connect-inject/acl-token" \
   /consul/connect-inject/service.hcl
-&& /consul/connect-inject/consul logout \
+/consul/connect-inject/consul logout \
   -token-file="/consul/connect-inject/acl-token"`)
 }
 
@@ -200,6 +200,6 @@ func TestHandlerEnvoySidecar_NamespacesAndAuthMethod(t *testing.T) {
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   /consul/connect-inject/service.hcl
-&& /consul/connect-inject/consul logout \
+/consul/connect-inject/consul logout \
   -token-file="/consul/connect-inject/acl-token"`)
 }

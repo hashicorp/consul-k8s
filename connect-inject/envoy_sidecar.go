@@ -92,7 +92,7 @@ const sidecarPreStopCommandTpl = `
   /consul/connect-inject/service.hcl
 
 {{- if .AuthMethod }}
-&& /consul/connect-inject/consul logout \
+/consul/connect-inject/consul logout \
   -token-file="/consul/connect-inject/acl-token"
 {{- end}}
 `
