@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1400,4 +1401,36 @@ EOF`)
 	require.NotContains(actual, `
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
+}
+
+func TestHandlerContainerInit_Resources(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod, k8sNamespace)
+	require.NoError(err)
+	require.Equal(corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
+		},
+	}, container.Resources)
 }
