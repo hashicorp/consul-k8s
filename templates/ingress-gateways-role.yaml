@@ -32,7 +32,7 @@ rules:
     verbs:
       - use
 {{- end }}
-{{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+{{- if $root.Values.global.acls.manageSystemACLs }}
   - apiGroups: [""]
     resources:
       - secrets

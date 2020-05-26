@@ -16,7 +16,7 @@ metadata:
     release: {{ $root.Release.Name }}
     component: terminating-gateway
     terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
-{{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs $root.Values.global.enablePodSecurityPolicies) }}
+{{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.enablePodSecurityPolicies) }}
 rules:
 {{- if $root.Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
@@ -26,7 +26,7 @@ rules:
     verbs:
       - use
 {{- end }}
-{{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.bootstrapACLs) }}
+{{- if $root.Values.global.acls.manageSystemACLs }}
   - apiGroups: [""]
     resources:
       - secrets
