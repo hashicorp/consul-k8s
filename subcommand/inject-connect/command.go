@@ -20,17 +20,11 @@ import (
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
-
-type arrayFlags []string
-
-func (i *arrayFlags) Set(value string) error {
-	*i = append(*i, value)
-	return nil
-}
 
 type Command struct {
 	UI cli.Ui
@@ -49,12 +43,6 @@ type Command struct {
 	flagDefaultProtocol      string // Default protocol for use with central config
 	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 
-	flagResources       bool   // True to enable resources for init and sidecar pods
-	flagCPULimit        string // CPU Limits
-	flagMemoryLimit     string // Memory Limits
-	flagCPURequest      string // CPU Requests
-	flagMemoryRequest   string // Memory Limits
-
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
 	flagConsulDestinationNamespace string   // Consul namespace to register everything if not mirroring
@@ -63,6 +51,12 @@ type Command struct {
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
+
+	// Proxy resource settings.
+	flagDefaultSidecarProxyCPULimit      string
+	flagDefaultSidecarProxyCPURequest    string
+	flagDefaultSidecarProxyMemoryLimit   string
+	flagDefaultSidecarProxyMemoryRequest string
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -118,16 +112,15 @@ func (c *Command) init() {
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
+	// Resource setting flags.
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
+
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
 	flags.Merge(c.flagSet, c.http.ServerFlags())
-
-	c.flagSet.BoolVar(&c.flagResources, "enable-resources", false,
-		"Enable to set custom resources for init and sidecar pods")
-	c.flagSet.StringVar(&c.flagCPULimit, "cpu-limit", "", "CPU Limits for init and sidecar pods")
-	c.flagSet.StringVar(&c.flagMemoryLimit, "memory-limit", "", "Memory Limits for init and sidecar pods")
-	c.flagSet.StringVar(&c.flagCPURequest, "cpu-request", "", "CPU Requests for init and sidecar pods")
-	c.flagSet.StringVar(&c.flagMemoryRequest, "memory-request", "", "Memory Requests for init and sidecar pods")
 	c.help = flags.Usage(help, c.flagSet)
 }
 
@@ -140,6 +133,50 @@ func (c *Command) Run(args []string) int {
 	// Validate flags.
 	if c.flagConsulK8sImage == "" {
 		c.UI.Error("-consul-k8s-image must be set")
+		return 1
+	}
+
+	var cpuLimit, cpuRequest, memoryLimit, memoryRequest resource.Quantity
+	var err error
+	if c.flagDefaultSidecarProxyCPULimit != "" {
+		cpuLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-limit is invalid: %s", err))
+			return 1
+		}
+	}
+	if c.flagDefaultSidecarProxyCPURequest != "" {
+		cpuRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-request is invalid: %s", err))
+			return 1
+		}
+	}
+	if cpuLimit.Value() != 0 && cpuRequest.Cmp(cpuLimit) > 0 {
+		c.UI.Error(fmt.Sprintf(
+			"request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
+			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit))
+		return 1
+	}
+
+	if c.flagDefaultSidecarProxyMemoryLimit != "" {
+		memoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-limit is invalid: %s", err))
+			return 1
+		}
+	}
+	if c.flagDefaultSidecarProxyMemoryRequest != "" {
+		memoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-request is invalid: %s", err))
+			return 1
+		}
+	}
+	if memoryLimit.Value() != 0 && memoryRequest.Cmp(memoryLimit) > 0 {
+		c.UI.Error(fmt.Sprintf(
+			"request must be <= limit: -default-sidecar-proxy-memory-request value of %q is greater than the -default-sidecar-proxy-memory-limit value of %q",
+			c.flagDefaultSidecarProxyMemoryRequest, c.flagDefaultSidecarProxyMemoryLimit))
 		return 1
 	}
 
@@ -228,10 +265,10 @@ func (c *Command) Run(args []string) int {
 		WriteServiceDefaults:       c.flagWriteServiceDefaults,
 		DefaultProtocol:            c.flagDefaultProtocol,
 		ConsulCACert:               string(consulCACert),
-		CPULimit:          c.flagCPULimit,
-		MemoryLimit:       c.flagMemoryLimit,
-		CPURequest:        c.flagCPURequest,
-		MemoryRequest:     c.flagMemoryRequest,
+		DefaultProxyCPULimit:       cpuLimit,
+		DefaultProxyCPURequest:     cpuRequest,
+		DefaultProxyMemoryLimit:    memoryLimit,
+		DefaultProxyMemoryRequest:  memoryRequest,
 		EnableNamespaces:           c.flagEnableNamespaces,
 		AllowK8sNamespacesSet:      allowSet,
 		DenyK8sNamespacesSet:       denySet,

@@ -11,6 +11,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+const (
+	initContainerCPULimit      = "50m"
+	initContainerCPURequest    = "50m"
+	initContainerMemoryLimit   = "25Mi"
+	initContainerMemoryRequest = "25Mi"
+)
+
 type initContainerCommandData struct {
 	ServiceName      string
 	ProxyServiceName string
@@ -34,10 +41,6 @@ type initContainerCommandData struct {
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
 	ConsulCACert string
-}
-
-type initContainerResources struct {
-	Resources corev1.ResourceRequirements
 }
 
 type initContainerCommandUpstreamData struct {
@@ -76,20 +79,6 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		// Assertion, since we call defaultAnnotations above and do
 		// not mutate pods without a service specified.
 		panic("No service found. This should be impossible since we default it.")
-	}
-
-	icr := initContainerResources{}
-	if h.Resources {
-		icr.Resources = corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
-				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(h.CPULimit),
-				corev1.ResourceMemory: resource.MustParse(h.MemoryLimit),
-			},
-		}
 	}
 
 	// If a port is specified, then we determine the value of that port
@@ -205,6 +194,17 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		return corev1.Container{}, err
 	}
 
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
+		},
+	}
+
 	return corev1.Container{
 		Name:  "consul-connect-inject-init",
 		Image: h.ImageConsul,
@@ -242,7 +242,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
 			},
 		},
-		Resources:    icr.Resources,
+		Resources:    resources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}, nil
