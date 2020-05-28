@@ -402,23 +402,6 @@ key2: value2' \
   [ "${readiness}" = "true" ]
 }
 
-@test "meshGateway/Deployment: can disable healthchecks" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/mesh-gateway-deployment.yaml  \
-      --set 'meshGateway.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'client.grpc=true' \
-      --set 'meshGateway.enableHealthChecks=false' \
-      . | tee /dev/stderr \
-      | yq '.spec.template.spec.containers[0]' | tee /dev/stderr )
-
-  local liveness=$(echo "${actual}" | yq -r '.livenessProbe | length > 0' | tee /dev/stderr)
-  [ "${liveness}" = "false" ]
-  local readiness=$(echo "${actual}" | yq -r '.readinessProbe | length > 0' | tee /dev/stderr)
-  [ "${readiness}" = "false" ]
-}
-
 #--------------------------------------------------------------------
 # hostPort
 
