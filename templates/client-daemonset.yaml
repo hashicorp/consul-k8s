@@ -295,7 +295,11 @@ spec:
                   2>/dev/null | grep -E '".+"'
           {{- if .Values.client.resources }}
           resources:
+            {{- if eq (typeOf .Values.client.resources) "string" }}
             {{ tpl .Values.client.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.client.resources | nindent 12 }}
+            {{- end }}
           {{- end }}
       {{- if (or .Values.global.acls.manageSystemACLs .Values.global.bootstrapACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:

@@ -297,10 +297,24 @@ key2: value2' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'meshGateway.resources=requests: yadayada' \
+      --set 'meshGateway.resources.foo=bar' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources.requests' | tee /dev/stderr)
-  [ "${actual}" = "yadayada" ]
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+# Test support for the deprecated method of setting a YAML string.
+@test "meshGateway/Deployment: resources can be overridden with string" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'client.grpc=true' \
+      --set 'meshGateway.resources=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }
 
 #--------------------------------------------------------------------
