@@ -252,9 +252,10 @@ server:
   connect: true
 
   # Resource requests, limits, etc. for the server cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec,
-  # formatted as a multi-line string. By default no direct resource request
-  # is made.
+  # should map directly to the value of the resources field for a PodSpec.
+  # By default no direct resource request is made.
+  # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
+  #       YAML map.
   resources: null
 
   # updatePartition is used to control a careful rolling update of Consul
@@ -411,9 +412,10 @@ client:
   exposeGossipPorts: false
 
   # Resource requests, limits, etc. for the client cluster placement. This
-  # should map directly to the value of the resources field for a PodSpec,
-  # formatted as a multi-line string. By default no direct resource request
-  # is made.
+  # should map directly to the value of the resources field for a PodSpec.
+  # By default no direct resource request is made.
+  # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
+  #       YAML map.
   resources: null
 
   # extraConfig is a raw string of extra configuration to set with the
@@ -963,7 +965,10 @@ meshGateway:
   # agent.
   hostPort: null
 
-  resources: |
+  # Resource settings for mesh gateway pods.
+  # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
+  #       YAML map.
+  resources:
     requests:
       memory: "128Mi"
       cpu: "250m"
