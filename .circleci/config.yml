@@ -1,4 +1,7 @@
-version: 2
+version: 2.1
+orbs:
+  slack: circleci/slack@3.4.2
+
 jobs:
   unit:
     docker:
@@ -42,6 +45,17 @@ jobs:
     docker:
       - image: circleci/golang:latest
     steps:
+      - checkout
+      - run:
+          name: verify Chart version matches tag version
+          command: |
+            GO111MODULE=on go get github.com/mikefarah/yq/v2
+            git_tag=$(echo "${CIRCLE_TAG#v}")
+            chart_tag=$(yq r Chart.yaml version)
+            if [ "${git_tag}" != "${chart_tag}" ]; then
+              echo "chart version (${chart_tag}) did not match git version (${git_tag})"
+              exit 1
+            fi
       - run:
           name: update helm-charts index
           command: |
@@ -51,6 +65,9 @@ jobs:
                 -H 'Accept: application/json' \
                 -d "{\"branch\": \"master\",\"parameters\":{\"SOURCE_REPO\": \"${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}\",\"SOURCE_TAG\": \"${CIRCLE_TAG}\"}}" \
                 "${CIRCLE_ENDPOINT}/${CIRCLE_PROJECT}/pipeline"
+      - slack/status:
+          fail_only: true
+          failure_message: "Failed to trigger an update to the helm charts index. Check the logs at: ${CIRCLE_BUILD_URL}"
 
 workflows:
   version: 2
