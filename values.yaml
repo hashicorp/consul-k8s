@@ -861,7 +861,7 @@ meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
   # See https://www.consul.io/docs/connect/mesh_gateway.html
-  # Requirements: consul >= 1.6.0 and consul-k8s >= 0.9.0 if using
+  # Requirements: consul 1.6.0+ and consul-k8s 0.15.0+ if using
   # global.acls.manageSystemACLs.
   enabled: false
 
@@ -922,8 +922,8 @@ meshGateway:
     # The targetPort will be set to meshGateway.containerPort.
     port: 443
 
-    # Optionally hardcode the nodePort of the service if using type: NodePort.
-    # If not set and using type: NodePort, Kubernetes will automatically assign
+    # Optionally hardcode the nodePort of the service if using a NodePort service.
+    # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
     nodePort: null
 
