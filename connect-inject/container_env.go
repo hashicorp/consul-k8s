@@ -16,7 +16,7 @@ func (h *Handler) containerEnvVars(pod *corev1.Pod) []corev1.EnvVar {
 
 	var result []corev1.EnvVar
 	for _, raw := range strings.Split(raw, ",") {
-		parts := strings.SplitN(raw, ":", 2)
+		parts := strings.SplitN(raw, ":", 3)
 		port, _ := portValue(pod, strings.TrimSpace(parts[1]))
 		if port > 0 {
 			name := strings.TrimSpace(parts[0])
