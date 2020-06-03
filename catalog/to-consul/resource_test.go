@@ -589,7 +589,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	require.Equal("bar", actual[0].Service.Meta["foo"])
 }
 
-// Test that with LoadBalancerEndpointsSync to true we track LB endpoints
+// Test that with LoadBalancerEndpointsSync to true we track the IP of the endpoints not the LB IP/name
 func TestServiceResource_lbAregisterEndpoints(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
