@@ -2,7 +2,16 @@ package connectinject
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"strings"
+)
+
+const (
+	lifecycleContainerCPULimit      = "10m"
+	lifecycleContainerCPURequest    = "10m"
+	lifecycleContainerMemoryLimit   = "25Mi"
+	lifecycleContainerMemoryRequest = "25Mi"
 )
 
 func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
@@ -52,6 +61,17 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 			})
 	}
 
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
+		},
+	}
+
 	return corev1.Container{
 		Name:  "consul-connect-lifecycle-sidecar",
 		Image: h.ImageConsulK8S,
@@ -62,6 +82,7 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		Command: command,
+		Command:   command,
+		Resources: resources,
 	}
 }
