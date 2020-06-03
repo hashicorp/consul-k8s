@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+
+* Connect: inject environment variables for upstreams in a different datacenter [[GH-250](https://github.com/hashicorp/consul-k8s/pull/250)].
+
 ## 0.15.0 (May 13, 2020)
 
 BREAKING CHANGES:
