@@ -4,6 +4,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
@@ -52,6 +53,16 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
+				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
+				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
+			},
 		},
 	}, container)
 }
@@ -159,6 +170,16 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 			"consul-k8s", "lifecycle-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
+				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
+				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
+			},
 		},
 	}, container)
 }

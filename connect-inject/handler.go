@@ -14,6 +14,7 @@ import (
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -76,6 +77,11 @@ const (
 	// consul-k8s lifecycle-sidecar command. This flag controls how often the
 	// service is synced (i.e. re-registered) with the local agent.
 	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
+
+	annotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
+	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
+	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
+	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 )
 
 var (
@@ -162,6 +168,12 @@ type Handler struct {
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
 	CrossNamespaceACLPolicy string
+
+	// Default resource settings for sidecar proxies.
+	DefaultProxyCPURequest    resource.Quantity
+	DefaultProxyCPULimit      resource.Quantity
+	DefaultProxyMemoryRequest resource.Quantity
+	DefaultProxyMemoryLimit   resource.Quantity
 
 	// Log
 	Log hclog.Logger

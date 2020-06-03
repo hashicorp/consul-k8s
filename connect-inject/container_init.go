@@ -8,6 +8,14 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+const (
+	initContainerCPULimit      = "50m"
+	initContainerCPURequest    = "50m"
+	initContainerMemoryLimit   = "25Mi"
+	initContainerMemoryRequest = "25Mi"
 )
 
 type initContainerCommandData struct {
@@ -186,6 +194,17 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		return corev1.Container{}, err
 	}
 
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(initContainerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
+		},
+	}
+
 	return corev1.Container{
 		Name:  "consul-connect-inject-init",
 		Image: h.ImageConsul,
@@ -223,6 +242,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
 			},
 		},
+		Resources:    resources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}, nil
