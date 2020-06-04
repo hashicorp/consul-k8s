@@ -14,14 +14,14 @@ helm_install() {
     fi
 
     helm install -f ${values} \
-        --name consul \
+        consul \
         --wait \
         ${BATS_TEST_DIRNAME}/../..
 }
 
 # helm_delete deletes the Consul chart and all resources.
 helm_delete() {
-    helm delete --purge consul
+    helm delete consul
     kubectl delete --all pvc
 }
 

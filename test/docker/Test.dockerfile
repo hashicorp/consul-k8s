@@ -6,11 +6,11 @@
 # a script to configure kubectl, potentially install Helm, and run the tests
 # manually. This image only has the dependencies pre-installed.
 
-FROM alpine:latest
+FROM alpine:3.11
 WORKDIR /root
 
 ENV BATS_VERSION "1.1.0"
-ENV TERRAFORM_VERSION "0.12.10"
+ENV TERRAFORM_VERSION "0.12.26"
 
 # base packages
 RUN apk update && apk add --no-cache --virtual .build-deps \
@@ -43,7 +43,7 @@ RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s
     mv ./kubectl /usr/local/bin/kubectl
 
 # helm
-RUN curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
+RUN curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
 # bats
 RUN curl -sSL https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz -o /tmp/bats.tgz \
