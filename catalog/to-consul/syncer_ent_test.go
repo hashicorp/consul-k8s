@@ -162,7 +162,7 @@ func TestConsulSyncer_reapServiceInstanceNamespacesEnabled(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	svc := testRegistrationNS(ConsulSyncNodeName, "foo", "foo", "foo")
-	svc.Service.ID = serviceID("k8s-sync", "foo2")
+	svc.Service.ID = serviceID("k8s-sync", "foo2", []string{"k8s"})
 	_, err = client.Catalog().Register(svc, nil)
 	require.NoError(t, err)
 

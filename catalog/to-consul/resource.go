@@ -456,7 +456,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r := baseNode
 			rs := baseService
 			r.Service = &rs
-			r.Service.ID = serviceID(r.Service.Service, ip)
+			r.Service.ID = serviceID(r.Service.Service, ip, r.Service.Tags)
 			r.Service.Address = ip
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
@@ -487,7 +487,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r := baseNode
 			rs := baseService
 			r.Service = &rs
-			r.Service.ID = serviceID(r.Service.Service, addr)
+			r.Service.ID = serviceID(r.Service.Service, addr, r.Service.Tags)
 			r.Service.Address = addr
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
@@ -538,7 +538,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						r := baseNode
 						rs := baseService
 						r.Service = &rs
-						r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
+						r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP, r.Service.Tags)
 						r.Service.Address = address.Address
 
 						t.consulMap[key] = append(t.consulMap[key], &r)
@@ -553,7 +553,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r := baseNode
 							rs := baseService
 							r.Service = &rs
-							r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
+							r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP, r.Service.Tags)
 							r.Service.Address = address.Address
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
@@ -617,7 +617,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r := baseNode
 				rs := baseService
 				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
+				r.Service.ID = serviceID(r.Service.Service, addr, r.Service.Tags)
 				r.Service.Address = addr
 				r.Service.Port = epPort
 
