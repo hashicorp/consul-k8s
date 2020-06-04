@@ -18,7 +18,8 @@ jobs:
   acceptance:
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: hashicorpdev/consul-helm-test:0.3.0
+      # version 0.4.0 uses helm v3 as default
+      - image: hashicorpdev/consul-helm-test:0.4.0
 
     steps:
       - checkout

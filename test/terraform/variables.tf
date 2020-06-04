@@ -12,6 +12,6 @@ variable "zone" {
 }
 
 variable "init_cli" {
-  default = false
-  description = "Whether to init the CLI tools kubectl, helm, etc. or not."
+  default     = false
+  description = "Whether to init kubectl."
 }
