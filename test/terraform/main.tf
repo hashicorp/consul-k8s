@@ -42,30 +42,14 @@ resource "null_resource" "kubectl" {
   # want this to continue on failure. Generally, this works just fine since
   # it only operates on local data.
   provisioner "local-exec" {
-    when       = "destroy"
-    on_failure = "continue"
+    when       = destroy
+    on_failure = continue
     command    = "kubectl config get-clusters | grep ${google_container_cluster.cluster.name} | xargs -n1 kubectl config delete-cluster"
   }
 
   provisioner "local-exec" {
-    when       = "destroy"
-    on_failure = "continue"
+    when       = destroy
+    on_failure = continue
     command    = "kubectl config get-contexts | grep ${google_container_cluster.cluster.name} | xargs -n1 kubectl config delete-context"
-  }
-}
-
-resource "null_resource" "helm" {
-  count = var.init_cli ? 1 : 0
-  depends_on = ["null_resource.kubectl"]
-
-  triggers = {
-    cluster = google_container_cluster.cluster.id
-  }
-
-  provisioner "local-exec" {
-    command = <<EOF
-kubectl apply -f '${local.service_account_path}'
-helm init --service-account helm --wait
-EOF
   }
 }
