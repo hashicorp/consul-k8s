@@ -29,7 +29,7 @@ func TestServiceResource_createDelete(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -57,7 +57,7 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -82,7 +82,7 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -108,7 +108,7 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
 
 	// Start the controller
@@ -134,7 +134,7 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
 
 	// Start the controller
@@ -160,7 +160,7 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
 
 	// Start the controller
@@ -201,7 +201,7 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 
 	// Start the controller
@@ -229,7 +229,7 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 	serviceResource.ConsulServicePrefix = "prefix"
 
@@ -258,7 +258,7 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 
 	// Start the controller
@@ -287,7 +287,7 @@ func TestServiceResource_externalIP(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -319,7 +319,7 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
@@ -352,7 +352,7 @@ func TestServiceResource_lb(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -381,7 +381,7 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulServicePrefix = "prefix"
 
 	// Start the controller
@@ -412,7 +412,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -448,7 +448,7 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -475,7 +475,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -507,7 +507,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -540,7 +540,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulK8STag = TestConsulK8STag
 
 	// Start the controller
@@ -568,7 +568,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -595,7 +595,8 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, true)
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.LoadBalancerEndpointsSync = true
 
 	// Start the controller
 	closer := controller.TestControllerRun(&serviceResource)
@@ -646,7 +647,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 	require := require.New(t)
 	syncer := &TestSyncer{}
 	client := fake.NewSimpleClientset()
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
@@ -686,7 +687,7 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 	serviceResource.ConsulServicePrefix = "prefix"
 
@@ -729,7 +730,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
@@ -783,7 +784,7 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
@@ -825,7 +826,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
 	// Start the controller
@@ -872,7 +873,7 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = InternalOnly
 
 	// Start the controller
@@ -914,7 +915,7 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalFirst
 
 	// Start the controller
@@ -963,7 +964,7 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1001,7 +1002,7 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 	serviceResource.ConsulServicePrefix = "prefix"
 
@@ -1041,7 +1042,7 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1081,7 +1082,7 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1120,7 +1121,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1163,7 +1164,7 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = false
 
 	// Start the controller
@@ -1195,7 +1196,7 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	testNamespace := "test_namespace"
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1233,7 +1234,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
 	// Start the controller
@@ -1315,7 +1316,7 @@ func TestServiceResource_AllowDenyNamespaces(t *testing.T) {
 		t.Run(name, func(tt *testing.T) {
 			client := fake.NewSimpleClientset()
 			syncer := &TestSyncer{}
-			serviceResource := defaultServiceResource(client, syncer, false)
+			serviceResource := defaultServiceResource(client, syncer)
 			serviceResource.AllowK8sNamespacesSet = c.AllowList
 			serviceResource.DenyK8sNamespacesSet = c.DenyList
 
@@ -1366,7 +1367,7 @@ func TestServiceResource_singleDestNamespace(t *testing.T) {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
 			client := fake.NewSimpleClientset()
 			syncer := &TestSyncer{}
-			serviceResource := defaultServiceResource(client, syncer, false)
+			serviceResource := defaultServiceResource(client, syncer)
 			serviceResource.ConsulDestinationNamespace = consulDestNamespace
 			serviceResource.EnableNamespaces = true
 			closer := controller.TestControllerRun(&serviceResource)
@@ -1391,7 +1392,7 @@ func TestServiceResource_MirroredNamespace(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.EnableK8SNSMirroring = true
 	serviceResource.EnableNamespaces = true
 	closer := controller.TestControllerRun(&serviceResource)
@@ -1426,7 +1427,7 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
-	serviceResource := defaultServiceResource(client, syncer, false)
+	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.EnableK8SNSMirroring = true
 	serviceResource.EnableNamespaces = true
 	serviceResource.K8SNSMirroringPrefix = "prefix-"
@@ -1591,13 +1592,12 @@ func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, n
 	require.NoError(t, err)
 }
 
-func defaultServiceResource(client kubernetes.Interface, syncer Syncer, syncLb bool) ServiceResource {
+func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceResource {
 	return ServiceResource{
-		Log:                       hclog.Default(),
-		Client:                    client,
-		Syncer:                    syncer,
-		AllowK8sNamespacesSet:     mapset.NewSet("*"),
-		DenyK8sNamespacesSet:      mapset.NewSet(),
-		LoadBalancerEndpointsSync: syncLb,
+		Log:                   hclog.Default(),
+		Client:                client,
+		Syncer:                syncer,
+		AllowK8sNamespacesSet: mapset.NewSet("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
 	}
 }
