@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+* Sync: Add `-sync-lb-services-endpoints` flag to optionally sync load balancer endpoint IPs instead of load balancer ingress IP or hostname to Consul [[GH-257](https://github.com/hashicorp/consul-k8s/pull/257)].
+
 BUG FIXES:
 
 * Connect: inject environment variables for upstreams in a different datacenter [[GH-250](https://github.com/hashicorp/consul-k8s/pull/250)].
