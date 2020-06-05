@@ -1,10 +1,60 @@
 ## Unreleased
 
+FEATURES:
+
+* Resources are now set on all containers. This enables the chart to be deployed
+  in clusters that have resource quotas set. This also ensures that Consul
+  server and client pods won't be evicted by Kubernetes when nodes reach their
+  resource limits.
+  
+  Resource settings have been made configurable for sync catalog, connect inject
+  and client snapshot deployments.
+  
+  The default settings were chosen based on a cluster with a small workload.
+  For production, we recommend monitoring resource usage and modifying the
+  defaults according to your usage.
+
 BREAKING CHANGES:
 
 * Mesh Gateway: `meshGateway.enableHealthChecks` is no longer supported. This config
   option was to work around an issue where mesh gateways would not listen on their
   bind ports until a Connect service was registered. This issue was fixed in Consul 1.6.2. ([GH-464](https://github.com/hashicorp/consul-helm/pull/464))
+
+* Mesh Gateway: The default resource settings have been changed. To keep
+  the previous settings, you must set `meshGateway.resources` in your own Helm config. ([GH-466](https://github.com/hashicorp/consul-helm/pull/466))
+
+  Before:
+  ```yaml
+  meshGateway:
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+  ```
+
+  After:
+  ```yaml
+  meshGateway:
+    resources:
+      requests:
+        memory: "100Mi"
+        cpu: "100m"
+      limits:
+        memory: "100Mi"
+        cpu: "100m"
+  ```
+
+ * Clients and Servers: There are now default resource settings for Consul clients
+   and servers. Previously, there were no default settings which meant the default
+   was unlimited. This change was made because Kubernetes will prefer to evict
+   pods that don't have resource settings and that resulted in the Consul client
+   and servers being evicted. The default resource settings were chosen based
+   on a low-usage cluster. If you are running a production cluster, use the
+   `kubectl top` command to see how much CPU and memory your clients and servers
+   are using and set the resources accordingly. ([GH-466](https://github.com/hashicorp/consul-helm/pull/466)]
 
 DEPRECATIONS
 

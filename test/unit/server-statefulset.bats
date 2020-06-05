@@ -83,16 +83,16 @@ load _helpers
 #--------------------------------------------------------------------
 # resources
 
-@test "server/StatefulSet: no resources defined by default" {
+@test "server/StatefulSet: resources defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
-@test "server/StatefulSet: resources can be set" {
+@test "server/StatefulSet: resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \
@@ -103,7 +103,7 @@ load _helpers
 }
 
 # Test support for the deprecated method of setting a YAML string.
-@test "server/StatefulSet: resources can be set with string" {
+@test "server/StatefulSet: resources can be overridden with string" {
   cd `chart_dir`
   local actual=$(helm template \
       -x templates/server-statefulset.yaml  \

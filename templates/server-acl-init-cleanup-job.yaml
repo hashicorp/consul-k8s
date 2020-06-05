@@ -52,6 +52,13 @@ spec:
             - delete-completed-job
             - -k8s-namespace={{ .Release.Namespace }}
             - {{ template "consul.fullname" . }}-server-acl-init
+          resources:
+            requests:
+              memory: "25Mi"
+              cpu: "50m"
+            limits:
+              memory: "25Mi"
+              cpu: "50m"
   {{- end }}
   {{- end }}
   {{- end }}
