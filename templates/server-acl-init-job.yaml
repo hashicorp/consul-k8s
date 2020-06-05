@@ -182,6 +182,13 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- end }}
+          resources:
+            requests:
+              memory: "25Mi"
+              cpu: "50m"
+            limits:
+              memory: "25Mi"
+              cpu: "50m"
 {{- end }}
 {{- end }}
 {{- end }}

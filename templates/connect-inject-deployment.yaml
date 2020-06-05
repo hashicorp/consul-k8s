@@ -161,6 +161,10 @@ spec:
               readOnly: true
             {{- end }}
           {{- end }}
+          {{- with .Values.connectInject.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- if (or .Values.connectInject.certs.secretName .Values.global.tls.enabled) }}
       volumes:
         {{- if .Values.connectInject.certs.secretName }}
@@ -200,6 +204,13 @@ spec:
             consul-k8s acl-init \
               -secret-name="{{ template "consul.fullname" . }}-connect-inject-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
       {{- end }}
       {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}

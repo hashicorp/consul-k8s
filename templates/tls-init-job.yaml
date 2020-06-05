@@ -110,5 +110,12 @@ spec:
               mountPath: /consul/tls/ca/key
               readOnly: true
           {{- end }}
+          resources:
+            requests:
+              memory: "25Mi"
+              cpu: "50m"
+            limits:
+              memory: "25Mi"
+              cpu: "50m"
 {{- end }}
 {{- end }}

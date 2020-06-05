@@ -97,4 +97,11 @@ This template is for an init container.
     {{- end }}
     - name: consul-auto-encrypt-ca-cert
       mountPath: /consul/tls/client/ca
+  resources:
+    requests:
+      memory: "25Mi"
+      cpu: "50m"
+    limits:
+      memory: "25Mi"
+      cpu: "50m"
 {{- end -}}
