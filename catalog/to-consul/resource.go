@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -77,6 +77,9 @@ type ServiceResource struct {
 	// ClusterIPSync set to true (the default) syncs ClusterIP-type services.
 	// Setting this to false will ignore ClusterIP services during the sync.
 	ClusterIPSync bool
+
+	// LoadBalancerEndpointsSync set to true (default false) will sync ServiceTypeLoadBalancer endpoints.
+	LoadBalancerEndpointsSync bool
 
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
@@ -295,7 +298,9 @@ func (t *ServiceResource) shouldTrackEndpoints(key string) bool {
 		return false
 	}
 
-	return svc.Spec.Type == apiv1.ServiceTypeNodePort || svc.Spec.Type == apiv1.ServiceTypeClusterIP
+	return svc.Spec.Type == apiv1.ServiceTypeNodePort ||
+		svc.Spec.Type == apiv1.ServiceTypeClusterIP ||
+		(t.LoadBalancerEndpointsSync && svc.Spec.Type == apiv1.ServiceTypeLoadBalancer)
 }
 
 // generateRegistrations generates the necessary Consul registrations for
@@ -468,28 +473,34 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For LoadBalancer type services, we create a service instance for
 	// each LoadBalancer entry. We only support entries that have an IP
 	// address assigned (not hostnames).
+	// If LoadBalancerEndpointsSync is true sync LB endpoints instead of loadbalancer ingress.
 	case apiv1.ServiceTypeLoadBalancer:
-		seen := map[string]struct{}{}
-		for _, ingress := range svc.Status.LoadBalancer.Ingress {
-			addr := ingress.IP
-			if addr == "" {
-				addr = ingress.Hostname
-			}
-			if addr == "" {
-				continue
-			}
+		if t.LoadBalancerEndpointsSync {
+			t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, false)
+		} else {
+			seen := map[string]struct{}{}
+			for _, ingress := range svc.Status.LoadBalancer.Ingress {
+				addr := ingress.IP
+				if addr == "" {
+					addr = ingress.Hostname
+				}
+				if addr == "" {
+					continue
+				}
 
-			if _, ok := seen[addr]; ok {
-				continue
-			}
-			seen[addr] = struct{}{}
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
 
-			r := baseNode
-			rs := baseService
-			r.Service = &rs
-			r.Service.ID = serviceID(r.Service.Service, addr)
-			r.Service.Address = addr
-			t.consulMap[key] = append(t.consulMap[key], &r)
+				r := baseNode
+				rs := baseService
+				r.Service = &rs
+				r.Service.ID = serviceID(r.Service.Service, addr)
+				r.Service.Address = addr
+
+				t.consulMap[key] = append(t.consulMap[key], &r)
+			}
 		}
 
 	// For NodePort services, we create a service instance for each
@@ -566,63 +577,74 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// For ClusterIP services, we register a service instance
 	// for each endpoint.
 	case apiv1.ServiceTypeClusterIP:
-		if t.endpointsMap == nil {
-			return
-		}
+		t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, true)
+	}
+}
 
-		endpoints := t.endpointsMap[key]
-		if endpoints == nil {
-			return
-		}
+func (t *ServiceResource) registerServiceInstance(
+	baseNode consulapi.CatalogRegistration,
+	baseService consulapi.AgentService,
+	key string,
+	overridePortName string,
+	overridePortNumber int,
+	useHostname bool) {
 
-		seen := map[string]struct{}{}
-		for _, subset := range endpoints.Subsets {
-			// For ClusterIP services, we use the endpoint port instead
-			// of the service port because we're registering each endpoint
-			// as a separate service instance.
-			epPort := baseService.Port
-			if overridePortName != "" {
-				// If we're supposed to use a specific named port, find it.
-				for _, p := range subset.Ports {
-					if overridePortName == p.Name {
-						epPort = int(p.Port)
-						break
-					}
-				}
-			} else if overridePortNumber == 0 {
-				// Otherwise we'll just use the first port in the list
-				// (unless the port number was overridden by an annotation).
-				for _, p := range subset.Ports {
+	if t.endpointsMap == nil {
+		return
+	}
+
+	endpoints := t.endpointsMap[key]
+	if endpoints == nil {
+		return
+	}
+
+	seen := map[string]struct{}{}
+	for _, subset := range endpoints.Subsets {
+		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
+		// of the service port because we're registering each endpoint
+		// as a separate service instance.
+		epPort := baseService.Port
+		if overridePortName != "" {
+			// If we're supposed to use a specific named port, find it.
+			for _, p := range subset.Ports {
+				if overridePortName == p.Name {
 					epPort = int(p.Port)
 					break
 				}
 			}
-			for _, subsetAddr := range subset.Addresses {
-				addr := subsetAddr.IP
-				if addr == "" {
-					addr = subsetAddr.Hostname
-				}
-				if addr == "" {
-					continue
-				}
-
-				// Its not clear whether K8S guarantees ready addresses to
-				// be unique so we maintain a set to prevent duplicates just
-				// in case.
-				if _, ok := seen[addr]; ok {
-					continue
-				}
-				seen[addr] = struct{}{}
-
-				r := baseNode
-				rs := baseService
-				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
-				r.Service.Address = addr
-				r.Service.Port = epPort
-
-				t.consulMap[key] = append(t.consulMap[key], &r)
+		} else if overridePortNumber == 0 {
+			// Otherwise we'll just use the first port in the list
+			// (unless the port number was overridden by an annotation).
+			for _, p := range subset.Ports {
+				epPort = int(p.Port)
+				break
 			}
+		}
+		for _, subsetAddr := range subset.Addresses {
+			addr := subsetAddr.IP
+			if addr == "" && useHostname {
+				addr = subsetAddr.Hostname
+			}
+			if addr == "" {
+				continue
+			}
+
+			// Its not clear whether K8S guarantees ready addresses to
+			// be unique so we maintain a set to prevent duplicates just
+			// in case.
+			if _, ok := seen[addr]; ok {
+				continue
+			}
+			seen[addr] = struct{}{}
+
+			r := baseNode
+			rs := baseService
+			r.Service = &rs
+			r.Service.ID = serviceID(r.Service.Service, addr)
+			r.Service.Address = addr
+			r.Service.Port = epPort
+
+			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
 }

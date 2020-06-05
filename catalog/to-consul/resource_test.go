@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
@@ -587,6 +587,58 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	actual := syncer.Registrations
 	require.Len(actual, 1)
 	require.Equal("bar", actual[0].Service.Meta["foo"])
+}
+
+// Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name
+func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	client := fake.NewSimpleClientset()
+	syncer := &TestSyncer{}
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.LoadBalancerEndpointsSync = true
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	node1, _ := createNodes(t, client)
+
+	// Insert the endpoints
+	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(&apiv1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+
+		Subsets: []apiv1.EndpointSubset{
+			{
+				Addresses: []apiv1.EndpointAddress{
+					{NodeName: &node1.Name, IP: "8.8.8.8"},
+				},
+				Ports: []apiv1.EndpointPort{
+					{Name: "http", Port: 8080},
+					{Name: "rpc", Port: 2000},
+				},
+			},
+		},
+	})
+	require.NoError(err)
+
+	// Insert an LB service
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
+	require.NoError(err)
+	time.Sleep(300 * time.Millisecond)
+
+	// Verify what we got
+	syncer.Lock()
+	defer syncer.Unlock()
+	actual := syncer.Registrations
+	require.Len(actual, 1)
+	require.Equal("foo", actual[0].Service.Service)
+	require.Equal("8.8.8.8", actual[0].Service.Address)
+	require.Equal(8080, actual[0].Service.Port)
+	require.Equal("k8s-sync", actual[0].Node)
 }
 
 // Test that the proper registrations are generated for a NodePort type.
