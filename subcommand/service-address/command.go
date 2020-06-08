@@ -27,9 +27,10 @@ type Command struct {
 	flags    *flag.FlagSet
 	k8sFlags *k8sflags.K8SFlags
 
-	flagNamespace   string
-	flagServiceName string
-	flagOutputFile  string
+	flagNamespace        string
+	flagServiceName      string
+	flagOutputFile       string
+	flagResolveHostnames bool
 
 	retryDuration time.Duration
 	k8sClient     kubernetes.Interface
@@ -45,6 +46,8 @@ func (c *Command) init() {
 		"Name of the service")
 	c.flags.StringVar(&c.flagOutputFile, "output-file", "",
 		"Path to file to write load balancer address")
+	c.flags.BoolVar(&c.flagResolveHostnames, "resolve-hostnames", false,
+		"If true we will resolve any hostnames and use their first IP address")
 
 	c.k8sFlags = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8sFlags.Flags())
@@ -104,13 +107,11 @@ func (c *Command) Run(args []string) int {
 					address = ingr.IP
 					return nil
 				} else if ingr.Hostname != "" {
-					// todo: for now we're resolving this hostname to an IP
-					// because Consul doesn't yet support hostnames for its mesh
-					// gateway addresses. We will want to remove this when it's
-					// supported because in the case of EKS (the only cloud
-					// that returns hostnames for its LBs) the IPs may change
-					// so only the hostname is safe.
-					address, unretryableErr = resolveHostname(ingr.Hostname)
+					if c.flagResolveHostnames {
+						address, unretryableErr = resolveHostname(ingr.Hostname)
+					} else {
+						address = ingr.Hostname
+					}
 					return nil
 				}
 			}

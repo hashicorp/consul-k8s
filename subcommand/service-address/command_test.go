@@ -105,6 +105,7 @@ func TestRun_UnresolvableHostname(t *testing.T) {
 		"-k8s-namespace", k8sNS,
 		"-name", svcName,
 		"-output-file", outputFile,
+		"-resolve-hostnames=true",
 	})
 	require.Equal(1, responseCode)
 	require.Contains(ui.ErrorWriter.String(), "Unable to get service address: unable to resolve hostname:")
@@ -118,6 +119,7 @@ func TestRun_ServiceTypes(t *testing.T) {
 	cases := map[string]struct {
 		Service              *v1.Service
 		ServiceModificationF func(*v1.Service)
+		ResolveHostnames     bool
 		ExpErr               string
 		ExpAddress           string
 	}{
@@ -133,9 +135,14 @@ func TestRun_ServiceTypes(t *testing.T) {
 			Service:    kubeLoadBalancerSvc("service-name", "1.2.3.4", ""),
 			ExpAddress: "1.2.3.4",
 		},
-		"LoadBalancer Hostname": {
+		"LoadBalancer hostname": {
 			Service:    kubeLoadBalancerSvc("service-name", "", "localhost"),
-			ExpAddress: "127.0.0.1",
+			ExpAddress: "localhost",
+		},
+		"LoadBalancer hostname with resolve-hostnames=true": {
+			Service:          kubeLoadBalancerSvc("service-name", "", "localhost"),
+			ResolveHostnames: true,
+			ExpAddress:       "127.0.0.1",
 		},
 		"LoadBalancer IP and hostname": {
 			Service:    kubeLoadBalancerSvc("service-name", "1.2.3.4", "example.com"),
@@ -195,11 +202,15 @@ func TestRun_ServiceTypes(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 			outputFile := filepath.Join(tmpDir, "address.txt")
 
-			responseCode := cmd.Run([]string{
+			args := []string{
 				"-k8s-namespace", k8sNS,
 				"-name", svcName,
 				"-output-file", outputFile,
-			})
+			}
+			if c.ResolveHostnames {
+				args = append(args, "-resolve-hostnames=true")
+			}
+			responseCode := cmd.Run(args)
 			if c.ExpErr != "" {
 				require.Equal(1, responseCode)
 				require.Contains(ui.ErrorWriter.String(), c.ExpErr)
