@@ -1,5 +1,7 @@
 # Consul Helm Chart
 
+⭐ **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** ⭐
+
 This repository contains the official HashiCorp Helm chart for installing
 and configuring Consul on Kubernetes. This chart supports multiple use
 cases of Consul on Kubernetes, depending on the values provided.
