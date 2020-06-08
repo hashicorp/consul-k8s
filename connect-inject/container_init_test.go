@@ -77,7 +77,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -132,7 +132,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -304,7 +304,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -350,7 +350,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -396,7 +396,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -443,7 +443,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -502,7 +502,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -635,7 +635,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -703,7 +703,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -772,7 +772,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -850,7 +850,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -928,7 +928,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
@@ -1010,7 +1010,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "web"
+    alias_service = "${SERVICE_ID}"
   }
 }
 

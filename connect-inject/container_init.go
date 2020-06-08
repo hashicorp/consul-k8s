@@ -323,7 +323,7 @@ services {
 
   checks {
     name = "Destination Alias"
-    alias_service = "{{ .ServiceName }}"
+    alias_service = "${SERVICE_ID}"
   }
 }
 
