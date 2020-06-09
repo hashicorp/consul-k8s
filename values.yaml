@@ -529,6 +529,15 @@ client:
         memory: "50Mi"
         cpu: "50m"
 
+    # Optional PEM-encoded CA certificate that will be added to the trusted system CAs.
+    # Useful if using an S3-compatible storage exposing a self-signed certificate.
+    # Example
+    #   caCert: |
+    #     -----BEGIN CERTIFICATE-----
+    #     MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
+    #     ...
+    caCert: null
+
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns

@@ -99,6 +99,11 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
+              {{- if .Values.client.snapshotAgent.caCert }}
+              cat <<EOF > /etc/ssl/certs/custom-ca.pem
+              {{- .Values.client.snapshotAgent.caCert | nindent 14 }}
+              EOF
+              {{- end }}
               exec /bin/consul snapshot agent \
                 {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
                 -config-dir=/consul/config \
