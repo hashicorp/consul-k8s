@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	DefaultConsulImage = "consul:1.7.1"
-	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.13.0"
+	DefaultConsulImage = "consul:1.8.0"
+	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.14.2"
 )
 
 const (
