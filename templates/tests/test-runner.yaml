@@ -67,8 +67,8 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-            consul members
-            if [ $(consul members | grep consul-server | wc -l) != $(consul members | grep consul-server | grep alive | wc -l) ]
+            consul members | tee members.txt
+            if [ $(grep -c consul-server members.txt) != $(grep consul-server members.txt | grep -c alive) ]
             then
               echo "Failed because not all consul servers are available"
               exit 1
