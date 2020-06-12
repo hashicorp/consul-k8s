@@ -56,6 +56,10 @@ BREAKING CHANGES:
    `kubectl top` command to see how much CPU and memory your clients and servers
    are using and set the resources accordingly. ([GH-466](https://github.com/hashicorp/consul-helm/pull/466)]
 
+IMPROVEMENTS:
+
+* Add component label to the server, DNS, and UI services [[GH-480](https://github.com/hashicorp/consul-helm/pull/480)].
+
 DEPRECATIONS
 
 * Setting resources via YAML string is now deprecated. Instead, set directly as YAML.
