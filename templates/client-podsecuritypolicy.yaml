@@ -26,7 +26,11 @@ spec:
     {{- if .Values.client.dataDirectoryHostPath }}
     - 'hostPath'
     {{- end }}
+  {{- if .Values.client.hostNetwork }}
+  hostNetwork: {{ .Values.client.hostNetwork }}
+  {{- else }}
   hostNetwork: false
+  {{- end }}
   hostPorts:
   {{- if (not (and .Values.global.tls.enabled .Values.global.tls.httpsOnly)) }}
   # HTTP Port
