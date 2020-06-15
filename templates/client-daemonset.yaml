@@ -55,6 +55,10 @@ spec:
       dnsPolicy: {{ .Values.client.dnsPolicy }}
       {{- end }}
 
+      {{- if .Values.client.hostNetwork }}
+      hostNetwork: {{ .Values.client.hostNetwork }}
+      {{- end }}
+
       volumes:
         - name: data
         {{- if .Values.client.dataDirectoryHostPath }}

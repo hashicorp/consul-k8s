@@ -963,6 +963,27 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# hostNetwork
+
+@test "client/DaemonSet: hostNetwork not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.hostNetwork == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: hostNetwork can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-daemonset.yaml \
+      --set 'client.hostNetwork=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.hostNetwork == true' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+#--------------------------------------------------------------------
 # updateStrategy
 
 @test "client/DaemonSet: updateStrategy not set by default" {

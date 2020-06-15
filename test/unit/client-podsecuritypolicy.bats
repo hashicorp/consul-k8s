@@ -129,3 +129,27 @@ load _helpers
       yq -c '.spec.hostPorts' | tee /dev/stderr)
   [ "${actual}" = '[{"min":8501,"max":8501},{"min":8502,"max":8502}]' ]
 }
+
+#--------------------------------------------------------------------
+# client.hostNetwork = true
+@test "client/PodSecurityPolicy: enabled with global.enablePodSecurityPolicies=true and hostNetwork=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'client.hostNetwork=true' \
+      . | tee /dev/stderr |
+      yq '.spec.hostNetwork == true' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+# client.hostNetwork = false
+@test "client/PodSecurityPolicy: enabled with global.enablePodSecurityPolicies=true and default hostNetwork=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/client-podsecuritypolicy.yaml  \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq '.spec.hostNetwork == false' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
