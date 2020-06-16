@@ -124,7 +124,7 @@ jobs:
       - restore_cache:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
-      - run: XC_OS=<< parameters.OS >> XC_ARCH=<< parameters.ARCH >> ./build-support/scripts/build-local.sh
+      - run: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
