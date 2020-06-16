@@ -219,5 +219,13 @@ spec:
       {{- if .Values.connectInject.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.connectInject.nodeSelector . | indent 8 | trim }}
-      {{- end }}  
+      {{- end }}
+      {{- if .Values.connectInject.affinity }}
+      affinity:
+        {{ tpl .Values.connectInject.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.connectInject.tolerations }}
+      tolerations:
+        {{ tpl .Values.connectInject.tolerations . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
