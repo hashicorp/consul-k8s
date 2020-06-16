@@ -67,10 +67,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-            export VALUE="{{ .Release.Name }}"
-            consul kv delete _consul_helm_test
-            consul kv put _consul_helm_test $VALUE
-            [ `consul kv get _consul_helm_test` = "$VALUE" ]
-            consul kv delete _consul_helm_test
+            consul members | tee members.txt
+            if [ $(grep -c consul-server members.txt) != $(grep consul-server members.txt | grep -c alive) ]
+            then
+              echo "Failed because not all consul servers are available"
+              exit 1
+            fi
+
   restartPolicy: Never
 {{- end }}
