@@ -62,6 +62,9 @@ services {
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -86,6 +89,9 @@ services {
   name = "web"
   address = "${POD_IP}"
   port = 0
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 
@@ -115,6 +121,9 @@ cp /bin/consul /consul/connect-inject/consul`,
   kind = "connect-proxy"
   address = "${POD_IP}"
   port = 20000
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -141,6 +150,9 @@ services {
   name = "web"
   address = "${POD_IP}"
   port = 1234
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }`,
 			"",
 		},
@@ -287,6 +299,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   tags = ["abc"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -314,6 +329,9 @@ services {
   address = "${POD_IP}"
   port = 1234
   tags = ["abc"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }`,
 			"",
 		},
@@ -333,6 +351,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -360,6 +381,9 @@ services {
   address = "${POD_IP}"
   port = 1234
   tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }`,
 			"",
 		},
@@ -379,6 +403,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -406,6 +433,9 @@ services {
   address = "${POD_IP}"
   port = 1234
   tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }`,
 			"",
 		},
@@ -426,6 +456,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   tags = ["abc","123","abc","123","def","456"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -453,6 +486,9 @@ services {
   address = "${POD_IP}"
   port = 1234
   tags = ["abc","123","abc","123","def","456"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }`,
 			"",
 		},
@@ -484,6 +520,7 @@ services {
   meta = {
     name = "abc"
     version = "2"
+    pod-name = "${POD_NAME}"
   }
 
   proxy {
@@ -514,6 +551,7 @@ services {
   meta = {
     name = "abc"
     version = "2"
+    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -525,8 +563,11 @@ services {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
+			`  meta = {
+    pod-name = "${POD_NAME}"
+  }
+`,
 			"",
-			`meta`,
 		},
 
 		{
@@ -535,8 +576,11 @@ services {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
+			`  meta = {
+    pod-name = "${POD_NAME}"
+  }
+`,
 			"",
-			`meta`,
 		},
 	}
 
@@ -620,6 +664,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -645,6 +692,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 
@@ -688,6 +738,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -713,6 +766,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 
@@ -757,6 +813,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -782,6 +841,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 /bin/consul login -method="auth-method" \
@@ -835,6 +897,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -860,6 +925,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 /bin/consul login -method="auth-method" \
@@ -913,6 +981,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -938,6 +1009,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 # Create the service-defaults config for the service
@@ -995,6 +1069,9 @@ services {
   address = "${POD_IP}"
   port = 20000
   namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 
   proxy {
     destination_service_name = "web"
@@ -1020,6 +1097,9 @@ services {
   address = "${POD_IP}"
   port = 0
   namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
 }
 EOF
 # Create the service-defaults config for the service
