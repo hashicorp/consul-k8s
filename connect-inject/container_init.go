@@ -278,13 +278,14 @@ services {
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
-  {{- if .Meta}}
   meta = {
+    {{- if .Meta}}
     {{- range $key, $value := .Meta }}
     {{$key}} = "{{$value}}"
     {{- end }}
+    {{- end }}
+    pod-name = "${POD_NAME}"
   }
-  {{- end}}
 
   proxy {
     destination_service_name = "{{ .ServiceName }}"
@@ -338,13 +339,14 @@ services {
   {{- if .Tags}}
   tags = {{.Tags}}
   {{- end}}
-  {{- if .Meta}}
   meta = {
+    {{- if .Meta}}
     {{- range $key, $value := .Meta }}
     {{$key}} = "{{$value}}"
     {{- end }}
+    {{- end }}
+    pod-name = "${POD_NAME}"
   }
-  {{- end}}
 }
 EOF
 
