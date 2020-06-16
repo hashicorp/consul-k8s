@@ -103,7 +103,17 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
-  build-distros:
+  build-distro: # defines a parameterized job
+    description: A job that will build the os/arch distro set by XC_OS and XC_ARCH
+    parameters:
+      OS:
+        description: What OSes to build
+        default: ""
+        type: string
+      ARCH:
+        description: What architectures to build
+        default: ""
+        type: string
     executor: go
     environment:
       GOXPARALLEL: 2 # CircleCI containers are 2 CPU x 4GB RAM
@@ -114,10 +124,7 @@ jobs:
       - restore_cache:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
-
-      - run: make tools
-      - run: ./build-support/scripts/build-local.sh
-
+      - run: XC_OS=<< parameters.OS >> XC_ARCH=<< parameters.ARCH >> ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
@@ -152,11 +159,28 @@ workflows:
           requires:
             - go-fmt-and-vet
             - lint-consul-retry
-      - build-distros:
+      - build-distro:
+          OS: "darwin freebsd linux windows"
+          ARCH: "386"
+          name: build-distros-386
+          requires:
+            - test
+            - test_enterprise
+      - build-distro:
+          OS: "darwin freebsd linux solaris windows"
+          ARCH: "amd64"
+          name: build-distros-amd64
+          requires:
+            - test
+            - test_enterprise
+      - build-distro:
+          OS: "linux"
+          ARCH: "arm arm64"
+          name: build-distros-arm-arm64
           requires:
             - test
             - test_enterprise
       - dev-upload-docker:
           context: consul-ci
           requires:
-            - build-distros
+            - build-distros-amd64
