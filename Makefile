@@ -31,7 +31,7 @@ export GOTAGS
 ################
 CI_DEV_DOCKER_NAMESPACE?=hashicorpdev
 CI_DEV_DOCKER_IMAGE_NAME?=consul-k8s
-CI_DEV_DOCKER_WORKDIR?=pkg/bin/linux_amd64/
+CI_DEV_DOCKER_WORKDIR?=.
 CONSUL_K8S_IMAGE_VERSION?=latest
 ################
 
