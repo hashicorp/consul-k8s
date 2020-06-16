@@ -207,5 +207,13 @@ spec:
       {{- if .Values.syncCatalog.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.syncCatalog.nodeSelector . | indent 8 | trim }}
-      {{- end }}  
+      {{- end }}
+      {{- if .Values.syncCatalog.affinity }}
+      affinity:
+        {{ tpl .Values.syncCatalog.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.syncCatalog.tolerations }}
+      tolerations:
+        {{ tpl .Values.syncCatalog.tolerations . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
