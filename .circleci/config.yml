@@ -118,9 +118,25 @@ jobs:
       - run: make tools
       - run: ./build-support/scripts/build-local.sh
 
+      # persist to downstream job
+      - persist_to_workspace:
+          root: .
+          paths:
+            - pkg/bin
       # save dev build to CircleCI
       - store_artifacts:
           path: ./pkg/bin
+
+  # upload dev docker image
+  dev-upload-docker:
+    executor: go
+    steps:
+      - checkout
+      # get consul-k8s binary
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - run: make ci.dev-docker
 
 workflows:
   version: 2
@@ -140,3 +156,7 @@ workflows:
           requires:
             - test
             - test_enterprise
+      - dev-upload-docker:
+          context: consul-ci
+          requires:
+            - build-distros
