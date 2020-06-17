@@ -30,7 +30,7 @@ global:
   #   image: "consul:1.5.0"
   #   # Consul Enterprise 1.5.0
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
-  image: "consul:1.7.3"
+  image: "consul:1.8.0"
 
   # array of objects containing image pull secret names that will be applied to
   # each service account.
@@ -53,7 +53,7 @@ global:
   # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
-  imageK8S: "hashicorp/consul-k8s:0.15.0"
+  imageK8S: "hashicorp/consul-k8s:0.16.0"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -200,13 +200,12 @@ global:
 
   # Settings related to federating with another Consul datacenter.
   federation:
-    # Experimental: Currently this is only available in Consul 1.8.0-beta1.
-    #               To use, set global.image: "consul:1.8.0-beta1".
     # If enabled, this datacenter will be federation-capable. Only federation
     # through mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
     # Requires global.tls.enabled, meshGateway.enabled and connectInject.enabled
     # to be true.
+    # Requires Consul 1.8+.
     enabled: false
 
     # If true, the chart will create a Kubernetes secret that can be imported
