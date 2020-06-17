@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.16.0 (June 17, 2020)
 
 FEATURES:
 
