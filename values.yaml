@@ -57,7 +57,7 @@ global:
 
   # imageEnvoy defines the default envoy image to use for ingress and
   # terminating gateways.
-  imageEnvoy: "envoyproxy/envoy:v1.13.0"
+  imageEnvoy: "envoyproxy/envoy-alpine:v1.14.2"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -1028,7 +1028,7 @@ meshGateway:
     additionalSpec: null
 
   # Envoy image to use. For Consul v1.7+, Envoy version 1.13+ is required.
-  imageEnvoy: envoyproxy/envoy:v1.13.0
+  imageEnvoy: envoyproxy/envoy-alpine:v1.14.2
 
   # If set to true, gateway Pods will run on the host network.
   hostNetwork: false
