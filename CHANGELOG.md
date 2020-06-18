@@ -2,6 +2,18 @@
 
 FEATURES:
 
+* Supports deploying Consul [Ingress](https://www.consul.io/docs/connect/ingress_gateway)
+  and [Terminating](https://www.consul.io/docs/connect/terminating_gateway) Gateways.
+  Multiple different gateways of each type can be deployed with default values that can
+  be overridden for specific gateways if desired. Full documentation of the configuration
+  options can be found in the values file or in the Helm chart documentation
+  ([Ingress](https://www.consul.io/docs/k8s/helm#v-ingressgateways),
+  [Terminating](https://www.consul.io/docs/k8s/helm#v-terminatinggateways)).
+  Requires Consul 1.8.0+.
+
+  Ingress gateways: ([GH-456](https://github.com/hashicorp/consul-helm/pull/456))
+  Terminating gateways: ([GH-503](https://github.com/hashicorp/consul-helm/pull/503))
+
 * Resources are now set on all containers. This enables the chart to be deployed
   in clusters that have resource quotas set. This also ensures that Consul
   server and client pods won't be evicted by Kubernetes when nodes reach their
