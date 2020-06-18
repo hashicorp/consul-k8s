@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.22.0 (June 18, 2020)
+
 FEATURES:
 
 * Supports deploying Consul [Ingress](https://www.consul.io/docs/connect/ingress_gateway)
@@ -11,8 +13,8 @@ FEATURES:
   [Terminating](https://www.consul.io/docs/k8s/helm#v-terminatinggateways)).
   Requires Consul 1.8.0+.
 
-  Ingress gateways: ([GH-456](https://github.com/hashicorp/consul-helm/pull/456))
-  Terminating gateways: ([GH-503](https://github.com/hashicorp/consul-helm/pull/503))
+  Ingress gateways: [[GH-456](https://github.com/hashicorp/consul-helm/pull/456)], 
+  Terminating gateways: [[GH-503](https://github.com/hashicorp/consul-helm/pull/503)]
 
 * Resources are now set on all containers. This enables the chart to be deployed
   in clusters that have resource quotas set. This also ensures that Consul
@@ -20,13 +22,21 @@ FEATURES:
   resource limits.
   
   Resource settings have been made configurable for sync catalog, connect inject
-  and client snapshot deployments.
+  and client snapshot deployments and sidecar proxies. [[GH-470](https://github.com/hashicorp/consul-helm/pull/470)]
   
   The default settings were chosen based on a cluster with a small workload.
   For production, we recommend monitoring resource usage and modifying the
-  defaults according to your usage.
+  defaults according to your usage. [[GH-466](https://github.com/hashicorp/consul-helm/pull/466)]
 
 BREAKING CHANGES:
+
+* It is recommended to use the helm repository to install the helm chart instead of cloning this repo directly. Starting with this release
+ the master branch may contain breaking changes.
+
+  ```sh
+    $ helm repo add hashicorp https://helm.releases.hashicorp.com
+    $ helm install consul hashicorp/consul --set global.name=consul
+  ```
 
 * Mesh Gateway: `meshGateway.enableHealthChecks` is no longer supported. This config
   option was to work around an issue where mesh gateways would not listen on their
@@ -59,25 +69,39 @@ BREAKING CHANGES:
         cpu: "100m"
   ```
 
- * Clients and Servers: There are now default resource settings for Consul clients
+* Clients and Servers: There are now default resource settings for Consul clients
    and servers. Previously, there were no default settings which meant the default
    was unlimited. This change was made because Kubernetes will prefer to evict
    pods that don't have resource settings and that resulted in the Consul client
    and servers being evicted. The default resource settings were chosen based
    on a low-usage cluster. If you are running a production cluster, use the
    `kubectl top` command to see how much CPU and memory your clients and servers
-   are using and set the resources accordingly. ([GH-466](https://github.com/hashicorp/consul-helm/pull/466)]
+   are using and set the resources accordingly [[GH-466](https://github.com/hashicorp/consul-helm/pull/466)].
+* `global.bootstrapACLs` has been removed, use `global.acls.manageSystemACLs` instead [[GH-501](https://github.com/hashicorp/consul-helm/pull/501)].
 
 IMPROVEMENTS:
 
 * Add component label to the server, DNS, and UI services [[GH-480](https://github.com/hashicorp/consul-helm/pull/480)].
+* Provide the ability to set a custom CA Cert for consul snapshot agent [[GH-481](https://github.com/hashicorp/consul-helm/pull/481)].
+* Add support for client host networking [[GH-496](https://github.com/hashicorp/consul-helm/pull/496)].
+
+  To enable:
+  ```yaml
+  client:
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
+  ```
+* Add ability to set Affinity and Tolerations to Connect Inject and Catalog Sync [[GH-335](https://github.com/hashicorp/consul-helm/pull/335)].
+* Updated the default consul-k8s version to 0.16.0.
+* Updated the default consul version to 1.8.0.
+* Update default Envoy image version and OS to `envoyproxy/envoy-alpine:1.14.2` [[GH-502](https://github.com/hashicorp/consul-helm/pull/502)].
 
 DEPRECATIONS
 
 * Setting resources via YAML string is now deprecated. Instead, set directly as YAML.
   This affects `client.resources`, `server.resources` and `meshGateway.resources`.
   To set directly as YAML, simply remove the pipe (`|`) character that defines
-  the YAML as a string: 
+  the YAML as a string [[GH-465](https://github.com/hashicorp/consul-helm/pull/465)]: 
   
   Before:
   ```yaml
