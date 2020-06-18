@@ -102,7 +102,7 @@ load _helpers
       -x templates/server-acl-init-job.yaml  \
       --set 'global.bootstrapACLs=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.bootstrapACLs is removed, use global.acls.manageSystemACLs instead" ]]
+  [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
 }
 
 @test "serverACLInit/Job: does not set -create-client-token=false when client is enabled (the default)" {
