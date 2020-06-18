@@ -2,7 +2,7 @@
 {{- if (and $serverEnabled .Values.externalServers.enabled) }}{{ fail "only one of server.enabled or externalServers.enabled can be set" }}{{ end -}}
 {{- if (or $serverEnabled .Values.externalServers.enabled) }}
 {{- if and .Values.global.acls.createReplicationToken (not .Values.global.acls.manageSystemACLs) }}{{ fail "if global.acls.createReplicationToken is true, global.acls.manageSystemACLs must be true" }}{{ end -}}
-{{- if .Values.global.bootstrapACLs }}{{ fail "global.bootstrapACLs is removed, use global.acls.manageSystemACLs instead" }}{{ end -}}
+{{- if .Values.global.bootstrapACLs }}{{ fail "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" }}{{ end -}}
 {{- if .Values.global.acls.manageSystemACLs }}
 {{- /* We don't render this job when server.updatePartition > 0 because that
     means a server rollout is in progress and this job won't complete unless
