@@ -680,9 +680,8 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		flags          []string
-		expectedHost   string
-		expectedCACert string
+		flags        []string
+		expectedHost string
 	}{
 		"-create-inject-token flag": {
 			flags:        []string{"-create-inject-token"},
@@ -707,9 +706,6 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
 			require := require.New(tt)
-			if c.expectedCACert != "" {
-				caCert = c.expectedCACert
-			}
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -768,6 +764,90 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Test that when we provide a different k8s auth method parameters,
+// the auth method is updated.
+func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	defer testSvr.Stop()
+	caCert, jwtToken := setUpK8sServiceAccount(t, k8s)
+	require := require.New(t)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+
+	bindingRuleSelector := "serviceaccount.name!=default"
+
+	// First, create an auth method using the defaults
+	responseCode := cmd.Run([]string{
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-create-inject-auth-method",
+		"-acl-binding-rule-selector=" + bindingRuleSelector,
+	})
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that the auth method was created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+	})
+	require.NoError(err)
+	authMethodName := resourcePrefix + "-k8s-auth-method"
+	authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
+		&api.QueryOptions{Token: bootToken})
+	require.NoError(err)
+	require.NotNil(authMethod)
+	require.Contains(authMethod.Config, "Host")
+	require.Equal(authMethod.Config["Host"], defaultKubernetesHost)
+	require.Contains(authMethod.Config, "CACert")
+	require.Equal(authMethod.Config["CACert"], caCert)
+	require.Contains(authMethod.Config, "ServiceAccountJWT")
+	require.Equal(authMethod.Config["ServiceAccountJWT"], jwtToken)
+
+	// Generate a new CA certificate
+	_, _, caCertPem, _, err := cert.GenerateCA("kubernetes")
+	require.NoError(err)
+
+	// Overwrite the default kubernetes api, service account token and CA cert
+	kubernetesHost := "https://kubernetes.example.com"
+	serviceAccountToken = "ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM="
+	serviceAccountCACert = base64.StdEncoding.EncodeToString([]byte(caCertPem))
+
+	// Create a new service account
+	updatedCACert, updatedJWTToken := setUpK8sServiceAccount(t, k8s)
+
+	// Run command again
+	responseCode = cmd.Run([]string{
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-acl-binding-rule-selector=" + bindingRuleSelector,
+		"-create-inject-auth-method",
+		"-inject-auth-method-host=" + kubernetesHost,
+	})
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that the auth method has been updated
+	authMethod, _, err = consul.ACL().AuthMethodRead(authMethodName,
+		&api.QueryOptions{Token: bootToken})
+	require.NoError(err)
+	require.NotNil(authMethod)
+	require.Contains(authMethod.Config, "Host")
+	require.Equal(authMethod.Config["Host"], kubernetesHost)
+	require.Contains(authMethod.Config, "CACert")
+	require.Equal(authMethod.Config["CACert"], updatedCACert)
+	require.Contains(authMethod.Config, "ServiceAccountJWT")
+	require.Equal(authMethod.Config["ServiceAccountJWT"], updatedJWTToken)
 }
 
 // Test that ACL binding rules are updated if the rule selector changes.
@@ -1766,45 +1846,50 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 // when the injector deployment is created. It returns the Service Account
 // CA Cert and JWT token.
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) {
-	// Create Kubernetes Service.
-	_, err := k8s.CoreV1().Services(ns).Create(&v1.Service{
-		Spec: v1.ServiceSpec{
-			ClusterIP: "1.2.3.4",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubernetes",
-		},
-	})
-	require.NoError(t, err)
-
-	// Create ServiceAccount for the injector that the helm chart creates.
-	_, err = k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
-		},
-		Secrets: []v1.ObjectReference{
-			{
-				Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
+	// and update do nothing.
+	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(serviceAccountName, metav1.GetOptions{})
+	if sa == nil {
+		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: serviceAccountName,
 			},
-		},
-	})
-	require.NoError(t, err)
+			Secrets: []v1.ObjectReference{
+				{
+					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+				},
+			},
+		})
+		require.NoError(t, err)
+	}
 
 	// Create the ServiceAccount Secret.
 	caCertBytes, err := base64.StdEncoding.DecodeString(serviceAccountCACert)
 	require.NoError(t, err)
 	tokenBytes, err := base64.StdEncoding.DecodeString(serviceAccountToken)
 	require.NoError(t, err)
-	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
+
+	// Create a Kubernetes secret if it doesn't exist, otherwise update it
+	secretName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+			Name: secretName,
 		},
 		Data: map[string][]byte{
 			"ca.crt": caCertBytes,
 			"token":  tokenBytes,
 		},
-	})
-	require.NoError(t, err)
+	}
+	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(secretName, metav1.GetOptions{})
+	if existingSecret == nil {
+		_, err = k8s.CoreV1().Secrets(ns).Create(secret)
+		require.NoError(t, err)
+	} else {
+		_, err = k8s.CoreV1().Secrets(ns).Update(secret)
+		require.NoError(t, err)
+	}
+
 	return string(caCertBytes), string(tokenBytes)
 }
 

@@ -136,7 +136,7 @@ func (c *Command) init() {
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
-		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times."+
+		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
 			"At least one value is required.")
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 	c.flags.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
