@@ -9,83 +9,62 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// We use the default Kubernetes service as the default host
+// for the auth method created in Consul.
+// This is recommended as described here:
+// https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
+const defaultKubernetesHost = "https://kubernetes.default.svc"
+
 // configureConnectInject sets up auth methods so that connect injection will
 // work.
 func (c *Command) configureConnectInject(consulClient *api.Client) error {
 
 	authMethodName := c.withPrefix("k8s-auth-method")
 
-	// If not running namespaces, check if there's already an auth method.
-	// This means no changes need to be made to it. Binding rules should
-	// still be checked in case a user has updated their config.
-	var createAuthMethod bool
-	if !c.flagEnableNamespaces {
-		// Check if an auth method exists with the given name
-		err := c.untilSucceeds(fmt.Sprintf("checking if %s auth method exists", authMethodName),
-			func() error {
-				am, _, err := consulClient.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{})
-				// This call returns nil if an AuthMethod does
-				// not exist with that name. This means we will
-				// need to create one.
-				if err == nil && am == nil {
-					createAuthMethod = true
-				}
+	// Create the auth method template. This requires calls to the
+	// kubernetes environment.
+	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName)
+	if err != nil {
+		return err
+	}
+
+	// Set up the auth method in the specific namespace if not mirroring.
+	// If namespaces and mirroring are enabled, this is not necessary because
+	// the auth method will fall back to being created in the Consul `default`
+	// namespace automatically, as is necessary for mirroring.
+	// Note: if the config changes, an auth method will be created in the
+	// correct namespace, but the old auth method will not be removed.
+	writeOptions := api.WriteOptions{}
+	if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
+		writeOptions.Namespace = c.flagConsulInjectDestinationNamespace
+
+		if c.flagConsulInjectDestinationNamespace != consulDefaultNamespace {
+			// If not the default namespace, check if it exists, creating it
+			// if necessary. The Consul namespace must exist for the AuthMethod
+			// to be created there.
+			err = c.untilSucceeds(fmt.Sprintf("checking or creating namespace %s",
+				c.flagConsulInjectDestinationNamespace),
+				func() error {
+					err := c.checkAndCreateNamespace(c.flagConsulInjectDestinationNamespace, consulClient)
+					return err
+				})
+			if err != nil {
 				return err
-			})
-		if err != nil {
-			return err
+			}
 		}
 	}
 
-	// If namespaces are enabled, a namespace configuration change may need
-	// the auth method to be updated (as with a different mirroring prefix)
-	// or a new auth method created (if a new destination namespace is specified).
-	if c.flagEnableNamespaces || createAuthMethod {
-		// Create the auth method template. This requires calls to the
-		// kubernetes environment.
-		authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName)
-		if err != nil {
+	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
+		func() error {
+			var err error
+			// `AuthMethodCreate` will also be able to update an existing
+			// AuthMethod based on the name provided. This means that any
+			// configuration changes will correctly update the AuthMethod.
+			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
 			return err
-		}
-
-		// Set up the auth method in the specific namespace if not mirroring
-		// If namespaces and mirroring are enabled, this is not necessary because
-		// the auth method will fall back to being created in the Consul `default`
-		// namespace automatically, as is necessary for mirroring.
-		// Note: if the config changes, an auth method will be created in the
-		// correct namespace, but the old auth method will not be removed.
-		writeOptions := api.WriteOptions{}
-		if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
-			writeOptions.Namespace = c.flagConsulInjectDestinationNamespace
-
-			if c.flagConsulInjectDestinationNamespace != consulDefaultNamespace {
-				// If not the default namespace, check if it exists, creating it
-				// if necessary. The Consul namespace must exist for the AuthMethod
-				// to be created there.
-				err = c.untilSucceeds(fmt.Sprintf("checking or creating namespace %s",
-					c.flagConsulInjectDestinationNamespace),
-					func() error {
-						err := c.checkAndCreateNamespace(c.flagConsulInjectDestinationNamespace, consulClient)
-						return err
-					})
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
-			func() error {
-				var err error
-				// `AuthMethodCreate` will also be able to update an existing
-				// AuthMethod based on the name provided. This means that any namespace
-				// configuration changes will correctly update the AuthMethod.
-				_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
-				return err
-			})
-		if err != nil {
-			return err
-		}
+		})
+	if err != nil {
+		return err
 	}
 
 	// Create the binding rule.
@@ -110,7 +89,7 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 	}
 
 	var existingRules []*api.ACLBindingRule
-	err := c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
+	err = c.untilSucceeds(fmt.Sprintf("listing binding rules for auth method %s", authMethodName),
 		func() error {
 			var err error
 			existingRules, _, err = consulClient.ACL().BindingRuleList(authMethodName, &queryOptions)
@@ -186,7 +165,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 		return api.ACLAuthMethod{}, err
 	}
 
-	kubernetesHost := "https://kubernetes.default.svc"
+	kubernetesHost := defaultKubernetesHost
 
 	// Check if custom auth method Host and CACert are provided
 	if c.flagInjectAuthMethodHost != "" {
