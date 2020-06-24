@@ -627,6 +627,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 						},
 					},
 				},
+				ServiceAccountName: "web",
 			},
 		}
 	}
@@ -1323,6 +1324,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 					},
 				},
 			},
+			ServiceAccountName: "foo",
 		},
 	}
 	container, err := h.containerInit(pod, k8sNamespace)
@@ -1373,6 +1375,7 @@ func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 					},
 				},
 			},
+			ServiceAccountName: "foo",
 		},
 	}
 	container, err := h.containerInit(pod, k8sNamespace)
@@ -1513,4 +1516,52 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
 		},
 	}, container.Resources)
+}
+
+func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsEnabled(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		AuthMethod: "auth-method",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "serviceName",
+				},
+			},
+			ServiceAccountName: "notServiceName",
+		},
+	}
+
+	_, err := h.containerInit(pod, k8sNamespace)
+	require.EqualError(err, `serviceAccountName "notServiceName" does not match service name "foo"`)
+}
+
+func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsDisabled(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "serviceName",
+				},
+			},
+			ServiceAccountName: "notServiceName",
+		},
+	}
+
+	_, err := h.containerInit(pod, k8sNamespace)
+	require.NoError(err)
 }

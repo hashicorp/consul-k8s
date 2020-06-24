@@ -81,6 +81,12 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		panic("No service found. This should be impossible since we default it.")
 	}
 
+	// When ACLs are enabled, the ACL token returned from `consul login` is only
+	// valid for a service with the same name as the ServiceAccountName.
+	if data.AuthMethod != "" && data.ServiceName != pod.Spec.ServiceAccountName {
+		return corev1.Container{}, fmt.Errorf("serviceAccountName %q does not match service name %q", pod.Spec.ServiceAccountName, data.ServiceName)
+	}
+
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
