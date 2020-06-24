@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+
+* ACLs: Always update Kubernetes auth method created by the `server-acl-init` job. Previously, we would only update the auth method if Consul namespaces are enabled. With this change, we always update it to make sure that any configuration changes or updates to the `connect-injector-authmethod-svc-account` are propagated [[GH-282](https://github.com/hashicorp/consul-k8s/pull/282)].
+
 ## 0.16.0 (June 17, 2020)
 
 FEATURES:
