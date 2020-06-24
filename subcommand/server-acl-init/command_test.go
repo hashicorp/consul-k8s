@@ -819,6 +819,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 
 	// Overwrite the default kubernetes api, service account token and CA cert
 	kubernetesHost := "https://kubernetes.example.com"
+	// This token is the base64 encoded example token from jwt.io
 	serviceAccountToken = "ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM="
 	serviceAccountCACert = base64.StdEncoding.EncodeToString([]byte(caCertPem))
 
@@ -1847,7 +1848,7 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 // CA Cert and JWT token.
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
-	// and update do nothing.
+	// otherwise, do nothing.
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
 	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
