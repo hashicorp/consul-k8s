@@ -2,29 +2,29 @@
 
 load _helpers
 
-@test "server/ClusterRole: enabled by default" {
+@test "server/Role: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "server/ClusterRole: disabled with global.enabled=false" {
+@test "server/Role: disabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'global.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "server/ClusterRole: can be enabled with global.enabled=false" {
+@test "server/Role: can be enabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'global.enabled=false' \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
@@ -32,20 +32,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ClusterRole: disabled with server.enabled=false" {
+@test "server/Role: disabled with server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "server/ClusterRole: enabled with server.enabled=true" {
+@test "server/Role: enabled with server.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -53,10 +53,10 @@ load _helpers
 }
 
 # The rules key must always be set (#178).
-@test "server/ClusterRole: rules empty with server.enabled=true" {
+@test "server/Role: rules empty with server.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
       yq '.rules' | tee /dev/stderr)
@@ -66,10 +66,10 @@ load _helpers
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 
-@test "server/ClusterRole: podsecuritypolicies are added when global.enablePodSecurityPolicies is true" {
+@test "server/Role: podsecuritypolicies are added when global.enablePodSecurityPolicies is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-clusterrole.yaml  \
+      -x templates/server-role.yaml  \
       --set 'server.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |

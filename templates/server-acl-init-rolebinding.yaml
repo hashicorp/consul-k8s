@@ -2,9 +2,10 @@
 {{- if (or $serverEnabled .Values.externalServers.enabled) }}
 {{- if .Values.global.acls.manageSystemACLs }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
+  name: {{ template "consul.fullname" . }}-server-acl-init
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -12,11 +13,10 @@ metadata:
     release: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
+  kind: Role
+  name: {{ template "consul.fullname" . }}-server-acl-init
 subjects:
   - kind: ServiceAccount
-    name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
-    namespace: {{ .Release.Namespace }}
+    name: {{ template "consul.fullname" . }}-server-acl-init
 {{- end }}
 {{- end }}
