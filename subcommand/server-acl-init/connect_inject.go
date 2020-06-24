@@ -9,6 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// We use the default Kubernetes service as the default host
+// for the auth method created in Consul.
+// This is recommended as described here:
+// https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
 const defaultKubernetesHost = "https://kubernetes.default.svc"
 
 // configureConnectInject sets up auth methods so that connect injection will
