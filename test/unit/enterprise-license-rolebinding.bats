@@ -2,19 +2,19 @@
 
 load _helpers
 
-@test "enterpriseLicense/ClusterRoleBinding: disabled by default" {
+@test "enterpriseLicense/RoleBinding: disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-clusterrolebinding.yaml  \
+      -x templates/enterprise-license-rolebinding.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "enterpriseLicense/ClusterRoleBinding: disabled with server=false, ent secret defined" {
+@test "enterpriseLicense/RoleBinding: disabled with server=false, ent secret defined" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-clusterrolebinding.yaml  \
+      -x templates/enterprise-license-rolebinding.yaml  \
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
@@ -23,30 +23,30 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "enterpriseLicense/ClusterRoleBinding: disabled when ent secretName missing" {
+@test "enterpriseLicense/RoleBinding: disabled when ent secretName missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-clusterrolebinding.yaml  \
+      -x templates/enterprise-license-rolebinding.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "enterpriseLicense/ClusterRoleBinding: disabled when ent secretKey missing" {
+@test "enterpriseLicense/RoleBinding: disabled when ent secretKey missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-clusterrolebinding.yaml  \
+      -x templates/enterprise-license-rolebinding.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "enterpriseLicense/ClusterRoleBinding: enabled when ent license defined" {
+@test "enterpriseLicense/RoleBinding: enabled when ent license defined" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-clusterrolebinding.yaml  \
+      -x templates/enterprise-license-rolebinding.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
