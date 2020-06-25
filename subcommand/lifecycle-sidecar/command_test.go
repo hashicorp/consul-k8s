@@ -138,8 +138,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	timer := &retry.Timer{Timeout: 1 * time.Second, Wait: 100 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		svc, _, err := client.Agent().Service("service-id", nil)
 		require.NoError(r, err)
 		require.Equal(r, 80, svc.Port)
