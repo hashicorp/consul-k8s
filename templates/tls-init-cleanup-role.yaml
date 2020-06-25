@@ -1,7 +1,7 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if .Values.global.tls.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
+kind: Role
 metadata:
   name: {{ template "consul.fullname" . }}-tls-init-cleanup
   namespace: {{ .Release.Namespace }}
@@ -13,13 +13,26 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete
     "helm.sh/hook-delete-policy": hook-succeeded
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ template "consul.fullname" . }}-tls-init-cleanup
-subjects:
-- kind: ServiceAccount
-  name: {{ template "consul.fullname" . }}-tls-init-cleanup
-  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: [""]
+  resources:
+    - secrets
+  resourceNames:
+    {{- if (not (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName)) }}
+    - {{ template "consul.fullname" . }}-ca-cert
+    - {{ template "consul.fullname" . }}-ca-key
+    {{- end }}
+    - {{ template "consul.fullname" . }}-server-cert
+  verbs:
+    - delete
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources:
+    - podsecuritypolicies
+  verbs:
+    - use
+  resourceNames:
+    - {{ template "consul.fullname" . }}-tls-init-cleanup
+{{- end }}
 {{- end }}
 {{- end }}
