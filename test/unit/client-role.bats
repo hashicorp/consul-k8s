@@ -2,29 +2,29 @@
 
 load _helpers
 
-@test "client/ClusterRole: enabled by default" {
+@test "client/Role: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "client/ClusterRole: disabled with global.enabled=false" {
+@test "client/Role: disabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'global.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "client/ClusterRole: can be enabled with global.enabled=false" {
+@test "client/Role: can be enabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -32,20 +32,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "client/ClusterRole: disabled with client.enabled=false" {
+@test "client/Role: disabled with client.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "client/ClusterRole: enabled with client.enabled=true" {
+@test "client/Role: enabled with client.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -53,10 +53,10 @@ load _helpers
 }
 
 # The rules key must always be set (#178).
-@test "client/ClusterRole: rules empty with client.enabled=true" {
+@test "client/Role: rules empty with client.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.rules' | tee /dev/stderr)
@@ -66,10 +66,10 @@ load _helpers
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 
-@test "client/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+@test "client/Role: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
@@ -80,10 +80,10 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "client/ClusterRole: allows secret access with global.bootsrapACLs=true" {
+@test "client/Role: allows secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -91,10 +91,10 @@ load _helpers
   [ "${actual}" = "secrets" ]
 }
 
-@test "client/ClusterRole: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
+@test "client/Role: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-clusterrole.yaml  \
+      -x templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
