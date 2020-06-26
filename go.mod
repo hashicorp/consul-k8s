@@ -10,12 +10,13 @@ require (
 	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/consul v1.7.1
-	github.com/hashicorp/consul/api v1.5.0
-	github.com/hashicorp/consul/sdk v0.5.0
+	github.com/hashicorp/consul/api v1.4.0
+	github.com/hashicorp/consul/sdk v0.4.1-0.20200626165806-0f9052a92c03
 	github.com/hashicorp/go-discover v0.0.0-20191202160150-7ec2cfbda7a2
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
+	github.com/hashicorp/serf v0.9.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/json-iterator/go v1.1.8 // indirect
 	github.com/mattbaird/jsonpatch v0.0.0-20171005235357-81af80346b1a

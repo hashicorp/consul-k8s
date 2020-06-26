@@ -79,13 +79,12 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
 		// change the write interval, so we can see changes in Consul quicker
-		"-consul-write-interval", "500ms",
+		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
-	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
@@ -124,12 +123,10 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		// change the write interval, so we can see changes in Consul quicker
-		"-consul-write-interval", "1s",
+		"-consul-write-interval", "100ms",
 	})
 
-	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
@@ -140,13 +137,13 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 
 	// restart sync with -add-k8s-namespace-suffix
 	exitChan = runCommandAsynchronously(&cmd, []string{
-		"-consul-write-interval", "1s",
+		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
 	// check that the name of the service is now namespaced
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		services, _, err := consulClient.Catalog().Services(nil)
 		require.NoError(r, err)
 		require.Len(r, services, 2)
@@ -189,14 +186,13 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-consul-write-interval", "1s",
+		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
 	// check that the name of the service is namespaced
-	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		svc, _, err := consulClient.Catalog().Service("foo-bar", "", nil)
 		require.NoError(r, err)
 		require.Len(r, svc, 1)
@@ -278,7 +274,7 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 			}
 
 			flags := []string{
-				"-consul-write-interval", "500ms",
+				"-consul-write-interval", "100ms",
 				"-log-level=debug",
 			}
 			for _, allow := range c.AllowList {
@@ -302,8 +298,7 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 			exitChan := runCommandAsynchronously(&cmd, flags)
 			defer stopCommand(tt, &cmd, exitChan)
 
-			timer := &retry.Timer{Timeout: 2 * time.Second, Wait: 500 * time.Millisecond}
-			retry.RunWith(timer, tt, func(r *retry.R) {
+			retry.Run(tt, func(r *retry.R) {
 				svcs, _, err := consulClient.Catalog().Services(nil)
 				require.NoError(r, err)
 				// There should be the number of expected services plus one
@@ -413,7 +408,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 			ui := cli.NewMockUi()
 
 			commonArgs := []string{
-				"-consul-write-interval", "500ms",
+				"-consul-write-interval", "100ms",
 				"-log-level=debug",
 			}
 
@@ -445,8 +440,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 				exitChan := runCommandAsynchronously(&firstCmd, append(commonArgs, c.FirstRunFlags...))
 
 				// Wait until the expected services are synced.
-				timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-				retry.RunWith(timer, tt, func(r *retry.R) {
+				retry.Run(tt, func(r *retry.R) {
 					for _, svcName := range c.FirstRunExpServices {
 						instances, _, err := consulClient.Catalog().Service(svcName, "k8s", nil)
 						require.NoError(r, err)

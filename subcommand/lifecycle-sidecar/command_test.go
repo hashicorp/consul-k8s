@@ -194,9 +194,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 	require.NoError(t, err)
 
 	// The services should be registered when the Consul agent comes up
-	// within 500ms.
-	timer := &retry.Timer{Timeout: 500 * time.Millisecond, Wait: 100 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		svc, _, err := client.Agent().Service("service-id", nil)
 		require.NoError(r, err)
 		require.Equal(r, 80, svc.Port)
@@ -251,8 +249,7 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-tls-server-name=consul.foo.com",
 		configFile,
 	}
-	timer := &retry.Timer{Timeout: 1000 * time.Millisecond, Wait: 100 * time.Millisecond}
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.Run(t, func(r *retry.R) {
 		require.ElementsMatch(r, expectedCommand, cmd.consulCommand)
 	})
 }
