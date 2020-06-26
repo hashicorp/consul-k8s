@@ -30,6 +30,8 @@ FEATURES:
 
 BREAKING CHANGES:
 
+* If upgrading to Consul 1.8.0 and using Consul Connect, you will need to upgrade consul-k8s to 0.16.0 (by setting `global.imageK8S: hashicorp/consul-k8s:0.16.0`) and re-roll your Connect pods so they get re-injected, before upgrading consul. This is required because we were previously setting a health check incorrectly that now fails on Consul 1.8.0. If you upgrade to 1.8.0 without upgrading to consul-k8s 0.16.0 and re-rolling your connect pods first, the connect pods will fail their health checks and no traffic will be routed to them.
+
 * It is recommended to use the helm repository to install the helm chart instead of cloning this repo directly. Starting with this release
  the master branch may contain breaking changes.
 
