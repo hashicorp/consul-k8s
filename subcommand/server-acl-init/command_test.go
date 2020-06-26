@@ -506,6 +506,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			defer fileCleanup()
 
 			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+			defer testAgent.Stop()
 
 			// Run the command.
 			ui := cli.NewMockUi()
