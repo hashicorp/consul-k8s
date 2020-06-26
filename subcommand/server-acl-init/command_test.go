@@ -1768,14 +1768,28 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	if bootToken == "" {
 		clientToken = aclReplicationToken
 	}
+
+	// Create a consul client pointing to the primary server.
+	// Note: We need to use the primary server to make the WAN join API call
+	// because the secondary  will not be able to verify this token
+	// until ACL replication has started, and ACL replication cannot
+	// be started because we haven't told the secondary where the primary
+	// server is yet.
 	consul, err := api.NewClient(&api.Config{
-		Address: secondarySvr.HTTPAddr,
-		Token:   clientToken,
+		Address: primarySvr.HTTPAddr,
+		Token:   bootToken,
 	})
 	require.NoError(t, err)
 
-	// WAN join the primary and secondary.
-	err = consul.Agent().Join(primarySvr.WANAddr, true)
+	// WAN join primary to the secondary
+	err = consul.Agent().Join(secondarySvr.WANAddr, true)
+	require.NoError(t, err)
+
+	// Overwrite consul client, pointing it to the secondary DC
+	consul, err = api.NewClient(&api.Config{
+		Address: secondarySvr.HTTPAddr,
+		Token:   clientToken,
+	})
 	require.NoError(t, err)
 
 	// Finally, set up our kube cluster. It will use the secondary dc.

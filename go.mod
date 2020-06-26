@@ -10,8 +10,8 @@ require (
 	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/consul v1.7.1
-	github.com/hashicorp/consul/api v1.4.0
-	github.com/hashicorp/consul/sdk v0.4.0
+	github.com/hashicorp/consul/api v1.5.0
+	github.com/hashicorp/consul/sdk v0.5.0
 	github.com/hashicorp/go-discover v0.0.0-20191202160150-7ec2cfbda7a2
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
