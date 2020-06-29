@@ -5,7 +5,7 @@ load _helpers
 @test "server/Role: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-role.yaml  \
+      -s templates/server-role.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -13,18 +13,16 @@ load _helpers
 
 @test "server/Role: disabled with global.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-role.yaml  \
+  assert_empty helm template \
+      -s templates/server-role.yaml  \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "server/Role: can be enabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-role.yaml  \
+      -s templates/server-role.yaml  \
       --set 'global.enabled=false' \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
@@ -34,18 +32,16 @@ load _helpers
 
 @test "server/Role: disabled with server.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-role.yaml  \
+  assert_empty helm template \
+      -s templates/server-role.yaml  \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "server/Role: enabled with server.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-role.yaml  \
+      -s templates/server-role.yaml  \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -56,7 +52,7 @@ load _helpers
 @test "server/Role: rules empty with server.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-role.yaml  \
+      -s templates/server-role.yaml  \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
       yq '.rules' | tee /dev/stderr)
@@ -69,7 +65,7 @@ load _helpers
 @test "server/Role: podsecuritypolicies are added when global.enablePodSecurityPolicies is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-role.yaml  \
+      -s templates/server-role.yaml  \
       --set 'server.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |

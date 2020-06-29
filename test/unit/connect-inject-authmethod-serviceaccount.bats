@@ -4,17 +4,15 @@ load _helpers
 
 @test "connectInjectAuthMethod/ServiceAccount: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-authmethod-serviceaccount.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/connect-inject-authmethod-serviceaccount.yaml  \
+      .
 }
 
 @test "connectInjectAuthMethod/ServiceAccount: enabled with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-authmethod-serviceaccount.yaml  \
+      -s templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -26,18 +24,16 @@ load _helpers
 
 @test "connectInjectAuthMethod/ServiceAccount: disabled with connectInject.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-authmethod-serviceaccount.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInjectAuthMethod/ServiceAccount: enabled with global.acls.manageSystemACLs.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-authmethod-serviceaccount.yaml  \
+      -s templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -51,7 +47,7 @@ load _helpers
 @test "connectInjectAuthMethod/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-authmethod-serviceaccount.yaml  \
+      -s templates/connect-inject-authmethod-serviceaccount.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \

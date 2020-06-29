@@ -4,49 +4,41 @@ load _helpers
 
 @test "enterpriseLicense/Role: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/enterprise-license-role.yaml  \
+      .
 }
 
 @test "enterpriseLicense/Role: disabled with server=false, ent secret defined" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "enterpriseLicense/Role: disabled when ent secretName missing" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "enterpriseLicense/Role: disabled when ent secretKey missing" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+  assert_empty helm template \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "enterpriseLicense/Role: enabled when ent license defined" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -57,7 +49,7 @@ load _helpers
 @test "enterpriseLicense/Role: rules are empty if global.acls.manageSystemACLs and global.enablePodSecurityPolicies are false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
@@ -71,7 +63,7 @@ load _helpers
 @test "enterpriseLicense/Role: allows acl token when global.acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -87,7 +79,7 @@ load _helpers
 @test "enterpriseLicense/Role: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/enterprise-license-role.yaml  \
+      -s templates/enterprise-license-role.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
       --set 'global.enablePodSecurityPolicies=true' \

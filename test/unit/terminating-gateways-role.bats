@@ -4,17 +4,15 @@ load _helpers
 
 @test "terminatingGateways/Role: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/terminating-gateways-role.yaml  \
+      .
 }
 
 @test "terminatingGateways/Role: enabled with terminatingGateways, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -25,7 +23,7 @@ load _helpers
 @test "terminatingGateways/Role: rules for PodSecurityPolicy" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
@@ -37,7 +35,7 @@ load _helpers
 @test "terminatingGateways/Role: rules for global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -54,7 +52,7 @@ load _helpers
 @test "terminatingGateways/Role: rules is empty if no ACLs, PSPs" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -65,7 +63,7 @@ load _helpers
 @test "terminatingGateways/Role: rules for ACLs, PSPs" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -78,7 +76,7 @@ load _helpers
 @test "terminatingGateways/Role: rules for ACLs, PSPs with multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \

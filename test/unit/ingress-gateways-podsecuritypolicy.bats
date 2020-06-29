@@ -4,17 +4,15 @@ load _helpers
 
 @test "ingressGateways/PodSecurityPolicy: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ingress-gateways-podsecuritypolicy.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/ingress-gateways-podsecuritypolicy.yaml  \
+      .
 }
 
 @test "ingressGateways/PodSecurityPolicy: enabled with ingressGateways, connectInject enabled and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-podsecuritypolicy.yaml  \
+      -s templates/ingress-gateways-podsecuritypolicy.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
@@ -26,7 +24,7 @@ load _helpers
 @test "ingressGateways/PodSecurityPolicy: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-podsecuritypolicy.yaml  \
+      -s templates/ingress-gateways-podsecuritypolicy.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \

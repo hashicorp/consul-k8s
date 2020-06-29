@@ -4,17 +4,15 @@ load _helpers
 
 @test "serverACLInitCleanup/Role: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/server-acl-init-cleanup-role.yaml  \
+      .
 }
 
 @test "serverACLInitCleanup/Role: enabled with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
+      -s templates/server-acl-init-cleanup-role.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -23,19 +21,17 @@ load _helpers
 
 @test "serverACLInitCleanup/Role: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
+  assert_empty helm template \
+      -s templates/server-acl-init-cleanup-role.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "serverACLInitCleanup/Role: enabled with client=true and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
+      -s templates/server-acl-init-cleanup-role.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -46,7 +42,7 @@ load _helpers
 @test "serverACLInitCleanup/Role: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled set to false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
+      -s templates/server-acl-init-cleanup-role.yaml  \
       --set 'server.enabled=false' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'externalServers.enabled=true' \
@@ -62,7 +58,7 @@ load _helpers
 @test "serverACLInitCleanup/Role: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-cleanup-role.yaml  \
+      -s templates/server-acl-init-cleanup-role.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |

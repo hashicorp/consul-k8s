@@ -5,7 +5,7 @@ load _helpers
 @test "client/Role: enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -13,18 +13,16 @@ load _helpers
 
 @test "client/Role: disabled with global.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/client-role.yaml  \
+  assert_empty helm template \
+      -s templates/client-role.yaml  \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "client/Role: can be enabled with global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
@@ -34,18 +32,16 @@ load _helpers
 
 @test "client/Role: disabled with client.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/client-role.yaml  \
+  assert_empty helm template \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "client/Role: enabled with client.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -56,7 +52,7 @@ load _helpers
 @test "client/Role: rules empty with client.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.rules' | tee /dev/stderr)
@@ -69,7 +65,7 @@ load _helpers
 @test "client/Role: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
@@ -83,7 +79,7 @@ load _helpers
 @test "client/Role: allows secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -94,7 +90,7 @@ load _helpers
 @test "client/Role: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-role.yaml  \
+      -s templates/client-role.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enablePodSecurityPolicies=true' \

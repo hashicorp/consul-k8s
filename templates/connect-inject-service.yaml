@@ -1,5 +1,5 @@
-# The service for the Connect sidecar injector
 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
+# The service for the Connect sidecar injector
 apiVersion: v1
 kind: Service
 metadata:
