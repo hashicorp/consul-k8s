@@ -11,11 +11,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+// The init container is bounded in memory usage by the size of the consul binary,
+// So we will match the memory limit/requests to the size of the consul binary
+// This has the added effect of modifying the connect-inject pod resource requirements
+// if/when it becomes larger than the pod resources
 const (
 	initContainerCPULimit      = "50m"
 	initContainerCPURequest    = "50m"
-	initContainerMemoryLimit   = "25Mi"
-	initContainerMemoryRequest = "25Mi"
+	initContainerMemoryLimit   = "110Mi"
+	initContainerMemoryRequest = "110Mi"
 )
 
 type initContainerCommandData struct {
