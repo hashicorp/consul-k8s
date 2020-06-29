@@ -34,6 +34,20 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   brew install kubernetes-helm
   ```
 
+### Helm 2/3
+These tests will work with both Helm 2 and 3 if run through `bats`, e.g. `bats ./test/unit`. If copying the
+test command and running yourself, e.g.
+```sh
+helm template \
+  -s templates/sync-catalog-deployment.yaml  \
+  --set 'syncCatalog.enabled=true' \
+  --set 'syncCatalog.toConsul=false' \
+  .
+```
+It's expected that the version of `helm` in your path is Helm 3.
+
+In our CI/CD the tests are run against both Helm 2 and Helm 3.
+
 ### Running The Tests
 To run the unit tests:
 
@@ -99,7 +113,7 @@ Here are some examples of common test patterns:
     @test "ui/Service: no type by default" {
       cd `chart_dir`
       local actual=$(helm template \
-          -x templates/ui-service.yaml  \
+          -s templates/ui-service.yaml  \
           . | tee /dev/stderr |
           yq -r '.spec.type' | tee /dev/stderr)
       [ "${actual}" = "null" ]
@@ -115,7 +129,7 @@ Here are some examples of common test patterns:
     @test "ui/Service: specified type" {
       cd `chart_dir`
       local actual=$(helm template \
-          -x templates/ui-service.yaml  \
+          -s templates/ui-service.yaml  \
           --set 'ui.service.type=LoadBalancer' \
           . | tee /dev/stderr |
           yq -r '.spec.type' | tee /dev/stderr)
@@ -130,7 +144,7 @@ Here are some examples of common test patterns:
     @test "syncCatalog/Deployment: to-k8s only" {
       cd `chart_dir`
       local actual=$(helm template \
-          -x templates/sync-catalog-deployment.yaml  \
+          -s templates/sync-catalog-deployment.yaml  \
           --set 'syncCatalog.enabled=true' \
           --set 'syncCatalog.toConsul=false' \
           . | tee /dev/stderr |
@@ -138,7 +152,7 @@ Here are some examples of common test patterns:
       [ "${actual}" = "true" ]
 
       local actual=$(helm template \
-          -x templates/sync-catalog-deployment.yaml  \
+          -s templates/sync-catalog-deployment.yaml  \
           --set 'syncCatalog.enabled=true' \
           --set 'syncCatalog.toConsul=false' \
           . | tee /dev/stderr |
@@ -155,12 +169,9 @@ Here are some examples of common test patterns:
     ```
     @test "syncCatalog/Deployment: disabled by default" {
       cd `chart_dir`
-      local actual=$(helm template \
-          -x templates/sync-catalog-deployment.yaml  \
-          . | tee /dev/stderr |
-          yq 'length > 0' | tee /dev/stderr)
-      [ "${actual}" = "false" ]
+      assert_empty helm template \
+          -s templates/sync-catalog-deployment.yaml \
+          . 
     }
     ```
-    Here we are check the length of the command output to see if the anything is rendered.
-    This style can easily be switched to check that a file is rendered instead.
+    Here we are using the `assert_empty` helper command that works with both Helm 2 and 3.
