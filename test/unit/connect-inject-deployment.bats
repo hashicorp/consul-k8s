@@ -4,17 +4,15 @@ load _helpers
 
 @test "connectInject/Deployment: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      .
 }
 
 @test "connectInject/Deployment: enable with global.enabled false, client.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -25,28 +23,24 @@ load _helpers
 
 @test "connectInject/Deployment: disable with connectInject.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInject/Deployment: disable with global.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInject/Deployment: fails if global.enabled=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=false' \
       --set 'connectInject.enabled=true' .
   [ "$status" -eq 1 ]
@@ -56,7 +50,7 @@ load _helpers
 @test "connectInject/Deployment: fails if global.enabled=true and client.enabled=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=true' \
       --set 'client.enabled=false' \
       --set 'connectInject.enabled=true' .
@@ -67,7 +61,7 @@ load _helpers
 @test "connectInject/Deployment: fails if global.enabled=false and client.enabled=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=false' \
       --set 'connectInject.enabled=true' .
@@ -78,7 +72,7 @@ load _helpers
 @test "connectInject/Deployment: fails if client.grpc=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'client.grpc=false' \
       --set 'connectInject.enabled=true' .
   [ "$status" -eq 1 ]
@@ -91,7 +85,7 @@ load _helpers
 @test "connectInject/Deployment: container image is global default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.imageK8S=foo' \
       . | tee /dev/stderr |
@@ -102,7 +96,7 @@ load _helpers
 @test "connectInject/Deployment: container image overrides" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.imageK8S=foo' \
       --set 'connectInject.image=bar' \
@@ -114,7 +108,7 @@ load _helpers
 @test "connectInject/Deployment: consul-image defaults to global" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.image=foo' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -125,7 +119,7 @@ load _helpers
 @test "connectInject/Deployment: consul-image can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.image=foo' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.imageConsul=bar' \
@@ -137,7 +131,7 @@ load _helpers
 @test "connectInject/Deployment: envoy-image is not set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image"))' | tee /dev/stderr)
@@ -147,7 +141,7 @@ load _helpers
 @test "connectInject/Deployment: envoy-image can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.imageEnvoy=foo' \
       . | tee /dev/stderr |
@@ -161,21 +155,21 @@ load _helpers
 @test "connectInject/Deployment: no secretName: no tls-{cert,key}-file set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-file"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-key-file"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-auto"))' | tee /dev/stderr)
@@ -185,7 +179,7 @@ load _helpers
 @test "connectInject/Deployment: with secretName: tls-{cert,key}-file set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.certs.secretName=foo' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -193,7 +187,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.certs.secretName=foo' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -201,7 +195,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.certs.secretName=foo' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -216,7 +210,7 @@ load _helpers
 @test "connectInject/Deployment: with secretName: no serviceAccountName set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.certs.secretName=foo' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -227,7 +221,7 @@ load _helpers
 @test "connectInject/Deployment: no secretName: serviceAccountName set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.serviceAccountName | contains("connect-injector-webhook-svc-account")' | tee /dev/stderr)
@@ -240,7 +234,7 @@ load _helpers
 @test "connectInject/Deployment: affinity not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.affinity == null' | tee /dev/stderr)
@@ -250,7 +244,7 @@ load _helpers
 @test "connectInject/Deployment: affinity can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.affinity=foobar' \
       . | tee /dev/stderr |
@@ -264,7 +258,8 @@ load _helpers
 @test "connectInject/Deployment: nodeSelector is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -273,7 +268,7 @@ load _helpers
 @test "connectInject/Deployment: nodeSelector is not set by default with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
@@ -283,7 +278,7 @@ load _helpers
 @test "connectInject/Deployment: specified nodeSelector" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.nodeSelector=testing' \
       . | tee /dev/stderr |
@@ -297,7 +292,7 @@ load _helpers
 @test "connectInject/Deployment: tolerations not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.tolerations == null' | tee /dev/stderr)
@@ -307,7 +302,7 @@ load _helpers
 @test "connectInject/Deployment: tolerations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.tolerations=foobar' \
       . | tee /dev/stderr |
@@ -321,7 +316,7 @@ load _helpers
 @test "connectInject/Deployment: centralConfig is enabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
@@ -331,7 +326,7 @@ load _helpers
 @test "connectInject/Deployment: centralConfig can be disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.centralConfig.enabled=false' \
       . | tee /dev/stderr |
@@ -342,7 +337,7 @@ load _helpers
 @test "connectInject/Deployment: defaultProtocol is disabled by default with centralConfig enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.centralConfig.enabled=true' \
       . | tee /dev/stderr |
@@ -353,7 +348,7 @@ load _helpers
 @test "connectInject/Deployment: defaultProtocol can be enabled with centralConfig enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.centralConfig.enabled=true' \
       --set 'connectInject.centralConfig.defaultProtocol=grpc' \
@@ -368,7 +363,7 @@ load _helpers
 @test "connectInject/Deployment: -acl-auth-method is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method="))' | tee /dev/stderr)
@@ -378,7 +373,7 @@ load _helpers
 @test "connectInject/Deployment: -acl-auth-method is set when global.acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -389,7 +384,7 @@ load _helpers
 @test "connectInject/Deployment: -acl-auth-method is set to connectInject.overrideAuthMethodName" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.overrideAuthMethodName=override' \
       . | tee /dev/stderr |
@@ -400,7 +395,7 @@ load _helpers
 @test "connectInject/Deployment: -acl-auth-method is overridden by connectInject.overrideAuthMethodName if global.acls.manageSystemACLs is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.overrideAuthMethodName=override' \
@@ -415,7 +410,7 @@ load _helpers
 @test "connectInject/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -426,7 +421,7 @@ load _helpers
 @test "connectInject/Deployment: Adds both tls-ca-cert and certs volumes when global.tls.enabled is true and connectInject.certs.secretName is set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'connectInject.certs.secretName=foo' \
@@ -438,7 +433,7 @@ load _helpers
 @test "connectInject/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -449,7 +444,7 @@ load _helpers
 @test "connectInject/Deployment: Adds both tls-ca-cert and certs volumeMounts when global.tls.enabled is true and connectInject.certs.secretName is set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'connectInject.certs.secretName=foo' \
@@ -461,7 +456,7 @@ load _helpers
 @test "connectInject/Deployment: can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
@@ -487,7 +482,7 @@ load _helpers
 @test "connectInject/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -499,7 +494,7 @@ load _helpers
 @test "connectInject/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -511,7 +506,7 @@ load _helpers
 @test "connectInject/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -523,7 +518,7 @@ load _helpers
 @test "connectInject/Deployment: adds both init containers when TLS with auto-encrypt and ACLs + namespaces are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -537,7 +532,7 @@ load _helpers
 @test "connectInject/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -555,7 +550,7 @@ load _helpers
 @test "connectInject/Deployment: default is allow '*', deny nothing" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -576,7 +571,7 @@ load _helpers
 @test "connectInject/Deployment: can set allow and deny" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.k8sAllowNamespaces[0]=allowNamespace' \
       --set 'connectInject.k8sDenyNamespaces[0]=denyNamespace' \
@@ -606,7 +601,7 @@ load _helpers
 @test "connectInject/Deployment: namespace options disabled by default" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -631,7 +626,7 @@ load _helpers
 @test "connectInject/Deployment: namespace options set with .global.enableConsulNamespaces=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
@@ -657,7 +652,7 @@ load _helpers
 @test "connectInject/Deployment: mirroring options set with .connectInject.consulNamespaces.mirroringK8S=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
@@ -684,7 +679,7 @@ load _helpers
 @test "connectInject/Deployment: prefix can be set with .connectInject.consulNamespaces.mirroringK8SPrefix" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
@@ -715,7 +710,7 @@ load _helpers
 @test "connectInject/Deployment: aclInjectToken disabled when namespaces not enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretKey=bar' \
       . | tee /dev/stderr |
@@ -726,7 +721,7 @@ load _helpers
 @test "connectInject/Deployment: aclInjectToken disabled when secretName is missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretKey=bar' \
@@ -738,7 +733,7 @@ load _helpers
 @test "connectInject/Deployment: aclInjectToken disabled when secretKey is missing" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretName=foo' \
@@ -750,7 +745,7 @@ load _helpers
 @test "connectInject/Deployment: aclInjectToken enabled when secretName and secretKey is provided" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretName=foo' \
@@ -773,7 +768,7 @@ load _helpers
 @test "connectInject/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -792,7 +787,7 @@ load _helpers
 @test "connectInject/Deployment: init container is created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -811,7 +806,7 @@ load _helpers
 @test "connectInject/Deployment: cross namespace policy is not added when global.acls.manageSystemACLs=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
@@ -822,7 +817,7 @@ load _helpers
 @test "connectInject/Deployment: cross namespace policy is added when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -837,7 +832,7 @@ load _helpers
 @test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable not set when namespaces are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
@@ -847,7 +842,7 @@ load _helpers
 @test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable set when namespaces are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
@@ -858,7 +853,7 @@ load _helpers
 @test "connectInject/Deployment: CONSUL_HTTP_ADDR and CONSUL_CACERT env variables set when namespaces are enabled" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
@@ -880,7 +875,7 @@ load _helpers
 @test "connectInject/Deployment: HOST_IP env variable not set when namespaces are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
@@ -890,7 +885,7 @@ load _helpers
 @test "connectInject/Deployment: HOST_IP env variable set when namespaces are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
@@ -904,7 +899,7 @@ load _helpers
 @test "connectInject/Deployment: default resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
@@ -914,7 +909,7 @@ load _helpers
 @test "connectInject/Deployment: can set resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-deployment.yaml  \
+      -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.resources.requests.memory=100Mi' \
       --set 'connectInject.resources.requests.cpu=100m' \
@@ -931,7 +926,7 @@ load _helpers
 @test "connectInject/Deployment: by default there are no resource settings" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -956,7 +951,7 @@ load _helpers
 @test "connectInject/Deployment: can set resource settings" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.sidecarProxy.resources.requests.memory=10Mi' \
       --set 'connectInject.sidecarProxy.resources.requests.cpu=100m' \
@@ -985,7 +980,7 @@ load _helpers
 @test "connectInject/Deployment: can set resource settings explicitly to 0" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -x templates/connect-inject-deployment.yaml \
+      -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.sidecarProxy.resources.requests.memory=0' \
       --set 'connectInject.sidecarProxy.resources.requests.cpu=0' \

@@ -4,17 +4,15 @@ load _helpers
 
 @test "terminatingGateways/RoleBinding: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/terminating-gateways-rolebinding.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/terminating-gateways-rolebinding.yaml  \
+      .
 }
 
 @test "terminatingGateways/RoleBinding: enabled with terminatingGateways, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-rolebinding.yaml  \
+      -s templates/terminating-gateways-rolebinding.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -25,7 +23,7 @@ load _helpers
 @test "terminatingGateways/RoleBinding: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-role.yaml  \
+      -s templates/terminating-gateways-role.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=gateway1' \

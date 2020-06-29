@@ -1,5 +1,5 @@
-# The deployment for running the sync-catalog pod
 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
+# The deployment for running the sync-catalog pod
 apiVersion: apps/v1
 kind: Deployment
 metadata:

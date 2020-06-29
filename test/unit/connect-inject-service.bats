@@ -4,17 +4,15 @@ load _helpers
 
 @test "connectInject/Service: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-service.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/connect-inject-service.yaml  \
+      .
 }
 
 @test "connectInject/Service: enable with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/connect-inject-service.yaml  \
+      -s templates/connect-inject-service.yaml  \
       --set 'global.enabled=false' \
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -25,20 +23,16 @@ load _helpers
 
 @test "connectInject/Service: disable with connectInject.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-service.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-service.yaml  \
       --set 'connectInject.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "connectInject/Service: disable with global.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/connect-inject-service.yaml  \
+  assert_empty helm template \
+      -s templates/connect-inject-service.yaml  \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }

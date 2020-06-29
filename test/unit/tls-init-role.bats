@@ -4,39 +4,33 @@ load _helpers
 
 @test "tlsInit/Role: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/tls-init-role.yaml  \
+      .
 }
 
 @test "tlsInit/Role: disabled with global.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
+  assert_empty helm template \
+      -s templates/tls-init-role.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "tlsInit/Role: disabled when server.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
+  assert_empty helm template \
+      -s templates/tls-init-role.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "tlsInit/Role: enabled when global.tls.enabled=true and server.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
+      -s templates/tls-init-role.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'server.enabled=true' \
       . | tee /dev/stderr |
@@ -47,7 +41,7 @@ load _helpers
 @test "tlsInit/Role: enabled with global.tls.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
+      -s templates/tls-init-role.yaml  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -57,7 +51,7 @@ load _helpers
 @test "tlsInit/Role: adds pod security polices with global.tls.enabled and global.enablePodSecurityPolicies" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/tls-init-role.yaml  \
+      -s templates/tls-init-role.yaml  \
       --set 'global.tls.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |

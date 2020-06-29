@@ -4,17 +4,15 @@ load _helpers
 
 @test "client/SnapshotAgentDeployment: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
+      .
 }
 
 @test "client/SnapshotAgentDeployment: enabled with client.snapshotAgent.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -24,7 +22,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: enabled with client.enabled=true and client.snapshotAgent.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.enabled=true' \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
@@ -34,13 +32,11 @@ load _helpers
 
 @test "client/SnapshotAgentDeployment: disabled with client=false and client.snapshotAgent.enabled=true" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+  assert_empty helm template \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 #--------------------------------------------------------------------
@@ -49,7 +45,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no tolerations by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.tolerations | length > 0' | tee /dev/stderr)
@@ -59,7 +55,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates tolerations when client.tolerations is populated" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.tolerations=allow' \
       . | tee /dev/stderr |
@@ -73,7 +69,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no priorityClassName by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.priorityClassName | length > 0' | tee /dev/stderr)
@@ -83,7 +79,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates priorityClassName when client.priorityClassName is populated" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.priorityClassName=allow' \
       . | tee /dev/stderr |
@@ -97,7 +93,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no initContainer by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers' | tee /dev/stderr)
@@ -107,7 +103,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates initContainer when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -118,7 +114,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no volumes by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes' | tee /dev/stderr)
@@ -128,7 +124,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates volumes when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -139,7 +135,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates volumes when client.snapshotAgent.configSecret.secretName and client.snapshotAgent.configSecret secretKey are defined" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=secret' \
       --set 'client.snapshotAgent.configSecret.secretKey=key' \
@@ -151,7 +147,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no container volumeMounts by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts' | tee /dev/stderr)
@@ -161,7 +157,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates container volumeMounts when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -172,7 +168,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates container volumeMounts when client.snapshotAgent.configSecret.secretName and client.snapshotAgent.configSecret secretKey are defined" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.configSecret.secretName=secret' \
       --set 'client.snapshotAgent.configSecret.secretKey=key' \
@@ -187,7 +183,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: no nodeSelector by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector | length > 0' | tee /dev/stderr)
@@ -197,7 +193,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates nodeSelector when client.nodeSelector is populated" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.nodeSelector=allow' \
       . | tee /dev/stderr |
@@ -211,7 +207,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -228,7 +224,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates volumes when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -239,7 +235,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: populates container volumeMounts when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
@@ -250,7 +246,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: can overwrite CA with the provided secret" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
@@ -276,7 +272,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -288,7 +284,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -300,7 +296,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -312,7 +308,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: adds both init containers when TLS with auto-encrypt and ACLs are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
@@ -325,7 +321,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
@@ -342,7 +338,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: default resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
@@ -352,7 +348,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: can set resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.resources.requests.memory=100Mi' \
       --set 'client.snapshotAgent.resources.requests.cpu=100m' \
@@ -369,7 +365,7 @@ load _helpers
 @test "client/SnapshotAgentDeployment: if caCert is set it is used in command" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/client-snapshot-agent-deployment.yaml  \
+      -s templates/client-snapshot-agent-deployment.yaml  \
       --set 'client.snapshotAgent.enabled=true' \
       --set 'client.snapshotAgent.caCert=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \

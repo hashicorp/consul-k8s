@@ -4,37 +4,31 @@ load _helpers
 
 @test "syncCatalog/ClusterRole: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/sync-catalog-clusterrole.yaml  \
+      .
 }
 
 @test "syncCatalog/ClusterRole: disabled with global.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+  assert_empty helm template \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'global.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "syncCatalog/ClusterRole: disabled with sync disabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+  assert_empty helm template \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "syncCatalog/ClusterRole: enabled with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -44,7 +38,7 @@ load _helpers
 @test "syncCatalog/ClusterRole: enabled with sync enabled and global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'global.enabled=false' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
@@ -58,7 +52,7 @@ load _helpers
 @test "syncCatalog/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
@@ -72,7 +66,7 @@ load _helpers
 @test "syncCatalog/ClusterRole: allows secret access with global.bootsrapACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
@@ -86,7 +80,7 @@ load _helpers
 @test "syncCatalog/ClusterRole: has reduced permissions if toK8s=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.toK8S=false' \
       . | tee /dev/stderr |
@@ -97,7 +91,7 @@ load _helpers
 @test "syncCatalog/ClusterRole: has full permissions if toK8s=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-clusterrole.yaml  \
+      -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.toK8S=true' \
       . | tee /dev/stderr |

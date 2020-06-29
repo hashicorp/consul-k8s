@@ -4,17 +4,15 @@ load _helpers
 
 @test "ingressGateways/ServiceAccount: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ingress-gateways-serviceaccount.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/ingress-gateways-serviceaccount.yaml  \
+      .
 }
 
 @test "ingressGateways/ServiceAccount: enabled with ingressGateways, connectInject enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-serviceaccount.yaml  \
+      -s templates/ingress-gateways-serviceaccount.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -28,7 +26,7 @@ load _helpers
 @test "ingressGateways/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-serviceaccount.yaml  \
+      -s templates/ingress-gateways-serviceaccount.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
@@ -50,7 +48,7 @@ load _helpers
 @test "ingressGateways/ServiceAccount: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-serviceaccount.yaml  \
+      -s templates/ingress-gateways-serviceaccount.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.gateways[0].name=gateway1' \

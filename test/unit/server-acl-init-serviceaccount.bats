@@ -4,17 +4,15 @@ load _helpers
 
 @test "serverACLInit/ServiceAccount: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/server-acl-init-serviceaccount.yaml  \
+      .
 }
 
 @test "serverACLInit/ServiceAccount: enabled with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
+      -s templates/server-acl-init-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -23,19 +21,17 @@ load _helpers
 
 @test "serverACLInit/ServiceAccount: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
+  assert_empty helm template \
+      -s templates/server-acl-init-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      .
 }
 
 @test "serverACLInit/ServiceAccount: enabled with client=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
+      -s templates/server-acl-init-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'client.enabled=false' \
       . | tee /dev/stderr |
@@ -46,7 +42,7 @@ load _helpers
 @test "serverACLInit/ServiceAccount: enabled with externalServers.enabled=true and global.acls.manageSystemACLs=true, but server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
+      -s templates/server-acl-init-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
@@ -62,7 +58,7 @@ load _helpers
 @test "serverACLInit/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/server-acl-init-serviceaccount.yaml  \
+      -s templates/server-acl-init-serviceaccount.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \

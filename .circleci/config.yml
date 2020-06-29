@@ -3,10 +3,19 @@ orbs:
   slack: circleci/slack@3.4.2
 
 jobs:
-  unit:
+  unit-helm2:
     docker:
       # This image is built from test/docker/Test.dockerfile
       - image: hashicorpdev/consul-helm-test:0.3.0
+
+    steps:
+      - checkout
+      - run:
+          name: Run Unit Tests
+          command: bats ./test/unit
+  unit-helm3:
+    docker:
+      - image: hashicorpdev/consul-helm-test:0.4.0
 
     steps:
       - checkout
@@ -74,10 +83,12 @@ workflows:
   version: 2
   test:
     jobs:
-      - unit
+      - unit-helm2
+      - unit-helm3
       - acceptance:
           requires:
-            - unit
+            - unit-helm2
+            - unit-helm3
           filters:
             branches:
               only: master

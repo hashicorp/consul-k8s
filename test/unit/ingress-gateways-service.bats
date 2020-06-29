@@ -4,17 +4,15 @@ load _helpers
 
 @test "ingressGateways/Service: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/ingress-gateways-service.yaml  \
+      .
 }
 
 @test "ingressGateways/Service: enabled by default with ingressGateways, connectInject andenabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -28,7 +26,7 @@ load _helpers
 @test "ingressGateways/Service: no annotations by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -39,7 +37,7 @@ load _helpers
 @test "ingressGateways/Deployment: annotations can be set through defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.annotations=key1: value1
@@ -60,7 +58,7 @@ key2: value2' \
 @test "ingressGateways/Service: annotations can be set through specific gateway" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.gateways[0].name=gateway1' \
@@ -82,7 +80,7 @@ key2: value2' \
 @test "ingressGateways/Service: annotations can be set through defaults and specific gateway" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.annotations=defaultkey: defaultvalue' \
@@ -111,7 +109,7 @@ key2: value2' \
 @test "ingressGateways/Service: has default ports" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -133,7 +131,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set ports through defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.ports[0].port=4443' \
@@ -164,7 +162,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set ports through specific gateway overriding defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.ports[0].port=8443' \
@@ -187,7 +185,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set port through specific gateway, overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.port=8443' \
@@ -204,7 +202,7 @@ key2: value2' \
 @test "ingressGateways/Service: no nodePort by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -215,7 +213,7 @@ key2: value2' \
 @test "ingressGateways/Service: if not a NodePort service, cannot set a nodePort through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.ports[0].port=80' \
@@ -228,7 +226,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set a nodePort through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.type=NodePort' \
@@ -242,7 +240,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set a nodePort through specific gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.type=NodePort' \
@@ -261,7 +259,7 @@ key2: value2' \
 @test "ingressGateways/Service: defaults to type ClusterIP" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -272,7 +270,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set type through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.type=LoadBalancer' \
@@ -284,7 +282,7 @@ key2: value2' \
 @test "ingressGateways/Service: can set type through specific gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.type=NodePort' \
@@ -301,7 +299,7 @@ key2: value2' \
 @test "ingressGateways/Service: can add additionalSpec through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.additionalSpec=key: value' \
@@ -313,7 +311,7 @@ key2: value2' \
 @test "ingressGateways/Service: can add additionalSpec through specific gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.additionalSpec=key: value' \
@@ -330,7 +328,7 @@ key2: value2' \
 @test "ingressGateways/Service: label selectors uniquely identify gateways" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -344,7 +342,7 @@ key2: value2' \
 @test "ingressGateways/Service: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/ingress-gateways-service.yaml  \
+      -s templates/ingress-gateways-service.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.gateways[0].name=gateway1' \

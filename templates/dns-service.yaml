@@ -1,5 +1,5 @@
-# Service for Consul DNS.
 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
+# Service for Consul DNS.
 apiVersion: v1
 kind: Service
 metadata:

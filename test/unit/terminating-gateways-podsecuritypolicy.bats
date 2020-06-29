@@ -4,17 +4,15 @@ load _helpers
 
 @test "terminatingGateways/PodSecurityPolicy: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/terminating-gateways-podsecuritypolicy.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/terminating-gateways-podsecuritypolicy.yaml  \
+      .
 }
 
 @test "terminatingGateways/PodSecurityPolicy: enabled with terminatingGateways, connectInject and client.grpc enabled and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-podsecuritypolicy.yaml  \
+      -s templates/terminating-gateways-podsecuritypolicy.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
@@ -26,7 +24,7 @@ load _helpers
 @test "terminatingGateways/PodSecurityPolicy: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-podsecuritypolicy.yaml  \
+      -s templates/terminating-gateways-podsecuritypolicy.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \

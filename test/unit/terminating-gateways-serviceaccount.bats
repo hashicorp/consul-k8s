@@ -4,17 +4,15 @@ load _helpers
 
 @test "terminatingGateways/ServiceAccount: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/terminating-gateways-serviceaccount.yaml  \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/terminating-gateways-serviceaccount.yaml  \
+      .
 }
 
 @test "terminatingGateways/ServiceAccount: enabled with terminatingGateways, connectInject and client.grpc enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-serviceaccount.yaml  \
+      -s templates/terminating-gateways-serviceaccount.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -28,7 +26,7 @@ load _helpers
 @test "terminatingGateways/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-serviceaccount.yaml  \
+      -s templates/terminating-gateways-serviceaccount.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
@@ -50,7 +48,7 @@ load _helpers
 @test "terminatingGateways/ServiceAccount: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-serviceaccount.yaml  \
+      -s templates/terminating-gateways-serviceaccount.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=gateway1' \

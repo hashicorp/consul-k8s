@@ -4,17 +4,15 @@ load _helpers
 
 @test "terminatingGateways/Deployment: disabled by default" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  assert_empty helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      .
 }
 
 @test "terminatingGateways/Deployment: enabled with terminatingGateways, connectInject and client.grpc enabled, has default gateway name" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -33,7 +31,7 @@ load _helpers
 @test "terminatingGateways/Deployment: fails if connectInject.enabled=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=false' .
   [ "$status" -eq 1 ]
@@ -43,7 +41,7 @@ load _helpers
 @test "terminatingGateways/Deployment: fails if client.grpc=false" {
   cd `chart_dir`
   run helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'client.grpc=false' \
       --set 'connectInject.enabled=true' .
@@ -54,7 +52,7 @@ load _helpers
 @test "terminatingGateways/Deployment: fails if global.enabled is false and clients are not explicitly enabled" {
   cd `chart_dir`
   run helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enabled=false' .
@@ -65,7 +63,7 @@ load _helpers
 @test "terminatingGateways/Deployment: fails if global.enabled is true but clients are explicitly disabled" {
   cd `chart_dir`
   run helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enabled=true' \
@@ -80,7 +78,7 @@ load _helpers
 @test "terminatingGateways/Deployment: envoy image has default global value" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -91,7 +89,7 @@ load _helpers
 @test "terminatingGateways/Deployment: envoy image can be set using the global value" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.imageEnvoy=new/image' \
@@ -106,7 +104,7 @@ load _helpers
 @test "terminatingGateways/Deployment: sets TLS env variables when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -126,7 +124,7 @@ load _helpers
 @test "terminatingGateways/Deployment: sets TLS env variables in lifecycle sidecar when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -143,7 +141,7 @@ load _helpers
 @test "terminatingGateways/Deployment: can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml  \
+      -s templates/terminating-gateways-deployment.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -169,7 +167,7 @@ load _helpers
 @test "terminatingGateways/Deployment: consul-auto-encrypt-ca-cert volume is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -182,7 +180,7 @@ load _helpers
 @test "terminatingGateways/Deployment: consul-auto-encrypt-ca-cert volumeMount is added when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -195,7 +193,7 @@ load _helpers
 @test "terminatingGateways/Deployment: get-auto-encrypt-client-ca init container is created when TLS with auto-encrypt is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -208,7 +206,7 @@ load _helpers
 @test "terminatingGateways/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -227,7 +225,7 @@ load _helpers
 @test "terminatingGateways/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -239,7 +237,7 @@ load _helpers
 @test "terminatingGateways/Deployment: lifecycle-sidecar uses -token-file flag when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -254,7 +252,7 @@ load _helpers
 @test "terminatingGateways/Deployment: replicas defaults to 2" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -265,7 +263,7 @@ load _helpers
 @test "terminatingGateways/Deployment: replicas can be set through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.replicas=3' \
@@ -277,7 +275,7 @@ load _helpers
 @test "terminatingGateways/Deployment: replicas can be set through specific gateway, overrides default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.replicas=3' \
@@ -296,7 +294,7 @@ load _helpers
 
   # Test that it defines it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
@@ -314,7 +312,7 @@ load _helpers
 
   # Test that it mounts it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
@@ -336,7 +334,7 @@ load _helpers
 
   # Test that it defines it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=secret' \
@@ -354,7 +352,7 @@ load _helpers
 
   # Test that it mounts it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
@@ -375,7 +373,7 @@ load _helpers
   cd `chart_dir`
 
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=secret' \
@@ -392,7 +390,7 @@ load _helpers
 
   # Test that it defines it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=secret' \
@@ -413,7 +411,7 @@ load _helpers
 
   # Test that it mounts it
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
@@ -439,7 +437,7 @@ load _helpers
 @test "terminatingGateways/Deployment: resources has default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -454,7 +452,7 @@ load _helpers
 @test "terminatingGateways/Deployment: resources can be set through defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.resources.requests.memory=memory' \
@@ -480,7 +478,7 @@ load _helpers
 @test "terminatingGateways/Deployment: resources can be set through specific gateway, overriding defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.resources.requests.memory=memory' \
@@ -514,7 +512,7 @@ load _helpers
 @test "terminatingGateways/Deployment: affinity defaults to one per node" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -525,7 +523,7 @@ load _helpers
 @test "terminatingGateways/Deployment: affinity can be set through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.affinity=key: value' \
@@ -537,7 +535,7 @@ load _helpers
 @test "terminatingGateways/Deployment: affinity can be set through specific gateway, overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.affinity=key: value' \
@@ -554,7 +552,7 @@ load _helpers
 @test "terminatingGateways/Deployment: no tolerations by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -565,7 +563,7 @@ load _helpers
 @test "terminatingGateways/Deployment: tolerations can be set through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.tolerations=- key: value' \
@@ -577,7 +575,7 @@ load _helpers
 @test "terminatingGateways/Deployment: tolerations can be set through specific gateway, overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.tolerations=- key: value' \
@@ -594,7 +592,7 @@ load _helpers
 @test "terminatingGateways/Deployment: no nodeSelector by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -605,7 +603,7 @@ load _helpers
 @test "terminatingGateways/Deployment: can set a nodeSelector through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.nodeSelector=key: value' \
@@ -617,7 +615,7 @@ load _helpers
 @test "terminatingGateways/Deployment: can set a nodeSelector through specific gateway, overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.nodeSelector=key: value' \
@@ -634,7 +632,7 @@ load _helpers
 @test "terminatingGateways/Deployment: no priorityClassName by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -645,7 +643,7 @@ load _helpers
 @test "terminatingGateways/Deployment: can set a priorityClassName through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.priorityClassName=name' \
@@ -657,7 +655,7 @@ load _helpers
 @test "terminatingGateways/Deployment: can set a priorityClassName per gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.priorityClassName=name' \
@@ -674,7 +672,7 @@ load _helpers
 @test "terminatingGateways/Deployment: no extra annotations by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -685,7 +683,7 @@ load _helpers
 @test "terminatingGateways/Deployment: extra annotations can be set through defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.annotations=key1: value1
@@ -706,7 +704,7 @@ key2: value2' \
 @test "terminatingGateways/Deployment: extra annotations can be set through specific gateway" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=gateway1' \
@@ -728,7 +726,7 @@ key2: value2' \
 @test "terminatingGateways/Deployment: extra annotations can be set through defaults and specific gateway" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.annotations=defaultkey: defaultvalue' \
@@ -757,7 +755,7 @@ key2: value2' \
 @test "terminatingGateways/Deployment: service-init init container defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -791,7 +789,7 @@ EOF
 @test "terminatingGateways/Deployment: service-init init container with acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -831,7 +829,7 @@ EOF
 @test "terminatingGateways/Deployment: service-init init container gateway namespace can be specified through defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -868,7 +866,7 @@ EOF
 @test "terminatingGateways/Deployment: service-init init container gateway namespace can be specified through specific gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -910,7 +908,7 @@ EOF
 @test "terminatingGateways/Deployment: namespace command flag is not present by default" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -926,7 +924,7 @@ EOF
 @test "terminatingGateways/Deployment: namespace command flag is specified through defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -944,7 +942,7 @@ EOF
 @test "terminatingGateways/Deployment: namespace command flag is specified through specific gateway overriding defaults" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
@@ -968,7 +966,7 @@ EOF
 @test "terminatingGateways/Deployment: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=gateway1' \
