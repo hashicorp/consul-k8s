@@ -18,8 +18,8 @@ import (
 const (
 	initContainerCPULimit      = "50m"
 	initContainerCPURequest    = "50m"
-	initContainerMemoryLimit   = "110Mi"
-	initContainerMemoryRequest = "110Mi"
+	initContainerMemoryLimit   = "125Mi"
+	initContainerMemoryRequest = "125Mi"
 )
 
 type initContainerCommandData struct {
