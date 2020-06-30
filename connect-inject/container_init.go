@@ -19,7 +19,7 @@ const (
 	initContainerCPULimit      = "50m"
 	initContainerCPURequest    = "50m"
 	initContainerMemoryLimit   = "125Mi"
-	initContainerMemoryRequest = "125Mi"
+	initContainerMemoryRequest = "25Mi"
 )
 
 type initContainerCommandData struct {
