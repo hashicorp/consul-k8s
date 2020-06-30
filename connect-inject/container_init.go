@@ -12,7 +12,7 @@ import (
 )
 
 // The init container is bounded in memory usage by the size of the consul binary,
-// So we will match the memory limit/requests to the size of the consul binary
+// So we will match the memory limit to the size of the consul binary plus 7Mi for safety buffer
 // This has the added effect of modifying the connect-inject pod resource requirements
 // if/when it becomes larger than the pod resources
 const (
