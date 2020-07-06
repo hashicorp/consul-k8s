@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -57,6 +58,18 @@ type Command struct {
 	flagDefaultSidecarProxyCPURequest    string
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
+
+	// Lifecycle sidecar resource settings.
+	flagLifecycleSidecarCPULimit      string
+	flagLifecycleSidecarCPURequest    string
+	flagLifecycleSidecarMemoryLimit   string
+	flagLifecycleSidecarMemoryRequest string
+
+	// Init container resource settings.
+	flagInitContainerCPULimit      string
+	flagInitContainerCPURequest    string
+	flagInitContainerMemoryLimit   string
+	flagInitContainerMemoryRequest string
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -112,11 +125,23 @@ func (c *Command) init() {
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
-	// Resource setting flags.
-	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
+	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
-	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+
+	// Init container resource setting flags.
+	c.flagSet.StringVar(&c.flagInitContainerCPURequest, "init-container-cpu-request", "50m", "Init container CPU request.")
+	c.flagSet.StringVar(&c.flagInitContainerCPULimit, "init-container-cpu-limit", "50m", "Init container CPU limit.")
+	c.flagSet.StringVar(&c.flagInitContainerMemoryRequest, "init-container-memory-request", "25Mi", "Init container memory request.")
+	c.flagSet.StringVar(&c.flagInitContainerMemoryLimit, "init-container-memory-limit", "150Mi", "Init container memory limit.")
+
+	// Lifecycle sidecar resource setting flags.
+	c.flagSet.StringVar(&c.flagLifecycleSidecarCPURequest, "lifecycle-sidecar-cpu-request", "20m", "Lifecycle sidecar CPU request.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarCPULimit, "lifecycle-sidecar-cpu-limit", "20m", "Lifecycle sidecar CPU limit.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryRequest, "lifecycle-sidecar-memory-request", "25Mi", "Lifecycle sidecar memory request.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "25Mi", "Lifecycle sidecar memory limit.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
@@ -135,47 +160,55 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var cpuLimit, cpuRequest, memoryLimit, memoryRequest resource.Quantity
+	// Proxy resources
+	var sidecarProxyCPULimit, sidecarProxyCPURequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
 	var err error
-	if c.flagDefaultSidecarProxyCPULimit != "" {
-		cpuLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-limit is invalid: %s", err))
-			return 1
-		}
-	}
 	if c.flagDefaultSidecarProxyCPURequest != "" {
-		cpuRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
+		sidecarProxyCPURequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-request is invalid: %s", err))
 			return 1
 		}
 	}
-	if cpuLimit.Value() != 0 && cpuRequest.Cmp(cpuLimit) > 0 {
+	if c.flagDefaultSidecarProxyCPULimit != "" {
+		sidecarProxyCPULimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-limit is invalid: %s", err))
+			return 1
+		}
+	}
+	if sidecarProxyCPULimit.Value() != 0 && sidecarProxyCPURequest.Cmp(sidecarProxyCPULimit) > 0 {
 		c.UI.Error(fmt.Sprintf(
 			"request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
 			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit))
 		return 1
 	}
 
-	if c.flagDefaultSidecarProxyMemoryLimit != "" {
-		memoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-limit is invalid: %s", err))
-			return 1
-		}
-	}
 	if c.flagDefaultSidecarProxyMemoryRequest != "" {
-		memoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
+		sidecarProxyMemoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-request is invalid: %s", err))
 			return 1
 		}
 	}
-	if memoryLimit.Value() != 0 && memoryRequest.Cmp(memoryLimit) > 0 {
+	if c.flagDefaultSidecarProxyMemoryLimit != "" {
+		sidecarProxyMemoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-limit is invalid: %s", err))
+			return 1
+		}
+	}
+	if sidecarProxyMemoryLimit.Value() != 0 && sidecarProxyMemoryRequest.Cmp(sidecarProxyMemoryLimit) > 0 {
 		c.UI.Error(fmt.Sprintf(
 			"request must be <= limit: -default-sidecar-proxy-memory-request value of %q is greater than the -default-sidecar-proxy-memory-limit value of %q",
 			c.flagDefaultSidecarProxyMemoryRequest, c.flagDefaultSidecarProxyMemoryLimit))
+		return 1
+	}
+
+	// Validate resource request/limit flags and parse into corev1.ResourceRequirements
+	initResources, lifecycleResources, err := c.parseAndValidateResourceFlags()
+	if err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -264,10 +297,12 @@ func (c *Command) Run(args []string) int {
 		WriteServiceDefaults:       c.flagWriteServiceDefaults,
 		DefaultProtocol:            c.flagDefaultProtocol,
 		ConsulCACert:               string(consulCACert),
-		DefaultProxyCPULimit:       cpuLimit,
-		DefaultProxyCPURequest:     cpuRequest,
-		DefaultProxyMemoryLimit:    memoryLimit,
-		DefaultProxyMemoryRequest:  memoryRequest,
+		DefaultProxyCPURequest:     sidecarProxyCPURequest,
+		DefaultProxyCPULimit:       sidecarProxyCPULimit,
+		DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
+		DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
+		InitContainerResources:     initResources,
+		LifecycleSidecarResources:  lifecycleResources,
 		EnableNamespaces:           c.flagEnableNamespaces,
 		AllowK8sNamespacesSet:      allowSet,
 		DenyK8sNamespacesSet:       denySet,
@@ -361,6 +396,106 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 		// Update the certificate
 		c.cert.Store(&cert)
 	}
+}
+
+func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {
+	// Init container
+	var initContainerCPULimit, initContainerCPURequest, initContainerMemoryLimit, initContainerMemoryRequest resource.Quantity
+
+	// Parse and validate the initContainer resources.
+	initContainerCPURequest, err := resource.ParseQuantity(c.flagInitContainerCPURequest)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-init-container-cpu-request '%s' is invalid: %s", c.flagInitContainerCPURequest, err)
+	}
+	initContainerCPULimit, err = resource.ParseQuantity(c.flagInitContainerCPULimit)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-init-container-cpu-limit '%s' is invalid: %s", c.flagInitContainerCPULimit, err)
+	}
+	if initContainerCPULimit.Value() != 0 && initContainerCPURequest.Cmp(initContainerCPULimit) > 0 {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+			"request must be <= limit: -init-container-cpu-request value of %q is greater than the -init-container-cpu-limit value of %q",
+			c.flagInitContainerCPURequest, c.flagInitContainerCPULimit)
+	}
+
+	initContainerMemoryRequest, err = resource.ParseQuantity(c.flagInitContainerMemoryRequest)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-init-container-memory-request '%s' is invalid: %s", c.flagInitContainerMemoryRequest, err)
+	}
+	initContainerMemoryLimit, err = resource.ParseQuantity(c.flagInitContainerMemoryLimit)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-init-container-memory-limit '%s' is invalid: %s", c.flagInitContainerMemoryLimit, err)
+	}
+	if initContainerMemoryLimit.Value() != 0 && initContainerMemoryRequest.Cmp(initContainerMemoryLimit) > 0 {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+			"request must be <= limit: -init-container-memory-request value of %q is greater than the -init-container-memory-limit value of %q",
+			c.flagInitContainerMemoryRequest, c.flagInitContainerMemoryLimit)
+	}
+
+	// Put into corev1.ResourceRequirements form
+	initResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    initContainerCPURequest,
+			corev1.ResourceMemory: initContainerMemoryRequest,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    initContainerCPULimit,
+			corev1.ResourceMemory: initContainerMemoryLimit,
+		},
+	}
+
+	// Lifecycle sidecar
+	var lifecycleSidecarCPULimit, lifecycleSidecarCPURequest, lifecycleSidecarMemoryLimit, lifecycleSidecarMemoryRequest resource.Quantity
+
+	// Parse and validate the lifecycle sidecar resources
+	lifecycleSidecarCPURequest, err = resource.ParseQuantity(c.flagLifecycleSidecarCPURequest)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-lifecycle-sidecar-cpu-request '%s' is invalid: %s", c.flagLifecycleSidecarCPURequest, err)
+	}
+	lifecycleSidecarCPULimit, err = resource.ParseQuantity(c.flagLifecycleSidecarCPULimit)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-lifecycle-sidecar-cpu-limit '%s' is invalid: %s", c.flagLifecycleSidecarCPULimit, err)
+	}
+	if lifecycleSidecarCPULimit.Value() != 0 && lifecycleSidecarCPURequest.Cmp(lifecycleSidecarCPULimit) > 0 {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+			"request must be <= limit: -lifecycle-sidecar-cpu-request value of %q is greater than the -lifecycle-sidecar-cpu-limit value of %q",
+			c.flagLifecycleSidecarCPURequest, c.flagLifecycleSidecarCPULimit)
+	}
+
+	lifecycleSidecarMemoryRequest, err = resource.ParseQuantity(c.flagLifecycleSidecarMemoryRequest)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-lifecycle-sidecar-memory-request '%s' is invalid: %s", c.flagLifecycleSidecarMemoryRequest, err)
+	}
+	lifecycleSidecarMemoryLimit, err = resource.ParseQuantity(c.flagLifecycleSidecarMemoryLimit)
+	if err != nil {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{},
+			fmt.Errorf("-lifecycle-sidecar-memory-limit '%s' is invalid: %s", c.flagLifecycleSidecarMemoryLimit, err)
+	}
+	if lifecycleSidecarMemoryLimit.Value() != 0 && lifecycleSidecarMemoryRequest.Cmp(lifecycleSidecarMemoryLimit) > 0 {
+		return corev1.ResourceRequirements{}, corev1.ResourceRequirements{}, fmt.Errorf(
+			"request must be <= limit: -lifecycle-sidecar-memory-request value of %q is greater than the -lifecycle-sidecar-memory-limit value of %q",
+			c.flagLifecycleSidecarMemoryRequest, c.flagLifecycleSidecarMemoryLimit)
+	}
+
+	// Put into corev1.ResourceRequirements form
+	lifecycleResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    lifecycleSidecarCPURequest,
+			corev1.ResourceMemory: lifecycleSidecarMemoryRequest,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    lifecycleSidecarCPULimit,
+			corev1.ResourceMemory: lifecycleSidecarMemoryLimit,
+		},
+	}
+
+	return initResources, lifecycleResources, nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }
