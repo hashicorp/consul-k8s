@@ -78,6 +78,7 @@ const (
 	// service is synced (i.e. re-registered) with the local agent.
 	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
 
+	// annotations for sidecar proxy resource limits
 	annotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
 	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
@@ -169,11 +170,20 @@ type Handler struct {
 	// Only necessary if ACLs are enabled.
 	CrossNamespaceACLPolicy string
 
-	// Default resource settings for sidecar proxies.
+	// Default resource settings for sidecar proxies. Some of these
+	// fields may be empty.
 	DefaultProxyCPURequest    resource.Quantity
 	DefaultProxyCPULimit      resource.Quantity
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
+
+	// Resource settings for init container. All of these fields
+	// will be populated by the defaults provided in the initial flags.
+	InitContainerResources corev1.ResourceRequirements
+
+	// Resource settings for lifecycle sidecar. All of these fields
+	// will be populated by the defaults provided in the initial flags.
+	LifecycleSidecarResources corev1.ResourceRequirements
 
 	// Log
 	Log hclog.Logger

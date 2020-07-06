@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+
+* Connect: Add resource request and limit flags for the injected init and lifecycle sidecar containers [[GH-298](https://github.com/hashicorp/consul-k8s/pull/298)].
+
 BUG FIXES:
 
 * Connect: Respect allow/deny list flags when namespaces are disabled. [[GH-296](https://github.com/hashicorp/consul-k8s/issues/296)]

@@ -1488,7 +1488,18 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 
 func TestHandlerContainerInit_Resources(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := Handler{
+		InitContainerResources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("20m"),
+				corev1.ResourceMemory: resource.MustParse("25Mi"),
+			},
+		},
+	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -1508,12 +1519,12 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(initContainerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(initContainerMemoryLimit),
+			corev1.ResourceCPU:    resource.MustParse("20m"),
+			corev1.ResourceMemory: resource.MustParse("25Mi"),
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(initContainerCPURequest),
-			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+			corev1.ResourceMemory: resource.MustParse("10Mi"),
 		},
 	}, container.Resources)
 }

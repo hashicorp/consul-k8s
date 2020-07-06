@@ -1,12 +1,26 @@
 package connectinject
 
 import (
+	"testing"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
+)
+
+var (
+	lifecycleResources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+			corev1.ResourceMemory: resource.MustParse("25Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("20m"),
+			corev1.ResourceMemory: resource.MustParse("50Mi"),
+		},
+	}
 )
 
 // NOTE: This is tested here rather than in handler_test because doing it there
@@ -16,8 +30,9 @@ import (
 // Test that the lifecycle sidecar is as expected.
 func TestLifecycleSidecar_Default(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
-		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		Log:                       hclog.Default().Named("handler"),
+		ImageConsulK8S:            "hashicorp/consul-k8s:9.9.9",
+		LifecycleSidecarResources: lifecycleResources,
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -54,16 +69,7 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
-			},
-		},
+		Resources: lifecycleResources,
 	}, container)
 }
 
@@ -128,9 +134,10 @@ func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 // and that the CA is provided
 func TestLifecycleSidecar_TLS(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
-		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
-		ConsulCACert:   "consul-ca-cert",
+		Log:                       hclog.Default().Named("handler"),
+		ImageConsulK8S:            "hashicorp/consul-k8s:9.9.9",
+		ConsulCACert:              "consul-ca-cert",
+		LifecycleSidecarResources: lifecycleResources,
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -171,15 +178,6 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
-			},
-		},
+		Resources: lifecycleResources,
 	}, container)
 }
