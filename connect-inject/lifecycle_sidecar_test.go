@@ -1,12 +1,20 @@
 package connectinject
 
 import (
+	"testing"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
+)
+
+const (
+	lifecycleContainerCPULimit      = "10m"
+	lifecycleContainerCPURequest    = "10m"
+	lifecycleContainerMemoryLimit   = "25Mi"
+	lifecycleContainerMemoryRequest = "25Mi"
 )
 
 // NOTE: This is tested here rather than in handler_test because doing it there

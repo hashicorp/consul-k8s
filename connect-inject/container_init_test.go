@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1508,12 +1507,12 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(initContainerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(initContainerMemoryLimit),
+			corev1.ResourceCPU:    h.InitCopyContainerCPULimit,
+			corev1.ResourceMemory: h.InitCopyContainerMemoryLimit,
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(initContainerCPURequest),
-			corev1.ResourceMemory: resource.MustParse(initContainerMemoryRequest),
+			corev1.ResourceCPU:    h.InitCopyContainerCPURequest,
+			corev1.ResourceMemory: h.InitCopyContainerMemoryRequest,
 		},
 	}, container.Resources)
 }

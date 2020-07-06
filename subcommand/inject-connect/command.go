@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/connect-inject"
+	mapset "github.com/deckarep/golang-set"
+	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
@@ -57,6 +57,18 @@ type Command struct {
 	flagDefaultSidecarProxyCPURequest    string
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
+
+	// Lifecycle sidecar resource settings.
+	flagLifecycleSidecarCPULimit      string
+	flagLifecycleSidecarCPURequest    string
+	flagLifecycleSidecarMemoryLimit   string
+	flagLifecycleSidecarMemoryRequest string
+
+	// Init copy container resource settings.
+	flagInitCopyContainerCPULimit      string
+	flagInitCopyContainerCPURequest    string
+	flagInitCopyContainerMemoryLimit   string
+	flagInitCopyContainerMemoryRequest string
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -117,6 +129,16 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
+	// Init container resource setting flags.
+	c.flagSet.StringVar(&c.flagInitCopyContainerCPULimit, "init-copy-container-cpu-limit", "", "Init copy container CPU limit.")
+	c.flagSet.StringVar(&c.flagInitCopyContainerCPURequest, "init-copy-container-cpu-request", "", "Init copy container CPU request.")
+	c.flagSet.StringVar(&c.flagInitCopyContainerMemoryLimit, "init-copy-container-memory-limit", "", "Init copy container memory limit.")
+	c.flagSet.StringVar(&c.flagInitCopyContainerMemoryRequest, "init-copy-container-memory-request", "", "Init copy container memory request.")
+	// Lifecycle sidecar resource setting flags.
+	c.flagSet.StringVar(&c.flagLifecycleSidecarCPULimit, "lifecycle-sidecar-cpu-limit", "", "Lifecycle sidecar CPU limit.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarCPURequest, "lifecycle-sidecar-cpu-request", "", "Lifecycle sidecar CPU request.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "", "Lifecycle sidecar memory limit.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryRequest, "lifecycle-sidecar-memory-request", "", "Lifecycle sidecar memory request.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.ClientFlags())
@@ -136,23 +158,91 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var cpuLimit, cpuRequest, memoryLimit, memoryRequest resource.Quantity
+	// Cpu/Memory requests and limits for the initCopyContainers which copy
+	// the consul binary to shared volume
+	var initCopyContainerCpuLimit, initCopyContainerCpuRequest, initCopyContainerMemoryLimit, initCopyContainerMemoryRequest resource.Quantity
+	// lifecycle sidecar container resources
+	var lifecycleSidecarCpuLimit, lifecycleSidecarCpuRequest, lifecycleSidecarMemoryLimit, lifecycleSidecarMemoryRequest resource.Quantity
+	// sidecar proxy container resources
+	var sidecarProxyCpuLimit, sidecarProxyCpuRequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
 	var err error
+
+	if c.flagLifecycleSidecarCPULimit == "" || c.flagLifecycleSidecarCPURequest == "" {
+		c.UI.Error("-lifecycle-sidecar-cpu-limit && -lifecycle-sidecar-cpu-request must be set")
+		return 1
+	}
+	if c.flagLifecycleSidecarMemoryLimit == "" || c.flagLifecycleSidecarMemoryRequest == "" {
+		c.UI.Error("-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set")
+		return 1
+	}
+	if c.flagInitCopyContainerCPULimit == "" || c.flagInitCopyContainerCPURequest == "" {
+		c.UI.Error("-init-copy-container-cpu-limit && -init-copy-container-cpu-request must be set")
+		return 1
+	}
+	if c.flagInitCopyContainerMemoryLimit == "" || c.flagInitCopyContainerMemoryRequest == "" {
+		c.UI.Error("-init-copy-container-memory-limit && -init-copy-container-memory-request must be set")
+		return 1
+	}
+
+	// Parse the initCopyContainer resources
+	initCopyContainerCpuLimit, err = resource.ParseQuantity(c.flagInitCopyContainerCPULimit)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-init-copy-container-cpu-limit is invalid: %s", err))
+		return 1
+	}
+	initCopyContainerCpuRequest, err = resource.ParseQuantity(c.flagInitCopyContainerCPURequest)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-init-copy-container-cpu-request is invalid: %s", err))
+		return 1
+	}
+	initCopyContainerMemoryLimit, err = resource.ParseQuantity(c.flagInitCopyContainerMemoryLimit)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-init-copy-container-memory-limit is invalid: %s", err))
+		return 1
+	}
+	initCopyContainerMemoryRequest, err = resource.ParseQuantity(c.flagInitCopyContainerMemoryRequest)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-init-copy-container-memory-request is invalid: %s", err))
+		return 1
+	}
+
+	// Parse the lifecycle sidecar resources
+	lifecycleSidecarCpuLimit, err = resource.ParseQuantity(c.flagLifecycleSidecarCPULimit)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-lifecycle-sidecar-cpu-limit is invalid: %s", err))
+		return 1
+	}
+	lifecycleSidecarCpuRequest, err = resource.ParseQuantity(c.flagLifecycleSidecarCPURequest)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-lifecycle-sidecar-cpu-request is invalid: %s", err))
+		return 1
+	}
+	lifecycleSidecarMemoryLimit, err = resource.ParseQuantity(c.flagLifecycleSidecarMemoryLimit)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-lifecycle-sidecar-memory-limit is invalid: %s", err))
+		return 1
+	}
+	initCopyContainerMemoryRequest, err = resource.ParseQuantity(c.flagLifecycleSidecarMemoryRequest)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("-lifecycle-sidecar-memory-request is invalid: %s", err))
+		return 1
+	}
+
 	if c.flagDefaultSidecarProxyCPULimit != "" {
-		cpuLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
+		sidecarProxyCpuLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-limit is invalid: %s", err))
 			return 1
 		}
 	}
 	if c.flagDefaultSidecarProxyCPURequest != "" {
-		cpuRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
+		sidecarProxyCpuRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-request is invalid: %s", err))
 			return 1
 		}
 	}
-	if cpuLimit.Value() != 0 && cpuRequest.Cmp(cpuLimit) > 0 {
+	if sidecarProxyCpuLimit.Value() != 0 && sidecarProxyCpuRequest.Cmp(sidecarProxyCpuLimit) > 0 {
 		c.UI.Error(fmt.Sprintf(
 			"request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
 			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit))
@@ -160,20 +250,20 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagDefaultSidecarProxyMemoryLimit != "" {
-		memoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
+		sidecarProxyMemoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-limit is invalid: %s", err))
 			return 1
 		}
 	}
 	if c.flagDefaultSidecarProxyMemoryRequest != "" {
-		memoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
+		sidecarProxyMemoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-request is invalid: %s", err))
 			return 1
 		}
 	}
-	if memoryLimit.Value() != 0 && memoryRequest.Cmp(memoryLimit) > 0 {
+	if sidecarProxyMemoryLimit.Value() != 0 && sidecarProxyMemoryRequest.Cmp(sidecarProxyMemoryLimit) > 0 {
 		c.UI.Error(fmt.Sprintf(
 			"request must be <= limit: -default-sidecar-proxy-memory-request value of %q is greater than the -default-sidecar-proxy-memory-limit value of %q",
 			c.flagDefaultSidecarProxyMemoryRequest, c.flagDefaultSidecarProxyMemoryLimit))
@@ -256,27 +346,35 @@ func (c *Command) Run(args []string) int {
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ConsulClient:               c.consulClient,
-		ImageConsul:                c.flagConsulImage,
-		ImageEnvoy:                 c.flagEnvoyImage,
-		ImageConsulK8S:             c.flagConsulK8sImage,
-		RequireAnnotation:          !c.flagDefaultInject,
-		AuthMethod:                 c.flagACLAuthMethod,
-		WriteServiceDefaults:       c.flagWriteServiceDefaults,
-		DefaultProtocol:            c.flagDefaultProtocol,
-		ConsulCACert:               string(consulCACert),
-		DefaultProxyCPULimit:       cpuLimit,
-		DefaultProxyCPURequest:     cpuRequest,
-		DefaultProxyMemoryLimit:    memoryLimit,
-		DefaultProxyMemoryRequest:  memoryRequest,
-		EnableNamespaces:           c.flagEnableNamespaces,
-		AllowK8sNamespacesSet:      allowSet,
-		DenyK8sNamespacesSet:       denySet,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-		Log:                        hclog.Default().Named("handler"),
+		ConsulClient:         c.consulClient,
+		ImageConsul:          c.flagConsulImage,
+		ImageEnvoy:           c.flagEnvoyImage,
+		ImageConsulK8S:       c.flagConsulK8sImage,
+		RequireAnnotation:    !c.flagDefaultInject,
+		AuthMethod:           c.flagACLAuthMethod,
+		WriteServiceDefaults: c.flagWriteServiceDefaults,
+		DefaultProtocol:      c.flagDefaultProtocol,
+		ConsulCACert:         string(consulCACert),
+		DefaultProxyCPULimit:           sidecarProxyCpuLimit,
+		DefaultProxyCPURequest:         sidecarProxyCpuRequest,
+		DefaultProxyMemoryLimit:        sidecarProxyMemoryLimit,
+		DefaultProxyMemoryRequest:      sidecarProxyMemoryRequest,
+		InitCopyContainerCPULimit:      initCopyContainerCpuLimit,
+		InitCopyContainerCPURequest:    initCopyContainerCpuRequest,
+		InitCopyContainerMemoryLimit:   initCopyContainerMemoryLimit,
+		InitCopyContainerMemoryRequest: initCopyContainerMemoryRequest,
+		LifecycleSidecarCPULimit:       lifecycleSidecarCpuLimit,
+		LifecycleSidecarCPURequest:     lifecycleSidecarCpuRequest,
+		LifecycleSidecarMemoryLimit:    lifecycleSidecarMemoryLimit,
+		LifecycleSidecarMemoryRequest:  lifecycleSidecarMemoryRequest,
+		EnableNamespaces:               c.flagEnableNamespaces,
+		AllowK8sNamespacesSet:          allowSet,
+		DenyK8sNamespacesSet:           denySet,
+		ConsulDestinationNamespace:     c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:           c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:           c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:        c.flagCrossNamespaceACLPolicy,
+		Log:                            hclog.Default().Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
