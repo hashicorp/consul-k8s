@@ -390,6 +390,29 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# server.disableFsGroupSecurityContext
+
+@test "server/StatefulSet: can disable fsGroup security context settings" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.disableFsGroupSecurityContext=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: default fsGroup security context settings fsGroup: 1000" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.disableFsGroupSecurityContext=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext.fsGroup' | tee /dev/stderr)
+  [ "${actual}" = "1000" ]
+}
+
+#--------------------------------------------------------------------
 # gossip encryption
 
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet by default" {

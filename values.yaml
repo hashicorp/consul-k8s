@@ -344,6 +344,10 @@ server:
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
 
+  # disableFsGroupSecurityContext disables setting the fsGroup securityContext for the server statefulset,
+  # this is required when using the OpenShift platform as fsGroup is automatically set to an arbitrary gid.
+  disableFsGroupSecurityContext : false
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting global.tls.enableAutoEncrypt to true (requires consul-k8s >= 0.13.0)
