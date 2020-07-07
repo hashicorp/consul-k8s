@@ -233,9 +233,6 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-token-file=/token/file",
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
-		"-client-cert=/client/cert",
-		"-client-key=/client/key",
-		"-tls-server-name=consul.foo.com",
 	})
 	defer stopCommand(t, &cmd, exitChan)
 
@@ -247,9 +244,6 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-token-file=/token/file",
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
-		"-client-cert=/client/cert",
-		"-client-key=/client/key",
-		"-tls-server-name=consul.foo.com",
 		configFile,
 	}
 	timer := &retry.Timer{Timeout: 1000 * time.Millisecond, Wait: 100 * time.Millisecond}
