@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,7 +22,7 @@ type Command struct {
 	UI cli.Ui
 
 	flags             *flag.FlagSet
-	k8s               *k8sflags.K8SFlags
+	k8s               *flags.K8SFlags
 	flagSecretName    string
 	flagInitType      string
 	flagNamespace     string
@@ -49,7 +48,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagTokenSinkFile, "token-sink-file", "",
 		"Optional filepath to write acl token")
 
-	c.k8s = &k8sflags.K8SFlags{}
+	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 }

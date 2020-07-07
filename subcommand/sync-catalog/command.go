@@ -15,9 +15,8 @@ import (
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +31,7 @@ type Command struct {
 
 	flags                     *flag.FlagSet
 	http                      *flags.HTTPFlags
-	k8s                       *k8sflags.K8SFlags
+	k8s                       *flags.K8SFlags
 	flagListen                string
 	flagToConsul              bool
 	flagToK8S                 bool
@@ -43,7 +42,7 @@ type Command struct {
 	flagConsulServicePrefix   string
 	flagK8SSourceNamespace    string
 	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     flags.DurationValue
+	flagConsulWritePeriod     time.Duration
 	flagSyncClusterIPServices bool
 	flagSyncLBEndpoints       bool
 	flagNodePortSyncType      string
@@ -96,7 +95,7 @@ func (c *Command) init() {
 			"Kubernetes. Defaults to consul.")
 	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
 		"Tag value for K8S services registered in Consul")
-	c.flags.Var(&c.flagConsulWritePeriod, "consul-write-interval",
+	c.flags.DurationVar(&c.flagConsulWritePeriod, "consul-write-interval", 30*time.Second,
 		"The interval to perform syncing operations creating Consul services, formatted "+
 			"as a time.Duration. All changes are merged and write calls are only made "+
 			"on this interval. Defaults to 30 seconds (30s).")
@@ -134,9 +133,8 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 
 	c.http = &flags.HTTPFlags{}
-	c.k8s = &k8sflags.K8SFlags{}
-	flags.Merge(c.flags, c.http.ClientFlags())
-	flags.Merge(c.flags, c.http.ServerFlags())
+	c.k8s = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.http.Flags())
 	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)
@@ -198,10 +196,6 @@ func (c *Command) Run(args []string) int {
 		})
 	}
 
-	// Get the sync interval
-	var syncInterval time.Duration
-	c.flagConsulWritePeriod.Merge(&syncInterval)
-
 	// Convert allow/deny lists to sets
 	allowSet := mapset.NewSet()
 	denySet := mapset.NewSet()
@@ -246,8 +240,8 @@ func (c *Command) Run(args []string) int {
 			Log:                      c.logger.Named("to-consul/sink"),
 			EnableNamespaces:         c.flagEnableNamespaces,
 			CrossNamespaceACLPolicy:  c.flagCrossNamespaceACLPolicy,
-			SyncPeriod:               syncInterval,
-			ServicePollPeriod:        syncInterval * 2,
+			SyncPeriod:               c.flagConsulWritePeriod,
+			ServicePollPeriod:        c.flagConsulWritePeriod * 2,
 			ConsulK8STag:             c.flagConsulK8STag,
 			ConsulNodeServicesClient: svcsClient,
 		}
