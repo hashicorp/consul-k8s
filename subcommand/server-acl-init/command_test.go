@@ -1772,7 +1772,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 
 	// Create a consul client pointing to the primary server.
 	// Note: We need to use the primary server to make the WAN join API call
-	// because the secondary  will not be able to verify this token
+	// because the secondary will not be able to verify this token
 	// until ACL replication has started, and ACL replication cannot
 	// be started because we haven't told the secondary where the primary
 	// server is yet.
