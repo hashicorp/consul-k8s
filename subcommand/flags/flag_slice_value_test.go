@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Taken from https://github.com/hashicorp/consul/blob/master/command/flags/flag_slice_value_test.go
+// Taken from https://github.com/hashicorp/consul/blob/b5b9c8d953cd3c79c6b795946839f4cf5012f507/command/flags/flag_slice_value_test.go
 // This was done so we don't depend on internal Consul implementation.
 
 func TestAppendSliceValue_implements(t *testing.T) {

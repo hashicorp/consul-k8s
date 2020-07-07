@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-// Taken from https://github.com/hashicorp/consul/blob/master/command/flags/http.go
+// Taken from https://github.com/hashicorp/consul/blob/b5b9c8d953cd3c79c6b795946839f4cf5012f507/command/flags/http.go
 // with flags we don't use removed. This was done so we don't depend on internal
 // Consul implementation.
 
@@ -19,6 +19,8 @@ type HTTPFlags struct {
 	tokenFile     StringValue
 	caFile        StringValue
 	caPath        StringValue
+	certFile      StringValue
+	keyFile       StringValue
 	tlsServerName StringValue
 }
 
@@ -44,6 +46,12 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 	fs.Var(&f.caPath, "ca-path",
 		"Path to a directory of CA certificates to use for TLS when communicating "+
 			"with Consul. This can also be specified via the CONSUL_CAPATH environment variable.")
+	fs.Var(&f.certFile, "client-cert",
+		"Path to a client cert file to use for TLS when 'verify_incoming' is enabled. This "+
+			"can also be specified via the CONSUL_CLIENT_CERT environment variable.")
+	fs.Var(&f.keyFile, "client-key",
+		"Path to a client key file to use for TLS when 'verify_incoming' is enabled. This "+
+			"can also be specified via the CONSUL_CLIENT_KEY environment variable.")
 	fs.Var(&f.tlsServerName, "tls-server-name",
 		"The server name to use as the SNI host when connecting via TLS. This "+
 			"can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
@@ -98,6 +106,8 @@ func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {
 	f.tokenFile.Merge(&c.TokenFile)
 	f.caFile.Merge(&c.TLSConfig.CAFile)
 	f.caPath.Merge(&c.TLSConfig.CAPath)
+	f.certFile.Merge(&c.TLSConfig.CertFile)
+	f.keyFile.Merge(&c.TLSConfig.KeyFile)
 	f.tlsServerName.Merge(&c.TLSConfig.Address)
 }
 

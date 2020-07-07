@@ -2,7 +2,7 @@ package flags
 
 import "strings"
 
-// Taken from https://github.com/hashicorp/consul/blob/master/command/flags/flag_slice_value.go
+// Taken from https://github.com/hashicorp/consul/blob/b5b9c8d953cd3c79c6b795946839f4cf5012f507/command/flags/flag_slice_value.go
 // This was done so we don't depend on internal Consul implementation.
 
 // AppendSliceValue implements the flag.Value interface and allows multiple

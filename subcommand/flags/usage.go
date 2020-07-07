@@ -7,10 +7,10 @@ import (
 	"io"
 	"strings"
 
-	text "github.com/kr/text"
+	"github.com/kr/text"
 )
 
-// Taken from https://github.com/hashicorp/consul/blob/master/command/flags/usage.go
+// Taken from https://github.com/hashicorp/consul/blob/b5b9c8d953cd3c79c6b795946839f4cf5012f507/command/flags/usage.go
 // This was done so we don't depend on internal Consul implementation.
 
 // Usage returns a usage string nicely formatted.
