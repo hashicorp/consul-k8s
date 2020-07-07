@@ -156,6 +156,9 @@ spec:
                 {{- end }}
                 -client=0.0.0.0 \
                 -config-dir=/consul/config \
+                {{- /* Always include the extraVolumes at the end so that users can
+                    override other Consul settings. The last -config-dir takes
+                    precedence. */}}
                 {{- range .Values.server.extraVolumes }}
                 {{- if .load }}
                 -config-dir=/consul/userconfig/{{ .name }} \

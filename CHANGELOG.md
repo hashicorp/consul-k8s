@@ -1,5 +1,11 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+* The volumes set by `client.extraVolumes` are now passed as the last `-config-dir` argument.
+  This means any settings there will override previous settings. This allows users to override
+  settings that Helm is setting automatically, for example the acl down policy. [[GH-531](https://github.com/hashicorp/consul-helm/pull/531)]
+
 ## 0.22.0 (June 18, 2020)
 
 FEATURES:
