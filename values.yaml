@@ -219,6 +219,32 @@ global:
     # Requires consul-k8s 0.15.0+.
     createFederationSecret: false
 
+  # Resource settings for lifecycle-sidecar containers.
+  # The lifecycle sidecar ensures the Consul services are always registered with
+  # their local consul clients and is used by the ingress/terminating/mesh gateways
+  # as well as with every connect-injected service.
+  lifecycleSidecarContainer:
+    resources:
+      requests:
+        memory: "25Mi"
+        cpu: "20m"
+      limits:
+        memory: "25Mi"
+        cpu: "20m"
+
+  # Resource settings for copy-consul-bin init containers which are used by the
+  # ingress/terminating/mesh gateways.
+  # These settings are bounded by the size of the consul binary
+  # as we use `cp` to copy it into a shared volume in the init container.
+  initContainer:
+    resources:
+      requests:
+        memory: "25Mi"
+        cpu: "50m"
+      limits:
+        memory: "125Mi"
+        cpu: "50m"
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.

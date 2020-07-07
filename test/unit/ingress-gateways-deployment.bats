@@ -446,6 +446,36 @@ load _helpers
   [ "${actual}" = "gwcpu2" ]
 }
 
+@test "ingressGateways/Deployment: init container has default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.initContainers[0].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "25Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "125Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
+}
+
+@test "ingressGateways/Deployment: lifecycle sidecar has default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[1].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "25Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "20m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "25Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "20m" ]
+}
+
 #--------------------------------------------------------------------
 # affinity
 

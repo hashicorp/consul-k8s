@@ -124,13 +124,7 @@ spec:
           volumeMounts:
           - name: consul-bin
             mountPath: /consul-bin
-          resources:
-            requests:
-              memory: "25Mi"
-              cpu: "50m"
-            limits:
-              memory: "150Mi"
-              cpu: "50m"
+          resources: {{ toYaml $root.Values.global.initContainer.resources | nindent 12 }}
         {{- if (and $root.Values.global.tls.enabled $root.Values.global.tls.enableAutoEncrypt) }}
         {{- include "consul.getAutoEncryptClientCA" $root | nindent 8 }}
         {{- end }}
@@ -333,6 +327,7 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
+          resources: {{ toYaml $root.Values.global.lifecycleSidecarContainer.resources | nindent 12 }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -359,13 +354,6 @@ spec:
             {{- if $root.Values.global.acls.manageSystemACLs }}
             - -token-file=/consul/service/acl-token
             {{- end }}
-          resources:
-            requests:
-              memory: "25Mi"
-              cpu: "20m"
-            limits:
-              memory: "25Mi"
-              cpu: "20m"
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
       {{- end }}
