@@ -31,7 +31,7 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-consul-k8s-image must be set",
 		},
 		{
-			flags:  append([]string{"-consul-k8s-image", "foo", "-ca-file", "bar"},  mandatoryResourceFlags...),
+			flags:  append([]string{"-consul-k8s-image", "foo", "-ca-file", "bar"}, mandatoryResourceFlags...),
 			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},
 		{
