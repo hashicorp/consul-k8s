@@ -11,7 +11,7 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/consul v1.7.1
 	github.com/hashicorp/consul/api v1.4.0
-	github.com/hashicorp/consul/sdk v0.4.1-0.20200626165806-0f9052a92c03
+	github.com/hashicorp/consul/sdk v0.4.1-0.20200707213735-c1b50f757cb7
 	github.com/hashicorp/go-discover v0.0.0-20191202160150-7ec2cfbda7a2
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
