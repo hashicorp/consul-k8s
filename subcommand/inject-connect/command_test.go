@@ -19,20 +19,14 @@ func TestRun_FlagValidation(t *testing.T) {
 		"-lifecycle-sidecar-cpu-limit=20m",
 		"-lifecycle-sidecar-cpu-request=20m",
 	}
-
 	cases := []struct {
 		name   string
 		flags  []string
 		expErr string
 	}{
 		{
-			//flags:  []string{} + mandatoryResourceFlags,
 			flags:  mandatoryResourceFlags,
 			expErr: "-consul-k8s-image must be set",
-		},
-		{
-			flags:  append([]string{"-consul-k8s-image", "foo", "-ca-file", "bar"}, mandatoryResourceFlags...),
-			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},
 		{
 			flags:  append([]string{"-consul-k8s-image", "foo", "-default-sidecar-proxy-cpu-limit=unparseable"}, mandatoryResourceFlags...),
@@ -63,6 +57,29 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-default-sidecar-proxy-cpu-limit=25m",
 			}, mandatoryResourceFlags...),
 			expErr: "request must be <= limit: -default-sidecar-proxy-cpu-request value of \"50m\" is greater than the -default-sidecar-proxy-cpu-limit value of \"25m\"",
+		},
+		{
+			flags:  []string{"-consul-k8s-image", "foo"},
+			expErr: "-lifecycle-sidecar-cpu-limit && -lifecycle-sidecar-cpu-request must be set",
+		},
+		{
+			flags:  []string{"-consul-k8s-image", "foo", "-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m"},
+			expErr: "-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set",
+		},
+		{
+			flags:  []string{"-consul-k8s-image", "foo", "-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m", "-lifecycle-sidecar-memory-limit", "100Mi"},
+			expErr: "-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
+				"-lifecycle-sidecar-memory-limit", "100Mi", "-lifecycle-sidecar-memory-request", "100Mi",
+				"-init-copy-container-cpu-limit", "10m", "-init-copy-container-cpu-request", "10m"},
+			expErr: "-init-copy-container-memory-limit && -init-copy-container-memory-request must be set",
+		},
+		{
+			flags:  append([]string{"-consul-k8s-image", "foo", "-ca-file", "bar"}, mandatoryResourceFlags...),
+			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},
 	}
 

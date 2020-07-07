@@ -24,8 +24,12 @@ const (
 // Test that the lifecycle sidecar is as expected.
 func TestLifecycleSidecar_Default(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
-		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
+		Log:                           hclog.Default().Named("handler"),
+		ImageConsulK8S:                "hashicorp/consul-k8s:9.9.9",
+		LifecycleSidecarMemoryRequest: resource.MustParse(lifecycleContainerMemoryRequest),
+		LifecycleSidecarMemoryLimit:   resource.MustParse(lifecycleContainerMemoryLimit),
+		LifecycleSidecarCPURequest:    resource.MustParse(lifecycleContainerCPURequest),
+		LifecycleSidecarCPULimit:      resource.MustParse(lifecycleContainerCPULimit),
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -136,9 +140,13 @@ func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 // and that the CA is provided
 func TestLifecycleSidecar_TLS(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
-		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
-		ConsulCACert:   "consul-ca-cert",
+		Log:                           hclog.Default().Named("handler"),
+		ImageConsulK8S:                "hashicorp/consul-k8s:9.9.9",
+		ConsulCACert:                  "consul-ca-cert",
+		LifecycleSidecarMemoryRequest: resource.MustParse(lifecycleContainerMemoryRequest),
+		LifecycleSidecarMemoryLimit:   resource.MustParse(lifecycleContainerMemoryLimit),
+		LifecycleSidecarCPURequest:    resource.MustParse(lifecycleContainerCPURequest),
+		LifecycleSidecarCPULimit:      resource.MustParse(lifecycleContainerCPULimit),
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
