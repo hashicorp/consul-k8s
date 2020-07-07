@@ -920,6 +920,104 @@ load _helpers
   [ "${actual}" = '{"limits":{"cpu":"200m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
+@test "connectInject/Deployment: default init and sidecar container resources" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-request=25Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-request=50m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-limit=125Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-limit=50m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request=20m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit=25Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+@test "connectInject/Deployment: can set init container resources" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.initContainer.resources.requests.memory=100Mi' \
+      --set 'global.initContainer.resources.requests.cpu=100m' \
+      --set 'global.initContainer.resources.limits.memory=200Mi' \
+      --set 'global.initContainer.resources.limits.cpu=200m' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-request=100Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-request=100m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-limit=200Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-limit=200m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: lifecycle sidecar container resources" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=100m' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.memory=200Mi' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=200m' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request=100Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request=100m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit=200Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # sidecarProxy.resources
 
