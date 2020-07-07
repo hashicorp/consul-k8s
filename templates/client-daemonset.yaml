@@ -196,13 +196,16 @@ spec:
                 -hcl='ports { grpc = 8502 }' \
                 {{- end }}
                 -config-dir=/consul/config \
+                {{- if .Values.global.acls.manageSystemACLs }}
+                -config-dir=/consul/aclconfig \
+                {{- end }}
+                {{- /* Always include the extraVolumes at the end so that users can
+                      override other Consul settings. The last -config-dir takes
+                      precedence. */}}
                 {{- range .Values.client.extraVolumes }}
                 {{- if .load }}
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
-                {{- end }}
-                {{- if .Values.global.acls.manageSystemACLs }}
-                -config-dir=/consul/aclconfig \
                 {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
