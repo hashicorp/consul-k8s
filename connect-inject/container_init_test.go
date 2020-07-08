@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1487,7 +1488,12 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 
 func TestHandlerContainerInit_Resources(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := Handler{
+		InitContainerMemoryRequest: resource.MustParse("10Mi"),
+		InitContainerMemoryLimit:   resource.MustParse("25Mi"),
+		InitContainerCPURequest:    resource.MustParse("10m"),
+		InitContainerCPULimit:      resource.MustParse("20m"),
+	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -1507,12 +1513,12 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    h.InitCopyContainerCPULimit,
-			corev1.ResourceMemory: h.InitCopyContainerMemoryLimit,
+			corev1.ResourceCPU:    resource.MustParse("20m"),
+			corev1.ResourceMemory: resource.MustParse("25Mi"),
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    h.InitCopyContainerCPURequest,
-			corev1.ResourceMemory: h.InitCopyContainerMemoryRequest,
+			corev1.ResourceCPU:    resource.MustParse("10m"),
+			corev1.ResourceMemory: resource.MustParse("10Mi"),
 		},
 	}, container.Resources)
 }

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
@@ -175,11 +175,11 @@ type Handler struct {
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
 
-	// Resource settings for Init Copy Container
-	InitCopyContainerCPULimit      resource.Quantity
-	InitCopyContainerCPURequest    resource.Quantity
-	InitCopyContainerMemoryLimit   resource.Quantity
-	InitCopyContainerMemoryRequest resource.Quantity
+	// Resource settings for Init Container
+	InitContainerCPULimit      resource.Quantity
+	InitContainerCPURequest    resource.Quantity
+	InitContainerMemoryLimit   resource.Quantity
+	InitContainerMemoryRequest resource.Quantity
 
 	// Resource settings for lifecycle sidecar
 	LifecycleSidecarCPULimit      resource.Quantity

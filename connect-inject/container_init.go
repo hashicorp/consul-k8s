@@ -10,13 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	initContainerCPULimit      = "50m"
-	initContainerCPURequest    = "50m"
-	initContainerMemoryLimit   = "25Mi"
-	initContainerMemoryRequest = "25Mi"
-)
-
 type initContainerCommandData struct {
 	ServiceName      string
 	ProxyServiceName string
@@ -201,12 +194,12 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 
 	resources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    h.InitCopyContainerCPULimit,
-			corev1.ResourceMemory: h.InitCopyContainerMemoryLimit,
+			corev1.ResourceCPU:    h.InitContainerCPULimit,
+			corev1.ResourceMemory: h.InitContainerMemoryLimit,
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    h.InitCopyContainerCPURequest,
-			corev1.ResourceMemory: h.InitCopyContainerMemoryRequest,
+			corev1.ResourceCPU:    h.InitContainerCPURequest,
+			corev1.ResourceMemory: h.InitContainerMemoryRequest,
 		},
 	}
 

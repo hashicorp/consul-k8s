@@ -10,10 +10,10 @@ import (
 
 func TestRun_FlagValidation(t *testing.T) {
 	mandatoryResourceFlags := []string{
-		"-init-copy-container-memory-limit=125M",
-		"-init-copy-container-memory-request=25M",
-		"-init-copy-container-cpu-limit=50m",
-		"-init-copy-container-cpu-request=50m",
+		"-init-container-memory-limit=125M",
+		"-init-container-memory-request=25M",
+		"-init-container-cpu-limit=50m",
+		"-init-container-cpu-request=50m",
 		"-lifecycle-sidecar-memory-limit=25Mi",
 		"-lifecycle-sidecar-memory-request=25Mi",
 		"-lifecycle-sidecar-cpu-limit=20m",
@@ -63,19 +63,45 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-lifecycle-sidecar-cpu-limit && -lifecycle-sidecar-cpu-request must be set",
 		},
 		{
-			flags:  []string{"-consul-k8s-image", "foo", "-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m"},
-			expErr: "-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set",
-		},
-		{
-			flags:  []string{"-consul-k8s-image", "foo", "-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m", "-lifecycle-sidecar-memory-limit", "100Mi"},
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m"},
 			expErr: "-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo",
 				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
+				"-lifecycle-sidecar-memory-limit", "100Mi"}, // Missing -lifecycle-sidecar-memory-request
+			expErr: "-lifecycle-sidecar-memory-limit && -lifecycle-sidecar-memory-request must be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
+				"-lifecycle-sidecar-memory-limit", "100Mi", "-lifecycle-sidecar-memory-request", "100Mi"},
+			// Missing -init-container-cpu-limit and -init-container-cpu-limit
+			expErr: "-init-container-cpu-limit && -init-container-cpu-request must be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
 				"-lifecycle-sidecar-memory-limit", "100Mi", "-lifecycle-sidecar-memory-request", "100Mi",
-				"-init-copy-container-cpu-limit", "10m", "-init-copy-container-cpu-request", "10m"},
-			expErr: "-init-copy-container-memory-limit && -init-copy-container-memory-request must be set",
+				"-init-container-cpu-limit", "10m"}, // Missing -init-container-cpu-request
+			expErr: "-init-container-cpu-limit && -init-container-cpu-request must be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
+				"-lifecycle-sidecar-memory-limit", "100Mi", "-lifecycle-sidecar-memory-request", "100Mi",
+				"-init-container-cpu-limit", "10m", "-init-container-cpu-request", "10m"},
+			// Missing -init-container-memory-limit && -init-container-memory-request
+			expErr: "-init-container-memory-limit && -init-container-memory-request must be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo",
+				"-lifecycle-sidecar-cpu-limit", "20m", "-lifecycle-sidecar-cpu-request", "20m",
+				"-lifecycle-sidecar-memory-limit", "100Mi", "-lifecycle-sidecar-memory-request", "100Mi",
+				"-init-container-cpu-limit", "10m", "-init-container-cpu-request", "10m",
+				"-init-container-memory-limit", "125Mi"}, // Missing -init-container-memory-request
+			expErr: "-init-container-memory-limit && -init-container-memory-request must be set",
 		},
 		{
 			flags:  append([]string{"-consul-k8s-image", "foo", "-ca-file", "bar"}, mandatoryResourceFlags...),

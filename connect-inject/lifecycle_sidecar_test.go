@@ -10,11 +10,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	lifecycleContainerCPULimit      = "10m"
-	lifecycleContainerCPURequest    = "10m"
-	lifecycleContainerMemoryLimit   = "25Mi"
-	lifecycleContainerMemoryRequest = "25Mi"
+var (
+	lifecycleContainerCPULimit      = resource.MustParse("20m")
+	lifecycleContainerCPURequest    = resource.MustParse("10m")
+	lifecycleContainerMemoryLimit   = resource.MustParse("50Mi")
+	lifecycleContainerMemoryRequest = resource.MustParse("25Mi")
 )
 
 // NOTE: This is tested here rather than in handler_test because doing it there
@@ -26,10 +26,10 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 	handler := Handler{
 		Log:                           hclog.Default().Named("handler"),
 		ImageConsulK8S:                "hashicorp/consul-k8s:9.9.9",
-		LifecycleSidecarMemoryRequest: resource.MustParse(lifecycleContainerMemoryRequest),
-		LifecycleSidecarMemoryLimit:   resource.MustParse(lifecycleContainerMemoryLimit),
-		LifecycleSidecarCPURequest:    resource.MustParse(lifecycleContainerCPURequest),
-		LifecycleSidecarCPULimit:      resource.MustParse(lifecycleContainerCPULimit),
+		LifecycleSidecarMemoryRequest: lifecycleContainerMemoryRequest,
+		LifecycleSidecarMemoryLimit:   lifecycleContainerMemoryLimit,
+		LifecycleSidecarCPURequest:    lifecycleContainerCPURequest,
+		LifecycleSidecarCPULimit:      lifecycleContainerCPULimit,
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -68,12 +68,12 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
+				corev1.ResourceCPU:    lifecycleContainerCPULimit,
+				corev1.ResourceMemory: lifecycleContainerMemoryLimit,
 			},
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
+				corev1.ResourceCPU:    lifecycleContainerCPURequest,
+				corev1.ResourceMemory: lifecycleContainerMemoryRequest,
 			},
 		},
 	}, container)
@@ -143,10 +143,10 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 		Log:                           hclog.Default().Named("handler"),
 		ImageConsulK8S:                "hashicorp/consul-k8s:9.9.9",
 		ConsulCACert:                  "consul-ca-cert",
-		LifecycleSidecarMemoryRequest: resource.MustParse(lifecycleContainerMemoryRequest),
-		LifecycleSidecarMemoryLimit:   resource.MustParse(lifecycleContainerMemoryLimit),
-		LifecycleSidecarCPURequest:    resource.MustParse(lifecycleContainerCPURequest),
-		LifecycleSidecarCPULimit:      resource.MustParse(lifecycleContainerCPULimit),
+		LifecycleSidecarMemoryRequest: lifecycleContainerMemoryRequest,
+		LifecycleSidecarMemoryLimit:   lifecycleContainerMemoryLimit,
+		LifecycleSidecarCPURequest:    lifecycleContainerCPURequest,
+		LifecycleSidecarCPULimit:      lifecycleContainerCPULimit,
 	}
 	container := handler.lifecycleSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -189,12 +189,12 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPULimit),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryLimit),
+				corev1.ResourceCPU:    lifecycleContainerCPULimit,
+				corev1.ResourceMemory: lifecycleContainerMemoryLimit,
 			},
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(lifecycleContainerCPURequest),
-				corev1.ResourceMemory: resource.MustParse(lifecycleContainerMemoryRequest),
+				corev1.ResourceCPU:    lifecycleContainerCPURequest,
+				corev1.ResourceMemory: lifecycleContainerMemoryRequest,
 			},
 		},
 	}, container)
