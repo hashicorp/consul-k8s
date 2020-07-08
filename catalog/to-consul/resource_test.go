@@ -2,9 +2,8 @@ package catalog
 
 import (
 	"testing"
-	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
@@ -26,7 +25,6 @@ func init() {
 // Test that deleting a service properly deletes the registration.
 func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -38,23 +36,23 @@ func TestServiceResource_createDelete(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Delete
-	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete("foo", nil))
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete("foo", nil))
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 0)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 0)
+	})
 }
 
 // Test that we're default enabled.
 func TestServiceResource_defaultEnable(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -66,20 +64,20 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+	})
 }
 
 // Test that we can explicitly disable.
 func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -92,20 +90,20 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "false"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 0)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 0)
+	})
 }
 
 // Test that we can default disable
 func TestServiceResource_defaultDisable(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -118,20 +116,20 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 0)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 0)
+	})
 }
 
 // Test that we can default disable but override
 func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -145,14 +143,15 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceSync] = "t"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+	})
 }
 
 // Test changing the sync tag to false deletes the service.
@@ -284,7 +283,6 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 // Test that external IPs take priority.
 func TestServiceResource_externalIP(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -297,26 +295,24 @@ func TestServiceResource_externalIP(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("3.3.3.3", actual[0].Service.Address)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("4.4.4.4", actual[1].Service.Address)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "3.3.3.3", actual[0].Service.Address)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "4.4.4.4", actual[1].Service.Address)
+	})
 }
 
 // Test externalIP with Prefix
 func TestServiceResource_externalIPPrefix(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -330,26 +326,24 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("prefixfoo", actual[0].Service.Service)
-	require.Equal("3.3.3.3", actual[0].Service.Address)
-	require.Equal("prefixfoo", actual[1].Service.Service)
-	require.Equal("4.4.4.4", actual[1].Service.Address)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "prefixfoo", actual[0].Service.Service)
+		require.Equal(r, "3.3.3.3", actual[0].Service.Address)
+		require.Equal(r, "prefixfoo", actual[1].Service.Service)
+		require.Equal(r, "4.4.4.4", actual[1].Service.Address)
+	})
 }
 
 // Test that the proper registrations are generated for a LoadBalancer.
 func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -361,24 +355,22 @@ func TestServiceResource_lb(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+	})
 }
 
 // Test that the proper registrations are generated for a LoadBalancer with a prefix
 func TestServiceResource_lbPrefix(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -391,25 +383,23 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("prefixfoo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "prefixfoo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+	})
 }
 
 // Test that the proper registrations are generated for a LoadBalancer
 // with multiple endpoints.
 func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -425,27 +415,25 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 		apiv1.LoadBalancerIngress{IP: "2.3.4.5"},
 	)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.NotEqual(actual[1].Service.ID, actual[0].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.NotEqual(r, actual[1].Service.ID, actual[0].Service.ID)
+	})
 }
 
 // Test explicit name annotation
 func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -458,21 +446,21 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceName] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("bar", actual[0].Service.Service)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "bar", actual[0].Service.Service)
+	})
 }
 
 // Test default port and additional ports in the meta
 func TestServiceResource_lbPort(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -488,23 +476,23 @@ func TestServiceResource_lbPort(t *testing.T) {
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal(80, actual[0].Service.Port)
-	require.Equal("80", actual[0].Service.Meta["port-http"])
-	require.Equal("8500", actual[0].Service.Meta["port-rpc"])
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, 80, actual[0].Service.Port)
+		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
+		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
+	})
 }
 
 // Test default port works with override annotation
 func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -521,23 +509,23 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal(8500, actual[0].Service.Port)
-	require.Equal("80", actual[0].Service.Meta["port-http"])
-	require.Equal("8500", actual[0].Service.Meta["port-rpc"])
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, 8500, actual[0].Service.Port)
+		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
+		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
+	})
 }
 
 // Test annotated tags
 func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -551,21 +539,21 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceTags] = "one, two,three"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal([]string{"k8s", "one", "two", "three"}, actual[0].Service.Tags)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, []string{"k8s", "one", "two", "three"}, actual[0].Service.Tags)
+	})
 }
 
 // Test annotated service meta
 func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -578,21 +566,21 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServiceMetaPrefix+"foo"] = "bar"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("bar", actual[0].Service.Meta["foo"])
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "bar", actual[0].Service.Meta["foo"])
+	})
 }
 
 // Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name
 func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -622,29 +610,29 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("8.8.8.8", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "8.8.8.8", actual[0].Service.Address)
+		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+	})
 }
 
 // Test that the proper registrations are generated for a NodePort type.
 func TestServiceResource_nodePort(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	syncer := &TestSyncer{}
 	client := fake.NewSimpleClientset()
 	serviceResource := defaultServiceResource(client, syncer)
@@ -661,30 +649,29 @@ func TestServiceResource_nodePort(t *testing.T) {
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(30000, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test node port works with prefix
 func TestServiceResource_nodePortPrefix(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -702,32 +689,30 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("prefixfoo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("prefixfoo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(30000, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "prefixfoo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "prefixfoo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the registrations for a NodePort type
 // are generated only for the nodes where pods are running.
 func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -757,31 +742,29 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 1)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+	})
 }
 
 // Test that the proper registrations are generated for a NodePort with annotated port.
 func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -799,31 +782,29 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	svc.Annotations = map[string]string{annotationServicePort: "rpc"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(30001, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(30001, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, 30001, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.Equal(r, 30001, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a NodePort with an unnamed port.
 func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -845,32 +826,30 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 		{Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
 	}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.2.3.4", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(30000, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a NodePort type
 // when syncing internal Node IPs only.
 func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -887,32 +866,30 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(200 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("4.5.6.7", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("3.4.5.6", actual[1].Service.Address)
-	require.Equal(30000, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "3.4.5.6", actual[1].Service.Address)
+		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a NodePort type
 // when preferring to sync external Node IPs over internal IPs
 func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -930,38 +907,36 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 		},
 	}
 	_, err := client.CoreV1().Nodes().UpdateStatus(node1)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
-
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("4.5.6.7", actual[0].Service.Address)
-	require.Equal(30000, actual[0].Service.Port)
-	require.Equal("k8s-sync", actual[0].Node)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.3.4.5", actual[1].Service.Address)
-	require.Equal(30000, actual[1].Service.Port)
-	require.Equal("k8s-sync", actual[1].Node)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
+		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "k8s-sync", actual[0].Node)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
+		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, "k8s-sync", actual[1].Node)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a ClusterIP type.
 func TestServiceResource_clusterIP(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -974,32 +949,30 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	// Insert the service
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 8080, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test clusterIP with prefix
 func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1013,33 +986,31 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	// Insert the service
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("prefixfoo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
-	require.Equal("prefixfoo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "prefixfoo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "prefixfoo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 8080, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a ClusterIP type with
 // annotated port name override.
 func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1053,33 +1024,31 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "rpc"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(2000, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(2000, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 2000, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 2000, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a ClusterIP type with
 // annotated port number override.
 func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1093,32 +1062,30 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "4141"
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(4141, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(4141, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 4141, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 4141, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the proper registrations are generated for a ClusterIP type with unnamed ports.
 func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1135,33 +1102,31 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 		{Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 8080, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test that the ClusterIP services aren't synced when ClusterIPSync
 // is disabled.
 func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1174,25 +1139,23 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	// Insert the service
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 0)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 0)
+	})
 }
 
 // Test that the ClusterIP services are synced when watching all namespaces
 func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	testNamespace := "test_namespace"
@@ -1206,32 +1169,30 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	// Insert the service
 	svc := clusterIPService("foo", testNamespace)
 	_, err := client.CoreV1().Services(testNamespace).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", testNamespace)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(8080, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(8080, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 8080, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test using a port name annotation when the targetPort is a named port.
 func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	client := fake.NewSimpleClientset()
 	syncer := &TestSyncer{}
 	serviceResource := defaultServiceResource(client, syncer)
@@ -1249,26 +1210,25 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 		{Port: 8500, TargetPort: intstr.FromString("rpcPort"), Name: "rpc"},
 	}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
-	// Wait a bit
-	time.Sleep(300 * time.Millisecond)
-
 	// Verify what we got
-	syncer.Lock()
-	defer syncer.Unlock()
-	actual := syncer.Registrations
-	require.Len(actual, 2)
-	require.Equal("foo", actual[0].Service.Service)
-	require.Equal("1.1.1.1", actual[0].Service.Address)
-	require.Equal(2000, actual[0].Service.Port)
-	require.Equal("foo", actual[1].Service.Service)
-	require.Equal("2.2.2.2", actual[1].Service.Address)
-	require.Equal(2000, actual[1].Service.Port)
-	require.NotEqual(actual[0].Service.ID, actual[1].Service.ID)
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
+		require.Equal(r, 2000, actual[0].Service.Port)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
+		require.Equal(r, 2000, actual[1].Service.Port)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
 }
 
 // Test allow/deny namespace lists.
