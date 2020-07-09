@@ -13,7 +13,7 @@ import (
 
 // The init container is bound in memory usage by the size of the consul binary
 // as it issues a cpu of the binary to a shared volume. The limit is set to be
-// slightly larger than the binary to ensure we dont get OOM killed during the cp.
+// slightly larger than the binary to ensure we don't get OOM killed during the cp.
 const (
 	initContainerCPULimit      = "50m"
 	initContainerCPURequest    = "50m"
