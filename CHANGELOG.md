@@ -3,6 +3,18 @@
 BREAKING CHANGES:
 
 * ACLs: Always update Kubernetes auth method created by the `server-acl-init` job. Previously, we would only update the auth method if Consul namespaces are enabled. With this change, we always update it to make sure that any configuration changes or updates to the `connect-injector-authmethod-svc-account` are propagated [[GH-282](https://github.com/hashicorp/consul-k8s/pull/282)].
+* Connect: Connect pods have had the following resource settings changed: `consul-connect-inject-init` now has its memory limit set to `150M` up from `25M` and `consul-connect-lifecycle-sidecar` has its CPU request and limit set to `20m` up from `10m`. [[GH-291](https://github.com/hashicorp/consul-k8s/pull/291)]
+
+IMPROVEMENTS:
+
+* Extracted Consul's HTTP flags into our own package so we no longer depend on the internal Consul golang module. [[GH-259](https://github.com/hashicorp/consul-k8s/pull/259)]
+
+BUG FIXES:
+
+* Connect: Update resource settings to fix out of memory errors and CPU usage at 100% of limit. [Fixes [GH-283](https://github.com/hashicorp/consul-k8s/issues/283), [consul-helm GH-515](https://github.com/hashicorp/consul-helm/issues/515)]
+* Connect: Creating a pod with a different service account name than its Consul service name will now result in an error when ACLs are enabled.
+  Previously this would not result in an error, but the pod would not be able to send or receive traffic because its ACL token would be for a
+  different service name. [Fixes [GH-237](https://github.com/hashicorp/consul-k8s/issues/237)]
 
 ## 0.16.0 (June 17, 2020)
 
