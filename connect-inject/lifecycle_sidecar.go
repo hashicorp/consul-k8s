@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	lifecycleContainerCPULimit      = "10m"
-	lifecycleContainerCPURequest    = "10m"
+	lifecycleContainerCPULimit      = "20m"
+	lifecycleContainerCPURequest    = "20m"
 	lifecycleContainerMemoryLimit   = "25Mi"
 	lifecycleContainerMemoryRequest = "25Mi"
 )
