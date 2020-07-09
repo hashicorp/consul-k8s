@@ -53,7 +53,7 @@ global:
   # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
-  imageK8S: "hashicorp/consul-k8s:0.16.0"
+  imageK8S: "hashicorp/consul-k8s:0.17.0"
 
   # imageEnvoy defines the default envoy image to use for ingress and
   # terminating gateways.
