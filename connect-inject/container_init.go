@@ -14,7 +14,7 @@ import (
 const (
 	initContainerCPULimit      = "50m"
 	initContainerCPURequest    = "50m"
-	initContainerMemoryLimit   = "25Mi"
+	initContainerMemoryLimit   = "125Mi"
 	initContainerMemoryRequest = "25Mi"
 )
 
