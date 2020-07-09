@@ -18,7 +18,7 @@ IMPROVEMENTS:
   * Client Daemonset
   * Client Snapshot Agent
 
-   [Fixes [GH-403](https://github.com/hashicorp/consul-helm/issues/403)]
+   [[GH-403](https://github.com/hashicorp/consul-helm/issues/403)]
 
 * The volumes set by `client.extraVolumes` are now passed as the last `-config-dir` argument.
   This means any settings there will override previous settings. This allows users to override
