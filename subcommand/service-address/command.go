@@ -12,8 +12,8 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	v1 "k8s.io/api/core/v1"

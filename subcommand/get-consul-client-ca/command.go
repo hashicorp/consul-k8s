@@ -11,8 +11,8 @@ import (
 
 	"github.com/cenkalti/backoff"
 	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"

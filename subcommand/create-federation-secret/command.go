@@ -14,9 +14,8 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +37,7 @@ var retryInterval = 1 * time.Second
 type Command struct {
 	UI    cli.Ui
 	flags *flag.FlagSet
-	k8s   *k8sflags.K8SFlags
+	k8s   *flags.K8SFlags
 	http  *flags.HTTPFlags
 
 	// flagExportReplicationToken controls whether we include the acl replication
@@ -90,12 +89,11 @@ func (c *Command) init() {
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 
-	c.help = flags.Usage(help, c.flags)
 	c.http = &flags.HTTPFlags{}
-	c.k8s = &k8sflags.K8SFlags{}
-	flags.Merge(c.flags, c.http.ClientFlags())
-	flags.Merge(c.flags, c.http.ServerFlags())
+	c.k8s = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.http.Flags())
 	flags.Merge(c.flags, c.k8s.Flags())
+	c.help = flags.Usage(help, c.flags)
 }
 
 // Run creates a Kubernetes secret with data needed by secondary datacenters
