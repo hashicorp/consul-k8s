@@ -1,5 +1,13 @@
 ## Unreleased
 
+## 0.23.1 (July 10, 2020)
+
+BUG FIXES:
+
+* TLS: Fixes bug introduced in 0.23.0 where the DNS subject alternative names
+  for the server certs were invalid. This would cause the server-acl-init job
+  to run forever without completing. [[GH-538](https://github.com/hashicorp/consul-helm/pull/538)]
+
 ## 0.23.0 (July 9, 2020)
 
 BREAKING CHANGES:
