@@ -76,17 +76,20 @@ spec:
                 -H "Accept: application/json" \
                 -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"{{ template "consul.fullname" . }}-ca-key\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"tls.key\": \"$( cat {{ .Values.global.domain }}-agent-ca-key.pem | base64 | tr -d '\n' )\" }}" > /dev/null
               {{- end }}
+              # Suppress globbing so we can interpolate the $NAMESPACE environment variable
+              # and use * at the start of the dns name when setting -additional-dnsname.
+              set -o noglob
               consul tls cert create -server \
                 -days=730 \
                 {{- if (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName) }}
                 -ca=/consul/tls/ca/cert/tls.crt \
                 -key=/consul/tls/ca/key/tls.key \
                 {{- end }}
-                -additional-dnsname='{{ template "consul.fullname" . }}-server' \
-                -additional-dnsname='*.{{ template "consul.fullname" . }}-server' \
+                -additional-dnsname="{{ template "consul.fullname" . }}-server" \
+                -additional-dnsname="*.{{ template "consul.fullname" . }}-server" \
                 -additional-dnsname="*.{{ template "consul.fullname" . }}-server.${NAMESPACE}" \
                 -additional-dnsname="*.{{ template "consul.fullname" . }}-server.${NAMESPACE}.svc" \
-                -additional-dnsname='*.server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}' \
+                -additional-dnsname="*.server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}" \
                 {{- range .Values.global.tls.serverAdditionalIPSANs }}
                 -additional-ipaddress={{ . }} \
                 {{- end }}
@@ -95,6 +98,7 @@ spec:
                  {{- end }}
                 -dc={{ .Values.global.datacenter }} \
                 -domain={{ .Values.global.domain }}
+              set +o noglob
               curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
                 https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
                 -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
