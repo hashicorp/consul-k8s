@@ -84,8 +84,8 @@ spec:
                 {{- end }}
                 -additional-dnsname='{{ template "consul.fullname" . }}-server' \
                 -additional-dnsname='*.{{ template "consul.fullname" . }}-server' \
-                -additional-dnsname="'*.{{ template "consul.fullname" . }}-server.${NAMESPACE}'" \
-                -additional-dnsname="'*.{{ template "consul.fullname" . }}-server.${NAMESPACE}.svc'" \
+                -additional-dnsname="*.{{ template "consul.fullname" . }}-server.${NAMESPACE}" \
+                -additional-dnsname="*.{{ template "consul.fullname" . }}-server.${NAMESPACE}.svc" \
                 -additional-dnsname='*.server.{{ .Values.global.datacenter }}.{{ .Values.global.domain }}' \
                 {{- range .Values.global.tls.serverAdditionalIPSANs }}
                 -additional-ipaddress={{ . }} \
