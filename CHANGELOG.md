@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+
+* Connect: Respect allow/deny list flags when namespaces are disabled. [[GH-296](https://github.com/hashicorp/consul-k8s/issues/296)]
+
 ## 0.17.0 (July 09, 2020)
 
 BREAKING CHANGES:

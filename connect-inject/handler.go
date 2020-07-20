@@ -382,16 +382,14 @@ func (h *Handler) shouldInject(pod *corev1.Pod, namespace string) (bool, error) 
 	}
 
 	// Namespace logic
-	if h.EnableNamespaces {
-		// If in deny list, don't inject
-		if h.DenyK8sNamespacesSet.Contains(namespace) {
-			return false, nil
-		}
+	// If in deny list, don't inject
+	if h.DenyK8sNamespacesSet.Contains(namespace) {
+		return false, nil
+	}
 
-		// If not in allow list or allow list is not *, don't inject
-		if !h.AllowK8sNamespacesSet.Contains("*") && !h.AllowK8sNamespacesSet.Contains(namespace) {
-			return false, nil
-		}
+	// If not in allow list or allow list is not *, don't inject
+	if !h.AllowK8sNamespacesSet.Contains("*") && !h.AllowK8sNamespacesSet.Contains(namespace) {
+		return false, nil
 	}
 
 	// If we already injected then don't inject again

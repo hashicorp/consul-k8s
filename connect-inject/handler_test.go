@@ -34,7 +34,11 @@ func TestHandlerHandle(t *testing.T) {
 	}{
 		{
 			"kube-system namespace",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Namespace: metav1.NamespaceSystem,
 				Object: encodeRaw(t, &corev1.Pod{
@@ -47,7 +51,11 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"already injected",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -65,7 +73,11 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -102,7 +114,11 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"pod with upstreams specified",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -161,7 +177,11 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection disabled",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -179,7 +199,11 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod with injection truthy",
-			Handler{Log: hclog.Default().Named("handler")},
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -222,7 +246,13 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic, no default protocol",
-			Handler{WriteServiceDefaults: true, DefaultProtocol: "", Log: hclog.Default().Named("handler")},
+			Handler{
+				WriteServiceDefaults:  true,
+				DefaultProtocol:       "",
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -260,7 +290,12 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic, protocol in annotation",
-			Handler{WriteServiceDefaults: true, Log: hclog.Default().Named("handler")},
+			Handler{
+				WriteServiceDefaults:  true,
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -299,7 +334,13 @@ func TestHandlerHandle(t *testing.T) {
 
 		{
 			"empty pod basic, default protocol specified",
-			Handler{WriteServiceDefaults: true, DefaultProtocol: "http", Log: hclog.Default().Named("handler")},
+			Handler{
+				WriteServiceDefaults:  true,
+				DefaultProtocol:       "http",
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -369,7 +410,11 @@ func TestHandlerHandle_badContentType(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "text/plain")
 
-	h := Handler{Log: hclog.Default().Named("handler")}
+	h := Handler{
+		Log:                   hclog.Default().Named("handler"),
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
+	}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -382,7 +427,11 @@ func TestHandlerHandle_noBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	h := Handler{Log: hclog.Default().Named("handler")}
+	h := Handler{
+		Log:                   hclog.Default().Named("handler"),
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
+	}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
@@ -789,7 +838,7 @@ func TestShouldInject(t *testing.T) {
 			false,
 		},
 		{
-			"namespaces disabled",
+			"namespaces disabled, empty allow/deny lists",
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -801,7 +850,112 @@ func TestShouldInject(t *testing.T) {
 			false,
 			mapset.NewSet(),
 			mapset.NewSet(),
+			false,
+		},
+		{
+			"namespaces disabled, allow *",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("*"),
+			mapset.NewSet(),
 			true,
+		},
+		{
+			"namespaces disabled, allow default",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("default"),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces disabled, allow * and default",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("*", "default"),
+			mapset.NewSet(),
+			true,
+		},
+		{
+			"namespaces disabled, allow only ns1 and ns2",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("ns1", "ns2"),
+			mapset.NewSet(),
+			false,
+		},
+		{
+			"namespaces disabled, deny default ns",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSet(),
+			mapset.NewSetWith("default"),
+			false,
+		},
+		{
+			"namespaces disabled, allow *, deny default ns",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("*"),
+			mapset.NewSetWith("default"),
+			false,
+		},
+		{
+			"namespaces disabled, default ns in both allow and deny lists",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "testing",
+					},
+				},
+			},
+			"default",
+			false,
+			mapset.NewSetWith("default"),
+			mapset.NewSetWith("default"),
+			false,
 		},
 		{
 			"namespaces enabled, empty allow/deny lists",
