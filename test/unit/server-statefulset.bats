@@ -353,7 +353,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -365,6 +365,27 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+#--------------------------------------------------------------------
+# extraConfig
+
+@test "server/StatefulSet: adds config-checksum annotation when extraConfig is blank" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
+  [ "${actual}" = ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356 ]
+}
+
+@test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.extraConfig="{\"hello\": \"world\"}"' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
+  [ "${actual}" = 83df36fdaf1b4acb815f1764f9ff2782c520ca012511f282ba9c57a04401a239 ]
 }
 
 #--------------------------------------------------------------------

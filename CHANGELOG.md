@@ -1,5 +1,16 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+* Add server.extraConfig and client.extraConfig values as hashes on Server
+  StatefulSet and Client Daemonset annotations respectively. This recreates
+  the server/client pod when the server/client extraConfig is updated via `helm upgrade` [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
+
+BREAKING CHANGESL
+
+* Updating either server.extraConfig or client.extraConfig and running `helm upgrade` will force a restart of the
+  server or agent pods respectively.
+
 ## 0.23.1 (July 10, 2020)
 
 BUG FIXES:
