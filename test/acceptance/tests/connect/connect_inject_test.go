@@ -93,7 +93,7 @@ func createServerAndClient(t *testing.T, options *k8s.KubectlOptions) {
 // checkConnection checks if static-client can talk to static-server.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func checkConnection(t *testing.T, options *k8s.KubectlOptions, client *kubernetes.Clientset, expectSuccess bool) {
+func checkConnection(t *testing.T, options *k8s.KubectlOptions, client kubernetes.Interface, expectSuccess bool) {
 	pods, err := client.CoreV1().Pods(options.Namespace).List(metav1.ListOptions{LabelSelector: "app=static-client"})
 	require.NoError(t, err)
 	require.Len(t, pods.Items, 1)

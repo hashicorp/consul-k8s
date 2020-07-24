@@ -25,10 +25,10 @@ func RandomName() string {
 // are in the ready status. It checks every 5 seconds for a total of 20 tries.
 // If there is at least one container in a pod that isn't ready after that,
 // it fails the test.
-func WaitForAllPodsToBeReady(t *testing.T, client *kubernetes.Clientset, namespace, podLabelSelector string) {
+func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	counter := &retry.Counter{Count: 20, Wait: 5*time.Second}
+	counter := &retry.Counter{Count: 20, Wait: 5 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)

@@ -81,7 +81,7 @@ func TestSyncCatalog(t *testing.T) {
 
 // createTestService creates a test Kubernetes service and its backend pod
 // with the provided name.
-func createTestService(t *testing.T, k8sClient *kubernetes.Clientset, name string) {
+func createTestService(t *testing.T, k8sClient kubernetes.Interface, name string) {
 	// Create a service in k8s and check that it exists in Consul
 	svc, err := k8sClient.CoreV1().Services("default").Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

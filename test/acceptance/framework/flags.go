@@ -40,7 +40,7 @@ func (t *TestFlags) testConfigFromFlags() *TestConfig {
 		KubeContext:   t.flagKubecontext,
 		KubeNamespace: t.flagNamespace,
 
-		ConsulImage: t.flagConsulImage,
+		ConsulImage:    t.flagConsulImage,
 		ConsulK8SImage: t.flagConsulK8sImage,
 	}
 }
