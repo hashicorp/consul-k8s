@@ -346,9 +346,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# podLabels
+# extraLabels
 
-@test "server/StatefulSet: no pod labels defined by default" {
+@test "server/StatefulSet: no extra labels defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -357,14 +357,27 @@ load _helpers
   [ "${actual}" = "{}" ]
 }
 
-@test "server/StatefulSet: pod labels can be set" {
+@test "server/StatefulSet: extra labels can be set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.podLabels=foo: bar' \
+      --set 'server.extraLabels=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
+}
+
+@test "server/StatefulSet: multiple extra labels can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.extraLabels=foo: bar \
+baz: qux' \
+      . | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualFoo}" = "bar" ]
+  [ "${actualBaz}" = "qux" ]
 }
 
 #--------------------------------------------------------------------

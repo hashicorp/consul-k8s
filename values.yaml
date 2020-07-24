@@ -324,9 +324,10 @@ server:
   # Extra labels to attach to the server pods.
   # This should be a multi-line YAML string.
   # Example:
-  #   podLabels: |
+  #   extraLabels: |
   #     "label-key": "label-value"
-  podLabels: null
+  #     "other-label-key": "another-label-value"
+  extraLabels: null
 
   # Extra annotations to attach to the server pods.
   # This should be a multi-line YAML string.
