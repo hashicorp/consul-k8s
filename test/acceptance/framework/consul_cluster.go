@@ -34,9 +34,9 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
-	helmOptions *helm.Options
-	releaseName string
-	kubernetesClient *kubernetes.Clientset
+	helmOptions      *helm.Options
+	releaseName      string
+	kubernetesClient kubernetes.Interface
 }
 
 func NewHelmCluster(
@@ -48,7 +48,7 @@ func NewHelmCluster(
 
 	// Deploy single-server cluster by default unless helmValues overwrites that
 	values := map[string]string{
-		"server.replicas": "1",
+		"server.replicas":        "1",
 		"server.bootstrapExpect": "1",
 	}
 	valuesFromConfig := cfg.HelmValuesFromConfig()
@@ -63,8 +63,8 @@ func NewHelmCluster(
 		Logger:         logger.TestingT,
 	}
 	return &HelmCluster{
-		helmOptions: opts,
-		releaseName: releaseName,
+		helmOptions:      opts,
+		releaseName:      releaseName,
 		kubernetesClient: ctx.KubernetesClient(t),
 	}
 }
@@ -92,7 +92,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	helm.Delete(t, h.helmOptions, h.releaseName, false)
 
 	// delete PVCs
-	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release="+h.releaseName})
+	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
 
 	// delete any secrets that have h.releaseName in their name
 	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(metav1.ListOptions{})

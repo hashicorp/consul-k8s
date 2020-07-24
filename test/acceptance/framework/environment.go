@@ -22,7 +22,7 @@ type TestEnvironment interface {
 // for example, information about a specific Kubernetes cluster.
 type TestContext interface {
 	KubectlOptions() *k8s.KubectlOptions
-	KubernetesClient(t *testing.T) *kubernetes.Clientset
+	KubernetesClient(t *testing.T) kubernetes.Interface
 }
 
 type kubernetesEnvironment struct {
@@ -67,7 +67,7 @@ func (k kubernetesContext) KubectlOptions() *k8s.KubectlOptions {
 	}
 }
 
-func (k kubernetesContext) KubernetesClient(t *testing.T) *kubernetes.Clientset {
+func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
 	configPath, err := k.KubectlOptions().GetConfigPath(t)
 	require.NoError(t, err)
 

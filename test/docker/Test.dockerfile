@@ -7,35 +7,30 @@
 # manually. This image only has the dependencies pre-installed.
 
 FROM circleci/golang:1.14
-WORKDIR /root
+
+# change the user to root so we can install stuff
+USER root
 
 ENV BATS_VERSION "1.1.0"
 ENV TERRAFORM_VERSION "0.12.26"
 
 # base packages
-RUN apk update && apk add --no-cache --virtual .build-deps \
-    ca-certificates \
-    curl \
-    tar \
-    bash \
+RUN apt-get install -y \
     openssl \
-    python \
-    py-pip \
-    git \
+    python3 \
+    python3-pip \
     jq
 
 # yq
-RUN pip install yq
+RUN pip3 install yq
 
 # gcloud
-RUN curl -OL https://dl.google.com/dl/cloudsdk/channels/rapid/install_google_cloud_sdk.bash && \
-    bash install_google_cloud_sdk.bash --disable-prompts --install-dir='/root/' && \
-    ln -s /root/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-sdk -y
 
 # terraform
 RUN curl -sSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o /tmp/tf.zip \
     && unzip /tmp/tf.zip  \
-    && ln -s /root/terraform /usr/local/bin/terraform
+    && mv ./terraform /usr/local/bin/terraform
 
 # kubectl
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && \
@@ -49,3 +44,6 @@ RUN curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 |
 RUN curl -sSL https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz -o /tmp/bats.tgz \
     && tar -zxf /tmp/bats.tgz -C /tmp \
     && /bin/bash /tmp/bats-core-${BATS_VERSION}/install.sh /usr/local
+
+# change the user back to what circleci/golang image has
+USER circleci

@@ -1,11 +1,18 @@
 version: 2.1
 orbs:
   slack: circleci/slack@3.4.2
+executors:
+  go:
+    docker:
+      - image: circleci/golang:1.14
+    environment:
+      - TEST_RESULTS: /tmp/test-results
 
 jobs:
   unit-helm2:
     docker:
       # This image is built from test/docker/Test.dockerfile
+      # helm2 must use 0.3.0 version of the image
       - image: hashicorpdev/consul-helm-test:0.3.0
 
     steps:
@@ -15,7 +22,7 @@ jobs:
           command: bats ./test/unit
   unit-helm3:
     docker:
-      - image: hashicorpdev/consul-helm-test:0.4.0
+      - image: hashicorpdev/consul-helm-test:0.5.0
 
     steps:
       - checkout
@@ -24,11 +31,72 @@ jobs:
           name: Run Unit Tests
           command: bats ./test/unit
 
+  go-fmt-and-vet:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: test/acceptance
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+          paths:
+            - "/go/pkg/mod"
+
+      # check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+
+      - run:
+          name: go vet
+          working_directory: test/acceptance
+          command: go vet ./...
+
+  unit-acceptance-framework:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run tests
+          working_directory: test/acceptance/framework
+          command: |
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   acceptance:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is build from test/docker/Test.dockerfile
-      # version 0.4.0 uses helm v3 as default
-      - image: hashicorpdev/consul-helm-test:0.4.0
+      - image: hashicorpdev/consul-helm-test:0.5.0
 
     steps:
       - checkout
@@ -41,9 +109,28 @@ jobs:
 
             terraform apply -var project=${CLOUDSDK_CORE_PROJECT} -var init_cli=true -auto-approve test/terraform
 
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
       - run:
           name: Run acceptance tests
-          command: bats ./test/acceptance
+          working_directory: test/acceptance/tests
+          command: |
+            if [ -n "$CIRCLE_PR_NUMBER" ]; then
+                echo "Skipping acceptance tests for forked PRs; marking step successful."
+                circleci step halt
+            fi
+
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 1
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
 
       - run:
           name: terraform destroy
@@ -83,15 +170,17 @@ workflows:
   version: 2
   test:
     jobs:
+      - go-fmt-and-vet
+      - unit-acceptance-framework:
+          requires:
+            - go-fmt-and-vet
       - unit-helm2
       - unit-helm3
       - acceptance:
           requires:
             - unit-helm2
             - unit-helm3
-          filters:
-            branches:
-              only: master
+            - unit-acceptance-framework
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
