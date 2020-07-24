@@ -38,6 +38,9 @@ spec:
         release: {{ .Release.Name }}
         component: server
         hasDNS: "true"
+        {{- if .Values.server.podLabels }}
+          {{- tpl .Values.server.podLabels . | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ .Values.server.extraConfig | sha256sum }}

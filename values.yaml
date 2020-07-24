@@ -321,6 +321,13 @@ server:
   # ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
   priorityClassName: ""
 
+  # Extra labels to attach to the server pods.
+  # This should be a multi-line YAML string.
+  # Example:
+  #   podLabels: |
+  #     "label-key": "label-value"
+  podLabels: null
+
   # Extra annotations to attach to the server pods.
   # This should be a multi-line YAML string.
   # Example:
