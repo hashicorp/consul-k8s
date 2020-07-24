@@ -6,7 +6,7 @@ IMPROVEMENTS:
   StatefulSet and Client Daemonset annotations respectively. This recreates
   the server/client pod when the server/client extraConfig is updated via `helm upgrade` [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
 
-BREAKING CHANGESL
+BREAKING CHANGES:
 
 * Updating either server.extraConfig or client.extraConfig and running `helm upgrade` will force a restart of the
   server or agent pods respectively.
