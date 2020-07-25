@@ -322,11 +322,11 @@ server:
   priorityClassName: ""
 
   # Extra labels to attach to the server pods.
-  # This should be a multi-line YAML string.
+  # This should be a regular YAML map.
   # Example:
-  #   extraLabels: |
-  #     "label-key": "label-value"
-  #     "other-label-key": "another-label-value"
+  #   extraLabels:
+  #     labelKey: "label-value"
+  #     otherLabelKey: "another-label-value"
   extraLabels: null
 
   # Extra annotations to attach to the server pods.

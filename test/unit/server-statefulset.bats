@@ -361,7 +361,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.extraLabels=foo: bar' \
+      --set 'server.extraLabels.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
@@ -371,8 +371,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.extraLabels=foo: bar \
-baz: qux' \
+      --set 'server.extraLabels.foo=bar' \
+      --set 'server.extraLabels.baz=qux' \
       . | tee /dev/stderr)
   local actualFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
   local actualBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
