@@ -6,9 +6,9 @@ IMPROVEMENTS:
   StatefulSet and Client Daemonset annotations respectively. This recreates
   the server/client pod when the server/client extraConfig is updated via `helm upgrade` [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
 
-* Introduce field server.extraLabels to append additional labels to consul server pods. [[GH-553](https://github.com/hashicorp/consul-helm/pull/553)]
+* Introduce field `server.extraLabels` to append additional labels to consul server pods. [[GH-553](https://github.com/hashicorp/consul-helm/pull/553)]
 
-* Introduce field server.disableFsGroupSecurityContext which disables setting the fsGroup securityContext on the server statefulset.
+* Introduce field `server.disableFsGroupSecurityContext` which disables setting the fsGroup securityContext on the server statefulset.
   This enables deploying on OpenShift where the fsGroup is automatically set to an arbitrary gid. [[GH-528](https://github.com/hashicorp/consul-helm/pull/528)]
 
 BREAKING CHANGES:
