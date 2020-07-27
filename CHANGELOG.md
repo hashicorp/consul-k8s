@@ -9,7 +9,7 @@ IMPROVEMENTS:
 * Introduce field `server.extraLabels` to append additional labels to consul server pods. [[GH-553](https://github.com/hashicorp/consul-helm/pull/553)]
 
 * Introduce field `server.disableFsGroupSecurityContext` which disables setting the fsGroup securityContext on the server statefulset.
-  This enables deploying on OpenShift where the fsGroup is automatically set to an arbitrary gid. [[GH-528](https://github.com/hashicorp/consul-helm/pull/528)]
+  This enables deploying on platforms where the fsGroup is automatically set to an arbitrary gid. (eg OpenShift) [[GH-528](https://github.com/hashicorp/consul-helm/pull/528)]
 
 BREAKING CHANGES:
 
