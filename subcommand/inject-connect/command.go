@@ -141,7 +141,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLifecycleSidecarCPURequest, "lifecycle-sidecar-cpu-request", "20m", "Lifecycle sidecar CPU request.")
 	c.flagSet.StringVar(&c.flagLifecycleSidecarCPULimit, "lifecycle-sidecar-cpu-limit", "20m", "Lifecycle sidecar CPU limit.")
 	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryRequest, "lifecycle-sidecar-memory-request", "25Mi", "Lifecycle sidecar memory request.")
-	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "25Mi", "Lifecycle sidecar memory limit.")
+	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "50Mi", "Lifecycle sidecar memory limit.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
