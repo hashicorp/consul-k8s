@@ -143,5 +143,5 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagLifecycleSidecarCPURequest, "20m")
 	require.Equal(t, cmd.flagLifecycleSidecarCPULimit, "20m")
 	require.Equal(t, cmd.flagLifecycleSidecarMemoryRequest, "25Mi")
-	require.Equal(t, cmd.flagLifecycleSidecarMemoryLimit, "25Mi")
+	require.Equal(t, cmd.flagLifecycleSidecarMemoryLimit, "50Mi")
 }
