@@ -920,7 +920,10 @@ load _helpers
   [ "${actual}" = '{"limits":{"cpu":"200m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
-@test "connectInject/Deployment: default init and sidecar container resources" {
+#--------------------------------------------------------------------
+# init container resources
+
+@test "connectInject/Deployment: default init container resources" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -937,38 +940,23 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-init-container-memory-limit=125Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-init-container-memory-limit=150Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("-init-container-cpu-limit=50m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request=20m"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit=25Mi"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
+
 @test "connectInject/Deployment: can set init container resources" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.initContainer.resources.requests.memory=100Mi' \
-      --set 'global.initContainer.resources.requests.cpu=100m' \
-      --set 'global.initContainer.resources.limits.memory=200Mi' \
-      --set 'global.initContainer.resources.limits.cpu=200m' \
+      --set 'connectInject.initContainer.resources.requests.memory=100Mi' \
+      --set 'connectInject.initContainer.resources.requests.cpu=100m' \
+      --set 'connectInject.initContainer.resources.limits.memory=200Mi' \
+      --set 'connectInject.initContainer.resources.limits.cpu=200m' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -989,7 +977,119 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: lifecycle sidecar container resources" {
+@test "connectInject/Deployment: init container resources can be set explicitly to 0" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.initContainer.resources.requests.memory=0' \
+      --set 'connectInject.initContainer.resources.requests.cpu=0' \
+      --set 'connectInject.initContainer.resources.limits.memory=0' \
+      --set 'connectInject.initContainer.resources.limits.cpu=0' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-request=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-request=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-limit=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-limit=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: init container resources can be individually set to null" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.initContainer.resources.requests.memory=null' \
+      --set 'connectInject.initContainer.resources.requests.cpu=null' \
+      --set 'connectInject.initContainer.resources.limits.memory=null' \
+      --set 'connectInject.initContainer.resources.limits.cpu=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: init container resources can be set to null" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.initContainer.resources=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-memory-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-init-container-cpu-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# lifecycle sidecar resources
+
+@test "connectInject/Deployment: default lifecycle sidecar container resources" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request=20m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit=50Mi"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: lifecycle sidecar container resources can be set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -1016,6 +1116,90 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-lifecycle-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: lifecycle sidecar container resources can be set explicitly to 0" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=0' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=0' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.memory=0' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=0' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: lifecycle sidecar container resources can be individually set to null" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=null' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=null' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.memory=null' \
+      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: lifecycle sidecar container resources can be set to null" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-request"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-memory-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-lifecycle-sidecar-cpu-limit"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------

@@ -138,31 +138,37 @@ spec:
                 {{- if not (kindIs "invalid" $resources.requests.cpu) }}
                 -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
                 {{- end }}
-                {{- $resources := .Values.global.initContainer.resources }}
-                {{- if not (kindIs "invalid" $resources.limits.memory) }}
-                -init-container-memory-limit={{ $resources.limits.memory }} \
+
+                {{- if .Values.connectInject.initContainer }}
+                {{- $initResources := .Values.connectInject.initContainer.resources }}
+                {{- if not (kindIs "invalid" $initResources.limits.memory) }}
+                -init-container-memory-limit={{ $initResources.limits.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.memory) }}
-                -init-container-memory-request={{ $resources.requests.memory }} \
+                {{- if not (kindIs "invalid" $initResources.requests.memory) }}
+                -init-container-memory-request={{ $initResources.requests.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.limits.cpu) }}
-                -init-container-cpu-limit={{ $resources.limits.cpu }} \
+                {{- if not (kindIs "invalid" $initResources.limits.cpu) }}
+                -init-container-cpu-limit={{ $initResources.limits.cpu }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.cpu) }}
-                -init-container-cpu-request={{ $resources.requests.cpu }} \
+                {{- if not (kindIs "invalid" $initResources.requests.cpu) }}
+                -init-container-cpu-request={{ $initResources.requests.cpu }} \
                 {{- end }}
-                {{- $resources := .Values.global.lifecycleSidecarContainer.resources }}
-                {{- if not (kindIs "invalid" $resources.limits.memory) }}
-                -lifecycle-sidecar-memory-limit={{ $resources.limits.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.memory) }}
-                -lifecycle-sidecar-memory-request={{ $resources.requests.memory }} \
+
+                {{- if .Values.global.lifecycleSidecarContainer }}
+                {{- $lifecycleResources := .Values.global.lifecycleSidecarContainer.resources }}
+                {{- if not (kindIs "invalid" $lifecycleResources.limits.memory) }}
+                -lifecycle-sidecar-memory-limit={{ $lifecycleResources.limits.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.limits.cpu) }}
-                -lifecycle-sidecar-cpu-limit={{ $resources.limits.cpu }} \
+                {{- if not (kindIs "invalid" $lifecycleResources.requests.memory) }}
+                -lifecycle-sidecar-memory-request={{ $lifecycleResources.requests.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.cpu) }}
-                -lifecycle-sidecar-cpu-request={{ $resources.requests.cpu }} \
+                {{- if not (kindIs "invalid" $lifecycleResources.limits.cpu) }}
+                -lifecycle-sidecar-cpu-limit={{ $lifecycleResources.limits.cpu }} \
+                {{- end }}
+                {{- if not (kindIs "invalid" $lifecycleResources.requests.cpu) }}
+                -lifecycle-sidecar-cpu-request={{ $lifecycleResources.requests.cpu }} \
+                {{- end }}
                 {{- end }}
           livenessProbe:
             httpGet:
