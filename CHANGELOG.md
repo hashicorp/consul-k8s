@@ -2,7 +2,7 @@
 
 IMPROVEMENTS:
 
-* Connect: Add resource request and limit flags for the injected init and lifecycle sidecar containers [[GH-298](https://github.com/hashicorp/consul-k8s/pull/298)].
+* Connect: Add resource request and limit flags for the injected init and lifecycle sidecar containers. These flags replace the hardcoded values previously included. As part of this change, the default value for the lifecycle sidecar container memory limit has increased from `25Mi` to `50Mi`. [[GH-298](https://github.com/hashicorp/consul-k8s/pull/298)], [[GH-300](https://github.com/hashicorp/consul-k8s/pull/300)]
 
 BUG FIXES:
 
