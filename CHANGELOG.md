@@ -18,6 +18,8 @@ IMPROVEMENTS:
   * `ingressGateways.defaults.initCopyConsulContainer.resources` - Configures the resource settings for the `copy-consul-bin` init container for ingress gateways. Defaults can be overridden per ingress gateway.
   * `terminatingGateways.defaults.initCopyConsulContainer.resources` - Configures the resource settings for the `copy-consul-bin` init container for terminating gateways. Defaults can be overridden per terminating gateway.
 
+* Updated the default consul version to 1.8.1.
+
 BREAKING CHANGES:
 
 * Updating either server.extraConfig or client.extraConfig and running `helm upgrade` will force a restart of the
