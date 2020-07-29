@@ -11,6 +11,13 @@ IMPROVEMENTS:
 * Introduce field `server.disableFsGroupSecurityContext` which disables setting the fsGroup securityContext on the server statefulset.
   This enables deploying on platforms where the fsGroup is automatically set to an arbitrary gid. (eg OpenShift) [[GH-528](https://github.com/hashicorp/consul-helm/pull/528)]
 
+* Connect: Resource settings for Connect, mesh, ingress and terminating gateway init containers and lifecycle sidecars have been made configurable. The default values correspond to the previously set limits, except that the lifecycle sidecar memory limit has been increased to `50Mi` [[GH-556](https://github.com/hashicorp/consul-helm/pull/556)]. These new fields are:
+  * `global.lifecycleSidecarContainer.resources` - Configures the resource settings for all lifecycle sidecar containers used with Connect inject, mesh gateways, ingress gateways and terminating gateways.
+  * `connectInject.initContainer.resources` - Configures resource settings for the Connect-injected init container.
+  * `meshGateway.initCopyConsulContainer.resources` - Configures the resource settings for the `copy-consul-bin` init container for mesh gateways.
+  * `ingressGateways.defaults.initCopyConsulContainer.resources` - Configures the resource settings for the `copy-consul-bin` init container for ingress gateways. Defaults can be overridden per ingress gateway.
+  * `terminatingGateways.defaults.initCopyConsulContainer.resources` - Configures the resource settings for the `copy-consul-bin` init container for terminating gateways. Defaults can be overridden per terminating gateway.
+
 BREAKING CHANGES:
 
 * Updating either server.extraConfig or client.extraConfig and running `helm upgrade` will force a restart of the
