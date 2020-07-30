@@ -34,9 +34,10 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
-	helmOptions      *helm.Options
-	releaseName      string
-	kubernetesClient kubernetes.Interface
+	helmOptions        *helm.Options
+	releaseName        string
+	kubernetesClient   kubernetes.Interface
+	noCleanupOnFailure bool
 }
 
 func NewHelmCluster(
@@ -63,9 +64,10 @@ func NewHelmCluster(
 		Logger:         logger.TestingT,
 	}
 	return &HelmCluster{
-		helmOptions:      opts,
-		releaseName:      releaseName,
-		kubernetesClient: ctx.KubernetesClient(t),
+		helmOptions:        opts,
+		releaseName:        releaseName,
+		kubernetesClient:   ctx.KubernetesClient(t),
+		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 	}
 }
 
@@ -74,7 +76,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, func() {
+	helpers.Cleanup(t, h.noCleanupOnFailure, func() {
 		h.Destroy(t)
 	})
 
@@ -103,6 +105,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+
+	// delete any serviceaccounts that have h.releaseName in their name
+	sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(metav1.ListOptions{})
+	require.NoError(t, err)
+	for _, sa := range sas.Items {
+		if strings.Contains(sa.Name, h.releaseName) {
+			err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).Delete(sa.Name, nil)
+			require.NoError(t, err)
+		}
+	}
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T) {
@@ -127,7 +139,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		require.NoError(t, err)
 		caFile, err := ioutil.TempFile("", "")
 		require.NoError(t, err)
-		helpers.Cleanup(t, func() {
+		helpers.Cleanup(t, h.noCleanupOnFailure, func() {
 			require.NoError(t, os.Remove(caFile.Name()))
 		})
 

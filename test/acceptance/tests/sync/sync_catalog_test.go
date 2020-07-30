@@ -53,7 +53,7 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Logf("creating a test service and pod called %s", releaseName)
-			createTestService(t, env.DefaultContext(t).KubernetesClient(t), releaseName)
+			createTestService(t, suite.Config(), env.DefaultContext(t).KubernetesClient(t), releaseName)
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
@@ -81,7 +81,7 @@ func TestSyncCatalog(t *testing.T) {
 
 // createTestService creates a test Kubernetes service and its backend pod
 // with the provided name.
-func createTestService(t *testing.T, k8sClient kubernetes.Interface, name string) {
+func createTestService(t *testing.T, cfg *framework.TestConfig, k8sClient kubernetes.Interface, name string) {
 	// Create a service in k8s and check that it exists in Consul
 	svc, err := k8sClient.CoreV1().Services("default").Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,7 +122,7 @@ func createTestService(t *testing.T, k8sClient kubernetes.Interface, name string
 		},
 	})
 	require.NoError(t, err)
-	helpers.Cleanup(t, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		k8sClient.CoreV1().Services("default").Delete(svc.Name, nil)
 		k8sClient.CoreV1().Pods("default").Delete(pod.Name, nil)
 	})

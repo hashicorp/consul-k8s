@@ -15,6 +15,13 @@ import (
 // RunKubectlAndGetOutputE runs an arbitrary kubectl command provided via args
 // and returns its output and error.
 func RunKubectlAndGetOutputE(t testing.TestingT, options *k8s.KubectlOptions, args ...string) (string, error) {
+	return RunKubectlAndGetOutputWithLoggerE(t, options, logger.TestingT, args...)
+}
+
+// RunKubectlAndGetOutputWithLoggerE is the same as RunKubectlAndGetOutputE but
+// it also allows you to provide a custom logger. This is useful if the command output
+// contains sensitive information, for example, when you can pass logger.Discard.
+func RunKubectlAndGetOutputWithLoggerE(t testing.TestingT, options *k8s.KubectlOptions, logger *logger.Logger, args ...string) (string, error) {
 	var cmdArgs []string
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)
@@ -30,7 +37,7 @@ func RunKubectlAndGetOutputE(t testing.TestingT, options *k8s.KubectlOptions, ar
 		Command: "kubectl",
 		Args:    cmdArgs,
 		Env:     options.Env,
-		Logger:  logger.TestingT,
+		Logger:  logger,
 	}
 	return shell.RunCommandAndGetOutputE(t, command)
 }

@@ -1,23 +1,22 @@
-locals {
-  service_account_path = "${path.module}/service-account.yaml"
-}
-
 provider "google" {
   project = var.project
 }
 
 resource "random_id" "suffix" {
+  count = var.cluster_count
   byte_length = 4
 }
 
 data "google_container_engine_versions" "main" {
   location = var.zone
+  version_prefix = "1.15."
 }
 
 resource "google_container_cluster" "cluster" {
-  name               = "consul-k8s-${random_id.suffix.dec}"
+  count = var.cluster_count
+
+  name               = "consul-k8s-${random_id.suffix[count.index].dec}"
   project            = var.project
-  enable_legacy_abac = true
   initial_node_count = 3
   location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
@@ -25,16 +24,16 @@ resource "google_container_cluster" "cluster" {
 }
 
 resource "null_resource" "kubectl" {
-  count = var.init_cli ? 1 : 0
+  count = var.init_cli ? var.cluster_count : 0
 
   triggers = {
-    cluster = google_container_cluster.cluster.id
+    cluster = google_container_cluster.cluster[count.index].id
   }
 
   # On creation, we want to setup the kubectl credentials. The easiest way
   # to do this is to shell out to gcloud.
   provisioner "local-exec" {
-    command = "gcloud container clusters get-credentials --zone=${var.zone} ${google_container_cluster.cluster.name}"
+    command = "gcloud container clusters get-credentials --zone=${var.zone} ${google_container_cluster.cluster[count.index].name}"
   }
 
   # On destroy we want to try to clean up the kubectl credentials. This
@@ -44,12 +43,12 @@ resource "null_resource" "kubectl" {
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
-    command    = "kubectl config get-clusters | grep ${google_container_cluster.cluster.name} | xargs -n1 kubectl config delete-cluster"
+    command    = "kubectl config get-clusters | grep ${google_container_cluster.cluster[count.index].name} | xargs -n1 kubectl config delete-cluster"
   }
 
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
-    command    = "kubectl config get-contexts | grep ${google_container_cluster.cluster.name} | xargs -n1 kubectl config delete-context"
+    command    = "kubectl config get-contexts | grep ${google_container_cluster.cluster[count.index].name} | xargs -n1 kubectl config delete-context"
   }
 }

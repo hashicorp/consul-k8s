@@ -73,7 +73,21 @@ func SetupInterruptHandler(cleanup func()) {
 // Cleanup will both register a cleanup function with t
 // and SetupInterruptHandler to make sure resources get cleaned up
 // if an interrupt signal is caught.
-func Cleanup(t *testing.T, cleanup func()) {
+func Cleanup(t *testing.T, noCleanupOnFailure bool, cleanup func()) {
+	// Always clean up when an interrupt signal is caught.
 	SetupInterruptHandler(cleanup)
-	t.Cleanup(cleanup)
+
+	// If noCleanupOnFailure is set, don't clean up resources if tests fail.
+	// We need to wrap the cleanup function because t that is passed in to this function
+	// might not have the information on whether the test has failed yet.
+	wrappedCleanupFunc := func() {
+		if !(noCleanupOnFailure && t.Failed()) {
+			t.Logf("cleaning up resources for %s", t.Name())
+			cleanup()
+		} else {
+			t.Log("skipping resource cleanup")
+		}
+	}
+
+	t.Cleanup(wrappedCleanupFunc)
 }
