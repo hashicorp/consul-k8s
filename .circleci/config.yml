@@ -103,11 +103,12 @@ jobs:
 
       - run:
           name: terraform init & apply
+          working_directory: test/terraform/gke
           command: |
-            terraform init test/terraform
+            terraform init
             echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
 
-            terraform apply -var project=${CLOUDSDK_CORE_PROJECT} -var init_cli=true -auto-approve test/terraform
+            terraform apply -var project=${CLOUDSDK_CORE_PROJECT} -var init_cli=true -var cluster_count=2 -auto-approve
 
       # Restore go module cache if there is one
       - restore_cache:
@@ -119,13 +120,16 @@ jobs:
       - run:
           name: Run acceptance tests
           working_directory: test/acceptance/tests
+          no_output_timeout: 30m
           command: |
             if [ -n "$CIRCLE_PR_NUMBER" ]; then
                 echo "Skipping acceptance tests for forked PRs; marking step successful."
                 circleci step halt
             fi
+            primary_context=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .context_names.value[0])
+            secondary_context=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .context_names.value[1])
 
-            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 1
+            gotestsum --junitfile /tmp/gotestsum-report.xml -- ./... -p 1 -timeout 20m -enable-multi-cluster -kubecontext=$primary_context -secondary-kubecontext=$secondary_context
 
       - store_test_results:
           path: /tmp/test-results

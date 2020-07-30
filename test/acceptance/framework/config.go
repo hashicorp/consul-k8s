@@ -6,8 +6,15 @@ type TestConfig struct {
 	KubeContext   string
 	KubeNamespace string
 
+	EnableMultiCluster     bool
+	SecondaryKubeconfig    string
+	SecondaryKubeContext   string
+	SecondaryKubeNamespace string
+
 	ConsulImage    string
 	ConsulK8SImage string
+
+	NoCleanupOnFailure bool
 }
 
 // HelmValuesFromConfig returns a map of Helm values
