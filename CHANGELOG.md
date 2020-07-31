@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.24.0 (July 31, 2020)
+
 IMPROVEMENTS:
 
 * Add server.extraConfig and client.extraConfig values as hashes on Server
