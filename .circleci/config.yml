@@ -138,8 +138,9 @@ jobs:
 
       - run:
           name: terraform destroy
+          working_directory: test/terraform/gke
           command: |
-            terraform destroy -auto-approve
+            terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
   update-helm-charts-index:
