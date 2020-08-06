@@ -39,3 +39,8 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
 Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://www.consul.io/docs/platform/k8s/helm.html).
+
+## Tutorials
+
+You can find examples and complete tutorials on how to deploy Consul on 
+Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/consul).
