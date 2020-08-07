@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+BUG FIXES:
+
+* Connect: Reduce downtime caused by an alias health check of the sidecar proxy not being healthy for up to 1 minute
+  when a Connect-enabled service is restarted [[GH-305](https://github.com/hashicorp/consul-k8s/pull/305)].
+
 ## 0.18.0 (July 30, 2020)
 
 IMPROVEMENTS:
