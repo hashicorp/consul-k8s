@@ -27,7 +27,10 @@ const helmChartPath = "../../../.."
 type Cluster interface {
 	Create(t *testing.T)
 	Destroy(t *testing.T)
-	Upgrade(t *testing.T)
+	// Upgrade runs helm upgrade. It will merge the helm values from the
+	// initial install with helmValues. Any keys that were previously set
+	// will be overridden by the helmValues keys.
+	Upgrade(t *testing.T, helmValues map[string]string)
 	SetupConsulClient(t *testing.T, secure bool) *api.Client
 }
 
@@ -117,7 +120,8 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 }
 
-func (h *HelmCluster) Upgrade(t *testing.T) {
+func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
+	mergeMaps(h.helmOptions.SetValues, helmValues)
 	helm.Upgrade(t, h.helmOptions, helmChartPath, h.releaseName)
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -186,7 +190,7 @@ func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, r := range installedReleases {
-		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s", r["chart"]))
+		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
 	}
 }
 
