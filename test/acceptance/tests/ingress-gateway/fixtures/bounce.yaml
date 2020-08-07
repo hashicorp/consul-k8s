@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bounce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bounce
+  template:
+    metadata:
+      name: bounce
+      labels:
+        app: bounce
+    spec:
+      containers:
+        - name: bounce
+          image: anubhavmishra/tiny-tools
+          command:
+            - sleep
+            - infinity
