@@ -193,7 +193,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			require := require.New(t)
 
 			// Set up consul server
-			a, err := testutil.NewTestServerT(t)
+			a, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(err)
 			defer a.Stop()
 

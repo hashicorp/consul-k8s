@@ -3,6 +3,7 @@
 package synccatalog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -63,15 +64,18 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 			}
 
 			// Create two services in k8s in default and foo namespaces.
-			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+			_, err = k8s.CoreV1().Namespaces().Create(
+				context.Background(),
+				&apiv1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
 				},
-			})
+				metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Services("foo").Create(lbService("foo", "1.1.1.1"))
+			_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 
 			exitChan := runCommandAsynchronously(&cmd, []string{
@@ -198,15 +202,18 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 			}
 
 			// Create two services in k8s in default and foo namespaces.
-			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+			_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+			_, err = k8s.CoreV1().Namespaces().Create(
+				context.Background(),
+				&apiv1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
 				},
-			})
+				metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Services("foo").Create(lbService("foo", "1.1.1.1"))
+			_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 
 			args := append([]string{
@@ -464,15 +471,18 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
+				_, err = k8s.CoreV1().Namespaces().Create(
+					context.Background(),
+					&apiv1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
 					},
-				})
+					metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Services("foo").Create(lbService("foo", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
 			}
 
@@ -597,15 +607,18 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 			k8s := fake.NewSimpleClientset()
 
 			// Create two k8s services in two different namespaces
-			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "non-default",
+			_, err = k8s.CoreV1().Namespaces().Create(
+				context.Background(),
+				&apiv1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "non-default",
+					},
 				},
-			})
+				metav1.CreateOptions{})
 			require.NoError(tt, err)
-			_, err = k8s.CoreV1().Services("non-default").Create(lbService("non-default", "1.1.1.1"))
+			_, err = k8s.CoreV1().Services("non-default").Create(context.Background(), lbService("non-default", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 
 			// Set up consul server
@@ -725,7 +738,7 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 // Set up test consul agent and fake kubernetes cluster client
 func completeSetupEnterprise(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
-	svr, err := testutil.NewTestServerT(t)
+	svr, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	return k8s, svr
 }

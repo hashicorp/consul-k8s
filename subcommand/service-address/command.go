@@ -1,6 +1,7 @@
 package serviceaddress
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -87,7 +88,7 @@ func (c *Command) Run(args []string) int {
 	var address string
 	var unretryableErr error
 	backoff.Retry(withErrLogger(log, func() error {
-		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(c.flagServiceName, metav1.GetOptions{})
+		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(context.Background(), c.flagServiceName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("getting service %s: %s", c.flagServiceName, err)
 		}

@@ -20,7 +20,7 @@ func TestRun_ServicesRegistration_Namespaces(t *testing.T) {
 	tmpDir, configFile := createServicesTmpFile(t, servicesRegistrationWithNamespaces)
 	defer os.RemoveAll(tmpDir)
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 

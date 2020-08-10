@@ -19,7 +19,7 @@ func TestSource_initServices(t *testing.T) {
 	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 	defer a.Stop()
 
@@ -63,7 +63,7 @@ func TestSource_prefix(t *testing.T) {
 	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 	defer a.Stop()
 
@@ -109,7 +109,7 @@ func TestSource_ignoreK8S(t *testing.T) {
 	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 	defer a.Stop()
 
@@ -153,7 +153,7 @@ func TestSource_deleteService(t *testing.T) {
 	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 	defer a.Stop()
 
@@ -214,7 +214,7 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 	require := require.New(t)
 
 	// Set up server, client
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 	defer a.Stop()
 

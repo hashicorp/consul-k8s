@@ -1,6 +1,7 @@
 package aclinit
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,14 +27,19 @@ func TestRun_TokenSinkFile(t *testing.T) {
 	k8sNS := "default"
 	secretName := "secret-name"
 	k8s := fake.NewSimpleClientset()
-	k8s.CoreV1().Secrets(k8sNS).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+	_, err = k8s.CoreV1().Secrets(k8sNS).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretName,
+			},
+			Data: map[string][]byte{
+				"token": []byte(token),
+			},
 		},
-		Data: map[string][]byte{
-			"token": []byte(token),
-		},
-	})
+		metav1.CreateOptions{})
+
+	require.NoError(err)
 
 	sinkFile := filepath.Join(tmpDir, "acl-token")
 	ui := cli.NewMockUi()
@@ -44,9 +50,9 @@ func TestRun_TokenSinkFile(t *testing.T) {
 	code := cmd.Run([]string{
 		"-k8s-namespace", k8sNS,
 		"-token-sink-file", sinkFile,
+		"-secret-name", secretName,
 	})
 	require.Equal(0, code, ui.ErrorWriter.String())
-
 	bytes, err := ioutil.ReadFile(sinkFile)
 	require.NoError(err)
 	require.Equal(token, string(bytes), "exp: %s, got: %s", token, string(bytes))
@@ -62,14 +68,19 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 	k8sNS := "default"
 	secretName := "secret-name"
 	k8s := fake.NewSimpleClientset()
-	k8s.CoreV1().Secrets(k8sNS).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+	_, err := k8s.CoreV1().Secrets(k8sNS).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretName,
+			},
+			Data: map[string][]byte{
+				"token": []byte(token),
+			},
 		},
-		Data: map[string][]byte{
-			"token": []byte(token),
-		},
-	})
+		metav1.CreateOptions{})
+
+	require.NoError(err)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -79,7 +90,9 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 	code := cmd.Run([]string{
 		"-k8s-namespace", k8sNS,
 		"-token-sink-file", "/this/filepath/does/not/exist",
+		"-secret-name", secretName,
 	})
+
 	require.Equal(1, code)
 	require.Contains(ui.ErrorWriter.String(),
 		`Error writing token to file "/this/filepath/does/not/exist": open /this/filepath/does/not/exist: no such file or directory`,
@@ -101,14 +114,17 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 	k8sNS := "default"
 	secretName := "secret-name"
 	k8s := fake.NewSimpleClientset()
-	k8s.CoreV1().Secrets(k8sNS).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+	_, err = k8s.CoreV1().Secrets(k8sNS).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretName,
+			},
+			Data: map[string][]byte{
+				"token": []byte(token),
+			},
 		},
-		Data: map[string][]byte{
-			"token": []byte(token),
-		},
-	})
+		metav1.CreateOptions{})
 
 	sinkFile := filepath.Join(tmpDir, "acl-token")
 	ui := cli.NewMockUi()
@@ -117,11 +133,14 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		k8sClient: k8s,
 	}
 
+	require.NoError(err)
+
 	// Run twice.
 	for i := 0; i < 2; i++ {
 		code := cmd.Run([]string{
 			"-k8s-namespace", k8sNS,
 			"-token-sink-file", sinkFile,
+			"-secret-name", secretName,
 		})
 		require.Equal(0, code, ui.ErrorWriter.String())
 
