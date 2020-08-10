@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -138,11 +139,11 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&apiv1.Service{},
@@ -186,7 +187,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
 			Endpoints(service.Namespace).
-			Get(service.Name, metav1.GetOptions{})
+			Get(context.TODO(), service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
 				"key", key,
@@ -526,7 +527,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				}
 
 				// Look up the node's ip address by getting node info
-				node, err := t.Client.CoreV1().Nodes().Get(*subsetAddr.NodeName, metav1.GetOptions{})
+				node, err := t.Client.CoreV1().Nodes().Get(context.TODO(), *subsetAddr.NodeName, metav1.GetOptions{})
 				if err != nil {
 					t.Log.Warn("error getting node info", "error", err)
 					continue
@@ -683,13 +684,13 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					List(options)
+					List(context.TODO(), options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					Watch(options)
+					Watch(context.TODO(), options)
 			},
 		},
 		&apiv1.Endpoints{},

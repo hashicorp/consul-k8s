@@ -1,6 +1,7 @@
 package createfederationsecret
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -207,11 +208,14 @@ func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 	ui := cli.NewMockUi()
 	k8s := fake.NewSimpleClientset()
 	k8sNS := "default"
-	k8s.CoreV1().Secrets(k8sNS).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+	k8s.CoreV1().Secrets(k8sNS).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+			},
 		},
-	})
+		metav1.CreateOptions{})
 	cmd := Command{
 		UI:        ui,
 		k8sClient: k8s,
@@ -383,14 +387,17 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 
 			// Create replication token secret if expected.
 			if c.aclsEnabled {
-				_, err := k8s.CoreV1().Secrets(c.k8sNS).Create(&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: c.resourcePrefix + "-acl-replication-acl-token",
+				_, err := k8s.CoreV1().Secrets(c.k8sNS).Create(
+					context.Background(),
+					&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: c.resourcePrefix + "-acl-replication-acl-token",
+						},
+						Data: map[string][]byte{
+							common.ACLTokenSecretKey: []byte(replicationToken),
+						},
 					},
-					Data: map[string][]byte{
-						common.ACLTokenSecretKey: []byte(replicationToken),
-					},
-				})
+					metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -430,7 +437,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 			// Check the secret is as expected.
-			secret, err := k8s.CoreV1().Secrets(c.k8sNS).Get(c.resourcePrefix+"-federation", metav1.GetOptions{})
+			secret, err := k8s.CoreV1().Secrets(c.k8sNS).Get(context.Background(), c.resourcePrefix+"-federation", metav1.GetOptions{})
 			require.NoError(t, err)
 
 			// CA Cert
@@ -530,7 +537,7 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	// Check the secret is as expected.
-	secret, err := k8s.CoreV1().Secrets(k8sNS).Get(resourcePrefix+"-federation", metav1.GetOptions{})
+	secret, err := k8s.CoreV1().Secrets(k8sNS).Get(context.Background(), resourcePrefix+"-federation", metav1.GetOptions{})
 	require.NoError(t, err)
 
 	// Test server config.
@@ -669,7 +676,7 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 			// Check the secret is as expected.
-			secret, err := k8s.CoreV1().Secrets(k8sNS).Get(resourcePrefix+"-federation", metav1.GetOptions{})
+			secret, err := k8s.CoreV1().Secrets(k8sNS).Get(context.Background(), resourcePrefix+"-federation", metav1.GetOptions{})
 			require.NoError(t, err)
 
 			// Server Config
@@ -778,14 +785,17 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 	// Create replication token secret after a delay.
 	go func() {
 		time.Sleep(400 * time.Millisecond)
-		_, err := k8s.CoreV1().Secrets("default").Create(&v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+		_, err := k8s.CoreV1().Secrets("default").Create(
+			context.Background(),
+			&v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+				},
+				Data: map[string][]byte{
+					common.ACLTokenSecretKey: []byte(replicationToken),
+				},
 			},
-			Data: map[string][]byte{
-				common.ACLTokenSecretKey: []byte(replicationToken),
-			},
-		})
+			metav1.CreateOptions{})
 		require.NoError(t, err)
 	}()
 
@@ -809,7 +819,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	// Check the secret is as expected.
-	secret, err := k8s.CoreV1().Secrets("default").Get("prefix-federation", metav1.GetOptions{})
+	secret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "prefix-federation", metav1.GetOptions{})
 	require.NoError(t, err)
 	require.Contains(t, secret.Data, "replicationToken")
 	require.Equal(t, replicationToken, string(secret.Data["replicationToken"]))
@@ -878,7 +888,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 		// Check the secret is as expected.
-		secret, err := k8s.CoreV1().Secrets(k8sNS).Get(resourcePrefix+"-federation", metav1.GetOptions{})
+		secret, err := k8s.CoreV1().Secrets(k8sNS).Get(context.Background(), resourcePrefix+"-federation", metav1.GetOptions{})
 		require.NoError(t, err)
 
 		// Test server config.
@@ -919,7 +929,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 		// Check the secret is as expected.
-		secret, err := k8s.CoreV1().Secrets(k8sNS).Get(resourcePrefix+"-federation", metav1.GetOptions{})
+		secret, err := k8s.CoreV1().Secrets(k8sNS).Get(context.Background(), resourcePrefix+"-federation", metav1.GetOptions{})
 		require.NoError(t, err)
 
 		// Test server config. The mesh gateway IP should be updated.
@@ -1015,7 +1025,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 
 	// Check the secret is as expected.
 	wg.Wait()
-	_, err := k8s.CoreV1().Secrets("default").Get("prefix-federation", metav1.GetOptions{})
+	_, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "prefix-federation", metav1.GetOptions{})
 	require.NoError(t, err)
 }
 
@@ -1081,7 +1091,7 @@ func TestRun_Autoencrypt(t *testing.T) {
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
 	// Check the value of the server CA cert is the key file.
-	secret, err := k8s.CoreV1().Secrets(k8sNS).Get(resourcePrefix+"-federation", metav1.GetOptions{})
+	secret, err := k8s.CoreV1().Secrets(k8sNS).Get(context.Background(), resourcePrefix+"-federation", metav1.GetOptions{})
 	require.NoError(t, err)
 
 	require.Contains(t, secret.Data, "caCert")

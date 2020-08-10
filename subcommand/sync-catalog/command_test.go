@@ -1,6 +1,7 @@
 package synccatalog
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	defer stopCommand(t, &cmd, exitChan)
 
 	retry.Run(t, func(r *retry.R) {
-		serviceList, err := k8s.CoreV1().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
+		serviceList, err := k8s.CoreV1().Services(metav1.NamespaceDefault).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
 		require.Len(r, serviceList.Items, 1)
 		require.Equal(r, "consul", serviceList.Items[0].Name)
@@ -74,7 +75,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -119,7 +120,7 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 	}
 
 	// create a service in k8s
-	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -179,10 +180,10 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 	}
 
 	// create two services in k8s
-	_, err = k8s.CoreV1().Services("bar").Create(lbService("foo", "1.1.1.1"))
+	_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	_, err = k8s.CoreV1().Services("baz").Create(lbService("foo", "2.2.2.2"))
+	_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	exitChan := runCommandAsynchronously(&cmd, []string{
@@ -261,15 +262,18 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
+				_, err = k8s.CoreV1().Namespaces().Create(
+					context.Background(),
+					&apiv1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
 					},
-				})
+					metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Services("foo").Create(lbService("foo", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
 			}
 
@@ -414,15 +418,18 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 
 			// Create two services in k8s in default and foo namespaces.
 			{
-				_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(lbService("default", "1.1.1.1"))
+				_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Namespaces().Create(&apiv1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
+				_, err = k8s.CoreV1().Namespaces().Create(
+					context.Background(),
+					&apiv1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
 					},
-				})
+					metav1.CreateOptions{})
 				require.NoError(tt, err)
-				_, err = k8s.CoreV1().Services("foo").Create(lbService("foo", "1.1.1.1"))
+				_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 				require.NoError(tt, err)
 			}
 
@@ -494,7 +501,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 	k8s := fake.NewSimpleClientset()
 
-	svr, err := testutil.NewTestServerT(t)
+	svr, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 
 	return k8s, svr

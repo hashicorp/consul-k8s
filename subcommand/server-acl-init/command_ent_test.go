@@ -3,6 +3,7 @@
 package serveraclinit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -706,7 +707,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				require.Equal(c.PolicyDCs, policy.Datacenters)
 
 				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]

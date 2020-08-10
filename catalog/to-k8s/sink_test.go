@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -39,7 +40,7 @@ func TestK8SSink_create(t *testing.T) {
 	// Verify service gets registered
 	var actual *apiv1.ServiceList
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -77,7 +78,7 @@ func TestK8SSink_createUppercase(t *testing.T) {
 	// Verify service gets registered
 	var actual *apiv1.ServiceList
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -107,16 +108,19 @@ func TestK8SSink_createExists(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
 	// Create the existing service
-	_, err := client.CoreV1().Services(metav1.NamespaceAll).Create(&apiv1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "web",
-		},
+	_, err := client.CoreV1().Services(metav1.NamespaceAll).Create(
+		context.Background(),
+		&apiv1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "web",
+			},
 
-		Spec: apiv1.ServiceSpec{
-			Type:         apiv1.ServiceTypeExternalName,
-			ExternalName: "example.com.",
+			Spec: apiv1.ServiceSpec{
+				Type:         apiv1.ServiceTypeExternalName,
+				ExternalName: "example.com.",
+			},
 		},
-	})
+		metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Start the controller
@@ -128,7 +132,7 @@ func TestK8SSink_createExists(t *testing.T) {
 
 	// Verify service gets registered
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -169,7 +173,7 @@ func TestK8SSink_updateReconcile(t *testing.T) {
 	// Verify service gets registered
 	var actual *apiv1.Service
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -188,12 +192,12 @@ func TestK8SSink_updateReconcile(t *testing.T) {
 	})
 
 	actual.Spec.ExternalName = "wrong.local."
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Update(actual)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Update(context.Background(), actual, metav1.UpdateOptions{})
 	require.NoError(err)
 
 	// Verify service gets fixed
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -233,7 +237,7 @@ func TestK8SSink_updateService(t *testing.T) {
 	// Verify service gets registered
 	var actual *apiv1.Service
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -256,7 +260,7 @@ func TestK8SSink_updateService(t *testing.T) {
 
 	// Verify service gets fixed
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -296,7 +300,7 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 	// Verify service gets registered
 	var actual *apiv1.Service
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -315,11 +319,11 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 	})
 
 	// Delete
-	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete(actual.Name, nil))
+	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), actual.Name, metav1.DeleteOptions{}))
 
 	// Verify service gets fixed
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -358,7 +362,7 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 
 	// Verify service gets registered
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
@@ -380,7 +384,7 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 
 	// Verify services get cleared
 	retry.Run(t, func(r *retry.R) {
-		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
 		}
