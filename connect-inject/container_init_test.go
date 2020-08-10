@@ -57,6 +57,16 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -83,16 +93,6 @@ services {
     alias_service = "${SERVICE_ID}"
   }
 }
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  meta = {
-    pod-name = "${POD_NAME}"
-  }
-}
 EOF
 
 /bin/consul services register \
@@ -116,6 +116,16 @@ cp /bin/consul /consul/connect-inject/consul`,
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -144,16 +154,7 @@ cp /bin/consul /consul/connect-inject/consul`,
     alias_service = "${SERVICE_ID}"
   }
 }
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  meta = {
-    pod-name = "${POD_NAME}"
-  }
-}`,
+`,
 			"",
 		},
 
@@ -293,6 +294,17 @@ services {
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  tags = ["abc"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -320,17 +332,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  tags = ["abc"]
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -345,6 +346,17 @@ services {
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -372,17 +384,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  tags = ["abc","123"]
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -397,6 +398,17 @@ services {
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  tags = ["abc","123"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -424,17 +436,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  tags = ["abc","123"]
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -450,6 +451,17 @@ services {
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  tags = ["abc","123","abc","123","def","456"]
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -477,17 +489,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  tags = ["abc","123","abc","123","def","456"]
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -512,6 +513,18 @@ services {
 				return pod
 			},
 			`services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 1234
+  meta = {
+    name = "abc"
+    version = "2"
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -540,18 +553,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 1234
-  meta = {
-    name = "abc"
-    version = "2"
-    pod-name = "${POD_NAME}"
   }
 }`,
 			"",
@@ -659,6 +660,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -684,17 +696,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "default"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
@@ -733,6 +734,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -758,17 +770,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "non-default"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
@@ -808,6 +809,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -833,17 +845,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "non-default"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
@@ -892,6 +893,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -917,17 +929,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "k8snamespace"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
@@ -976,6 +977,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "non-default"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -1001,17 +1013,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "non-default"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
@@ -1064,6 +1065,17 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 # the preStop hook can access it to deregister the service.
 cat <<EOF >/consul/connect-inject/service.hcl
 services {
+  id   = "${SERVICE_ID}"
+  name = "web"
+  address = "${POD_IP}"
+  port = 0
+  namespace = "k8snamespace"
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}
+
+services {
   id   = "${PROXY_SERVICE_ID}"
   name = "web-sidecar-proxy"
   kind = "connect-proxy"
@@ -1089,17 +1101,6 @@ services {
   checks {
     name = "Destination Alias"
     alias_service = "${SERVICE_ID}"
-  }
-}
-
-services {
-  id   = "${SERVICE_ID}"
-  name = "web"
-  address = "${POD_IP}"
-  port = 0
-  namespace = "k8snamespace"
-  meta = {
-    pod-name = "${POD_NAME}"
   }
 }
 EOF
