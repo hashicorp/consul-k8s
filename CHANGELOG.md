@@ -3,7 +3,10 @@
 BUG FIXES:
 
 * Connect: Reduce downtime caused by an alias health check of the sidecar proxy not being healthy for up to 1 minute
-  when a Connect-enabled service is restarted [[GH-305](https://github.com/hashicorp/consul-k8s/pull/305)].
+  when a Connect-enabled service is restarted. Note that this fix reverts the behavior of Consul Connect to the behavior
+  it had before consul-k8s `v0.16.0` and Consul `v1.8.x`, where Consul can route to potentially unhealthy instances of a service
+  because we don't respect Kubernetes readiness/liveness checks yet. Please follow [GH-155](https://github.com/hashicorp/consul-k8s/issues/155)
+  for updates on that feature. [[GH-305](https://github.com/hashicorp/consul-k8s/pull/305)]
 
 ## 0.18.0 (July 30, 2020)
 
