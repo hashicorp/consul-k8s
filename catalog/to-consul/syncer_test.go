@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// ConsulSyncNodeName is the name of the node in Consul that we register
+	// services on. It's not a real node backed by a Consul agent.
+	ConsulSyncNodeName = "k8s-sync"
+)
+
 func TestConsulSyncer_register(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -282,6 +288,7 @@ func testConsulSyncerWithConfig(client *api.Client, configurator func(*ConsulSyn
 		SyncPeriod:        200 * time.Millisecond,
 		ServicePollPeriod: 50 * time.Millisecond,
 		ConsulK8STag:      TestConsulK8STag,
+		ConsulNodeName:    ConsulSyncNodeName,
 		ConsulNodeServicesClient: &PreNamespacesNodeServicesClient{
 			Client: client,
 		},

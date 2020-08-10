@@ -37,6 +37,7 @@ type Command struct {
 	flagToK8S                 bool
 	flagConsulDomain          string
 	flagConsulK8STag          string
+	flagConsulNodeName        string
 	flagK8SDefault            bool
 	flagK8SServicePrefix      string
 	flagConsulServicePrefix   string
@@ -48,7 +49,6 @@ type Command struct {
 	flagNodePortSyncType      string
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
-	flagNodeName              string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -96,6 +96,8 @@ func (c *Command) init() {
 			"Kubernetes. Defaults to consul.")
 	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
 		"Tag value for K8S services registered in Consul")
+	c.flags.StringVar(&c.flagConsulNodeName, "consul-node-name", "k8s-sync",
+		"The Consul node name to register for k8s-sync. Defaults to k8s-sync.")
 	c.flags.DurationVar(&c.flagConsulWritePeriod, "consul-write-interval", 30*time.Second,
 		"The interval to perform syncing operations creating Consul services, formatted "+
 			"as a time.Duration. All changes are merged and write calls are only made "+
@@ -116,6 +118,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -132,8 +135,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
-	c.flags.StringVar(&c.flagNodeName, "node-name", "k8s-sync",
-		"The Consul node name to register for k8s-sync. Defaults to k8s-sync.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &flags.K8SFlags{}
@@ -246,8 +247,8 @@ func (c *Command) Run(args []string) int {
 			SyncPeriod:               c.flagConsulWritePeriod,
 			ServicePollPeriod:        c.flagConsulWritePeriod * 2,
 			ConsulK8STag:             c.flagConsulK8STag,
+			ConsulNodeName:           c.flagConsulNodeName,
 			ConsulNodeServicesClient: svcsClient,
-			NodeName:                 c.flagNodeName,
 		}
 		go syncer.Run(ctx)
 
