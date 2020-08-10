@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -28,9 +29,9 @@ func TestController_initialData(t *testing.T) {
 	resource, data, _ := testResource(client)
 
 	// Add some initial data before the controller starts
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("bar"))
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("bar"), metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Start the controller
@@ -57,9 +58,9 @@ func TestController_create(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Add some initial data before the controller starts
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("bar"))
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("bar"), metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Wait some period of time
@@ -84,14 +85,14 @@ func TestController_createDelete(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Add some initial data before the controller starts
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("bar"))
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("bar"), metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Wait a bit so that the create hopefully propagates
 	time.Sleep(50 * time.Millisecond)
-	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete("bar", nil))
+	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), "bar", metav1.DeleteOptions{}))
 
 	// Wait some period of time
 	time.Sleep(100 * time.Millisecond)
@@ -115,7 +116,7 @@ func TestController_update(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Add some initial data before the controller starts
-	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(testService("foo"))
+	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
 
 	{
@@ -129,7 +130,7 @@ func TestController_update(t *testing.T) {
 
 	// Update
 	svc.Spec.Type = apiv1.ServiceTypeNodePort
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Update(svc)
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Update(context.Background(), svc, metav1.UpdateOptions{})
 	require.NoError(err)
 
 	{
@@ -213,11 +214,11 @@ func testInformer(client kubernetes.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().Services(metav1.NamespaceDefault).List(options)
+				return client.CoreV1().Services(metav1.NamespaceDefault).List(context.Background(), options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().Services(metav1.NamespaceDefault).Watch(options)
+				return client.CoreV1().Services(metav1.NamespaceDefault).Watch(context.Background(), options)
 			},
 		},
 		&apiv1.Service{},

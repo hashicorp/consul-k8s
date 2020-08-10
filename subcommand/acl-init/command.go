@@ -2,6 +2,7 @@ package aclinit
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -127,7 +128,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) getSecret(secretName string) (string, error) {
-	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
