@@ -106,11 +106,11 @@ func (s *K8SSink) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return s.Client.CoreV1().Services(s.namespace()).List(options)
+				return s.Client.CoreV1().Services(s.namespace()).List(context.TODO(), options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return s.Client.CoreV1().Services(s.namespace()).Watch(options)
+				return s.Client.CoreV1().Services(s.namespace()).Watch(context.TODO(), options)
 			},
 		},
 		&apiv1.Service{},
@@ -208,7 +208,7 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 			return
 		case <-triggerCh:
 			// Coalesce to prevent lots of API calls during churn periods.
-			coalesce.Coalesce(context.Background(),
+			coalesce.Coalesce(context.TODO(),
 				K8SQuietPeriod, K8SMaxPeriod,
 				func(ctx context.Context) {
 					select {
@@ -225,20 +225,20 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 
 		svcClient := s.Client.CoreV1().Services(s.namespace())
 		for _, name := range delete {
-			if err := svcClient.Delete(name, nil); err != nil {
+			if err := svcClient.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 				s.Log.Warn("error deleting service", "name", name, "error", err)
 			}
 		}
 
 		for _, svc := range update {
-			_, err := svcClient.Update(svc)
+			_, err := svcClient.Update(context.TODO(), svc, metav1.UpdateOptions{})
 			if err != nil {
 				s.Log.Warn("error updating service", "name", svc.Name, "error", err)
 			}
 		}
 
 		for _, svc := range create {
-			_, err := svcClient.Create(svc)
+			_, err := svcClient.Create(context.TODO(), svc, metav1.CreateOptions{})
 			if err != nil {
 				s.Log.Warn("error creating service", "name", svc.Name, "error", err)
 			}

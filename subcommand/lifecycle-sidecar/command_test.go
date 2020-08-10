@@ -116,7 +116,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 
@@ -211,7 +211,7 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 	tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 	defer os.RemoveAll(tmpDir)
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 

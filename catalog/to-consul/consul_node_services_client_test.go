@@ -157,7 +157,7 @@ func TestPreNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			svr, err := testutil.NewTestServerT(tt)
+			svr, err := testutil.NewTestServerConfigT(tt, nil)
 			require.NoError(err)
 			defer svr.Stop()
 
