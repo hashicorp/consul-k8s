@@ -1,6 +1,7 @@
 package serviceaddress
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -59,7 +60,7 @@ func TestRun_UnableToWriteToFile(t *testing.T) {
 
 	// Create the service.
 	k8s := fake.NewSimpleClientset()
-	_, err := k8s.CoreV1().Services(k8sNS).Create(kubeLoadBalancerSvc(svcName, expAddress, ""))
+	_, err := k8s.CoreV1().Services(k8sNS).Create(context.Background(), kubeLoadBalancerSvc(svcName, expAddress, ""), metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Run command with an unwriteable file.
@@ -87,7 +88,7 @@ func TestRun_UnresolvableHostname(t *testing.T) {
 
 	// Create the service.
 	k8s := fake.NewSimpleClientset()
-	_, err := k8s.CoreV1().Services(k8sNS).Create(kubeLoadBalancerSvc(svcName, "", "unresolvable"))
+	_, err := k8s.CoreV1().Services(k8sNS).Create(context.Background(), kubeLoadBalancerSvc(svcName, "", "unresolvable"), metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Run command.
@@ -188,7 +189,7 @@ func TestRun_ServiceTypes(t *testing.T) {
 			if c.ServiceModificationF != nil {
 				c.ServiceModificationF(c.Service)
 			}
-			_, err := k8s.CoreV1().Services(k8sNS).Create(c.Service)
+			_, err := k8s.CoreV1().Services(k8sNS).Create(context.Background(), c.Service, metav1.CreateOptions{})
 			require.NoError(err)
 
 			// Run command.
@@ -264,7 +265,7 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 				svc := kubeLoadBalancerSvc(svcName, "", "")
 				// Reset the status to nothing.
 				svc.Status = v1.ServiceStatus{}
-				_, err := k8s.CoreV1().Services(k8sNS).Create(svc)
+				_, err := k8s.CoreV1().Services(k8sNS).Create(context.Background(), svc, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -274,9 +275,9 @@ func TestRun_FileWrittenAfterRetry(t *testing.T) {
 				svc := kubeLoadBalancerSvc(svcName, ip, "")
 				var err error
 				if c.InitialService {
-					_, err = k8s.CoreV1().Services(k8sNS).Update(svc)
+					_, err = k8s.CoreV1().Services(k8sNS).Update(context.Background(), svc, metav1.UpdateOptions{})
 				} else {
-					_, err = k8s.CoreV1().Services(k8sNS).Create(svc)
+					_, err = k8s.CoreV1().Services(k8sNS).Create(context.Background(), svc, metav1.CreateOptions{})
 				}
 				require.NoError(t, err)
 			}()

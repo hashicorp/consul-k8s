@@ -15,7 +15,7 @@ import (
 func TestConsulSyncer_ConsulNamespaces(t *testing.T) {
 	t.Parallel()
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 
@@ -66,7 +66,7 @@ func TestConsulSyncer_ConsulNamespaces(t *testing.T) {
 func TestConsulSyncer_ReapConsulNamespace(t *testing.T) {
 	t.Parallel()
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 
@@ -135,7 +135,7 @@ func TestConsulSyncer_ReapConsulNamespace(t *testing.T) {
 func TestConsulSyncer_reapServiceInstanceNamespacesEnabled(t *testing.T) {
 	t.Parallel()
 
-	a, err := testutil.NewTestServerT(t)
+	a, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
 	defer a.Stop()
 

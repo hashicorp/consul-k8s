@@ -1,15 +1,17 @@
 package deletecompletedjob
 
 import (
+	"context"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	batch "k8s.io/api/batch/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 func TestRun_ArgValidation(t *testing.T) {
@@ -117,14 +119,17 @@ func TestRun_JobConditionChanges(t *testing.T) {
 			require := require.New(t)
 
 			// Create the job that's not complete.
-			_, err := k8s.BatchV1().Jobs(ns).Create(&batch.Job{
-				ObjectMeta: meta.ObjectMeta{
-					Name: jobName,
+			_, err := k8s.BatchV1().Jobs(ns).Create(
+				context.Background(),
+				&batch.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: jobName,
+					},
+					Status: batch.JobStatus{
+						Active: 1,
+					},
 				},
-				Status: batch.JobStatus{
-					Active: 1,
-				},
-			})
+				metav1.CreateOptions{})
 			require.NoError(err)
 
 			ui := cli.NewMockUi()
@@ -155,12 +160,15 @@ func TestRun_JobConditionChanges(t *testing.T) {
 				delay := 100 + rand.Intn(400)
 				time.Sleep(time.Duration(delay) * time.Millisecond)
 
-				_, err := k8s.BatchV1().Jobs(ns).Update(&batch.Job{
-					ObjectMeta: meta.ObjectMeta{
-						Name: jobName,
+				_, err := k8s.BatchV1().Jobs(ns).Update(
+					context.Background(),
+					&batch.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: jobName,
+						},
+						Status: c.EventualStatus,
 					},
-					Status: c.EventualStatus,
-				})
+					metav1.UpdateOptions{})
 				require.NoError(err)
 			}()
 
@@ -173,7 +181,7 @@ func TestRun_JobConditionChanges(t *testing.T) {
 			}
 
 			// Check job deletion.
-			_, err = k8s.BatchV1().Jobs(ns).Get(jobName, meta.GetOptions{})
+			_, err = k8s.BatchV1().Jobs(ns).Get(context.Background(), jobName, metav1.GetOptions{})
 			if c.ExpDelete {
 				require.True(k8serrors.IsNotFound(err))
 			} else {
@@ -192,14 +200,17 @@ func TestRun_Timeout(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	// Create the job that's not complete.
-	_, err := k8s.BatchV1().Jobs(ns).Create(&batch.Job{
-		ObjectMeta: meta.ObjectMeta{
-			Name: jobName,
+	_, err := k8s.BatchV1().Jobs(ns).Create(
+		context.Background(),
+		&batch.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: jobName,
+			},
+			Status: batch.JobStatus{
+				Active: 1,
+			},
 		},
-		Status: batch.JobStatus{
-			Active: 1,
-		},
-	})
+		metav1.CreateOptions{})
 	require.NoError(err)
 
 	ui := cli.NewMockUi()
@@ -230,6 +241,6 @@ func TestRun_Timeout(t *testing.T) {
 	}
 
 	// The job should not have been deleted.
-	_, err = k8s.BatchV1().Jobs(ns).Get(jobName, meta.GetOptions{})
+	_, err = k8s.BatchV1().Jobs(ns).Get(context.Background(), jobName, metav1.GetOptions{})
 	require.NoError(err)
 }

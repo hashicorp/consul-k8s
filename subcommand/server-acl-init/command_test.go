@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -254,7 +255,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				require.Equal(c.PolicyDCs, policy.Datacenters)
 
 				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
@@ -405,7 +406,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 					require.Equal(r, c.PolicyDCs, policy.Datacenters)
 
 					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 					require.NoError(r, err)
 					require.NotNil(r, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
@@ -537,7 +538,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 					policyExists(r, c.PolicyNames[i], consul)
 
 					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(c.SecretNames[i], metav1.GetOptions{})
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 					require.NoError(r, err)
 					require.NotNil(r, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
@@ -1263,14 +1264,17 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	require.NoError(err)
 
 	// Create the bootstrap secret.
-	_, err = k8s.CoreV1().Secrets(ns).Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: resourcePrefix + "-bootstrap-acl-token",
+	_, err = k8s.CoreV1().Secrets(ns).Create(
+		context.Background(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourcePrefix + "-bootstrap-acl-token",
+			},
+			Data: map[string][]byte{
+				"token": []byte("old-token"),
+			},
 		},
-		Data: map[string][]byte{
-			"token": []byte("old-token"),
-		},
-	})
+		metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Run the command.
@@ -1289,7 +1293,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 	// Test that the Secret is the same.
-	secret, err := k8s.CoreV1().Secrets(ns).Get(resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+	secret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
 	require.NoError(err)
 	require.Contains(secret.Data, "token")
 	require.Equal("old-token", string(secret.Data["token"]))
@@ -1442,7 +1446,7 @@ func TestRun_HTTPS(t *testing.T) {
 
 	// Test that the bootstrap token is created to make sure the bootstrapping succeeded.
 	// The presence of the bootstrap token tells us that the API calls to Consul have been successful.
-	tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
+	tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), resourcePrefix+"-bootstrap-acl-token", metav1.GetOptions{})
 	require.NoError(err)
 	require.NotNil(tokenSecret)
 	_, ok := tokenSecret.Data["token"]
@@ -1740,7 +1744,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		require.Equal(t, 0, responseCode, primaryUI.ErrorWriter.String())
 
 		// Retrieve the replication ACL token from the kubernetes secret.
-		tokenSecret, err := primaryK8s.CoreV1().Secrets(ns).Get("release-name-consul-acl-replication-acl-token", metav1.GetOptions{})
+		tokenSecret, err := primaryK8s.CoreV1().Secrets(ns).Get(context.Background(), "release-name-consul-acl-replication-acl-token", metav1.GetOptions{})
 		require.NoError(t, err)
 		require.NotNil(t, tokenSecret)
 		aclReplicationTokenBytes, ok := tokenSecret.Data["token"]
@@ -1805,7 +1809,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
 // cause a test failure if the Secret doesn't exist or is malformed.
 func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace string) string {
-	bootstrapSecret, err := k8s.CoreV1().Secrets(k8sNamespace).Get(fmt.Sprintf("%s-bootstrap-acl-token", prefix), metav1.GetOptions{})
+	bootstrapSecret, err := k8s.CoreV1().Secrets(k8sNamespace).Get(context.Background(), fmt.Sprintf("%s-bootstrap-acl-token", prefix), metav1.GetOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, bootstrapSecret)
 	bootToken, ok := bootstrapSecret.Data["token"]
@@ -1865,18 +1869,21 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
-	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(serviceAccountName, metav1.GetOptions{})
+	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
-		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: serviceAccountName,
-			},
-			Secrets: []v1.ObjectReference{
-				{
-					Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
+			context.Background(),
+			&v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: serviceAccountName,
+				},
+				Secrets: []v1.ObjectReference{
+					{
+						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+					},
 				},
 			},
-		})
+			metav1.CreateOptions{})
 		require.NoError(t, err)
 	}
 
@@ -1897,12 +1904,12 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 			"token":  tokenBytes,
 		},
 	}
-	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(secretName, metav1.GetOptions{})
+	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
 	if existingSecret == nil {
-		_, err = k8s.CoreV1().Secrets(ns).Create(secret)
+		_, err = k8s.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
 		require.NoError(t, err)
 	} else {
-		_, err = k8s.CoreV1().Secrets(ns).Update(secret)
+		_, err = k8s.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
 		require.NoError(t, err)
 	}
 

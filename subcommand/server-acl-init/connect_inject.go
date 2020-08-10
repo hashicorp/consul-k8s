@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -142,7 +143,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
-			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(saName, metav1.GetOptions{})
+			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(context.TODO(), saName, metav1.GetOptions{})
 			return err
 		})
 	if err != nil {
@@ -158,7 +159,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
 		func() error {
 			var err error
-			saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(saSecretName, metav1.GetOptions{})
+			saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), saSecretName, metav1.GetOptions{})
 			return err
 		})
 	if err != nil {

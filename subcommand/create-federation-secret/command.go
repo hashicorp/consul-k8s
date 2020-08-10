@@ -1,6 +1,7 @@
 package createfederationsecret
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -240,10 +241,10 @@ func (c *Command) Run(args []string) int {
 
 	// Now create the Kubernetes secret.
 	logger.Info("Creating/updating Kubernetes secret", "name", federationSecret.ObjectMeta.Name, "ns", c.flagK8sNamespace)
-	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(federationSecret)
+	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 	if k8serrors.IsAlreadyExists(err) {
 		logger.Info("Secret already exists, updating instead")
-		_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Update(federationSecret)
+		_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Update(context.Background(), federationSecret, metav1.UpdateOptions{})
 	}
 
 	if err != nil {
@@ -297,7 +298,7 @@ func (c *Command) replicationToken(logger hclog.Logger) ([]byte, error) {
 	// This will run forever but it's running as a Helm hook so Helm will timeout
 	// after a configurable time period.
 	backoff.Retry(func() error {
-		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(secretName, metav1.GetOptions{})
+		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Warn("secret not yet created, retrying", "secret", secretName, "ns", c.flagK8sNamespace)
 			return errors.New("")

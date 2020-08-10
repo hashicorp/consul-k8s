@@ -644,7 +644,7 @@ func (c *Command) Run(args []string) int {
 // reading the Kubernetes Secret with name secretName.
 // If there is no bootstrap token yet, then it returns an empty string (not an error).
 func (c *Command) getBootstrapToken(secretName string) (string, error) {
-	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(secretName, metav1.GetOptions{})
+	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return "", nil
