@@ -30,7 +30,7 @@ global:
   #   image: "consul:1.5.0"
   #   # Consul Enterprise 1.5.0
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
-  image: "consul:1.8.1"
+  image: "consul:1.8.2"
 
   # array of objects containing image pull secret names that will be applied to
   # each service account.
@@ -53,7 +53,7 @@ global:
   # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
-  imageK8S: "hashicorp/consul-k8s:0.18.0"
+  imageK8S: "hashicorp/consul-k8s:0.18.1"
 
   # imageEnvoy defines the default envoy image to use for ingress and
   # terminating gateways.

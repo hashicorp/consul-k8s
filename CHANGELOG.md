@@ -1,5 +1,19 @@
 ## Unreleased
 
+## 0.24.1 (Aug 10, 2020)
+
+BUG FIXES:
+
+* Bumps default Consul version to `1.8.2`. This version of Consul contains a fix
+  for [https://github.com/hashicorp/consul/issues/8430](https://github.com/hashicorp/consul/issues/8430)
+  which causes Consul clients running on the same node as a connect-injected pod
+  to crash loop indefinitely when restarted.
+
+* Bumps default consul-k8s version to `0.18.1`. This version contains a fix
+  for an issue that caused all connect-injected pods to be unhealthy for 60s
+  if they were restarted. To roll out this fix, all Connect deployments must
+  be restarted so that they are re-injected.
+
 ## 0.24.0 (July 31, 2020)
 
 IMPROVEMENTS:
