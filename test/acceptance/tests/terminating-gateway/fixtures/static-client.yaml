@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: static-client
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-client
+  template:
+    metadata:
+      name: static-client
+      labels:
+        app: static-client
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service-upstreams": "example-http:1234"
+    spec:
+      containers:
+        # This name will be the service name in Consul.
+        - name: static-client
+          image: tutum/curl:latest
+          # Just spin & wait forever, we'll use  to demo
+          command: [ "/bin/sh", "-c", "--" ]
+          args: [ "while true; do sleep 30; done;" ]
+       # If ACLs are enabled, the serviceAccountName must match the Consul service name.
+      serviceAccountName: static-client
