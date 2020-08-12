@@ -83,3 +83,38 @@ load _helpers
       yq '.spec | .clusterIP == "192.168.1.1"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# service type
+
+@test "dns/Service: service type ClusterIP by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-service.yaml \
+      . | tee /dev/stderr |
+      yq '.spec | .type == "ClusterIP"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dns/Service: add custom service type" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-service.yaml \
+      --set dns.type=LoadBalancer \
+      . | tee /dev/stderr |
+      yq '.spec | .type == "LoadBalancer"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# additionalSpec
+
+@test "dns/Service: add additionalSpec" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-service.yaml \
+      --set dns.additionalSpec="loadBalancerIP: 192.168.0.100" \
+      . | tee /dev/stderr |
+      yq '.spec | .loadBalancerIP == "192.168.0.100"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

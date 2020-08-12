@@ -579,6 +579,11 @@ client:
 dns:
   enabled: "-"
 
+  # type can be used to control the type of service created. For
+  # example, setting this to "LoadBalancer" will create an external load
+  # balancer (for supported K8S installations)
+  type: ClusterIP
+
   # Set a predefined cluster IP for the DNS service.
   # Useful if you need to reference the DNS service's IP
   # address in CoreDNS config.
@@ -588,6 +593,11 @@ dns:
   # This should be a multi-line string of
   # annotations to apply to the dns Service
   annotations: null
+
+  # Additional ServiceSpec values
+  # This should be a multi-line string mapping directly to a Kubernetes
+  # ServiceSpec object.
+  additionalSpec: null
 
 ui:
   # True if you want to enable the Consul UI. The UI will run only
