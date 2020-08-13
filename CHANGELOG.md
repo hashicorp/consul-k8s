@@ -3,6 +3,7 @@
 IMPROVEMENTS:
 
 * Add `dns.type` and `dns.additionalSpec` settings for changing the DNS service type and adding additional spec. [[GH-555](https://github.com/hashicorp/consul-helm/pull/555)]
+* Catalog Sync: Can now be run when Consul clients are disabled. It will make API calls to the Consul servers instead. [[GH-570](https://github.com/hashicorp/consul-helm/pull/570)]
 
 ## 0.24.1 (Aug 10, 2020)
 
