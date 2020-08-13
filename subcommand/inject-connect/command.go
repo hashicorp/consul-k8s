@@ -380,7 +380,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 
 			_, err := clientset.AdmissionregistrationV1beta1().
 				MutatingWebhookConfigurations().
-				Patch(context.Background(), c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
+				Patch(context.TODO(), c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
 					`[{
 						"op": "add",
 						"path": "/webhooks/0/clientConfig/caBundle",
