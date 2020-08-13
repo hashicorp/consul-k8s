@@ -76,13 +76,23 @@ spec:
                   key: "token"
             {{- end}}
             {{- if .Values.global.tls.enabled }}
+            {{- if .Values.client.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: https://$(HOST_IP):8501
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://{{ template "consul.fullname" . }}-server:8501
+            {{- end }}
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- else }}
+            {{- if .Values.client.enabled }}
             - name: CONSUL_HTTP_ADDR
               value: http://$(HOST_IP):8500
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://{{ template "consul.fullname" . }}-server:8500
+            {{- end }}
             {{- end }}
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
