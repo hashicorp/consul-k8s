@@ -35,7 +35,6 @@ import (
 )
 
 func TestServiceDefaultsController_createsConfigEntry(t *testing.T) {
-	t.SkipNow()
 	req := require.New(t)
 	svcDefaults := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
@@ -143,7 +142,6 @@ func TestServiceDefaultsController_addsFinalizerOnCreate(t *testing.T) {
 }
 
 func TestServiceDefaultsController_updatesConfigEntry(t *testing.T) {
-	t.SkipNow()
 	req := require.New(t)
 	svcDefaults := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
@@ -315,7 +313,7 @@ func TestServiceDefaultsController_errorUpdatesSyncStatus(t *testing.T) {
 			Name:      svcDefaults.Name,
 		},
 	})
-	req.EqualError(err, "Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address: no such host")
+	req.EqualError(err, "Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address on 127.0.0.11:53: no such host")
 	req.False(resp.Requeue)
 
 	// Check that the status is "synced=false".
@@ -327,5 +325,5 @@ func TestServiceDefaultsController_errorUpdatesSyncStatus(t *testing.T) {
 	conditionSynced := svcDefaults.Status.GetCondition(v1alpha1.ConditionSynced)
 	req.True(conditionSynced.IsFalse())
 	req.Equal("ConsulAgentError", conditionSynced.Reason)
-	req.Equal("Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address: no such host", conditionSynced.Message)
+	req.Equal("Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address on 127.0.0.11:53: no such host", conditionSynced.Message)
 }
