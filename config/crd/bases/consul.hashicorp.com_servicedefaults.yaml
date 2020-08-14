@@ -127,14 +127,11 @@ spec:
               type: array
           type: object
       type: object
-  version: v1alpha2
+  version: v1alpha1
   versions:
-  - name: v1alpha2
-    served: true
-    storage: true
   - name: v1alpha1
     served: true
-    storage: false
+    storage: true
 status:
   acceptedNames:
     kind: ""
