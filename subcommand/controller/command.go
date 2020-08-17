@@ -52,11 +52,9 @@ func init() {
 }
 
 func (c *Command) init() {
-	var metricsAddr string
-	var enableLeaderElection bool
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	c.flags.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	c.flags.StringVar(&c.metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	c.flags.BoolVar(&c.enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flags.Merge(c.flags, c.httpFlags.Flags())

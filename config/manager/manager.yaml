@@ -32,7 +32,8 @@ spec:
           - name: CONSUL_HTTP_ADDR
             value: http://$(HOST_IP):8500
         command:
-        - /manager
+        - consul-k8s
+        - controller
         args:
         - --enable-leader-election
         image: controller:latest

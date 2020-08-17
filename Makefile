@@ -79,7 +79,7 @@ else
 DEV_PUSH_ARG=--no-push
 endif
 
-all: bin
+all: bin ctrl-generate
 
 bin:
 	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh
