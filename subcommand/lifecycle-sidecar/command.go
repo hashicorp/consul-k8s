@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
-	"github.com/prometheus/common/log"
 )
 
 type Command struct {
@@ -112,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		case <-time.After(c.flagSyncPeriod):
 			continue
 		case <-c.sigCh:
-			log.Info("SIGINT received, shutting down")
+			logger.Info("SIGINT received, shutting down")
 			return 0
 		}
 	}
