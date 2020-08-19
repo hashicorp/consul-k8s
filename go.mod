@@ -1,8 +1,6 @@
 module github.com/hashicorp/consul-k8s
 
 require (
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
-	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 // indirect
 	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/deckarep/golang-set v1.7.1
@@ -22,7 +20,6 @@ require (
 	github.com/mitchellh/cli v1.1.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/onsi/gomega v1.8.1 // indirect
-	github.com/prometheus/common v0.4.1
 	github.com/radovskyb/watcher v1.0.2
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
