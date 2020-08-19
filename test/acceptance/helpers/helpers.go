@@ -88,11 +88,13 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
-// checkConnection execs into a pod of the deployment given by deploymentName
+// CheckStaticServerConnection execs into a pod of the deployment given by deploymentName
 // and runs a curl command with the provided curlArgs.
+// This function assumes that the connection is made to the static-server and expects the output
+// to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckConnection(t *testing.T, options *k8s.KubectlOptions, deploymentName string, expectSuccess bool, curlArgs ...string) {
+func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, deploymentName string, expectSuccess bool, curlArgs ...string) {
 	t.Helper()
 
 	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}

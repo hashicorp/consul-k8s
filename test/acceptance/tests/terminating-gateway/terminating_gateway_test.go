@@ -63,7 +63,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 	// Test that we can make a call to the terminating gateway
 	t.Log("trying calls to terminating gateway")
-	helpers.CheckConnection(t,
+	helpers.CheckStaticServerConnection(t,
 		ctx.KubectlOptions(),
 		"static-client",
 		true,
