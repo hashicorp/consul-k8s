@@ -1,6 +1,7 @@
 package meshgateway
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -11,5 +12,10 @@ var suite framework.Suite
 
 func TestMain(m *testing.M) {
 	suite = framework.NewSuite(m)
-	os.Exit(suite.Run())
+	if suite.Config().EnableMultiCluster {
+		os.Exit(suite.Run())
+	} else {
+		fmt.Println("Skipping mesh gateway tests because -enable-multi-cluster is not set")
+		os.Exit(0)
+	}
 }
