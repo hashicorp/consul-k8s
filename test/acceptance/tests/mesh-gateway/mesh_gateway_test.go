@@ -3,22 +3,19 @@ package meshgateway
 import (
 	"fmt"
 	"testing"
-	"time"
 
-	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Test that Connect and wan federation over mesh gateways work in a default installation
 // i.e. without ACLs because TLS is required for WAN federation over mesh gateways
 func TestMeshGatewayDefault(t *testing.T) {
 	env := suite.Environment()
+	cfg := suite.Config()
 
 	primaryContext := env.DefaultContext(t)
 	secondaryContext := env.Context(t, framework.SecondaryContextName)
@@ -39,7 +36,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	releaseName := helpers.RandomName()
 
 	// Install the primary consul cluster in the default kubernetes context
-	primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, suite.Config(), releaseName)
+	primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 	primaryConsulCluster.Create(t)
 
 	// Get the federation secret from the primary cluster and apply it to secondary cluster
@@ -77,7 +74,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	}
 
 	// Install the secondary consul cluster in the secondary kubernetes context
-	secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, suite.Config(), releaseName)
+	secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
 	// Verify federation between servers
@@ -90,13 +87,17 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	// Check that we can connect services over the mesh gateways
 	t.Log("creating static-server in dc2")
-	createServer(t, suite.Config(), secondaryContext.KubectlOptions())
+	helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
 
 	t.Log("creating static-client in dc1")
-	createClient(t, suite.Config(), primaryContext.KubectlOptions())
+	helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
-	checkConnection(t, primaryContext.KubectlOptions(), primaryContext.KubernetesClient(t), true)
+	helpers.CheckConnection(t,
+		primaryContext.KubectlOptions(),
+		"static-client",
+		true,
+		"http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -119,6 +120,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			env := suite.Environment()
+			cfg := suite.Config()
 
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, framework.SecondaryContextName)
@@ -143,7 +145,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			releaseName := helpers.RandomName()
 
 			// Install the primary consul cluster in the default kubernetes context
-			primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, suite.Config(), releaseName)
+			primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
@@ -186,7 +188,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			}
 
 			// Install the secondary consul cluster in the secondary kubernetes context
-			secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, suite.Config(), releaseName)
+			secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
 
 			// Verify federation between servers
@@ -199,10 +201,10 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 			// Check that we can connect services over the mesh gateways
 			t.Log("creating static-server in dc2")
-			createServer(t, suite.Config(), secondaryContext.KubectlOptions())
+			helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
 
 			t.Log("creating static-client in dc1")
-			createClient(t, suite.Config(), primaryContext.KubectlOptions())
+			helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 			t.Log("creating intention")
 			_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
@@ -213,63 +215,11 @@ func TestMeshGatewaySecure(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Log("checking that connection is successful")
-			checkConnection(t, primaryContext.KubectlOptions(), primaryContext.KubernetesClient(t), true)
+			helpers.CheckConnection(t,
+				primaryContext.KubectlOptions(),
+				"static-client",
+				true,
+				"http://localhost:1234")
 		})
 	}
-}
-
-// createServer sets up static-server deployment
-func createServer(t *testing.T, cfg *framework.TestConfig, options *k8s.KubectlOptions) {
-	helpers.KubectlApply(t, options, "fixtures/static-server.yaml")
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		helpers.KubectlDelete(t, options, "fixtures/static-server.yaml")
-	})
-
-	// Wait for both deployments
-	helpers.RunKubectl(t, options, "wait", "--for=condition=available", "deploy/static-server")
-}
-
-// createServer sets up static-client deployment
-func createClient(t *testing.T, cfg *framework.TestConfig, options *k8s.KubectlOptions) {
-	helpers.KubectlApply(t, options, "fixtures/static-client.yaml")
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		helpers.KubectlDelete(t, options, "fixtures/static-client.yaml")
-	})
-
-	// Wait for both deployments
-	helpers.RunKubectl(t, options, "wait", "--for=condition=available", "deploy/static-client")
-}
-
-// checkConnection checks if static-client can talk to static-server.
-// If expectSuccess is true, it will expect connection to succeed,
-// otherwise it will expect failure due to intentions.
-func checkConnection(t *testing.T, options *k8s.KubectlOptions, client kubernetes.Interface, expectSuccess bool) {
-	pods, err := client.CoreV1().Pods(options.Namespace).List(metav1.ListOptions{LabelSelector: "app=static-client"})
-	require.NoError(t, err)
-	require.Len(t, pods.Items, 1, fmt.Sprintf("expected to find at least one static-client pod, but found %d", len(pods.Items)))
-
-	retrier := &retry.Timer{
-		Timeout: 20 * time.Second,
-		Wait:    500 * time.Millisecond,
-	}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		output, err := helpers.RunKubectlAndGetOutputE(t, options, "exec", pods.Items[0].Name, "-c", "static-client", "--", "curl", "-vvvsSf", "http://127.0.0.1:1234/")
-		if expectSuccess {
-			require.NoError(r, err)
-			require.Contains(r, output, "hello world")
-		} else {
-			require.Error(r, err)
-			require.Contains(r, output, "503 Service Unavailable")
-		}
-	})
 }

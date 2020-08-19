@@ -9,10 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -27,6 +30,8 @@ func RandomName() string {
 // it fails the test.
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
+
+	t.Log("Waiting for pods to be ready.")
 
 	// Wait up to 3m.
 	counter := &retry.Counter{Count: 36, Wait: 5 * time.Second}
@@ -54,6 +59,55 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 		}
 		if numNotReadyContainers != 0 {
 			r.Errorf("%d out of %d containers are ready", totalNumContainers-numNotReadyContainers, totalNumContainers)
+		}
+	})
+}
+
+// Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
+// sets up a cleanup function and waits for the deployment to become available.
+func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, filepath string) {
+	t.Helper()
+
+	KubectlApply(t, options, filepath)
+
+	file, err := os.Open(filepath)
+	require.NoError(t, err)
+
+	deployment := v1.Deployment{}
+	err = yaml.NewYAMLOrJSONDecoder(file, 1024).Decode(&deployment)
+	require.NoError(t, err)
+
+	Cleanup(t, noCleanupOnFailure, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		KubectlDelete(t, options, filepath)
+	})
+
+	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("deploy/%s", deployment.Name))
+}
+
+// checkConnection execs into a pod of the deployment given by deploymentName
+// and runs a curl command with the provided curlArgs.
+// If expectSuccess is true, it will expect connection to succeed,
+// otherwise it will expect failure due to intentions.
+func CheckConnection(t *testing.T, options *k8s.KubectlOptions, deploymentName string, expectSuccess bool, curlArgs ...string) {
+	t.Helper()
+
+	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
+
+	args := []string{"exec", "deploy/" + deploymentName, "-c", deploymentName, "--", "curl", "-vvvsSf"}
+	args = append(args, curlArgs...)
+
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := RunKubectlAndGetOutputE(t, options, args...)
+		if expectSuccess {
+			require.NoError(r, err)
+			require.Contains(r, output, "hello world")
+		} else {
+			require.Error(r, err)
+			require.Contains(r, output, "curl: (52) Empty reply from server")
 		}
 	})
 }

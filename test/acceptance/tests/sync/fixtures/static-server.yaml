@@ -17,8 +17,6 @@ spec:
       name: static-server
       labels:
         app: static-server
-      annotations:
-        "consul.hashicorp.com/connect-inject": "true"
     spec:
       containers:
         - name: static-server
@@ -30,3 +28,15 @@ spec:
             - containerPort: 8080
               name: http
       serviceAccountName: static-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-server
+spec:
+  selector:
+    app: static-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

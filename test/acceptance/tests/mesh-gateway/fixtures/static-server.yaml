@@ -19,7 +19,6 @@ spec:
         app: static-server
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service-protocol": "http"
     spec:
       containers:
         - name: static-server

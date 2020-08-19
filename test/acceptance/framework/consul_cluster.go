@@ -121,6 +121,8 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
+	t.Helper()
+
 	mergeMaps(h.helmOptions.SetValues, helmValues)
 	helm.Upgrade(t, h.helmOptions, helmChartPath, h.releaseName)
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
