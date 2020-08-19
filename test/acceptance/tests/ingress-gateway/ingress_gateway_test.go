@@ -73,7 +73,7 @@ func TestIngressGateway(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				t.Log("testing intentions prevent ingress")
-				helpers.CheckConnection(t,
+				helpers.CheckStaticServerConnection(t,
 					k8sOptions,
 					"bounce",
 					false,
@@ -93,7 +93,7 @@ func TestIngressGateway(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the bounce pod. It should route to the static-server pod.
 			t.Log("trying calls to ingress gateway")
-			helpers.CheckConnection(t,
+			helpers.CheckStaticServerConnection(t,
 				k8sOptions,
 				"bounce",
 				true,

@@ -93,7 +93,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckConnection(t,
+	helpers.CheckStaticServerConnection(t,
 		primaryContext.KubectlOptions(),
 		"static-client",
 		true,
@@ -215,7 +215,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Log("checking that connection is successful")
-			helpers.CheckConnection(t,
+			helpers.CheckStaticServerConnection(t,
 				primaryContext.KubectlOptions(),
 				"static-client",
 				true,

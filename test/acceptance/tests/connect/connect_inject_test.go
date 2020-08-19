@@ -28,7 +28,7 @@ func TestConnectInjectDefault(t *testing.T) {
 	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
 }
 
 // Test that Connect works in a secure installation,
@@ -53,7 +53,7 @@ func TestConnectInjectSecure(t *testing.T) {
 	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that the connection is not successful because there's no intention")
-	helpers.CheckConnection(t, ctx.KubectlOptions(), "static-client", false, "http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", false, "http://localhost:1234")
 
 	consulClient := consulCluster.SetupConsulClient(t, true)
 
@@ -66,5 +66,5 @@ func TestConnectInjectSecure(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("checking that connection is successful")
-	helpers.CheckConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
 }
