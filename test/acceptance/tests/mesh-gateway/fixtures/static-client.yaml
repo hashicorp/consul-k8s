@@ -20,7 +20,6 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234:dc2"
-        "consul.hashicorp.com/connect-service-protocol": "http"
     spec:
       containers:
         - name: static-client

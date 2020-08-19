@@ -19,14 +19,11 @@ spec:
         app: static-client
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service-upstreams": "example-http:1234"
+        "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
     spec:
       containers:
-        # This name will be the service name in Consul.
         - name: static-client
           image: tutum/curl:latest
-          # Just spin & wait forever, we'll use  to demo
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]
-       # If ACLs are enabled, the serviceAccountName must match the Consul service name.
       serviceAccountName: static-client

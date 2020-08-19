@@ -9,10 +9,6 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Test that sync catalog works in both the default installation and
@@ -45,21 +41,21 @@ func TestSyncCatalog(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			env := suite.Environment()
+			ctx := suite.Environment().DefaultContext(t)
 
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, c.helmValues, env.DefaultContext(t), suite.Config(), releaseName)
+			consulCluster := framework.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
 
 			consulCluster.Create(t)
 
-			t.Logf("creating a test service and pod called %s", releaseName)
-			createTestService(t, suite.Config(), env.DefaultContext(t).KubernetesClient(t), releaseName)
+			t.Log("creating a static-server with a service")
+			helpers.Deploy(t, ctx.KubectlOptions(), suite.Config().NoCleanupOnFailure, "fixtures/static-server.yaml")
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
 			t.Log("checking that the service has been synced to Consul")
 			var services map[string][]string
-			syncedServiceName := fmt.Sprintf("%s-%s", releaseName, env.DefaultContext(t).KubectlOptions().Namespace)
+			syncedServiceName := fmt.Sprintf("static-server-%s", ctx.KubectlOptions().Namespace)
 			counter := &retry.Counter{Count: 10, Wait: 5 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var err error
@@ -76,54 +72,4 @@ func TestSyncCatalog(t *testing.T) {
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 		})
 	}
-
-}
-
-// createTestService creates a test Kubernetes service and its backend pod
-// with the provided name.
-func createTestService(t *testing.T, cfg *framework.TestConfig, k8sClient kubernetes.Interface, name string) {
-	// Create a service in k8s and check that it exists in Consul
-	svc, err := k8sClient.CoreV1().Services("default").Create(&corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeNodePort,
-			Selector: map[string]string{"app": "test-pod"},
-			Ports: []corev1.ServicePort{
-				{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	pod, err := k8sClient.CoreV1().Pods("default").Create(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{"app": "test-pod"},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "test-container",
-					Image: "hashicorp/http-echo:latest",
-					Args: []string{
-						`-text="hello world"`,
-						`-listen=:8080`,
-					},
-					Ports: []corev1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: 8080,
-						},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		k8sClient.CoreV1().Services("default").Delete(svc.Name, nil)
-		k8sClient.CoreV1().Pods("default").Delete(pod.Name, nil)
-	})
 }
