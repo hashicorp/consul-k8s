@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const staticClientName = "static-client"
+
 // Test that Connect works in a default installation
 func TestConnectInjectDefault(t *testing.T) {
 	cfg := suite.Config()
@@ -28,43 +30,61 @@ func TestConnectInjectDefault(t *testing.T) {
 	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), true, staticClientName, "http://localhost:1234")
 }
 
 // Test that Connect works in a secure installation,
 // with ACLs and TLS enabled.
 func TestConnectInjectSecure(t *testing.T) {
-	cfg := suite.Config()
-	ctx := suite.Environment().DefaultContext(t)
-
-	helmValues := map[string]string{
-		"connectInject.enabled":        "true",
-		"global.tls.enabled":           "true",
-		"global.acls.manageSystemACLs": "true",
+	cases := []struct {
+		name              string
+		enableAutoEncrypt string
+	}{
+		{
+			"without auto-encrypt",
+			"false",
+		},
+		{
+			"with auto-encrypt",
+			"true",
+		},
 	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := suite.Config()
+			ctx := suite.Environment().DefaultContext(t)
 
-	releaseName := helpers.RandomName()
-	consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+			helmValues := map[string]string{
+				"connectInject.enabled":        "true",
+				"global.tls.enabled":           "true",
+				"global.tls.enableAutoEncrypt": c.enableAutoEncrypt,
+				"global.acls.manageSystemACLs": "true",
+			}
 
-	consulCluster.Create(t)
+			releaseName := helpers.RandomName()
+			consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
-	t.Log("creating static-server and static-client deployments")
-	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
-	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
+			consulCluster.Create(t)
 
-	t.Log("checking that the connection is not successful because there's no intention")
-	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", false, "http://localhost:1234")
+			t.Log("creating static-server and static-client deployments")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
-	consulClient := consulCluster.SetupConsulClient(t, true)
+			t.Log("checking that the connection is not successful because there's no intention")
+			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), false, staticClientName, "http://localhost:1234")
 
-	t.Log("creating intention")
-	_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
-		SourceName:      "static-client",
-		DestinationName: "static-server",
-		Action:          api.IntentionActionAllow,
-	}, nil)
-	require.NoError(t, err)
+			consulClient := consulCluster.SetupConsulClient(t, true)
 
-	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), "static-client", true, "http://localhost:1234")
+			t.Log("creating intention")
+			_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
+				SourceName:      staticClientName,
+				DestinationName: "static-server",
+				Action:          api.IntentionActionAllow,
+			}, nil)
+			require.NoError(t, err)
+
+			t.Log("checking that connection is successful")
+			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), true, staticClientName, "http://localhost:1234")
+		})
+	}
 }

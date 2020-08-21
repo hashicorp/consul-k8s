@@ -2,6 +2,7 @@ package ingressgateway
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
@@ -12,9 +13,26 @@ import (
 
 // Test that ingress gateways work in a default installation and a secure installation.
 func TestIngressGateway(t *testing.T) {
-	for _, secure := range []bool{false, true} {
-		testName := fmt.Sprintf("secure: %t", secure)
-		t.Run(testName, func(t *testing.T) {
+	cases := []struct {
+		secure      bool
+		autoEncrypt bool
+	}{
+		{
+			false,
+			false,
+		},
+		{
+			true,
+			false,
+		},
+		{
+			true,
+			true,
+		},
+	}
+	for _, c := range cases {
+		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
 
@@ -24,9 +42,10 @@ func TestIngressGateway(t *testing.T) {
 				"ingressGateways.gateways[0].name":     "ingress-gateway",
 				"ingressGateways.gateways[0].replicas": "1",
 			}
-			if secure {
+			if c.secure {
 				helmValues["global.acls.manageSystemACLs"] = "true"
 				helmValues["global.tls.enabled"] = "true"
+				helmValues["global.tls.autoEncrypt"] = strconv.FormatBool(c.autoEncrypt)
 			}
 
 			releaseName := helpers.RandomName()
@@ -44,7 +63,7 @@ func TestIngressGateway(t *testing.T) {
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			t.Log("creating config entry")
-			consulClient := consulCluster.SetupConsulClient(t, secure)
+			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Create config entry
 			created, _, err := consulClient.ConfigEntries().Set(&api.IngressGatewayConfigEntry{
@@ -68,17 +87,12 @@ func TestIngressGateway(t *testing.T) {
 			k8sOptions := ctx.KubectlOptions()
 
 			// If ACLs are enabled, test that intentions prevent connections.
-			if secure {
+			if c.secure {
 				// With the ingress gateway up, we test that we can make a call to it
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				t.Log("testing intentions prevent ingress")
-				helpers.CheckStaticServerConnection(t,
-					k8sOptions,
-					"bounce",
-					false,
-					"-H", "Host: static-server.ingress.consul",
-					fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+				helpers.CheckStaticServerConnection(t, k8sOptions, false, "bounce", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 
 				// Now we create the allow intention.
 				t.Log("creating ingress-gateway => static-server intention")
@@ -93,12 +107,7 @@ func TestIngressGateway(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the bounce pod. It should route to the static-server pod.
 			t.Log("trying calls to ingress gateway")
-			helpers.CheckStaticServerConnection(t,
-				k8sOptions,
-				"bounce",
-				true,
-				"-H", "Host: static-server.ingress.consul",
-				fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+			helpers.CheckStaticServerConnection(t, k8sOptions, true, "bounce", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 		})
 	}
 }

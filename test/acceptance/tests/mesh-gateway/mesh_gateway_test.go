@@ -11,6 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const staticClientName = "static-client"
+
 // Test that Connect and wan federation over mesh gateways work in a default installation
 // i.e. without ACLs because TLS is required for WAN federation over mesh gateways
 func TestMeshGatewayDefault(t *testing.T) {
@@ -93,11 +95,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnection(t,
-		primaryContext.KubectlOptions(),
-		"static-client",
-		true,
-		"http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -208,18 +206,14 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 			t.Log("creating intention")
 			_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
-				SourceName:      "static-client",
+				SourceName:      staticClientName,
 				DestinationName: "static-server",
 				Action:          api.IntentionActionAllow,
 			}, nil)
 			require.NoError(t, err)
 
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnection(t,
-				primaryContext.KubectlOptions(),
-				"static-client",
-				true,
-				"http://localhost:1234")
+			helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
 		})
 	}
 }

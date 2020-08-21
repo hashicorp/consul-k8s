@@ -37,6 +37,16 @@ func TestSyncCatalog(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"Secure installation (with TLS with auto-encrypt and ACLs enabled)",
+			map[string]string{
+				"syncCatalog.enabled":          "true",
+				"global.tls.enabled":           "true",
+				"global.tls.enableAutoEncrypt": "true",
+				"global.acls.manageSystemACLs": "true",
+			},
+			true,
+		},
 	}
 
 	for _, c := range cases {

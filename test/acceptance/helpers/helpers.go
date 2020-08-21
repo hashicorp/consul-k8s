@@ -94,7 +94,7 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 // to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, deploymentName string, expectSuccess bool, curlArgs ...string) {
+func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, deploymentName string, curlArgs ...string) {
 	t.Helper()
 
 	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
