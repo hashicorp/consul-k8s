@@ -6,3 +6,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ashwinvenkatesh/consul-k8s
+  newTag: latest
