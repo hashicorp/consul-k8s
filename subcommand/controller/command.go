@@ -103,7 +103,7 @@ func (c *Command) Run(args []string) int {
 	// todo: this is super hacky. Setting global variable so the webhook validation can use the clients.
 	// Instead we should implement our own validating webhooks so we can pass in the clients.
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		mgr.GetWebhookServer().Register("/validate-consul-hashicorp-com-v1alpha1-servicedefaults", &webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
 			Client:       mgr.GetClient(),
 			ConsulClient: consulClient,
 		}})

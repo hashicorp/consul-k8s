@@ -21,7 +21,7 @@ type ServiceDefaultsValidator struct {
 	decoder      *admission.Decoder
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-consul-hashicorp-com-v1alpha1-servicedefaults,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=vservicedefaults.kb.io
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mservicedefaults.consul.io
 
 func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	svcDefaults := &ServiceDefaults{}

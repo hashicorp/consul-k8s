@@ -1,19 +1,19 @@
 
 ---
 apiVersion: admissionregistration.k8s.io/v1beta1
-kind: ValidatingWebhookConfiguration
+kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
-  name: validating-webhook-configuration
+  name: mutating-webhook-configuration
 webhooks:
 - clientConfig:
     caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
-      path: /validate-consul-hashicorp-com-v1alpha1-servicedefaults
+      path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
-  name: vservicedefaults.kb.io
+  name: mservicedefaults.consul.io
   rules:
   - apiGroups:
     - consul.hashicorp.com
