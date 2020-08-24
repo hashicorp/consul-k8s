@@ -57,6 +57,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flags, c.httpFlags.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
