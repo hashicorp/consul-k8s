@@ -91,7 +91,7 @@ func (s *ServiceDefaults) gatewayMode() consulapi.MeshGatewayMode {
 	}
 }
 
-// this will check if the consul struct shares the same spec as the spec of the resource
+// MatchesConsul returns true if entry has the same config as this struct.
 func (s *ServiceDefaults) MatchesConsul(entry *consulapi.ServiceConfigEntry) bool {
 	matches := s.Name == entry.GetName() &&
 		s.Spec.Protocol == entry.Protocol &&
