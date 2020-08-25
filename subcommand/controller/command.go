@@ -63,7 +63,7 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flags)
 }
 
-func (c *Command) Run(args []string) int {
+func (c *Command) Run(_ []string) int {
 	c.once.Do(c.init)
 
 	if err := c.flags.Parse(nil); err != nil {
@@ -100,8 +100,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceDefaults")
 		return 1
 	}
-	// todo: this is super hacky. Setting global variable so the webhook validation can use the clients.
-	// Instead we should implement our own validating webhooks so we can pass in the clients.
+
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
 			Client:       mgr.GetClient(),
