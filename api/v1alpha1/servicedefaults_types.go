@@ -54,13 +54,40 @@ func (s *ServiceDefaults) ToConsul() *consulapi.ServiceConfigEntry {
 		//Namespace: s.Namespace, // todo: don't set this unless enterprise
 		Protocol: s.Spec.Protocol,
 		MeshGateway: consulapi.MeshGatewayConfig{
-			Mode: consulapi.MeshGatewayModeDefault, //this will change. forcing it to default for now.
+			Mode: s.gatewayMode(),
 		},
 		Expose: consulapi.ExposeConfig{
 			Checks: s.Spec.Expose.Checks,
-			Paths:  []consulapi.ExposePath{}, //will create a helper on our expose paths to translate to consul expose paths
+			Paths:  s.parseExposePath(),
 		},
 		ExternalSNI: s.Spec.ExternalSNI,
+	}
+}
+
+func (s *ServiceDefaults) parseExposePath() []consulapi.ExposePath {
+	var paths []consulapi.ExposePath
+	for _, path := range s.Spec.Expose.Paths {
+		paths = append(paths, consulapi.ExposePath{
+			ListenerPort:    path.ListenerPort,
+			Path:            path.Path,
+			LocalPathPort:   path.LocalPathPort,
+			Protocol:        path.Protocol,
+			ParsedFromCheck: path.ParsedFromCheck,
+		})
+	}
+	return paths
+}
+
+func (s *ServiceDefaults) gatewayMode() consulapi.MeshGatewayMode {
+	switch s.Spec.MeshGateway.Mode {
+	case "local":
+		return consulapi.MeshGatewayModeLocal
+	case "none":
+		return consulapi.MeshGatewayModeNone
+	case "remote":
+		return consulapi.MeshGatewayModeRemote
+	default:
+		return consulapi.MeshGatewayModeDefault
 	}
 }
 
@@ -69,32 +96,10 @@ func (s *ServiceDefaults) MatchesConsul(entry *consulapi.ServiceConfigEntry) boo
 	matches := s.Name == entry.GetName() &&
 		s.Spec.Protocol == entry.Protocol &&
 		s.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		s.Spec.Expose.Checks == entry.Expose.Checks &&
+		s.Spec.Expose.Matches(entry.Expose) &&
 		s.Spec.ExternalSNI == entry.ExternalSNI
 	if !matches {
 		return false
-	}
-
-	// Also check each exposed path config.
-	if len(s.Spec.Expose.Paths) != len(entry.Expose.Paths) {
-		return false
-	}
-	for _, path := range s.Spec.Expose.Paths {
-		found := false
-		for _, entryPath := range entry.Expose.Paths {
-			if path.ParsedFromCheck == entryPath.ParsedFromCheck &&
-				path.Protocol == entryPath.Protocol &&
-				path.Path == entryPath.Path &&
-				path.ListenerPort == entryPath.ListenerPort &&
-				path.LocalPathPort == entryPath.LocalPathPort {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return false
-		}
 	}
 	return true
 }

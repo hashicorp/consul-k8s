@@ -1,5 +1,9 @@
 package v1alpha1
 
+import (
+	"github.com/hashicorp/consul/api"
+)
+
 type MeshGatewayMode string
 
 const (
@@ -37,6 +41,35 @@ type ExposeConfig struct {
 
 	// Paths is the list of paths exposed through the proxy.
 	Paths []ExposePath `json:"paths,omitempty"`
+}
+
+func (in *ExposeConfig) Matches(expose api.ExposeConfig) bool {
+	if in.Checks != expose.Checks {
+		return false
+	}
+
+	if len(in.Paths) != len(expose.Paths) {
+		return false
+	}
+
+	for _, path := range in.Paths {
+		found := false
+		for _, entryPath := range expose.Paths {
+			if path.ParsedFromCheck == entryPath.ParsedFromCheck &&
+				path.Protocol == entryPath.Protocol &&
+				path.Path == entryPath.Path &&
+				path.ListenerPort == entryPath.ListenerPort &&
+				path.LocalPathPort == entryPath.LocalPathPort {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 type ExposePath struct {
