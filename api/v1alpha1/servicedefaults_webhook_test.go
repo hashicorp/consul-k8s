@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	logrtest "github.com/go-logr/logr/testing"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,7 @@ func TestRun_HandleErrorsIfServiceDefaultsWithSameNameExists(t *testing.T) {
 	validator := &serviceDefaultsValidator{
 		Client:       client,
 		ConsulClient: consulClient,
+		Logger:       logrtest.NullLogger{},
 	}
 
 	decoder, err := admission.NewDecoder(scheme.Scheme)
