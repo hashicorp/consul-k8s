@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"sync"
 	"time"
 
@@ -97,7 +98,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
 		"Tag value for K8S services registered in Consul")
 	c.flags.StringVar(&c.flagConsulNodeName, "consul-node-name", "k8s-sync",
-		"The Consul node name to register for k8s-sync. Defaults to k8s-sync.")
+		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
+			"via DNS, the name should only contain alpha-numerics and dashes.")
 	c.flags.DurationVar(&c.flagConsulWritePeriod, "consul-write-interval", 30*time.Second,
 		"The interval to perform syncing operations creating Consul services, formatted "+
 			"as a time.Duration. All changes are merged and write calls are only made "+
@@ -159,6 +161,12 @@ func (c *Command) Run(args []string) int {
 	}
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		return 1
+	}
+
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -378,6 +386,31 @@ func (c *Command) Help() string {
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
 	c.sigCh <- os.Interrupt
+}
+
+func (c *Command) validateFlags() error {
+	// For the Consul node name to be discoverable via DNS, it must contain only
+	// dashes and alphanumeric characters. Length is also constrained.
+	// These restrictions match those defined in Consul's agent definition.
+	var InvalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	const MaxDNSLabelLength = 63
+
+	if InvalidDnsRe.MatchString(c.flagConsulNodeName) {
+		return fmt.Errorf("Node name will not be discoverable "+
+			"via DNS due to invalid characters. Valid characters include "+
+			"all alpha-numerics and dashes. consul-node-name=%s",
+			c.flagConsulNodeName,
+		)
+	}
+	if len(c.flagConsulNodeName) > MaxDNSLabelLength {
+		return fmt.Errorf("Node name will not be discoverable "+
+			"via DNS due to it being too long. Valid lengths are between "+
+			"1 and 63 bytes. consul-node-name=%s",
+			c.flagConsulNodeName,
+		)
+	}
+
+	return nil
 }
 
 const synopsis = "Sync Kubernetes services and Consul services."
