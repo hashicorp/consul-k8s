@@ -33,6 +33,10 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install kubernetes-helm
   ```
+* [go](https://golang.org/) (v1.14+)
+  ```bash
+  brew install golang
+  ```
 
 ### Helm 2/3
 These tests will work with both Helm 2 and 3 if run through `bats`, e.g. `bats ./test/unit`. If copying the
@@ -48,21 +52,64 @@ It's expected that the version of `helm` in your path is Helm 3.
 
 In our CI/CD the tests are run against both Helm 2 and Helm 3.
 
+**Note:** Acceptance tests require Helm 3.
+
 ### Running The Tests
+
+#### Unit Tests
 To run the unit tests:
 
     bats ./test/unit
 
+#### Acceptance Tests
+
 To run the acceptance tests:
 
-    bats ./test/acceptance
+    cd test/acceptance/tests
+    go test ./... -p 1
+    
+The above command will run all tests that can run against a single Kubernetes cluster,
+using the current context set in your kubeconfig locally.
 
-If the acceptance tests fail, deployed resources in the Kubernetes cluster
-may not be properly cleaned up. We recommend recycling the Kubernetes cluster to
-start from a clean slate.
+**Note:** You must run all tests in serial by passing the `-p 1` flag
+because the test suite currently does not support parallel execution.
+
+You can run other tests by enabling them by passing appropriate flags to `go test`.
+For example, to run mesh gateway tests, which require two Kubernetes clusters,
+you may use the following command:
+
+    go test ./... -p 1 -timeout 20m \
+        -enable-multi-cluster \
+        -kubecontext=<name of the primary Kubernetes context> \
+        -secondary-kubecontext=<name of the secondary Kubernetes context>
+
+Below is the list of available flags:
+
+```
+-consul-image string
+    The Consul image to use for all tests.
+-consul-k8s-image string
+    The consul-k8s image to use for all tests.
+-enable-multi-cluster
+    If true, the tests that require multiple Kubernetes clusters will be run. At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.
+-kubeconfig string
+    The path to a kubeconfig file. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
+-kubecontext string
+    The name of the Kubernetes context to use. If this is blank, the context set as the current context will be used by default.
+-namespace string
+    The Kubernetes namespace to use for tests. (default "default")
+-no-cleanup-on-failure
+    If true, the tests will not cleanup resources they create when they finish running.Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.
+-secondary-kubeconfig string
+    The path to a kubeconfig file of the secondary k8s cluster. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
+-secondary-kubecontext string
+    The name of the Kubernetes context for the secondary cluster to use. If this is blank, the context set as the current context will be used by default.
+-secondary-namespace string
+    The Kubernetes namespace to use in the secondary k8s cluster. (default "default")
+```
 
 **Note:** There is a Terraform configuration in the
-[`test/terraform/`](https://github.com/hashicorp/consul-helm/tree/master/test/terraform) directory
+[`test/terraform/gke`](./test/terraform/gke) directory
 that can be used to quickly bring up a GKE cluster and configure
 `kubectl` and `helm` locally. This can be used to quickly spin up a test
 cluster for acceptance tests. Unit tests _do not_ require a running Kubernetes
@@ -175,3 +222,152 @@ Here are some examples of common test patterns:
     }
     ```
     Here we are using the `assert_empty` helper command that works with both Helm 2 and 3.
+    
+### Writing Acceptance Tests
+
+If you are adding a feature that fits thematically with one of the existing test suites,
+then you need to add your test cases to the existing test files.
+Otherwise, you will need to create a new test suite.
+
+We recommend to start by either copying the [example test](test/acceptance/tests/example/example_test.go)
+or the whole [example test suite](test/acceptance/tests/example),
+depending on the test you need to add.
+
+#### Adding Test Suites
+
+To add a test suite, copy the [example test suite](test/acceptance/tests/example)
+and uncomment the code you need in the [`main_test.go`](test/acceptance/tests/example/main_test.go) file.
+
+At a minimum, this file needs to contain the following:
+
+```go
+package example
+
+import (
+	"os"
+	"testing"
+
+	"github.com/hashicorp/consul-helm/test/acceptance/framework"
+)
+
+var suite framework.Suite
+
+func TestMain(m *testing.M) {
+	suite = framework.NewSuite(m)
+	os.Exit(suite.Run())
+}
+```
+
+If the test suite needs to run only when certain test flags are passed,
+you need to handle that in the `TestMain` function.
+
+```go
+func TestMain(m *testing.M) {
+    // First, create a new suite so that all flags are parsed. 	
+    suite = framework.NewSuite(m)
+    
+    // Run the suite only if our example feature test flag is set.
+    if suite.Config().EnableExampleFeature {
+        os.Exit(suite.Run())
+    } else {
+        fmt.Println("Skipping example feature tests because -enable-example-feature is not set")
+        os.Exit(0)
+    }
+}
+```
+
+#### Example Test
+
+We recommend using the [example test](test/acceptance/tests/example/example_test.go)
+as a starting point for adding your tests.
+
+To write a test, you need access to the environment and context to run it against.
+Each test belongs to a test **suite** that contains a test **environment** and test **configuration** created from flags passed to `go test`.
+A test **environment** contains references to one or more test **contexts**,
+which represents one Kubernetes cluster.
+
+```go
+func TestExample(t *testing.T) {
+  // Get test configuration.
+  cfg := suite.Config()
+
+  // Get the default context.
+  ctx := suite.Environment().DefaultContext(t)
+
+  // Create Helm values for the Helm install.
+  helmValues := map[string]string{
+      "exampleFeature.enabled": "true",
+  }
+  
+  // Generate a random name for this test. 
+  releaseName := helpers.RandomName()
+
+  // Create a new Consul cluster object.
+  consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+  
+  // Create the Consul cluster with Helm.
+  consulCluster.Create(t)
+    
+  // Make test assertions.
+}
+```
+
+Please see [mesh gateway tests](test/acceptance/tests/mesh-gateway/mesh_gateway_test.go)
+for an example of how to use write a test that uses multiple contexts.
+
+#### Writing Assertions
+
+Depending on the test you're writing, you may need to write assertions
+either by running `kubectl` commands, calling the Kubernetes API, or
+the Consul API.
+
+To run `kubectl` commands, you need to get `KubectlOptions` from the test context.
+There are a number of `kubectl` commands available in the `helpers/kubectl.go` file.
+For example, to call `kubectl apply` from the test write the following:
+
+```go
+helpers.KubectlApply(t, ctx.KubectlOptions(), filepath)
+```
+
+Similarly, you can obtain Kubernetes client from your test context.
+You can use it to, for example, read all services in a namespace:
+
+```go
+k8sClient := ctx.KubernetesClient(t)
+services, err := k8sClient.CoreV1().Services(ctx.KubectlOptions().Namespace).List(metav1.ListOptions{})
+```
+
+To make Consul API calls, you can get the Consul client from the `consulCluster` object,
+indicating whether the client needs to be secure or not (i.e. whether TLS and ACLs are enabled on the Consul cluster):
+
+```go
+consulClient := consulCluster.SetupConsulClient(t, true)
+consulServices, _, err := consulClient.Catalog().Services(nil)
+```
+
+#### Cleaning Up Resources
+
+Because you may be creating resources that will not be destroyed automatically
+when a test finishes, you need to make sure to clean them up. Most methods and objects
+provided by the framework already do that, so you don't need to worry cleaning them up.
+However, if your tests create Kubernetes objects, you need to clean them up yourself by
+calling `helpers.Cleanup` function.
+
+**Note:** If you want to keep resources after a test run for debugging purposes,
+you can run tests with `-no-cleanup-on-failure` flag.
+You need to make sure to clean them up manually before running tests again.
+
+#### When to Add Acceptance Tests
+
+Sometimes adding an acceptance test for the feature you're writing may not be the right thing.
+Here are some things to consider before adding a test:
+
+* Is this a test for a happy case scenario?
+  Generally, we expect acceptance tests to test happy case scenarios. If your test does not,
+  then perhaps it could be tested by either a unit test in this repository or a test in the
+  [consul-k8s](https://github.com/hashicorp/consul-k8s) repository.
+* Is the test you're going to write for a feature that is scoped to one of the underlying componenets of this Helm chart,
+  either Consul itself or consul-k8s? In that case, it should be tested there rather than in the Helm chart.
+  For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
+  and their respective flags. Something like that should be tested in the consul-k8s repository.
+ 
