@@ -5,9 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
 type ServiceDefaultsSpec struct {
 	Protocol    string            `json:"protocol,omitempty"`
@@ -47,47 +44,16 @@ func init() {
 	SchemeBuilder.Register(&ServiceDefaults{}, &ServiceDefaultsList{})
 }
 
+// ToConsul converts the entry into it's Consul equivalent struct.
 func (s *ServiceDefaults) ToConsul() *consulapi.ServiceConfigEntry {
 	return &consulapi.ServiceConfigEntry{
 		Kind: consulapi.ServiceDefaults,
 		Name: s.Name,
 		//Namespace: s.Namespace, // todo: don't set this unless enterprise
-		Protocol: s.Spec.Protocol,
-		MeshGateway: consulapi.MeshGatewayConfig{
-			Mode: s.gatewayMode(),
-		},
-		Expose: consulapi.ExposeConfig{
-			Checks: s.Spec.Expose.Checks,
-			Paths:  s.parseExposePath(),
-		},
+		Protocol:    s.Spec.Protocol,
+		MeshGateway: s.Spec.MeshGateway.ToConsul(),
+		Expose:      s.Spec.Expose.ToConsul(),
 		ExternalSNI: s.Spec.ExternalSNI,
-	}
-}
-
-func (s *ServiceDefaults) parseExposePath() []consulapi.ExposePath {
-	var paths []consulapi.ExposePath
-	for _, path := range s.Spec.Expose.Paths {
-		paths = append(paths, consulapi.ExposePath{
-			ListenerPort:    path.ListenerPort,
-			Path:            path.Path,
-			LocalPathPort:   path.LocalPathPort,
-			Protocol:        path.Protocol,
-			ParsedFromCheck: path.ParsedFromCheck,
-		})
-	}
-	return paths
-}
-
-func (s *ServiceDefaults) gatewayMode() consulapi.MeshGatewayMode {
-	switch s.Spec.MeshGateway.Mode {
-	case "local":
-		return consulapi.MeshGatewayModeLocal
-	case "none":
-		return consulapi.MeshGatewayModeNone
-	case "remote":
-		return consulapi.MeshGatewayModeRemote
-	default:
-		return consulapi.MeshGatewayModeDefault
 	}
 }
 

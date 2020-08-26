@@ -2,12 +2,14 @@ package controller
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -17,23 +19,16 @@ import (
 )
 
 type Command struct {
-	flags                *flag.FlagSet
-	k8s                  *flags.K8SFlags
-	httpFlags            *flags.HTTPFlags
-	metricsAddr          string
-	enableLeaderElection bool
+	UI        cli.Ui
+	flagSet   *flag.FlagSet
+	k8s       *flags.K8SFlags
+	httpFlags *flags.HTTPFlags
+
+	flagMetricsAddr          string
+	flagEnableLeaderElection bool
 
 	once sync.Once
 	help string
-}
-
-func (c *Command) Help() string {
-	c.once.Do(c.init)
-	return c.help
-}
-
-func (c *Command) Synopsis() string {
-	return synopsis
 }
 
 var (
@@ -48,21 +43,24 @@ func init() {
 }
 
 func (c *Command) init() {
-	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.StringVar(&c.metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	c.flags.BoolVar(&c.enableLeaderElection, "enable-leader-election", false,
+	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
+	c.flagSet.StringVar(&c.flagMetricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	c.httpFlags = &flags.HTTPFlags{}
-	flags.Merge(c.flags, c.httpFlags.Flags())
-	c.help = flags.Usage(help, c.flags)
+	flags.Merge(c.flagSet, c.httpFlags.Flags())
+	c.help = flags.Usage(help, c.flagSet)
 }
 
 func (c *Command) Run(_ []string) int {
 	c.once.Do(c.init)
-
-	if err := c.flags.Parse(nil); err != nil {
-		setupLog.Error(err, "parsing flags")
+	if err := c.flagSet.Parse(nil); err != nil {
+		setupLog.Error(err, "parsing flagSet")
+		return 1
+	}
+	if len(c.flagSet.Args()) > 0 {
+		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
 		return 1
 	}
 
@@ -70,9 +68,9 @@ func (c *Command) Run(_ []string) int {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		MetricsBindAddress: c.metricsAddr,
+		MetricsBindAddress: c.flagMetricsAddr,
 		Port:               9443,
-		LeaderElection:     c.enableLeaderElection,
+		LeaderElection:     c.flagEnableLeaderElection,
 		LeaderElectionID:   "consul.hashicorp.com",
 	})
 	if err != nil {
@@ -97,7 +95,9 @@ func (c *Command) Run(_ []string) int {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient)})
+		//Note: The path here should be identical to the one on the kubebuilder annotation in file api/v1alpha1/servicedefaults_webhook.go
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
+			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 	}
 	// +kubebuilder:scaffold:builder
 
@@ -107,6 +107,15 @@ func (c *Command) Run(_ []string) int {
 		return 1
 	}
 	return 0
+}
+
+func (c *Command) Help() string {
+	c.once.Do(c.init)
+	return c.help
+}
+
+func (c *Command) Synopsis() string {
+	return synopsis
 }
 
 const synopsis = "Starts the Consul Kubernetes controller"

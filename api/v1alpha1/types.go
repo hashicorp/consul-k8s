@@ -1,7 +1,7 @@
 package v1alpha1
 
 import (
-	"github.com/hashicorp/consul/api"
+	capi "github.com/hashicorp/consul/api"
 )
 
 type MeshGatewayMode string
@@ -32,6 +32,28 @@ type MeshGatewayConfig struct {
 	Mode string `json:"mode,omitempty"`
 }
 
+//ToConsul returns the MeshGatewayConfig for the entry
+func (m MeshGatewayConfig) ToConsul() capi.MeshGatewayConfig {
+	switch m.Mode {
+	case string(capi.MeshGatewayModeLocal):
+		return capi.MeshGatewayConfig{
+			Mode: capi.MeshGatewayModeLocal,
+		}
+	case string(capi.MeshGatewayModeNone):
+		return capi.MeshGatewayConfig{
+			Mode: capi.MeshGatewayModeNone,
+		}
+	case string(capi.MeshGatewayModeRemote):
+		return capi.MeshGatewayConfig{
+			Mode: capi.MeshGatewayModeRemote,
+		}
+	default:
+		return capi.MeshGatewayConfig{
+			Mode: capi.MeshGatewayModeDefault,
+		}
+	}
+}
+
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
 // Users can expose individual paths and/or all HTTP/GRPC paths for checks.
 type ExposeConfig struct {
@@ -41,35 +63,6 @@ type ExposeConfig struct {
 
 	// Paths is the list of paths exposed through the proxy.
 	Paths []ExposePath `json:"paths,omitempty"`
-}
-
-func (in *ExposeConfig) Matches(expose api.ExposeConfig) bool {
-	if in.Checks != expose.Checks {
-		return false
-	}
-
-	if len(in.Paths) != len(expose.Paths) {
-		return false
-	}
-
-	for _, path := range in.Paths {
-		found := false
-		for _, entryPath := range expose.Paths {
-			if path.ParsedFromCheck == entryPath.ParsedFromCheck &&
-				path.Protocol == entryPath.Protocol &&
-				path.Path == entryPath.Path &&
-				path.ListenerPort == entryPath.ListenerPort &&
-				path.LocalPathPort == entryPath.LocalPathPort {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 type ExposePath struct {
@@ -85,7 +78,54 @@ type ExposePath struct {
 	// Protocol describes the upstream's service protocol.
 	// Valid values are "http" and "http2", defaults to "http"
 	Protocol string `json:"protocol,omitempty"`
+}
 
-	// ParsedFromCheck is set if this path was parsed from a registered check
-	ParsedFromCheck bool `json:"parsedFromCheck,omitempty"`
+//Matches returns true if the expose config of the entry is the same as the struct
+func (e ExposeConfig) Matches(expose capi.ExposeConfig) bool {
+	if e.Checks != expose.Checks {
+		return false
+	}
+
+	if len(e.Paths) != len(expose.Paths) {
+		return false
+	}
+
+	for _, path := range e.Paths {
+		found := false
+		for _, entryPath := range expose.Paths {
+			if path.Protocol == entryPath.Protocol &&
+				path.Path == entryPath.Path &&
+				path.ListenerPort == entryPath.ListenerPort &&
+				path.LocalPathPort == entryPath.LocalPathPort {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+//ToConsul returns the ExposeConfig for the entry
+func (e ExposeConfig) ToConsul() capi.ExposeConfig {
+	return capi.ExposeConfig{
+		Checks: e.Checks,
+		Paths:  e.parseExposePath(),
+	}
+}
+
+func (e ExposeConfig) parseExposePath() []capi.ExposePath {
+	var paths []capi.ExposePath
+	for _, path := range e.Paths {
+		paths = append(paths, capi.ExposePath{
+			ListenerPort:  path.ListenerPort,
+			Path:          path.Path,
+			LocalPathPort: path.LocalPathPort,
+			Protocol:      path.Protocol,
+		})
+	}
+	return paths
 }

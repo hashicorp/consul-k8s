@@ -63,10 +63,6 @@ spec:
                         description: LocalPathPort is the port that the service is
                           listening on for the given path.
                         type: integer
-                      parsedFromCheck:
-                        description: ParsedFromCheck is set if this path was parsed
-                          from a registered check
-                        type: boolean
                       path:
                         description: Path is the path to expose through the proxy,
                           ie. "/metrics."

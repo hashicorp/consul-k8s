@@ -99,40 +99,44 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
 			return ctrl.Result{}, err
 		}
-	} else if err != nil {
+		return ctrl.Result{}, nil
+	}
+
+	// If there is an error when trying to get the config entry from the api server, fail the reconcile
+	if err != nil {
 		svcDefaults.Status.Conditions = syncFailed(ConsulAgentError, err.Error())
 		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
-	} else {
-		svcDefaultEntry, ok := entry.(*capi.ServiceConfigEntry)
-		if !ok {
-			err := errors.New("could not cast entry as ServiceConfigEntry")
-			svcDefaults.Status.Conditions = syncUnknownWithError(CastError, err.Error())
+	}
+
+	svcDefaultEntry, ok := entry.(*capi.ServiceConfigEntry)
+	if !ok {
+		err := errors.New("could not cast entry as ServiceConfigEntry")
+		svcDefaults.Status.Conditions = syncUnknownWithError(CastError, err.Error())
+		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, err
+	}
+	if !svcDefaults.MatchesConsul(svcDefaultEntry) {
+		_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), nil)
+		if err != nil {
+			svcDefaults.Status.Conditions = syncUnknownWithError(ConsulAgentError, err.Error())
 			if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, err
 		}
-		if !svcDefaults.MatchesConsul(svcDefaultEntry) {
-			_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), nil)
-			if err != nil {
-				svcDefaults.Status.Conditions = syncUnknownWithError(ConsulAgentError, err.Error())
-				if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-					return ctrl.Result{}, err
-				}
-				return ctrl.Result{}, err
-			}
-			svcDefaults.Status.Conditions = syncSuccessful()
-			if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-				return ctrl.Result{}, err
-			}
-		} else if !svcDefaults.Status.GetCondition(consulv1alpha1.ConditionSynced).IsTrue() {
-			svcDefaults.Status.Conditions = syncSuccessful()
-			if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-				return ctrl.Result{}, err
-			}
+		svcDefaults.Status.Conditions = syncSuccessful()
+		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if !svcDefaults.Status.GetCondition(consulv1alpha1.ConditionSynced).IsTrue() {
+		svcDefaults.Status.Conditions = syncSuccessful()
+		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -205,11 +209,12 @@ func containsString(slice []string, s string) bool {
 
 // removeString removes s from slice and returns the new slice.
 func removeString(slice []string, s string) []string {
+	var result []string
 	for _, item := range slice {
 		if item == s {
 			continue
 		}
 		result = append(result, item)
 	}
-	return
+	return result
 }
