@@ -56,7 +56,7 @@ func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	c.flags.BoolVar(&c.enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
+		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flags, c.httpFlags.Flags())
@@ -78,7 +78,7 @@ func (c *Command) Run(_ []string) int {
 		MetricsBindAddress: c.metricsAddr,
 		Port:               9443,
 		LeaderElection:     c.enableLeaderElection,
-		LeaderElectionID:   "65a0bb41.my.domain",
+		LeaderElectionID:   "consul.hashicorp.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

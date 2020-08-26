@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestRun_ToConsul(t *testing.T) {
+func ToConsul(t *testing.T) {
 	cases := []ToConsulCase{
 		{
 			&ServiceDefaults{

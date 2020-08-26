@@ -43,7 +43,7 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
-		logger.Error(err, "failed to retrieve Service Default")
+		logger.Error(err, "failed to retrieve resource")
 		return ctrl.Result{}, err
 	}
 
@@ -62,7 +62,7 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		// The object is being deleted
 		if containsString(svcDefaults.ObjectMeta.Finalizers, FinalizerName) {
 			logger.Info("deletion event")
-			// our finalizer is present, so we need to delete the config entry
+			// Our finalizer is present, so we need to delete the config entry
 			// from consul.
 			_, err = r.ConsulClient.ConfigEntries().Delete(capi.ServiceDefaults, svcDefaults.Name, nil)
 			if err != nil {
@@ -193,7 +193,7 @@ func isNotFoundErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "404")
 }
 
-// Helper functions to check and remove string from a slice of strings.
+// containsString returns true if s is in slice.
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {
@@ -203,7 +203,8 @@ func containsString(slice []string, s string) bool {
 	return false
 }
 
-func removeString(slice []string, s string) (result []string) {
+// removeString removes s from slice and returns the new slice.
+func removeString(slice []string, s string) []string {
 	for _, item := range slice {
 		if item == s {
 			continue

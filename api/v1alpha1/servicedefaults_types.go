@@ -93,13 +93,9 @@ func (s *ServiceDefaults) gatewayMode() consulapi.MeshGatewayMode {
 
 // MatchesConsul returns true if entry has the same config as this struct.
 func (s *ServiceDefaults) MatchesConsul(entry *consulapi.ServiceConfigEntry) bool {
-	matches := s.Name == entry.GetName() &&
+	return s.Name == entry.GetName() &&
 		s.Spec.Protocol == entry.Protocol &&
 		s.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
 		s.Spec.Expose.Matches(entry.Expose) &&
 		s.Spec.ExternalSNI == entry.ExternalSNI
-	if !matches {
-		return false
-	}
-	return true
 }
