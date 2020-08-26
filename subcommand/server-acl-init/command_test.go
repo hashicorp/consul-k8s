@@ -56,6 +56,24 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags:  []string{"-bootstrap-token-file=/notexist", "-server-address=localhost", "-resource-prefix=prefix"},
 			ExpErr: "Unable to read bootstrap token from file \"/notexist\": open /notexist: no such file or directory",
 		},
+		{
+			Flags: []string{
+				"-server-address=localhost",
+				"-resource-prefix=prefix",
+				"-sync-consul-node-name=Speci@l_Chars",
+			},
+			ExpErr: "Node name will not be discoverable via DNS due to invalid characters. Valid characters include " +
+				"all alpha-numerics and dashes. sync-consul-node-name=Speci@l_Chars",
+		},
+		{
+			Flags: []string{
+				"-server-address=localhost",
+				"-resource-prefix=prefix",
+				"-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
+			},
+			ExpErr: "Node name will not be discoverable via DNS due to it being too long. Valid lengths are between " +
+				"1 and 63 bytes. sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
+		},
 	}
 
 	for _, c := range cases {
@@ -930,6 +948,84 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
 		require.Equal("${serviceaccount.name}", actRule.BindName)
 		require.Equal("serviceaccount.name!=changed", actRule.Selector)
+	}
+}
+
+// Test that the catalog sync policy is updated if the Consul node name changes.
+func TestRun_SyncPolicyUpdates(t *testing.T) {
+	t.Parallel()
+	k8s, testSvr := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s)
+	defer testSvr.Stop()
+	require := require.New(t)
+
+	ui := cli.NewMockUi()
+	commonArgs := []string{
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-create-sync-token",
+	}
+	firstRunArgs := append(commonArgs,
+		"-sync-consul-node-name=k8s-sync",
+	)
+	// Our second run, we change the binding rule selector.
+	secondRunArgs := append(commonArgs,
+		"-sync-consul-node-name=new-node-name",
+	)
+
+	// Run the command first to populate the sync policy.
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	responseCode := cmd.Run(firstRunArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Create consul client
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consul, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+
+	// Get and check the sync policy details
+	firstPolicies, _, err := consul.ACL().PolicyList(nil)
+	require.NoError(err)
+
+	for _, p := range firstPolicies {
+		if p.Name == "catalog-sync-token" {
+			policy, _, err := consul.ACL().PolicyRead(p.ID, nil)
+			require.NoError(err)
+
+			// Check the node name in the policy
+			require.Contains(policy.Rules, "k8s-sync")
+		}
+	}
+
+	// Re-run the command with a new Consul node name. The sync policy should be updated.
+	// NOTE: We're redefining the command so that the old flag values are reset.
+	cmd = Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	responseCode = cmd.Run(secondRunArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Get and check the sync policy details
+	secondPolicies, _, err := consul.ACL().PolicyList(nil)
+	require.NoError(err)
+
+	for _, p := range secondPolicies {
+		if p.Name == "catalog-sync-token" {
+			policy, _, err := consul.ACL().PolicyRead(p.ID, nil)
+			require.NoError(err)
+
+			// Check the node name in the policy
+			require.Contains(policy.Rules, "new-node-name")
+		}
 	}
 }
 
