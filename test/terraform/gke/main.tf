@@ -3,12 +3,12 @@ provider "google" {
 }
 
 resource "random_id" "suffix" {
-  count = var.cluster_count
+  count       = var.cluster_count
   byte_length = 4
 }
 
 data "google_container_engine_versions" "main" {
-  location = var.zone
+  location       = var.zone
   version_prefix = "1.15."
 }
 
@@ -33,7 +33,7 @@ resource "null_resource" "kubectl" {
   # On creation, we want to setup the kubectl credentials. The easiest way
   # to do this is to shell out to gcloud.
   provisioner "local-exec" {
-    command = "gcloud container clusters get-credentials --zone=${var.zone} ${google_container_cluster.cluster[count.index].name}"
+    command = "KUBECONFIG=$HOME/.kube/${google_container_cluster.cluster[count.index].name} gcloud container clusters get-credentials --zone=${var.zone} ${google_container_cluster.cluster[count.index].name}"
   }
 
   # On destroy we want to try to clean up the kubectl credentials. This
@@ -43,12 +43,6 @@ resource "null_resource" "kubectl" {
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
-    command    = "kubectl config get-clusters | grep ${google_container_cluster.cluster[count.index].name} | xargs -n1 kubectl config delete-cluster"
-  }
-
-  provisioner "local-exec" {
-    when       = destroy
-    on_failure = continue
-    command    = "kubectl config get-contexts | grep ${google_container_cluster.cluster[count.index].name} | xargs -n1 kubectl config delete-context"
+    command    = "rm $HOME/.kube/${google_container_cluster.cluster[count.index].name}"
   }
 }
