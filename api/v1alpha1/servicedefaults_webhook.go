@@ -15,7 +15,14 @@ import (
 // log is for logging in this package.
 var servicedefaultslog = logf.Log.WithName("servicedefaults-resource")
 
-type ServiceDefaultsValidator struct {
+func NewServiceDefaultsValidator(client client.Client, consulClient *capi.Client) *serviceDefaultsValidator {
+	return &serviceDefaultsValidator{
+		Client:       client,
+		ConsulClient: consulClient,
+	}
+}
+
+type serviceDefaultsValidator struct {
 	client.Client
 	ConsulClient *capi.Client
 	decoder      *admission.Decoder
@@ -23,7 +30,7 @@ type ServiceDefaultsValidator struct {
 
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mservicedefaults.consul.io
 
-func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	svcDefaults := &ServiceDefaults{}
 	err := v.decoder.Decode(req, svcDefaults)
 	if err != nil {
@@ -46,7 +53,7 @@ func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 	return admission.Allowed("Valid Service Defaults Request")
 }
 
-func (v *ServiceDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *serviceDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

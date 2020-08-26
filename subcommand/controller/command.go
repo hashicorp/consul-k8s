@@ -22,11 +22,6 @@ type Command struct {
 	httpFlags            *flags.HTTPFlags
 	metricsAddr          string
 	enableLeaderElection bool
-	flagSecretName       string
-	flagInitType         string
-	flagNamespace        string
-	flagACLDir           string
-	flagTokenSinkFile    string
 
 	once sync.Once
 	help string
@@ -38,7 +33,7 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Synopsis() string {
-	return help
+	return synopsis
 }
 
 var (
@@ -102,10 +97,7 @@ func (c *Command) Run(_ []string) int {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
-			Client:       mgr.GetClient(),
-			ConsulClient: consulClient,
-		}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient)})
 	}
 	// +kubebuilder:scaffold:builder
 
@@ -117,9 +109,10 @@ func (c *Command) Run(_ []string) int {
 	return 0
 }
 
+const synopsis = "Starts the Consul Kubernetes controller"
 const help = `
 Usage: consul-k8s controller [options]
 
-  Starts the consul kubernetes controller
+  Starts the Consul Kubernetes controller that manages Consul Custom Resource Definitions
 
 `
