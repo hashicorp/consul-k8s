@@ -28,7 +28,7 @@ type serviceDefaultsValidator struct {
 }
 
 // Note: The path value in the below line is the path to the webhook. If it is updates, run code-gen, update subcommand/controller/command.go and the consul-helm value for the path to the webhook.
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mservicedefaults.consul.io
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mutate-servicedefaults.consul.hashicorp.com
 
 func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcDefaults ServiceDefaults

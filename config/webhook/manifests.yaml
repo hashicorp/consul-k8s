@@ -13,7 +13,7 @@ webhooks:
       namespace: system
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
-  name: mservicedefaults.consul.io
+  name: mutate-servicedefaults.consul.hashicorp.com
   rules:
   - apiGroups:
     - consul.hashicorp.com
