@@ -1,15 +1,14 @@
 package controller
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -19,7 +18,6 @@ import (
 )
 
 type Command struct {
-	UI        cli.Ui
 	flagSet   *flag.FlagSet
 	k8s       *flags.K8SFlags
 	httpFlags *flags.HTTPFlags
@@ -60,7 +58,7 @@ func (c *Command) Run(_ []string) int {
 		return 1
 	}
 	if len(c.flagSet.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		setupLog.Error(errors.New("should have no non-flag arguments"), "invalid arguments")
 		return 1
 	}
 

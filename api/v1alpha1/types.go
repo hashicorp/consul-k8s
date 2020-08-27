@@ -32,20 +32,13 @@ type MeshGatewayConfig struct {
 	Mode string `json:"mode,omitempty"`
 }
 
-//ToConsul returns the MeshGatewayConfig for the entry
-func (m MeshGatewayConfig) ToConsul() capi.MeshGatewayConfig {
-	switch m.Mode {
-	case string(capi.MeshGatewayModeLocal):
+// toConsul returns the MeshGatewayConfig for the entry
+func (m MeshGatewayConfig) toConsul() capi.MeshGatewayConfig {
+	mode := capi.MeshGatewayMode(m.Mode)
+	switch mode {
+	case capi.MeshGatewayModeLocal, capi.MeshGatewayModeRemote, capi.MeshGatewayModeNone:
 		return capi.MeshGatewayConfig{
-			Mode: capi.MeshGatewayModeLocal,
-		}
-	case string(capi.MeshGatewayModeNone):
-		return capi.MeshGatewayConfig{
-			Mode: capi.MeshGatewayModeNone,
-		}
-	case string(capi.MeshGatewayModeRemote):
-		return capi.MeshGatewayConfig{
-			Mode: capi.MeshGatewayModeRemote,
+			Mode: mode,
 		}
 	default:
 		return capi.MeshGatewayConfig{

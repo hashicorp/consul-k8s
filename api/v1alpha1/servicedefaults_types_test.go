@@ -8,47 +8,207 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_ToConsul(t *testing.T) {
+func TestToConsul(t *testing.T) {
 	cases := map[string]struct {
 		input    *ServiceDefaults
 		expected *capi.ServiceConfigEntry
 	}{
-		"protocol:http,mode:remote": {
+		"kind:service-defaults": {
+			&ServiceDefaults{},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+			},
+		},
+		"name:resource-name": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
+					Name: "resource-name",
 				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				Name: "resource-name",
+			},
+		},
+		"protocol:http": {
+			&ServiceDefaults{
 				Spec: ServiceDefaultsSpec{
 					Protocol: "http",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Protocol: "http",
+			},
+		},
+		"protocol:https": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "https",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Protocol: "https",
+			},
+		},
+		"protocol:''": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Protocol: "",
+			},
+		},
+		"mode:unsupported": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "unsupported",
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeDefault,
+				},
+			},
+		},
+		"mode:local": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "local",
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			},
+		},
+		"mode:remote": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
 					MeshGateway: MeshGatewayConfig{
 						Mode: "remote",
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
+				Kind: capi.ServiceDefaults,
 				MeshGateway: capi.MeshGatewayConfig{
 					Mode: capi.MeshGatewayModeRemote,
 				},
 			},
 		},
-		"protocol:https,mode:local,exposePaths:1,externalSNI": {
+		"mode:none": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
 					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
+						Mode: "none",
 					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeNone,
+				},
+			},
+		},
+		"mode:default": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "default",
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeDefault,
+				},
+			},
+		},
+		"mode:''": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "",
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeDefault,
+				},
+			},
+		},
+		"externalSNI:test-external-sni": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					ExternalSNI: "test-external-sni",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:        capi.ServiceDefaults,
+				ExternalSNI: "test-external-sni",
+			},
+		},
+		"externalSNI:''": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					ExternalSNI: "",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:        capi.ServiceDefaults,
+				ExternalSNI: "",
+			},
+		},
+		"expose.checks:false": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
+						Checks: false,
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				Expose: capi.ExposeConfig{
+					Checks: false,
+				},
+			},
+		},
+		"expose.checks:true": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
 					Expose: ExposeConfig{
 						Checks: true,
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				Expose: capi.ExposeConfig{
+					Checks: true,
+				},
+			},
+		},
+		"expose.paths:single": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
 						Paths: []ExposePath{
 							{
 								ListenerPort:  80,
@@ -58,19 +218,11 @@ func Test_ToConsul(t *testing.T) {
 							},
 						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  80,
@@ -80,22 +232,12 @@ func Test_ToConsul(t *testing.T) {
 						},
 					},
 				},
-				ExternalSNI: "test-external-sni",
 			},
 		},
-		"protocol:\"\",mode:\"\",exposePaths:2,externalSNI": {
+		"expose.paths:multiple": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
 								ListenerPort:  80,
@@ -105,25 +247,17 @@ func Test_ToConsul(t *testing.T) {
 							},
 							{
 								ListenerPort:  8080,
-								Path:          "/second/test/path",
-								LocalPathPort: 11,
+								Path:          "/root/test/path",
+								LocalPathPort: 4201,
 								Protocol:      "https",
 							},
 						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  80,
@@ -133,80 +267,11 @@ func Test_ToConsul(t *testing.T) {
 						},
 						{
 							ListenerPort:  8080,
-							Path:          "/second/test/path",
-							LocalPathPort: 11,
+							Path:          "/root/test/path",
+							LocalPathPort: 4201,
 							Protocol:      "https",
 						},
 					},
-				},
-				ExternalSNI: "test-external-sni",
-			},
-		},
-		"protocol:http,mode:none,exposePaths:1,exposeChecks:false": {
-			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
-				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "none",
-					},
-					Expose: ExposeConfig{
-						Checks: false,
-						Paths: []ExposePath{
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-						},
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeNone,
-				},
-				Expose: capi.ExposeConfig{
-					Checks: false,
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-					},
-				},
-			},
-		},
-		"protocol:https,mode:unsupported": {
-			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
-				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "unsupported",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
 				},
 			},
 		},
@@ -220,7 +285,7 @@ func Test_ToConsul(t *testing.T) {
 	}
 }
 
-func Test_MatchesConsul(t *testing.T) {
+func TestMatchesConsul(t *testing.T) {
 	cases := map[string]struct {
 		internal *ServiceDefaults
 		consul   *capi.ServiceConfigEntry
@@ -229,111 +294,63 @@ func Test_MatchesConsul(t *testing.T) {
 		"name:matches": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
+					Name: "my-test-service",
 				},
-				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
-				},
+				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeRemote,
-				},
+				Kind: capi.ServiceDefaults,
+				Name: "my-test-service",
 			},
 			true,
 		},
 		"name:mismatched": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
+					Name: "my-test-service",
 				},
-				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
-				},
+				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "differently-named-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeRemote,
-				},
+				Kind: capi.ServiceDefaults,
+				Name: "differently-named-service",
 			},
 			false,
 		},
 		"protocol:matches": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
+				Kind:     capi.ServiceDefaults,
+				Protocol: "http",
 			},
 			true,
 		},
 		"protocol:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "http",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
+				Kind:     capi.ServiceDefaults,
+				Protocol: "https",
 			},
 			false,
 		},
 		"gatewayConfig:matches": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
 					MeshGateway: MeshGatewayConfig{
 						Mode: "remote",
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
+				Kind: capi.ServiceDefaults,
 				MeshGateway: capi.MeshGatewayConfig{
 					Mode: capi.MeshGatewayModeRemote,
 				},
@@ -342,22 +359,14 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"gatewayConfig:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
 					MeshGateway: MeshGatewayConfig{
 						Mode: "remote",
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
+				Kind: capi.ServiceDefaults,
 				MeshGateway: capi.MeshGatewayConfig{
 					Mode: capi.MeshGatewayModeLocal,
 				},
@@ -366,165 +375,64 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"externalSNI:matches": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
 					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeRemote,
-				},
+				Kind:        capi.ServiceDefaults,
 				ExternalSNI: "test-external-sni",
 			},
 			true,
 		},
 		"externalSNI:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
 					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "http",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind:        capi.ServiceDefaults,
 				ExternalSNI: "different-external-sni",
 			},
 			false,
 		},
 		"expose.checks:matches": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
 						Checks: true,
-						Paths: []ExposePath{
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
 					Checks: true,
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-					},
 				},
-				ExternalSNI: "test-external-sni",
 			},
 			true,
 		},
 		"expose.checks:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-config",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
 						Checks: true,
-						Paths: []ExposePath{
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
 					Checks: false,
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-					},
 				},
-				ExternalSNI: "test-external-sni",
 			},
 			false,
 		},
 		"expose.paths:matches": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
 								ListenerPort:  80,
@@ -543,15 +451,8 @@ func Test_MatchesConsul(t *testing.T) {
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  80,
@@ -572,44 +473,22 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"expose.paths.listenerPort:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
+								ListenerPort: 80,
 							},
 						},
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
-							ListenerPort:  81,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
+							ListenerPort: 81,
 						},
 					},
 				},
@@ -618,44 +497,22 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"expose.paths.path:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
+								Path: "/test/path",
 							},
 						},
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
-							ListenerPort:  80,
-							Path:          "/differnt/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
+							Path: "/differnt/path",
 						},
 					},
 				},
@@ -664,44 +521,22 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"expose.paths.localPathPort:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
-								ListenerPort:  80,
-								Path:          "/test/path",
 								LocalPathPort: 42,
-								Protocol:      "tcp",
 							},
 						},
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
-							ListenerPort:  80,
-							Path:          "/test/path",
 							LocalPathPort: 21,
-							Protocol:      "tcp",
 						},
 					},
 				},
@@ -710,44 +545,22 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"expose.paths.protocol:mismatched": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
+								Protocol: "tcp",
 							},
 						},
 					},
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "https",
+							Protocol: "https",
 						},
 					},
 				},
@@ -756,17 +569,8 @@ func Test_MatchesConsul(t *testing.T) {
 		},
 		"expose.paths:mismatched when path lengths are different": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
 								ListenerPort:  8080,
@@ -782,19 +586,11 @@ func Test_MatchesConsul(t *testing.T) {
 							},
 						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  8080,
@@ -804,23 +600,13 @@ func Test_MatchesConsul(t *testing.T) {
 						},
 					},
 				},
-				ExternalSNI: "test-external-sni",
 			},
 			false,
 		},
 		"expose.paths:match when paths orders are different": {
 			&ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-service",
-					Namespace: "consul-configs",
-				},
 				Spec: ServiceDefaultsSpec{
-					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
-						Mode: "local",
-					},
 					Expose: ExposeConfig{
-						Checks: true,
 						Paths: []ExposePath{
 							{
 								ListenerPort:  8080,
@@ -836,19 +622,11 @@ func Test_MatchesConsul(t *testing.T) {
 							},
 						},
 					},
-					ExternalSNI: "test-external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "",
-				Protocol:  "https",
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
+				Kind: capi.ServiceDefaults,
 				Expose: capi.ExposeConfig{
-					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  80,
@@ -864,7 +642,6 @@ func Test_MatchesConsul(t *testing.T) {
 						},
 					},
 				},
-				ExternalSNI: "test-external-sni",
 			},
 			true,
 		},

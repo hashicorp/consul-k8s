@@ -51,8 +51,8 @@ func (s *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
 		Name: s.Name,
 		//Namespace: s.Namespace, // todo: don't set this unless enterprise
 		Protocol:    s.Spec.Protocol,
-		MeshGateway: s.Spec.MeshGateway.ToConsul(),
-		Expose:      s.Spec.Expose.ToConsul(),
+		MeshGateway: s.Spec.MeshGateway.toConsul(),
+		Expose:      s.Spec.Expose.toConsul(),
 		ExternalSNI: s.Spec.ExternalSNI,
 	}
 }
@@ -62,7 +62,7 @@ func (s *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
 	return s.Name == entry.GetName() &&
 		s.Spec.Protocol == entry.Protocol &&
 		s.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		s.Spec.Expose.Matches(entry.Expose) &&
+		s.Spec.Expose.matches(entry.Expose) &&
 		s.Spec.ExternalSNI == entry.ExternalSNI
 }
 
@@ -92,8 +92,8 @@ type ExposePath struct {
 	Protocol string `json:"protocol,omitempty"`
 }
 
-//Matches returns true if the expose config of the entry is the same as the struct
-func (e ExposeConfig) Matches(expose capi.ExposeConfig) bool {
+// matches returns true if the expose config of the entry is the same as the struct
+func (e ExposeConfig) matches(expose capi.ExposeConfig) bool {
 	if e.Checks != expose.Checks {
 		return false
 	}
@@ -121,15 +121,8 @@ func (e ExposeConfig) Matches(expose capi.ExposeConfig) bool {
 	return true
 }
 
-//ToConsul returns the ExposeConfig for the entry
-func (e ExposeConfig) ToConsul() capi.ExposeConfig {
-	return capi.ExposeConfig{
-		Checks: e.Checks,
-		Paths:  e.parseExposePath(),
-	}
-}
-
-func (e ExposeConfig) parseExposePath() []capi.ExposePath {
+// toConsul returns the ExposeConfig for the entry
+func (e ExposeConfig) toConsul() capi.ExposeConfig {
 	var paths []capi.ExposePath
 	for _, path := range e.Paths {
 		paths = append(paths, capi.ExposePath{
@@ -139,5 +132,8 @@ func (e ExposeConfig) parseExposePath() []capi.ExposePath {
 			Protocol:      path.Protocol,
 		})
 	}
-	return paths
+	return capi.ExposeConfig{
+		Checks: e.Checks,
+		Paths:  paths,
+	}
 }

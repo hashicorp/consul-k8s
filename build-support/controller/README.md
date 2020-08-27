@@ -1,9 +1,5 @@
-# Consul-K8s hack GuideLines
-
-This document describes how you can use the scripts from [`hack`](.) directory 
-and gives a brief introduction and explanation of these scripts. 
-
 ## Overview
 
-The [`hack`](.) directory contains many scripts that ensure continuous development of consul-k8s, 
-enhance the robustness of the code, improve development efficiency, etc. 
+`boilerplate.go.txt` is a file required by `operator-sdk` when it performs code-generation.
+
+It's contents provide the headers to the generated files but as we do not require headers for the files we generate, it has been left intentionally blank.
