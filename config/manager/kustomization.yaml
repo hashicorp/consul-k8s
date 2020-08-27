@@ -1,0 +1,9 @@
+resources:
+- manager.yaml
+# todo: this was auto-generated
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: controller
+  newName: ashwinvenkatesh/consul-k8s
+  newTag: latest

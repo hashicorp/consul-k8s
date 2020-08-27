@@ -1,0 +1,6 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: servicedefaults-sample
+spec:
+  protocol: "http"
