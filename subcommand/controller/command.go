@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"flag"
@@ -12,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -45,7 +43,6 @@ type Command struct {
 
 	once sync.Once
 	help string
-	cert atomic.Value
 }
 
 var (
@@ -182,17 +179,10 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			return
 		}
 
-		webhookCert, err := tls.X509KeyPair(bundle.Cert, bundle.Key)
-		if err != nil {
-			log.Error(err, "Error loading TLS keypair")
-			continue
-		}
-
 		// If there is a MWC name set, then update the CA bundle.
 		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
 			ctrlWebhook := v1beta1.MutatingWebhookConfiguration{}
-			err = clientset.Get(ctx, types.NamespacedName{Namespace: "", Name: c.flagAutoName}, &ctrlWebhook)
-			if err != nil {
+			if err := clientset.Get(ctx, types.NamespacedName{Namespace: "", Name: c.flagAutoName}, &ctrlWebhook); err != nil {
 				log.Error(err, "Error retrieving MutatingWebhookConfiguration from API")
 				continue
 			}
@@ -211,27 +201,21 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			}
 			webhookPatch := strings.Join(patches, ",")
 
-			err := clientset.Patch(ctx, &ctrlWebhook, client.RawPatch(types.MergePatchType, []byte(webhookPatch)))
-			if err != nil {
+			if err := clientset.Patch(ctx, &ctrlWebhook, client.RawPatch(types.MergePatchType, []byte(webhookPatch))); err != nil {
 				log.Error(err, "Error updating MutatingWebhookConfiguration")
 				continue
 			}
 		}
 
 		//Write certs to disk
-		err = ioutil.WriteFile(filepath.Join(tlsCertDir, tlsCertFile), bundle.Cert, os.ModePerm)
-		if err != nil {
+		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsCertFile), bundle.Cert, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS cert to disk")
 			continue
 		}
-		err = ioutil.WriteFile(filepath.Join(tlsCertDir, tlsKeyFile), bundle.Key, os.ModePerm)
-		if err != nil {
+		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsKeyFile), bundle.Key, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS key to disk")
 			continue
 		}
-
-		// Update the certificate
-		c.cert.Store(&webhookCert)
 	}
 }
 
