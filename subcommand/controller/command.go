@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/helper/cert"
@@ -53,8 +55,8 @@ var (
 
 const (
 	tlsCertDir  = "/etc/controller-webhook/certs"
-	tlsCertFile = "/etc/controller-webhook/certs/tls.crt"
-	tlsKeyFile  = "/etc/controller-webhook/certs/tls.key"
+	tlsCertFile = "tls.crt"
+	tlsKeyFile  = "tls.key"
 )
 
 func init() {
@@ -127,7 +129,7 @@ func (c *Command) Run(_ []string) int {
 	go certNotify.Start(context.Background())
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	go c.certWatcher(ctx, certCh, mgr.GetClient())
+	go c.certWatcher(ctx, certCh, mgr.GetClient(), setupLog)
 
 	consulClient, err := c.httpFlags.APIClient()
 	if err != nil {
@@ -161,7 +163,7 @@ func (c *Command) Run(_ []string) int {
 	return 0
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset client.Client) {
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset client.Client, log logr.Logger) {
 	var bundle cert.Bundle
 	for {
 		select {
@@ -182,7 +184,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 
 		webhookCert, err := tls.X509KeyPair(bundle.Cert, bundle.Key)
 		if err != nil {
-			//c.UI.Error(fmt.Sprintf("Error loading TLS keypair: %s", err))
+			log.Error(err, "Error loading TLS keypair")
 			continue
 		}
 
@@ -191,7 +193,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			ctrlWebhook := v1beta1.MutatingWebhookConfiguration{}
 			err = clientset.Get(ctx, types.NamespacedName{Namespace: "", Name: c.flagAutoName}, &ctrlWebhook)
 			if err != nil {
-				//exit
+				log.Error(err, "Error retrieving MutatingWebhookConfiguration from API")
 				continue
 			}
 
@@ -199,7 +201,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
 			var patches []string
-			for i, _ := range ctrlWebhook.Webhooks {
+			for i := range ctrlWebhook.Webhooks {
 				patches = append(patches, fmt.Sprintf(
 					`[{
 						"op": "add",
@@ -211,20 +213,20 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 
 			err := clientset.Patch(ctx, &ctrlWebhook, client.RawPatch(types.MergePatchType, []byte(webhookPatch)))
 			if err != nil {
-				//c.UI.Error(fmt.Sprintf(
-				//	"Error updating MutatingWebhookConfiguration: %s",
-				//	err))
+				log.Error(err, "Error updating MutatingWebhookConfiguration")
 				continue
 			}
 		}
 
 		//Write certs to disk
-		err = ioutil.WriteFile(tlsCertFile, bundle.Cert, os.ModePerm)
+		err = ioutil.WriteFile(filepath.Join(tlsCertDir, tlsCertFile), bundle.Cert, os.ModePerm)
 		if err != nil {
+			log.Error(err, "Error writing TLS cert to disk")
 			continue
 		}
-		err = ioutil.WriteFile(tlsKeyFile, bundle.Key, os.ModePerm)
+		err = ioutil.WriteFile(filepath.Join(tlsCertDir, tlsKeyFile), bundle.Key, os.ModePerm)
 		if err != nil {
+			log.Error(err, "Error writing TLS key to disk")
 			continue
 		}
 
