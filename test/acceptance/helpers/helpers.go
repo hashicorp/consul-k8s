@@ -2,14 +2,17 @@ package helpers
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -65,7 +68,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
 // sets up a cleanup function and waits for the deployment to become available.
-func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, filepath string) {
+func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, filepath string) {
 	t.Helper()
 
 	KubectlApply(t, options, filepath)
@@ -82,6 +85,7 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
 		// they should have different pod names.
+		WritePodsDebugInfoIfFailed(t, options, debugDirectory, labelMapToString(deployment.GetLabels()))
 		KubectlDelete(t, options, filepath)
 	})
 
@@ -147,4 +151,89 @@ func Cleanup(t *testing.T, noCleanupOnFailure bool, cleanup func()) {
 	}
 
 	t.Cleanup(wrappedCleanupFunc)
+}
+
+// WritePodsDebugInfoIfFailed calls kubectl describe and kubectl logs --all-containers
+// on pods filtered by the labelSelector and writes it to the debugDirectory.
+func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions, debugDirectory, labelSelector string) {
+	t.Helper()
+
+	if t.Failed() {
+		// Create k8s client from kubectl options
+		client := KubernetesClientFromOptions(t, kubectlOptions)
+
+		contextName := kubernetesContextFromOptions(t, kubectlOptions)
+
+		// Create a directory for the test
+		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
+		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
+
+		t.Logf("dumping logs and pod info for %s to %s", labelSelector, testDebugDirectory)
+		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(metav1.ListOptions{LabelSelector: labelSelector})
+		require.NoError(t, err)
+
+		for _, pod := range pods.Items {
+			// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
+			logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "logs", "--all-containers=true", pod.Name)
+			require.NoError(t, err)
+
+			// Write logs to file name <pod.Name>.log
+			logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
+			require.NoError(t, ioutil.WriteFile(logFilename, []byte(logs), 0600))
+
+			// Describe pod
+			desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "describe", "pod", pod.Name)
+			require.NoError(t, err)
+
+			// Write pod info to file name <pod.Name>.txt
+			descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.txt", pod.Name))
+			require.NoError(t, ioutil.WriteFile(descFilename, []byte(desc), 0600))
+		}
+	}
+}
+
+// KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
+func KubernetesClientFromOptions(t *testing.T, options *k8s.KubectlOptions) kubernetes.Interface {
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	client, err := kubernetes.NewForConfig(config)
+	require.NoError(t, err)
+
+	return client
+}
+
+// kubernetesContextFromOptions returns the Kubernetes context from options.
+// If context is explicitly set in options, it returns that context.
+// Otherwise, it returns the current context.
+func kubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) string {
+	t.Helper()
+
+	// First, check if context set in options and return that
+	if options.ContextName != "" {
+		return options.ContextName
+	}
+
+	// Otherwise, get current context from config
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	rawConfig, err := k8s.LoadConfigFromPath(configPath).RawConfig()
+	require.NoError(t, err)
+
+	return rawConfig.CurrentContext
+}
+
+// labelMapToString takes a label map[string]string
+// and returns the string-ified version of, e.g app=foo,env=dev.
+func labelMapToString(labelMap map[string]string) string {
+	var labels []string
+	for k, v := range labelMap {
+		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return strings.Join(labels, ",")
 }

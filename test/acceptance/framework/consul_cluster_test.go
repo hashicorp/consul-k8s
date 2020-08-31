@@ -26,6 +26,10 @@ func TestNewHelmCluster(t *testing.T) {
 
 type ctx struct{}
 
+func (c *ctx) Name() string {
+	return ""
+}
+
 func (c *ctx) KubectlOptions() *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{}
 }

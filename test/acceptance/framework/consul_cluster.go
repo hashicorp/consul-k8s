@@ -37,10 +37,12 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
+	ctx                TestContext
 	helmOptions        *helm.Options
 	releaseName        string
 	kubernetesClient   kubernetes.Interface
 	noCleanupOnFailure bool
+	debugDirectory     string
 }
 
 func NewHelmCluster(
@@ -67,10 +69,12 @@ func NewHelmCluster(
 		Logger:         logger.TestingT,
 	}
 	return &HelmCluster{
+		ctx:                ctx,
 		helmOptions:        opts,
 		releaseName:        releaseName,
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
+		debugDirectory:     cfg.DebugDirectory,
 	}
 }
 
@@ -93,6 +97,8 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
+
+	helpers.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
 	helm.Delete(t, h.helmOptions, h.releaseName, false)
 

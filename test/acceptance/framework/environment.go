@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 )
@@ -66,14 +67,17 @@ func (k *kubernetesEnvironment) DefaultContext(t *testing.T) TestContext {
 
 type kubernetesContext struct {
 	pathToKubeConfig string
-	contextName      string
+	kubeContextName  string
 	namespace        string
-	client           kubernetes.Interface
+
+	client kubernetes.Interface
+
+	logDirectory string
 }
 
 func (k kubernetesContext) KubectlOptions() *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{
-		ContextName: k.contextName,
+		ContextName: k.kubeContextName,
 		ConfigPath:  k.pathToKubeConfig,
 		Namespace:   k.namespace,
 	}
@@ -84,25 +88,15 @@ func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
 		return k.client
 	}
 
-	configPath, err := k.KubectlOptions().GetConfigPath(t)
-	require.NoError(t, err)
+	k.client = helpers.KubernetesClientFromOptions(t, k.KubectlOptions())
 
-	t.Logf("Creating client from config path at %s for context %s", configPath, k.contextName)
-	config, err := k8s.LoadApiClientConfigE(configPath, k.contextName)
-	require.NoError(t, err)
-
-	client, err := kubernetes.NewForConfig(config)
-	require.NoError(t, err)
-
-	k.client = client
-
-	return client
+	return k.client
 }
 
-func NewContext(namespace, pathToKubeConfig, contextName string) *kubernetesContext {
+func NewContext(namespace, pathToKubeConfig, kubeContextName string) *kubernetesContext {
 	return &kubernetesContext{
 		namespace:        namespace,
 		pathToKubeConfig: pathToKubeConfig,
-		contextName:      contextName,
+		kubeContextName:  kubeContextName,
 	}
 }

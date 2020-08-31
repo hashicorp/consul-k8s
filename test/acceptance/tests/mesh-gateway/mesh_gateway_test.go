@@ -89,10 +89,10 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	// Check that we can connect services over the mesh gateways
 	t.Log("creating static-server in dc2")
-	helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
+	helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
 
 	t.Log("creating static-client in dc1")
-	helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
+	helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-client.yaml")
 
 	t.Log("checking that connection is successful")
 	helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
@@ -199,10 +199,10 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 			// Check that we can connect services over the mesh gateways
 			t.Log("creating static-server in dc2")
-			helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
+			helpers.Deploy(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
 
 			t.Log("creating static-client in dc1")
-			helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
+			helpers.Deploy(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-client.yaml")
 
 			t.Log("creating intention")
 			_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{

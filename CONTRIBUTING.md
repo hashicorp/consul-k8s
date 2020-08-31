@@ -90,6 +90,8 @@ Below is the list of available flags:
     The Consul image to use for all tests.
 -consul-k8s-image string
     The consul-k8s image to use for all tests.
+-debug-directory
+    The directory where to write debug information about failed test runs, such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.
 -enable-multi-cluster
     If true, the tests that require multiple Kubernetes clusters will be run. At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.
 -kubeconfig string
@@ -99,7 +101,7 @@ Below is the list of available flags:
 -namespace string
     The Kubernetes namespace to use for tests. (default "default")
 -no-cleanup-on-failure
-    If true, the tests will not cleanup resources they create when they finish running.Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.
+    If true, the tests will not cleanup Kubernetes resources they create when they finish running.Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.
 -secondary-kubeconfig string
     The path to a kubeconfig file of the secondary k8s cluster. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
 -secondary-kubecontext string
