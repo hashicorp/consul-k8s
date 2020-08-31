@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "controller/Issuer: disabled by default" {
+@test "controller-cert-manager/ClusterRole: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/controller-issuer.yaml  \
+      -s templates/controller-cert-manager-clusterrole.yaml  \
       .
 }
 
-@test "controller/Issuer: enabled with controller.enabled=true" {
+@test "controller-cert-manager/ClusterRole: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/controller-issuer.yaml  \
+      -s templates/controller-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)

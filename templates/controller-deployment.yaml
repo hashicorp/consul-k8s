@@ -55,6 +55,7 @@ spec:
       - args:
         - controller
         - --enable-leader-election
+        - --webhook-tls-cert-dir=/tmp/controller-webhook/certs
         command:
         - consul-k8s
         env:
@@ -79,6 +80,10 @@ spec:
           {{- else }}
           value: http://$(HOST_IP):8500
           {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         image: {{ .Values.global.imageK8S }}
         name: controller
         ports:
@@ -93,7 +98,7 @@ spec:
             cpu: 100m
             memory: 20Mi
         volumeMounts:
-        - mountPath: /tmp/k8s-webhook-server/serving-certs
+        - mountPath: /tmp/controller-webhook/certs
           name: cert
           readOnly: true
         {{- if .Values.global.tls.enabled }}
@@ -110,7 +115,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: webhook-server-cert
+          secretName: {{ template "consul.fullname" . }}-controller-webhook-cert
       {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert

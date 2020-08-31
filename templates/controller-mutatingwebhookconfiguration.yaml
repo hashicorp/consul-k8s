@@ -2,17 +2,16 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ template "consul.fullname" . }}-controller
+  name: {{ template "consul.fullname" . }}-controller-mutating-webhook-configuration
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: controller
-  annotations:
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "consul.fullname" . }}-controller
 webhooks:
 - clientConfig:
+    caBundle: {{ quote }}
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
