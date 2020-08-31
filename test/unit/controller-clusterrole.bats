@@ -18,3 +18,28 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.enablePodSecurityPolicies
+
+@test "controller/ClusterRole: no podsecuritypolicies access with global.enablePodSecurityPolicies=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-clusterrole.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=false' \
+      . | tee /dev/stderr |
+      yq '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "controller/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-clusterrole.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}

@@ -30,4 +30,12 @@ rules:
       - get
       - patch
       - update
+  {{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-controller
+    verbs:
+      - use
+  {{- end }}
 {{- end }}
