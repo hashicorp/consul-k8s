@@ -998,6 +998,10 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
+controller:
+  enabled: false #todo
+  replicas: 1
+
 # Mesh Gateways enable Consul Connect to work across Consul datacenters.
 meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs

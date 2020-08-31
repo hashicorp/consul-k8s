@@ -1,0 +1,33 @@
+{{- if .Values.controller.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-controller
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: controller
+rules:
+  - apiGroups:
+      - consul.hashicorp.com
+    resources:
+      - servicedefaults
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - consul.hashicorp.com
+    resources:
+      - servicedefaults/status
+    verbs:
+      - get
+      - patch
+      - update
+{{- end }}
