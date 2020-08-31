@@ -1,0 +1,64 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-controller-cert-manager
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      heritage: {{ .Release.Service }}
+      release: {{ .Release.Name }}
+      component: controller
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        heritage: {{ .Release.Service }}
+        release: {{ .Release.Name }}
+        component: controller
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/controller-cert-manager-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+      - command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s webhook-cert-manager \
+          -config-file=/tmp/config/webhook-config.json
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: {{ .Values.global.imageK8S }}
+        name: controller-cert-manager
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        volumeMounts:
+        - name: config
+          mountPath: /tmp/config
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" . }}-controller-cert-manager
+      volumes:
+      - name: config
+        configMap:
+          name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
+
+{{- end }}
