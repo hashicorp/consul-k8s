@@ -18,13 +18,14 @@ import (
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
-	"k8s.io/api/admissionregistration/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -41,6 +42,8 @@ type Command struct {
 	flagCertFile             string // TLS cert for listening (PEM)
 	flagKeyFile              string // TLS cert private key (PEM)
 
+	clientset kubernetes.Interface
+
 	once sync.Once
 	help string
 }
@@ -51,7 +54,7 @@ var (
 )
 
 const (
-	tlsCertDir  = "/etc/controller-webhook/certs"
+	tlsCertDir  = "/tmp/controller-webhook/certs"
 	tlsCertFile = "tls.crt"
 	tlsKeyFile  = "tls.key"
 )
@@ -82,9 +85,10 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flagSet)
 }
 
-func (c *Command) Run(_ []string) int {
+func (c *Command) Run(args []string) int {
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	c.once.Do(c.init)
-	if err := c.flagSet.Parse(nil); err != nil {
+	if err := c.flagSet.Parse(args); err != nil {
 		setupLog.Error(err, "parsing flagSet")
 		return 1
 	}
@@ -104,7 +108,18 @@ func (c *Command) Run(_ []string) int {
 		}
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	if c.clientset == nil {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			setupLog.Error(err, "Error loading in-cluster K8S config")
+			return 1
+		}
+		c.clientset, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			setupLog.Error(err, "Error creating K8S client")
+			return 1
+		}
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -126,7 +141,7 @@ func (c *Command) Run(_ []string) int {
 	go certNotify.Start(context.Background())
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	go c.certWatcher(ctx, certCh, mgr.GetClient(), setupLog)
+	go c.certWatcher(ctx, certCh, c.clientset, setupLog)
 
 	consulClient, err := c.httpFlags.APIClient()
 	if err != nil {
@@ -150,6 +165,11 @@ func (c *Command) Run(_ []string) int {
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 	}
+
+	err = waitForCerts()
+	if err != nil {
+		setupLog.Error(err, "Error reading certificate files")
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
@@ -160,15 +180,30 @@ func (c *Command) Run(_ []string) int {
 	return 0
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset client.Client, log logr.Logger) {
+func waitForCerts() error {
+	for {
+		_, err := os.Stat(filepath.Join(tlsCertDir, tlsCertFile))
+		if err == nil {
+			return nil
+		}
+		if os.IsNotExist(err) {
+			time.Sleep(1 * time.Millisecond)
+			continue
+		} else {
+			return err
+		}
+	}
+}
+
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset kubernetes.Interface, log logr.Logger) {
 	var bundle cert.Bundle
 	for {
 		select {
 		case bundle = <-ch:
-			//c.Output("Updated certificate bundle received. Updating certs...")
+			log.Info("Updated certificate bundle received. Updating webhook certs.")
 			// Bundle is updated, set it up
 
-		case <-time.After(1 * time.Second):
+		case <-time.After(30 * time.Minute):
 			// This forces the mutating ctrlWebhook config to remain updated
 			// fairly quickly. This is a jank way to do this and we should
 			// look to improve it in the future. Since we use Patch requests
@@ -179,35 +214,14 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			return
 		}
 
-		// If there is a MWC name set, then update the CA bundle.
-		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
-			ctrlWebhook := v1beta1.MutatingWebhookConfiguration{}
-			if err := clientset.Get(ctx, types.NamespacedName{Namespace: "", Name: c.flagAutoName}, &ctrlWebhook); err != nil {
-				log.Error(err, "Error retrieving MutatingWebhookConfiguration from API")
-				continue
-			}
-
-			// The CA Bundle value must be base64 encoded
-			value := base64.StdEncoding.EncodeToString(bundle.CACert)
-
-			var patches []string
-			for i := range ctrlWebhook.Webhooks {
-				patches = append(patches, fmt.Sprintf(
-					`[{
-						"op": "add",
-						"path": "/webhooks/%q/clientConfig/caBundle",
-						"value": %q
-					}]`, i, value))
-			}
-			webhookPatch := strings.Join(patches, ",")
-
-			if err := clientset.Patch(ctx, &ctrlWebhook, client.RawPatch(types.MergePatchType, []byte(webhookPatch))); err != nil {
-				log.Error(err, "Error updating MutatingWebhookConfiguration")
+		if _, err := os.Stat(tlsCertDir); os.IsNotExist(err) {
+			err = os.MkdirAll(tlsCertDir, os.ModePerm)
+			if err != nil {
+				log.Error(err, "Creating cert folder")
 				continue
 			}
 		}
 
-		//Write certs to disk
 		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsCertFile), bundle.Cert, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS cert to disk")
 			continue
@@ -215,6 +229,35 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsKeyFile), bundle.Key, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS key to disk")
 			continue
+		}
+
+		// If there is a MWC name set, then update the CA bundle.
+		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
+
+			value := base64.StdEncoding.EncodeToString(bundle.CACert)
+
+			webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagAutoName, metav1.GetOptions{})
+			if err != nil {
+				log.Error(err, "Error retrieving MutatingWebhookConfiguration from API")
+				continue
+			}
+			var patches []string
+			for i := range webhookCfg.Webhooks {
+				patches = append(patches, fmt.Sprintf(
+					`{
+						"op": "add",
+						"path": "/webhooks/%d/clientConfig/caBundle",
+						"value": %q
+					}`, i, value))
+			}
+			webhookPatch := fmt.Sprintf("[%s]", strings.Join(patches, ","))
+
+			if _, err = clientset.AdmissionregistrationV1beta1().
+				MutatingWebhookConfigurations().
+				Patch(ctx, c.flagAutoName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
+				log.Error(err, "Error updating MutatingWebhookConfiguration")
+				continue
+			}
 		}
 	}
 }
