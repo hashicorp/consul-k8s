@@ -55,10 +55,6 @@ global:
   # If using Consul Enterprise namespaces, must be >= 0.12.
   imageK8S: "hashicorp/consul-k8s:0.18.1"
 
-  # imageEnvoy defines the default envoy image to use for ingress and
-  # terminating gateways.
-  imageEnvoy: "envoyproxy/envoy-alpine:v1.14.2"
-
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
   # since Consul doesn't support an automatic way to change this value
@@ -231,6 +227,11 @@ global:
       limits:
         memory: "50Mi"
         cpu: "20m"
+
+  # imageEnvoy is the name (and tag) of the Envoy Docker image used for the
+  # connect-injected sidecar proxies and the mesh, terminating, and ingress gateways.
+  # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
+  imageEnvoy: "envoyproxy/envoy-alpine:v1.14.2"
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -803,12 +804,6 @@ connectInject:
       memory: "50Mi"
       cpu: "50m"
 
-  # The Docker image for envoy to use as the proxy sidecar when performing
-  # Connect injection. If using Consul 1.7+, the envoy version must be 1.13+.
-  # If not set, the image used depends on the consul-k8s version. For
-  # consul-k8s 0.12.0 the default is envoyproxy/envoy-alpine:v1.13.0.
-  imageEnvoy: null
-
   # namespaceSelector is the selector for restricting the webhook to only
   # specific namespaces. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
@@ -1071,9 +1066,6 @@ meshGateway:
 
     # Optional YAML string that will be appended to the Service spec.
     additionalSpec: null
-
-  # Envoy image to use. For Consul v1.7+, Envoy version 1.13+ is required.
-  imageEnvoy: envoyproxy/envoy-alpine:v1.14.2
 
   # If set to true, gateway Pods will run on the host network.
   hostNetwork: false

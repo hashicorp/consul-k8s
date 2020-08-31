@@ -239,16 +239,15 @@ key2: value2' \
   [ "${actual}" = "envoyproxy/envoy-alpine:v1.14.2" ]
 }
 
-@test "meshGateway/Deployment: envoy image can be set" {
+@test "meshGateway/Deployment: setting meshGateway.imageEnvoy fails" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'meshGateway.imageEnvoy=new/image' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "new/image" ]
+      --set 'meshGateway.imageEnvoy=new/image' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "meshGateway.imageEnvoy must be specified in global" ]]
 }
 
 #--------------------------------------------------------------------
