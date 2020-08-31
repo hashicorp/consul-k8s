@@ -240,6 +240,20 @@ namespace_prefix "" {
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
+// todo: implement namespaces support.
+func (c *Command) controllerRules() (string, error) {
+	controllerRules := `
+operator = "write"
+node_prefix "" {
+  policy = "write"
+}
+service_prefix "" {
+  policy = "write"
+}
+`
+	return c.renderRules(controllerRules)
+}
+
 func (c *Command) rulesData() rulesData {
 	return rulesData{
 		EnableNamespaces:               c.flagEnableNamespaces,
