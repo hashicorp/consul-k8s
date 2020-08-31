@@ -128,26 +128,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: envoy-image is not set" {
+@test "connectInject/Deployment: envoy-image can be set via global" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: envoy-image can be set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.imageEnvoy=foo' \
+      --set 'global.imageEnvoy=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-envoy-image=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "connectInject/Deployment: setting connectInject.imageEnvoy fails" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.imageEnvoy=new/image' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.imageEnvoy must be specified in global" ]]
+}
+
 
 #--------------------------------------------------------------------
 # cert secrets
