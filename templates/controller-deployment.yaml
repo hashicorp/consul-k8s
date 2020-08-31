@@ -27,8 +27,9 @@ spec:
         release: {{ .Release.Name }}
         component: controller
     spec:
-      {{- if .Values.global.acls.manageSystemACLs }}
+      {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
+      {{- if .Values.global.acls.manageSystemACLs }}
       - name: controller-acl-init
         image: {{ .Values.global.imageK8S }}
         command:
@@ -45,6 +46,10 @@ spec:
           limits:
             memory: "25Mi"
             cpu: "50m"
+      {{- end }}
+      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
+      {{- end }}
       {{- end }}
       containers:
       - args:
@@ -64,8 +69,16 @@ spec:
               name: "{{ template "consul.fullname" . }}-controller-acl-token"
               key: "token"
         {{- end}}
+        {{- if .Values.global.tls.enabled }}
+        - name: CONSUL_CACERT
+          value: /consul/tls/ca/tls.crt
+        {{- end }}
         - name: CONSUL_HTTP_ADDR
+          {{- if .Values.global.tls.enabled }}
+          value: https://$(HOST_IP):8501
+          {{- else }}
           value: http://$(HOST_IP):8500
+          {{- end }}
         image: {{ .Values.global.imageK8S }}
         name: controller
         ports:
@@ -83,11 +96,39 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
+        {{- if .Values.global.tls.enabled }}
+        {{- if .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+        {{- else }}
+        - name: consul-ca-cert
+        {{- end }}
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cert
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+      {{- end }}
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      - name: consul-auto-encrypt-ca-cert
+        emptyDir:
+          medium: "Memory"
+      {{- end }}
+      {{- end }}
       serviceAccountName: {{ template "consul.fullname" . }}-controller
 {{- end }}
