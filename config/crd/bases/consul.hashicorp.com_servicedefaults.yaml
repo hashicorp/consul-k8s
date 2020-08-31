@@ -42,9 +42,8 @@ spec:
           description: ServiceDefaultsSpec defines the desired state of ServiceDefaults
           properties:
             expose:
-              description: ExposeConfig describes HTTP paths to expose through Envoy
-                outside of Connect. Users can expose individual paths and/or all HTTP/GRPC
-                paths for checks.
+              description: Expose controls the default expose path configuration for
+                Envoy.
               properties:
                 checks:
                   description: Checks defines whether paths associated with Consul
@@ -65,27 +64,34 @@ spec:
                         type: integer
                       path:
                         description: Path is the path to expose through the proxy,
-                          ie. "/metrics."
+                          ie. "/metrics".
                         type: string
                       protocol:
                         description: Protocol describes the upstream's service protocol.
-                          Valid values are "http" and "http2", defaults to "http"
+                          Valid values are "http" and "http2", defaults to "http".
                         type: string
                     type: object
                   type: array
               type: object
             externalSNI:
+              description: ExternalSNI is an optional setting that allows for the
+                TLS SNI value to be changed to a non-connect value when federating
+                with an external system.
               type: string
             meshGateway:
-              description: MeshGatewayConfig controls how Mesh Gateways are used for
-                upstream Connect services
+              description: MeshGateway controls the default mesh gateway configuration
+                for this service.
               properties:
                 mode:
                   description: Mode is the mode that should be used for the upstream
-                    connection.
+                    connection. One of none, local, or remote.
                   type: string
               type: object
             protocol:
+              description: Protocol sets the protocol of the service. This is used
+                by Connect proxies for things like observability features and to unlock
+                usage of the service-splitter and service-router config entries for
+                a service.
               type: string
           type: object
         status:

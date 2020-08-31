@@ -29,6 +29,7 @@ const (
 // services
 type MeshGatewayConfig struct {
 	// Mode is the mode that should be used for the upstream connection.
+	// One of none, local, or remote.
 	Mode string `json:"mode,omitempty"`
 }
 

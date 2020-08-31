@@ -7,10 +7,17 @@ import (
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
 type ServiceDefaultsSpec struct {
-	Protocol    string            `json:"protocol,omitempty"`
+	// Protocol sets the protocol of the service. This is used by Connect proxies for
+	// things like observability features and to unlock usage of the
+	// service-splitter and service-router config entries for a service.
+	Protocol string `json:"protocol,omitempty"`
+	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
-	Expose      ExposeConfig      `json:"expose,omitempty"`
-	ExternalSNI string            `json:"externalSNI,omitempty"`
+	// Expose controls the default expose path configuration for Envoy.
+	Expose ExposeConfig `json:"expose,omitempty"`
+	// ExternalSNI is an optional setting that allows for the TLS SNI value
+	// to be changed to a non-connect value when federating with an external system.
+	ExternalSNI string `json:"externalSNI,omitempty"`
 }
 
 // ServiceDefaultsStatus defines the observed state of ServiceDefaults
@@ -81,14 +88,14 @@ type ExposePath struct {
 	// ListenerPort defines the port of the proxy's listener for exposed paths.
 	ListenerPort int `json:"listenerPort,omitempty"`
 
-	// Path is the path to expose through the proxy, ie. "/metrics."
+	// Path is the path to expose through the proxy, ie. "/metrics".
 	Path string `json:"path,omitempty"`
 
 	// LocalPathPort is the port that the service is listening on for the given path.
 	LocalPathPort int `json:"localPathPort,omitempty"`
 
 	// Protocol describes the upstream's service protocol.
-	// Valid values are "http" and "http2", defaults to "http"
+	// Valid values are "http" and "http2", defaults to "http".
 	Protocol string `json:"protocol,omitempty"`
 }
 
