@@ -60,7 +60,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service
 			t.Log("creating static-server deployment")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
 
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
@@ -121,7 +121,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Deploy the static client
 			t.Log("deploying static client")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-client.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-client.yaml")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {

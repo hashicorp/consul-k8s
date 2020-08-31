@@ -54,12 +54,12 @@ func TestIngressGateway(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating server")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/static-server.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
 
 			// We use a "bounce" pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			t.Log("creating bounce pod")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, "fixtures/bounce.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/bounce.yaml")
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			t.Log("creating config entry")

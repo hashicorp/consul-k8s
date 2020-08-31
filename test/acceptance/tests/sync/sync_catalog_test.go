@@ -59,7 +59,7 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating a static-server with a service")
-			helpers.Deploy(t, ctx.KubectlOptions(), suite.Config().NoCleanupOnFailure, "fixtures/static-server.yaml")
+			helpers.Deploy(t, ctx.KubectlOptions(), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "fixtures/static-server.yaml")
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 

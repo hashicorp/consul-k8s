@@ -12,6 +12,7 @@ var suite framework.Suite
 
 func TestMain(m *testing.M) {
 	suite = framework.NewSuite(m)
+
 	if suite.Config().EnableMultiCluster {
 		os.Exit(suite.Run())
 	} else {

@@ -129,8 +129,11 @@ jobs:
             eval "$(echo export primary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[0]))"
             eval "$(echo export secondary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[1]))"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 20m -enable-multi-cluster \
-              -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig"
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 20m -failfast \
+              -enable-multi-cluster \
+              -kubeconfig="$primary_kubeconfig" \
+              -secondary-kubeconfig="$secondary_kubeconfig" \
+              -debug-directory="$TEST_RESULTS/debug"
 
       - store_test_results:
           path: /tmp/test-results
