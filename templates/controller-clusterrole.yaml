@@ -10,32 +10,41 @@ metadata:
     release: {{ .Release.Name }}
     component: controller
 rules:
-  - apiGroups:
-      - consul.hashicorp.com
-    resources:
-      - servicedefaults
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - consul.hashicorp.com
-    resources:
-      - servicedefaults/status
-    verbs:
-      - get
-      - patch
-      - update
-  {{- if .Values.global.enablePodSecurityPolicies }}
-  - apiGroups: ["policy"]
-    resources: ["podsecuritypolicies"]
-    resourceNames:
-      - {{ template "consul.fullname" . }}-controller
-    verbs:
-      - use
-  {{- end }}
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- if .Values.global.acls.manageSystemACLs }}
+- apiGroups: [""]
+  resources:
+  - secrets
+  resourceNames:
+  - {{ template "consul.fullname" . }}-controller-acl-token
+  verbs:
+  - get
+{{- end }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames:
+    - {{ template "consul.fullname" . }}-controller
+  verbs:
+    - use
+{{- end }}
 {{- end }}
