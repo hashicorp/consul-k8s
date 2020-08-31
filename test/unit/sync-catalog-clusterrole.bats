@@ -63,7 +63,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "syncCatalog/ClusterRole: allows secret access with global.bootsrapACLs=true" {
+@test "syncCatalog/ClusterRole: allows secret access with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-clusterrole.yaml  \

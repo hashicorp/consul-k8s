@@ -205,6 +205,10 @@ spec:
                 -acl-replication-token-file=/consul/acl/tokens/acl-replication-token \
                 {{- end }}
 
+                {{- if .Values.controller.enabled }}
+                -create-controller-token=true \
+                {{- end }}
+
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \
 

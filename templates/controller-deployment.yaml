@@ -27,6 +27,25 @@ spec:
         release: {{ .Release.Name }}
         component: controller
     spec:
+      {{- if .Values.global.acls.manageSystemACLs }}
+      initContainers:
+      - name: controller-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ template "consul.fullname" . }}-controller-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }}
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
+      {{- end }}
       containers:
       - args:
         - controller
@@ -38,6 +57,13 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_HTTP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "{{ template "consul.fullname" . }}-controller-acl-token"
+              key: "token"
+        {{- end}}
         - name: CONSUL_HTTP_ADDR
           value: http://$(HOST_IP):8500
         image: {{ .Values.global.imageK8S }}
