@@ -499,3 +499,49 @@ namespace_prefix "" {
 		})
 	}
 }
+
+func TestControllerRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		EnableNamespaces bool
+		Expected         string
+	}{
+		{
+			"Namespaces are disabled",
+			false,
+			`operator = "write"
+node_prefix "" {
+  policy = "write"
+}
+service_prefix "" {
+  policy = "write"
+}`,
+		},
+		{
+			"Namespaces are enabled",
+			true,
+			`operator = "write"
+node_prefix "" {
+  policy = "write"
+}
+service_prefix "" {
+  policy = "write"
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+
+			rules, err := cmd.controllerRules()
+
+			require.NoError(err)
+			require.Equal(tt.Expected, rules)
+		})
+	}
+}
