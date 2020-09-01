@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	certManager "github.com/hashicorp/consul-k8s/subcommand/cert-manager"
 	cmdController "github.com/hashicorp/consul-k8s/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
@@ -67,6 +68,9 @@ func init() {
 
 		"controller": func() (cli.Command, error) {
 			return &cmdController.Command{}, nil
+		},
+		"cert-manager": func() (cli.Command, error) {
+			return &certManager.Command{UI: ui}, nil
 		},
 	}
 }
