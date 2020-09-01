@@ -93,9 +93,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var certSource cert.Source = &cert.GenSource{
-		Name:   "Consul Webhook Certificates",
-		Hosts:  strings.Split(c.flagAutoHosts, ","),
-		Expiry: 3 * time.Minute,
+		Name:  "Consul Webhook Certificates",
+		Hosts: strings.Split(c.flagAutoHosts, ","),
 	}
 	if c.flagCertFile != "" {
 		certSource = &cert.DiskSource{
@@ -153,8 +152,9 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 				log.Error(err, "Error writing secret to API server")
 				continue
 			}
-			err = c.updateWebhookConfig(bundle, clientset, ctx, log)
+			err = c.updateWebhookConfig(bundle, clientset, ctx)
 			if err != nil {
+				log.Error(err, "Error updating webhook configuration")
 				continue
 			}
 		} else if err != nil {
@@ -162,6 +162,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			continue
 		}
 
+		//Dont update secret if the certificate is unchanged
 		if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) {
 			continue
 		}
@@ -175,21 +176,21 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			continue
 		}
 
-		err = c.updateWebhookConfig(bundle, clientset, ctx, log)
+		err = c.updateWebhookConfig(bundle, clientset, ctx)
 		if err != nil {
+			log.Error(err, "Error updating webhook configuration")
 			continue
 		}
 	}
 }
 
-func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.Interface, ctx context.Context, log logr.Logger) error {
+func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.Interface, ctx context.Context) error {
 	if c.flagAutoName != "" && len(bundle.CACert) > 0 {
 		value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
 		// If there is a MWC name set, then update the CA bundle on all the webhooks on that MWC.
 		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagAutoName, metav1.GetOptions{})
 		if err != nil {
-			log.Error(err, "Error retrieving MutatingWebhookConfiguration from API")
 			return err
 		}
 		var patches []string
@@ -204,7 +205,6 @@ func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.I
 		webhookPatch := fmt.Sprintf("[%s]", strings.Join(patches, ","))
 
 		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, c.flagAutoName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
-			log.Error(err, "Error updating MutatingWebhookConfiguration")
 			return err
 		}
 	}
