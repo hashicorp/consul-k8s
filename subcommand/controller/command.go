@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -214,6 +215,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			return
 		}
 
+		// Create the directory for the TLS certs if it does not exist
 		if _, err := os.Stat(tlsCertDir); os.IsNotExist(err) {
 			err = os.MkdirAll(tlsCertDir, os.ModePerm)
 			if err != nil {
@@ -222,18 +224,30 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			}
 		}
 
+		// Attempt to read the TLS certificate. It will not exist in the bootstrapping situation, so ignore the error if returned.
+		// If the cert file does exists, compare it's value to that of the certificate from the bundle.
+		// Only perform the below operations of writing the cert file and updating the MWC if the certificate is updated.
+		// In it's absence, the logs can lead one to assume the certs are being updated constantly.
+		certFile, err := ioutil.ReadFile(filepath.Join(tlsCertDir, tlsCertFile))
+		if err == nil {
+			if bytes.Equal(certFile, bundle.Cert) {
+				continue
+			}
+		}
+
+		// Write TLS cert file
 		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsCertFile), bundle.Cert, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS cert to disk")
 			continue
 		}
+		// Write TLS key file
 		if err := ioutil.WriteFile(filepath.Join(tlsCertDir, tlsKeyFile), bundle.Key, os.ModePerm); err != nil {
 			log.Error(err, "Error writing TLS key to disk")
 			continue
 		}
 
-		// If there is a MWC name set, then update the CA bundle.
+		// If there is a MWC name set, then update the CA bundle on all the webhooks on that MWC.
 		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
-
 			value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
 			webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagAutoName, metav1.GetOptions{})
@@ -252,9 +266,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 			}
 			webhookPatch := fmt.Sprintf("[%s]", strings.Join(patches, ","))
 
-			if _, err = clientset.AdmissionregistrationV1beta1().
-				MutatingWebhookConfigurations().
-				Patch(ctx, c.flagAutoName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
+			if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, c.flagAutoName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
 				log.Error(err, "Error updating MutatingWebhookConfiguration")
 				continue
 			}
