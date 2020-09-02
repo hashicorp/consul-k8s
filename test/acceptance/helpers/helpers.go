@@ -92,6 +92,32 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
+// DeployKustomize creates a Kubernetes deployment by applying the kustomize directory stored at kustomizeDir,
+// sets up a cleanup function and waits for the deployment to become available.
+func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, kustomizeDir string) {
+	t.Helper()
+
+	KubectlApplyK(t, options, kustomizeDir)
+
+	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
+	require.NoError(t, err)
+
+	deployment := v1.Deployment{}
+	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
+	require.NoError(t, err)
+
+	Cleanup(t, noCleanupOnFailure, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		WritePodsDebugInfoIfFailed(t, options, debugDirectory, labelMapToString(deployment.GetLabels()))
+		KubectlDeleteK(t, options, kustomizeDir)
+	})
+
+	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("deploy/%s", deployment.Name))
+}
+
 // CheckStaticServerConnection execs into a pod of the deployment given by deploymentName
 // and runs a curl command with the provided curlArgs.
 // This function assumes that the connection is made to the static-server and expects the output
