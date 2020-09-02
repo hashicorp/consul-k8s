@@ -26,8 +26,8 @@ func TestConnectInjectDefault(t *testing.T) {
 	consulCluster.Create(t)
 
 	t.Log("creating static-server and static-client deployments")
-	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
-	helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-client.yaml")
+	helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 	t.Log("checking that connection is successful")
 	helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), true, staticClientName, "http://localhost:1234")
@@ -67,8 +67,8 @@ func TestConnectInjectSecure(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating static-server and static-client deployments")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-client.yaml")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			t.Log("checking that the connection is not successful because there's no intention")
 			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), false, staticClientName, "http://localhost:1234")

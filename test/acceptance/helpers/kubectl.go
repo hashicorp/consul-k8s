@@ -50,11 +50,27 @@ func KubectlApply(t testing.TestingT, options *k8s.KubectlOptions, configPath st
 	require.NoError(t, err)
 }
 
+// KubectlApplyK takes a path to a kustomize directory and
+// applies it to the cluster by running 'kubectl apply -k'.
+// If there's an error applying the file, fail the test.
+func KubectlApplyK(t testing.TestingT, options *k8s.KubectlOptions, kustomizeDir string) {
+	_, err := RunKubectlAndGetOutputE(t, options, "apply", "-k", kustomizeDir)
+	require.NoError(t, err)
+}
+
 // KubectlDelete takes a path to a Kubernetes YAML file and
 // deletes it from the cluster by running 'kubectl delete -f'.
 // If there's an error deleting the file, fail the test.
 func KubectlDelete(t testing.TestingT, options *k8s.KubectlOptions, configPath string) {
 	_, err := RunKubectlAndGetOutputE(t, options, "delete", "-f", configPath)
+	require.NoError(t, err)
+}
+
+// KubectlDeleteK takes a path to a kustomize directory and
+// deletes it from the cluster by running 'kubectl delete -k'.
+// If there's an error deleting the file, fail the test.
+func KubectlDeleteK(t testing.TestingT, options *k8s.KubectlOptions, kustomizeDir string) {
+	_, err := RunKubectlAndGetOutputE(t, options, "delete", "-k", kustomizeDir)
 	require.NoError(t, err)
 }
 

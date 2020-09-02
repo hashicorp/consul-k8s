@@ -54,12 +54,12 @@ func TestIngressGateway(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating server")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/static-server.yaml")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-			// We use a "bounce" pod so that we can make calls to the ingress gateway
+			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
-			t.Log("creating bounce pod")
-			helpers.Deploy(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "fixtures/bounce.yaml")
+			t.Log("creating static-client pod")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			t.Log("creating config entry")
@@ -92,7 +92,7 @@ func TestIngressGateway(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				t.Log("testing intentions prevent ingress")
-				helpers.CheckStaticServerConnection(t, k8sOptions, false, "bounce", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+				helpers.CheckStaticServerConnection(t, k8sOptions, false, "static-client", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 
 				// Now we create the allow intention.
 				t.Log("creating ingress-gateway => static-server intention")
@@ -105,9 +105,9 @@ func TestIngressGateway(t *testing.T) {
 			}
 
 			// Test that we can make a call to the ingress gateway
-			// via the bounce pod. It should route to the static-server pod.
+			// via the static-client pod. It should route to the static-server pod.
 			t.Log("trying calls to ingress gateway")
-			helpers.CheckStaticServerConnection(t, k8sOptions, true, "bounce", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
+			helpers.CheckStaticServerConnection(t, k8sOptions, true, "static-client", "-H", "Host: static-server.ingress.consul", fmt.Sprintf("http://%s-consul-ingress-gateway:8080/", releaseName))
 		})
 	}
 }
