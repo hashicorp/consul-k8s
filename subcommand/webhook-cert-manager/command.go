@@ -1,4 +1,4 @@
-package certmanager
+package webhookcertmanager
 
 import (
 	"bytes"
@@ -27,12 +27,12 @@ type Command struct {
 	httpFlags *flags.HTTPFlags
 	UI        cli.Ui
 
-	flagWebhookName     string // MutatingWebhookConfiguration for updating
-	flagAutoHosts       string // SANs for the auto-generated TLS cert.
-	flagSecretName      string // Name of secret where certificates will be written to.
-	flagSecretNamespace string // Namespace of the secret where certificates will be written to.
-	flagCertFile        string // TLS cert for listening (PEM)
-	flagKeyFile         string // TLS cert private key (PEM)
+	flagMWebhookConfigName string // MutatingWebhookConfiguration for updating
+	flagDNSSans            string // SANs for the auto-generated TLS cert.
+	flagSecretName         string // Name of secret where certificates will be written to.
+	flagSecretNamespace    string // Namespace of the secret where certificates will be written to.
+	flagCertFile           string // TLS cert for listening (PEM)
+	flagKeyFile            string // TLS cert private key (PEM)
 
 	clientset kubernetes.Interface
 
@@ -42,9 +42,9 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.StringVar(&c.flagWebhookName, "webhook-name", "",
+	c.flagSet.StringVar(&c.flagMWebhookConfigName, "m-webhook-config-name", "",
 		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
-	c.flagSet.StringVar(&c.flagAutoHosts, "tls-hosts", "",
+	c.flagSet.StringVar(&c.flagDNSSans, "dns-sans", "",
 		"Comma-separated hosts for auto-generated TLS cert. If specified, will auto generate cert bundle.")
 	c.flagSet.StringVar(&c.flagSecretName, "secret-name", "",
 		"Name of the secret to update TLS certificates")
@@ -76,8 +76,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if c.flagCertFile == "" && c.flagKeyFile == "" && c.flagWebhookName == "" {
-		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("either webhook-name or tls-cert-file and tls-key-file must be provided")))
+	if c.flagCertFile == "" && c.flagKeyFile == "" && c.flagMWebhookConfigName == "" {
+		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("either m-webhook-config-name or tls-cert-file and tls-key-file must be provided")))
 		return 1
 	}
 
@@ -101,7 +101,7 @@ func (c *Command) Run(args []string) int {
 
 	var certSource cert.Source = &cert.GenSource{
 		Name:  "Consul Webhook Certificates",
-		Hosts: strings.Split(c.flagAutoHosts, ","),
+		Hosts: strings.Split(c.flagDNSSans, ","),
 	}
 	if c.flagCertFile != "" {
 		certSource = &cert.DiskSource{
@@ -199,11 +199,11 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 }
 
 func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.Interface, ctx context.Context) error {
-	if c.flagWebhookName != "" && len(bundle.CACert) > 0 {
+	if c.flagMWebhookConfigName != "" && len(bundle.CACert) > 0 {
 		value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
 		// If there is a MWC name set, then update the CA bundle on all the webhooks on that MWC.
-		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagWebhookName, metav1.GetOptions{})
+		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagMWebhookConfigName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.I
 		}
 		webhookPatch := fmt.Sprintf("[%s]", strings.Join(patches, ","))
 
-		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, c.flagWebhookName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
+		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, c.flagMWebhookConfigName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
@@ -234,10 +234,10 @@ func (c *Command) Synopsis() string {
 	return synopsis
 }
 
-const synopsis = "Starts the Consul Kubernetes cert-manager"
+const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"
 const help = `
-Usage: consul-k8s cert-manager [options]
+Usage: consul-k8s webhook-cert-manager [options]
 
-  Starts the Consul Kubernetes cert-manager that manages the lifecycle for webhook TLS certificates
+  Starts the Consul Kubernetes webhook-cert-manager that manages the lifecycle for webhook TLS certificates
 
 `

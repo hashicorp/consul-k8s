@@ -1,4 +1,4 @@
-package certmanager
+package webhookcertmanager
 
 import (
 	"testing"
@@ -28,7 +28,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags:  []string{"-secret-name=tls-secret", "-secret-namespace=consul-ns"},
-			expErr: "either webhook-name or tls-cert-file and tls-key-file must be provided",
+			expErr: "either m-webhook-config-name or tls-cert-file and tls-key-file must be provided",
 		},
 	}
 
