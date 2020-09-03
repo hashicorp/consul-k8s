@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	capi "github.com/hashicorp/consul/api"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 type MeshGatewayMode string
@@ -45,5 +46,14 @@ func (m MeshGatewayConfig) toConsul() capi.MeshGatewayConfig {
 		return capi.MeshGatewayConfig{
 			Mode: capi.MeshGatewayModeDefault,
 		}
+	}
+}
+
+func (m MeshGatewayConfig) validate() *field.Error {
+	switch m.Mode {
+	case "", "local", "remote", "none":
+		return nil
+	default:
+		return field.Invalid(field.NewPath("spec").Child("meshGateway").Child("mode"), m.Mode, `must be one of "remote", "local", "none" or ""`)
 	}
 }

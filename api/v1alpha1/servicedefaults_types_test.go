@@ -654,3 +654,84 @@ func TestMatchesConsul(t *testing.T) {
 		})
 	}
 }
+
+func TestDefault(t *testing.T) {
+	cases := map[string]struct {
+		input    *ServiceDefaults
+		expected *ServiceDefaults
+	}{
+		"protocol": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "",
+				},
+			},
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+				},
+			},
+		},
+		"expose.path.protocol": {
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "",
+							},
+						},
+					},
+				},
+			},
+			&ServiceDefaults{
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "http",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			testCase.input.Default()
+			require.Equal(t, testCase.expected, testCase.input)
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	cases := map[string]struct {
+		input          *ServiceDefaults
+		expectedErrMsg string
+	}{
+		"meshgateway.mode": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "foobar",
+					},
+				},
+			},
+			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be on of "remote", "local", "none" or ""`,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate()
+			require.EqualError(t, err, testCase.expectedErrMsg)
+		})
+	}
+}

@@ -2,7 +2,10 @@ package v1alpha1
 
 import (
 	capi "github.com/hashicorp/consul/api"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
@@ -52,24 +55,48 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (s *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
+func (in *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        capi.ServiceDefaults,
-		Name:        s.Name,
-		Protocol:    s.Spec.Protocol,
-		MeshGateway: s.Spec.MeshGateway.toConsul(),
-		Expose:      s.Spec.Expose.toConsul(),
-		ExternalSNI: s.Spec.ExternalSNI,
+		Name:        in.Name,
+		Protocol:    in.Spec.Protocol,
+		MeshGateway: in.Spec.MeshGateway.toConsul(),
+		Expose:      in.Spec.Expose.toConsul(),
+		ExternalSNI: in.Spec.ExternalSNI,
 	}
 }
 
 // MatchesConsul returns true if entry has the same config as this struct.
-func (s *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
-	return s.Name == entry.GetName() &&
-		s.Spec.Protocol == entry.Protocol &&
-		s.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		s.Spec.Expose.matches(entry.Expose) &&
-		s.Spec.ExternalSNI == entry.ExternalSNI
+func (in *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
+	return in.Name == entry.GetName() &&
+		in.Spec.Protocol == entry.Protocol &&
+		in.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(entry.Expose) &&
+		in.Spec.ExternalSNI == entry.ExternalSNI
+}
+
+func (in *ServiceDefaults) Default() {
+	if in.Spec.Protocol == "" {
+		in.Spec.Protocol = "tcp"
+	}
+	in.Spec.Expose.defaultConfig()
+}
+
+func (in *ServiceDefaults) Validate() error {
+	var allErrs field.ErrorList
+	if err := in.Spec.MeshGateway.validate(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.Expose.validate(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: "consul.hashicorp.com", Kind: "ServiceDefaults"},
+		in.Name, allErrs)
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
@@ -142,4 +169,19 @@ func (e ExposeConfig) toConsul() capi.ExposeConfig {
 		Checks: e.Checks,
 		Paths:  paths,
 	}
+}
+
+func (e *ExposeConfig) defaultConfig() {
+	for i, path := range e.Paths {
+		if path.Protocol == "" {
+			e.Paths[i].Protocol = "http"
+		}
+	}
+}
+
+func (e ExposeConfig) validate() *field.Error {
+	//for i, path := range e.Paths {
+	//
+	//}
+	return nil
 }
