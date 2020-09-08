@@ -152,16 +152,20 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 
 	// ServiceAccounts always have a secret name. The secret
 	// contains the JWT token.
-	saSecretName := authMethodServiceAccount.Secrets[0].Name
-
-	// Get the secret that will contain the ServiceAccount JWT token.
+	// Because there could be multiple secrets attached to the service account,
+	// we need pick the first one of type "kubernetes.io/service-account-token".
 	var saSecret *apiv1.Secret
-	err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
-		func() error {
-			var err error
-			saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), saSecretName, metav1.GetOptions{})
-			return err
-		})
+	for _, secret := range authMethodServiceAccount.Secrets {
+		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secret.Name),
+			func() error {
+				var err error
+				saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
+				return err
+			})
+		if saSecret.Type == apiv1.SecretTypeServiceAccountToken {
+			break
+		}
+	}
 	if err != nil {
 		return api.ACLAuthMethod{}, err
 	}
