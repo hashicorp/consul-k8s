@@ -269,7 +269,7 @@ func (c *Command) Run(args []string) int {
 
 	// Create the certificate notifier so we can update for certificates,
 	// then start all the background routines for updating certificates.
-	certCh := make(chan cert.Bundle)
+	certCh := make(chan cert.MetaBundle)
 	certNotify := &cert.Notify{Ch: certCh, Source: certSource}
 	defer certNotify.Stop()
 	go certNotify.Start(context.Background())
@@ -348,8 +348,8 @@ func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	return certRaw.(*tls.Certificate), nil
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset kubernetes.Interface) {
-	var bundle cert.Bundle
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface) {
+	var bundle cert.MetaBundle
 	for {
 		select {
 		case bundle = <-ch:

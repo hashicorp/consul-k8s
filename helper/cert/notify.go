@@ -13,8 +13,7 @@ type Notify struct {
 	// Ch is where the notifications for new bundles are sent. If this
 	// blocks then the notify loop will also be blocked, so downstream
 	// users should process this channel in a timely manner.
-	Ch     chan<- Bundle
-	MetaCh chan<- MetaBundle
+	Ch chan<- MetaBundle
 
 	// Source is the source of certificates.
 	Source Source
@@ -72,8 +71,7 @@ func (n *Notify) Start(ctx context.Context) {
 
 		// Send the update, or quit if we were cancelled
 		select {
-		case n.Ch <- next:
-		case n.MetaCh <- MetaBundle{
+		case n.Ch <- MetaBundle{
 			Bundle:            next,
 			WebhookConfigName: n.WebhookName,
 			SecretName:        n.SecretName,
