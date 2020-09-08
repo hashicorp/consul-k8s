@@ -23,6 +23,7 @@ type Command struct {
 	httpFlags *flags.HTTPFlags
 
 	flagMetricsAddr          string
+	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
 
 	once sync.Once
@@ -32,10 +33,6 @@ type Command struct {
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
-)
-
-const (
-	tlsCertDir = "/tmp/controller-webhook/certs"
 )
 
 func init() {
@@ -50,6 +47,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
+		"Directory that contains the tls cert and key required to communicate with the MutatingWebhookConfiguration")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -97,7 +96,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		mgr.GetWebhookServer().CertDir = tlsCertDir
+		mgr.GetWebhookServer().CertDir = c.flagWebhookTLSCertDir
 		//Note: The path here should be identical to the one on the kubebuilder annotation in file api/v1alpha1/servicedefaults_webhook.go
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})

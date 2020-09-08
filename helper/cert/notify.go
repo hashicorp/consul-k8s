@@ -13,7 +13,8 @@ type Notify struct {
 	// Ch is where the notifications for new bundles are sent. If this
 	// blocks then the notify loop will also be blocked, so downstream
 	// users should process this channel in a timely manner.
-	Ch chan<- Bundle
+	Ch     chan<- Bundle
+	MetaCh chan<- MetaBundle
 
 	// Source is the source of certificates.
 	Source Source
@@ -22,6 +23,10 @@ type Notify struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 	doneCh    <-chan struct{}
+
+	SecretName      string
+	WebhookName     string
+	SecretNamespace string
 }
 
 // Start starts the notifier. This blocks and should be started in a goroutine.
@@ -68,6 +73,12 @@ func (n *Notify) Start(ctx context.Context) {
 		// Send the update, or quit if we were cancelled
 		select {
 		case n.Ch <- next:
+		case n.MetaCh <- MetaBundle{
+			Bundle:            next,
+			WebhookConfigName: n.WebhookName,
+			SecretName:        n.SecretName,
+			SecretNamespace:   n.SecretNamespace,
+		}:
 		case <-ctx.Done():
 			return
 		}

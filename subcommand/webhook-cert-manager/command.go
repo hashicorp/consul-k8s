@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"errors"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"strings"
+	"io/ioutil"
+	"os"
+	"os/signal"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/subcommand"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
@@ -19,45 +22,42 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type Command struct {
+	UI cli.Ui
+
 	flagSet   *flag.FlagSet
 	httpFlags *flags.HTTPFlags
-	UI        cli.Ui
+	k8s       *flags.K8SFlags
 
-	flagMWebhookConfigName string // MutatingWebhookConfiguration for updating
-	flagDNSSans            string // SANs for the auto-generated TLS cert.
-	flagSecretName         string // Name of secret where certificates will be written to.
-	flagSecretNamespace    string // Namespace of the secret where certificates will be written to.
-	flagCertFile           string // TLS cert for listening (PEM)
-	flagKeyFile            string // TLS cert private key (PEM)
+	flagConfigFile string
 
 	clientset kubernetes.Interface
 
-	once sync.Once
-	help string
+	once  sync.Once
+	help  string
+	sigCh chan os.Signal
 }
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.StringVar(&c.flagMWebhookConfigName, "m-webhook-config-name", "",
-		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
-	c.flagSet.StringVar(&c.flagDNSSans, "dns-sans", "",
-		"Comma-separated hosts for auto-generated TLS cert. If specified, will auto generate cert bundle.")
-	c.flagSet.StringVar(&c.flagSecretName, "secret-name", "",
-		"Name of the secret to update TLS certificates")
-	c.flagSet.StringVar(&c.flagSecretNamespace, "secret-namespace", "default",
-		"Namespace of the secret to update TLS certificates. Defaults to default")
-	c.flagSet.StringVar(&c.flagCertFile, "tls-cert-file", "",
-		"PEM-encoded TLS certificate to serve. If blank, will generate random cert.")
-	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
-		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
+	c.flagSet.StringVar(&c.flagConfigFile, "config-file", "",
+		"Path to config file to read webhook configs from")
 
 	c.httpFlags = &flags.HTTPFlags{}
+	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
+	flags.Merge(c.flagSet, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flagSet)
+
+	// Wait on an interrupt to exit. This channel must be initialized before
+	// Run() is called so that there are no race conditions where the channel
+	// is not defined.
+	if c.sigCh == nil {
+		c.sigCh = make(chan os.Signal, 1)
+		signal.Notify(c.sigCh, os.Interrupt)
+	}
 }
 
 func (c *Command) Run(args []string) int {
@@ -67,74 +67,91 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flagSet.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("should have no non-flag arguments")))
+		c.UI.Error("invalid arguments: should have no non-flag arguments")
 		return 1
 	}
 
-	if c.flagSecretName == "" {
-		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("secret-name must be set")))
+	if c.flagConfigFile == "" {
+		c.UI.Error(fmt.Sprintf("-config-file must be set"))
 		return 1
 	}
 
-	if c.flagCertFile == "" && c.flagKeyFile == "" && c.flagMWebhookConfigName == "" {
-		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("either m-webhook-config-name or tls-cert-file and tls-key-file must be provided")))
-		return 1
-	}
-
-	if (c.flagCertFile != "" && c.flagKeyFile == "") || (c.flagCertFile == "" && c.flagKeyFile != "") {
-		c.UI.Error(fmt.Sprintf("invalid arguments: %s", errors.New("both tls-cert-file and tls-key-file must be provided")))
-		return 1
-	}
-
+	// Create the Kubernetes clientset
 	if c.clientset == nil {
-		config, err := rest.InClusterConfig()
+		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("error loading in-cluster K8S config: %s", err))
+			c.UI.Error(fmt.Sprintf("error retrieving Kubernetes auth: %s", err))
 			return 1
 		}
 		c.clientset, err = kubernetes.NewForConfig(config)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("error creating K8S client: %s", err))
+			c.UI.Error(fmt.Sprintf("error initializing Kubernetes client: %s", err))
 			return 1
 		}
 	}
 
-	var certSource cert.Source = &cert.GenSource{
-		Name:  "Consul Webhook Certificates",
-		Hosts: strings.Split(c.flagDNSSans, ","),
+	configFile, err := ioutil.ReadFile(c.flagConfigFile)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error reading config file from %s", c.flagConfigFile))
 	}
-	if c.flagCertFile != "" {
-		certSource = &cert.DiskSource{
-			CertPath: c.flagCertFile,
-			KeyPath:  c.flagKeyFile,
-		}
+	var configs []webhookConfig
+	err = json.Unmarshal(configFile, &configs)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("error unmarshalling config file: %s", err.Error()))
 	}
 
 	// Create the certificate notifier so we can update for certificates,
 	// then start all the background routines for updating certificates.
-	certCh := make(chan cert.Bundle)
-	certNotify := &cert.Notify{Ch: certCh, Source: certSource}
-	defer certNotify.Stop()
-	go certNotify.Start(context.Background())
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx := context.Background()
+	ctx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
-	c.certWatcher(ctx, certCh, c.clientset, c.UI)
-	return 0
+	certCh := make(chan cert.Bundle)
+	certMetaCh := make(chan cert.MetaBundle)
+
+	var notifiers []*cert.Notify
+
+	for _, config := range configs {
+		certSource := &cert.GenSource{
+			Name:  "Consul Webhook Certificates",
+			Hosts: config.TLSAutoHosts,
+		}
+		certNotify := &cert.Notify{Ch: certCh, Source: certSource, MetaCh: certMetaCh, WebhookName: config.Name, SecretName: config.SecretName, SecretNamespace: config.SecretNamespace}
+		notifiers = append(notifiers, certNotify)
+		go certNotify.Start(ctx)
+	}
+
+	go c.certWatcher(ctx, certMetaCh, c.clientset, c.UI)
+
+	closeNotifiers := func() {
+		for _, notifier := range notifiers {
+			notifier.Stop()
+		}
+	}
+	defer closeNotifiers()
+
+	// Interrupted, gracefully exit
+	select {
+	case <-c.sigCh:
+		closeNotifiers()
+		cancelFunc()
+		return 0
+	}
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset kubernetes.Interface, log cli.Ui) {
-	var bundle cert.Bundle
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface, log cli.Ui) {
+	var metaBundle cert.MetaBundle
 	for {
 		select {
-		case bundle = <-ch:
+		case metaBundle = <-ch:
 			log.Info("updated certificate bundle received. updating webhook certs.")
 			// Bundle is updated, set it up
 
 		case <-time.After(30 * time.Minute):
 			// This forces the mutating ctrlWebhook config to remain updated
-			// fairly quickly. This is a jank way to do this and we should
-			// look to improve it in the future. Since we use Patch requests
-			// it is pretty cheap to do, though.
+			// fairly quickly. This is done every 30 minutes to ensure the certificates
+			// are in sync. Because the certificate and key are being read from a secret,
+			// this does not have to be processed as aggressively as the 1 sec time in
+			// the connect inject cert watcher.
 
 		case <-ctx.Done():
 			// Quit
@@ -142,87 +159,99 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, client
 		}
 
 		log.Info("getting secret from kubernetes")
-		certSecret, err := clientset.CoreV1().Secrets(c.flagSecretNamespace).Get(ctx, c.flagSecretName, metav1.GetOptions{})
+		certSecret, err := clientset.CoreV1().Secrets(metaBundle.SecretNamespace).Get(ctx, metaBundle.SecretName, metav1.GetOptions{})
 		if err != nil && k8serrors.IsNotFound(err) {
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      c.flagSecretName,
-					Namespace: c.flagSecretNamespace,
+					Name:      metaBundle.SecretName,
+					Namespace: metaBundle.SecretNamespace,
 				},
 				Data: map[string][]byte{
-					corev1.TLSCertKey:       bundle.Cert,
-					corev1.TLSPrivateKeyKey: bundle.Key,
+					corev1.TLSCertKey:       metaBundle.Cert,
+					corev1.TLSPrivateKeyKey: metaBundle.Key,
 				},
 				Type: corev1.SecretTypeTLS,
 			}
 
 			log.Info("creating kubernetes secret")
-			_, err := clientset.CoreV1().Secrets(c.flagSecretNamespace).Create(ctx, secret, metav1.CreateOptions{})
-			if err != nil {
+			if _, err := clientset.CoreV1().Secrets(metaBundle.SecretNamespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 				log.Error(fmt.Sprintf("error writing secret to API server: %s", err))
 				continue
 			}
 
 			log.Info("updating webhook configuration with new CA")
-			err = c.updateWebhookConfig(bundle, clientset, ctx)
-			if err != nil {
+			if err := c.updateWebhookConfig(ctx, metaBundle, clientset); err != nil {
 				log.Error(fmt.Sprintf("error updating webhook configuration: %s", err))
 				continue
 			}
+			continue
 		} else if err != nil {
 			log.Error(fmt.Sprintf("error getting secret for API server: %s", err))
 			continue
 		}
 
-		//Dont update secret if the certificate is unchanged
-		if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) {
+		// Don't update secret if the certificate is unchanged.
+		if bytes.Equal(certSecret.Data[corev1.TLSCertKey], metaBundle.Cert) {
 			continue
 		}
 
-		certSecret.Data[corev1.TLSCertKey] = bundle.Cert
-		certSecret.Data[corev1.TLSPrivateKeyKey] = bundle.Key
+		certSecret.Data[corev1.TLSCertKey] = metaBundle.Cert
+		certSecret.Data[corev1.TLSPrivateKeyKey] = metaBundle.Key
 
 		log.Info("updating secret with new certificate")
-		_, err = clientset.CoreV1().Secrets(c.flagSecretNamespace).Update(ctx, certSecret, metav1.UpdateOptions{})
+		_, err = clientset.CoreV1().Secrets(metaBundle.SecretNamespace).Update(ctx, certSecret, metav1.UpdateOptions{})
 		if err != nil {
 			log.Error(fmt.Sprintf("error updating secret with certificate: %s", err))
 			continue
 		}
 
 		log.Info("updating webhook configuration with new CA")
-		err = c.updateWebhookConfig(bundle, clientset, ctx)
-		if err != nil {
+		if err := c.updateWebhookConfig(ctx, metaBundle, clientset); err != nil {
 			log.Error(fmt.Sprintf("error updating webhook configuration: %s", err))
 			continue
 		}
 	}
 }
 
-func (c *Command) updateWebhookConfig(bundle cert.Bundle, clientset kubernetes.Interface, ctx context.Context) error {
-	if c.flagMWebhookConfigName != "" && len(bundle.CACert) > 0 {
-		value := base64.StdEncoding.EncodeToString(bundle.CACert)
+func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaBundle, clientset kubernetes.Interface) error {
+	if len(metaBundle.CACert) > 0 {
+		value := base64.StdEncoding.EncodeToString(metaBundle.CACert)
 
-		// If there is a MWC name set, then update the CA bundle on all the webhooks on that MWC.
-		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.flagMWebhookConfigName, metav1.GetOptions{})
+		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		var patches []string
+		var patches []patch
 		for i := range webhookCfg.Webhooks {
-			patches = append(patches, fmt.Sprintf(
-				`{
-						"op": "add",
-						"path": "/webhooks/%d/clientConfig/caBundle",
-						"value": %q
-					}`, i, value))
+			patches = append(patches, patch{
+				Op:    "add",
+				Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+				Value: value,
+			})
 		}
-		webhookPatch := fmt.Sprintf("[%s]", strings.Join(patches, ","))
+		patchesJson, err := json.Marshal(patches)
+		if err != nil {
+			return err
+		}
 
-		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, c.flagMWebhookConfigName, types.JSONPatchType, []byte(webhookPatch), metav1.PatchOptions{}); err != nil {
+		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+type webhookConfig struct {
+	Name            string   `json:"name,omitempty"`
+	TLSAutoHosts    []string `json:"tlsAutoHosts,omitempty"`
+	SecretName      string   `json:"secretName,omitempty"`
+	SecretNamespace string   `json:"secretNamespace,omitempty"`
+}
+
+type patch struct {
+	Op    string `json:"op,omitempty"`
+	Path  string `json:"path,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 func (c *Command) Help() string {
@@ -232,6 +261,12 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return synopsis
+}
+
+// interrupt sends os.Interrupt signal to the command
+// so it can exit gracefully. This function is needed for tests
+func (c *Command) interrupt() {
+	c.sigCh <- os.Interrupt
 }
 
 const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"

@@ -32,6 +32,13 @@ type Bundle struct {
 	CACert []byte // CA cert bundle, optional.
 }
 
+type MetaBundle struct {
+	Bundle
+	SecretName        string
+	WebhookConfigName string
+	SecretNamespace   string
+}
+
 // Equal returns true if the two cert bundles contain equivalent certs.
 func (b *Bundle) Equal(b2 *Bundle) bool {
 	return reflect.DeepEqual(b, b2)
