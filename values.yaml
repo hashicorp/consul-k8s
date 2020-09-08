@@ -396,10 +396,13 @@ externalServers:
   # host header when connecting with HTTPS.
   tlsServerName: null
 
-  # If true, the Helm chart will ignore the CA set in
-  # global.tls.caCert and will rely on the container's
-  # system CAs for TLS verification when talking to Consul servers.
-  # Otherwise, the chart will use global.tls.caCert.
+  # If true, consul-k8s components will ignore the CA set in
+  # global.tls.caCert when making HTTPS calls to Consul servers and
+  # will instead use the consul-k8s image's system CAs for TLS verification.
+  # If false, consul-k8s components will use global.tls.caCert when
+  # making HTTPS calls to Consul servers.
+  # NOTE: This does not affect Consul's internal RPC communication which will
+  # always use global.tls.caCert.
   useSystemRoots: false
 
   # If you are setting global.acls.manageSystemACLs and connectInject.enabled to true,
