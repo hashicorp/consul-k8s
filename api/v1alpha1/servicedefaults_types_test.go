@@ -724,7 +724,64 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be on of "remote", "local", "none" or ""`,
+			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none" or ""`,
+		},
+		"expose.paths[].protocol": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "/valid-path",
+							},
+						},
+					},
+				},
+			},
+			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"`,
+		},
+		"expose.paths[].path": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "http",
+								Path:     "invalid-path",
+							},
+						},
+					},
+				},
+			},
+			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+		},
+		"multi-error": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "invalid-mode",
+					},
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "invalid-path",
+							},
+						},
+					},
+				},
+			},
+			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: [spec.meshGateway.mode: Invalid value: "invalid-mode": must be one of "remote", "local", "none" or "", spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"]`,
 		},
 	}
 

@@ -1,6 +1,9 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+
 	capi "github.com/hashicorp/consul/api"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +91,7 @@ func (in *ServiceDefaults) Validate() error {
 		allErrs = append(allErrs, err)
 	}
 	if err := in.Spec.Expose.validate(); err != nil {
-		allErrs = append(allErrs, err)
+		allErrs = append(allErrs, err...)
 	}
 	if len(allErrs) == 0 {
 		return nil
@@ -179,9 +182,22 @@ func (e *ExposeConfig) defaultConfig() {
 	}
 }
 
-func (e ExposeConfig) validate() *field.Error {
-	//for i, path := range e.Paths {
-	//
-	//}
-	return nil
+func (e ExposeConfig) validate() []*field.Error {
+	var errs field.ErrorList
+	for i, path := range e.Paths {
+		if !strings.HasPrefix(path.Path, "/") {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
+		}
+		switch path.Protocol {
+		case "http", "http2":
+			continue
+		default:
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, `must be one of "http" or "http2"`))
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	} else {
+		return errs
+	}
 }
