@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ type Command struct {
 	flagToK8S                 bool
 	flagConsulDomain          string
 	flagConsulK8STag          string
+	flagConsulNodeName        string
 	flagK8SDefault            bool
 	flagK8SServicePrefix      string
 	flagConsulServicePrefix   string
@@ -95,6 +97,9 @@ func (c *Command) init() {
 			"Kubernetes. Defaults to consul.")
 	c.flags.StringVar(&c.flagConsulK8STag, "consul-k8s-tag", "k8s",
 		"Tag value for K8S services registered in Consul")
+	c.flags.StringVar(&c.flagConsulNodeName, "consul-node-name", "k8s-sync",
+		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
+			"via DNS, the name should only contain alpha-numerics and dashes.")
 	c.flags.DurationVar(&c.flagConsulWritePeriod, "consul-write-interval", 30*time.Second,
 		"The interval to perform syncing operations creating Consul services, formatted "+
 			"as a time.Duration. All changes are merged and write calls are only made "+
@@ -115,6 +120,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -155,6 +161,12 @@ func (c *Command) Run(args []string) int {
 	}
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		return 1
+	}
+
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -243,6 +255,7 @@ func (c *Command) Run(args []string) int {
 			SyncPeriod:               c.flagConsulWritePeriod,
 			ServicePollPeriod:        c.flagConsulWritePeriod * 2,
 			ConsulK8STag:             c.flagConsulK8STag,
+			ConsulNodeName:           c.flagConsulNodeName,
 			ConsulNodeServicesClient: svcsClient,
 		}
 		go syncer.Run(ctx)
@@ -267,6 +280,7 @@ func (c *Command) Run(args []string) int {
 				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+				ConsulNodeName:             c.flagConsulNodeName,
 			},
 		}
 
@@ -373,6 +387,29 @@ func (c *Command) Help() string {
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
 	c.sigCh <- os.Interrupt
+}
+
+func (c *Command) validateFlags() error {
+	// For the Consul node name to be discoverable via DNS, it must contain only
+	// dashes and alphanumeric characters. Length is also constrained.
+	// These restrictions match those defined in Consul's agent definition.
+	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	const maxDNSLabelLength = 63
+
+	if invalidDnsRe.MatchString(c.flagConsulNodeName) {
+		return fmt.Errorf("-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to invalid characters. Valid characters include all alpha-numerics and dashes",
+			c.flagConsulNodeName,
+		)
+	}
+	if len(c.flagConsulNodeName) > maxDNSLabelLength {
+		return fmt.Errorf("-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
+			c.flagConsulNodeName,
+		)
+	}
+
+	return nil
 }
 
 const synopsis = "Sync Kubernetes services and Consul services."

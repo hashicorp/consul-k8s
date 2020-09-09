@@ -115,6 +115,9 @@ type ServiceResource struct {
 	// `k8s-default` namespace.
 	K8SNSMirroringPrefix string
 
+	// The Consul node name to register service with.
+	ConsulNodeName string
+
 	// serviceLock must be held for any read/write to these maps.
 	serviceLock sync.RWMutex
 
@@ -332,7 +335,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// shallow copied for each instance.
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
-		Node:           ConsulSyncNodeName,
+		Node:           t.ConsulNodeName,
 		Address:        "127.0.0.1",
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
