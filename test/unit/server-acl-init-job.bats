@@ -263,6 +263,53 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# syncCatalog.enabled
+
+@test "serverACLInit/Job: sync catalog acl option disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -x templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-sync-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: sync catalog acl option enabled with .syncCatalog.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-sync-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: sync catalog node name set to 'k8s-sync' by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-consul-node-name=k8s-sync"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: sync catalog node name set to 'k8s-sync' can be changed" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.consulNodeName=new-node-name' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-consul-node-name=new-node-name"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # meshGateway.enabled
 
 @test "serverACLInit/Job: mesh gateway acl option disabled by default" {
