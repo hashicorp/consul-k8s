@@ -23,9 +23,9 @@ type Notify struct {
 	ctxCancel context.CancelFunc
 	doneCh    <-chan struct{}
 
-	SecretName      string
-	WebhookName     string
-	SecretNamespace string
+	WebhookConfigName string
+	SecretName        string
+	SecretNamespace   string
 }
 
 // Start starts the notifier. This blocks and should be started in a goroutine.
@@ -73,7 +73,7 @@ func (n *Notify) Start(ctx context.Context) {
 		select {
 		case n.Ch <- MetaBundle{
 			Bundle:            next,
-			WebhookConfigName: n.WebhookName,
+			WebhookConfigName: n.WebhookConfigName,
 			SecretName:        n.SecretName,
 			SecretNamespace:   n.SecretNamespace,
 		}:

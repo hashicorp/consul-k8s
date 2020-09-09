@@ -48,7 +48,7 @@ func (c *Command) init() {
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
-		"Directory that contains the tls cert and key required to communicate with the MutatingWebhookConfiguration")
+		"Directory that contains the tls cert and key required for the webhook")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -64,6 +64,10 @@ func (c *Command) Run(args []string) int {
 	}
 	if len(c.flagSet.Args()) > 0 {
 		setupLog.Error(errors.New("should have no non-flag arguments"), "invalid arguments")
+		return 1
+	}
+	if c.flagWebhookTLSCertDir == "" {
+		setupLog.Error(errors.New("-webhook-tls-cert-dir must be set"), "invalid arguments")
 		return 1
 	}
 
