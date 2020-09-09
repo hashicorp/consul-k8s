@@ -78,13 +78,8 @@ func (in *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
 		in.Spec.ExternalSNI == entry.ExternalSNI
 }
 
-func (in *ServiceDefaults) Default() {
-	if in.Spec.Protocol == "" {
-		in.Spec.Protocol = "tcp"
-	}
-	in.Spec.Expose.defaultConfig()
-}
-
+// Validate validates the fields provided in the spec of the ServiceDefaults and
+// returns an error which lists all invalid fields in the resource spec.
 func (in *ServiceDefaults) Validate() error {
 	var allErrs field.ErrorList
 	if err := in.Spec.MeshGateway.validate(); err != nil {
@@ -174,18 +169,10 @@ func (e ExposeConfig) toConsul() capi.ExposeConfig {
 	}
 }
 
-func (e *ExposeConfig) defaultConfig() {
-	for i, path := range e.Paths {
-		if path.Protocol == "" {
-			e.Paths[i].Protocol = "http"
-		}
-	}
-}
-
 func (e ExposeConfig) validate() []*field.Error {
 	var errs field.ErrorList
 	for i, path := range e.Paths {
-		if !strings.HasPrefix(path.Path, "/") {
+		if path.Path != "" && !strings.HasPrefix(path.Path, "/") {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
 		}
 		switch path.Protocol {

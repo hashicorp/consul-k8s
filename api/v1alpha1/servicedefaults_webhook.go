@@ -50,7 +50,6 @@ func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 			}
 		}
 	}
-	svcDefaults.Default()
 	if err := svcDefaults.Validate(); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}

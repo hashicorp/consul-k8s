@@ -655,59 +655,6 @@ func TestMatchesConsul(t *testing.T) {
 	}
 }
 
-func TestDefault(t *testing.T) {
-	cases := map[string]struct {
-		input    *ServiceDefaults
-		expected *ServiceDefaults
-	}{
-		"protocol": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "",
-				},
-			},
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "tcp",
-				},
-			},
-		},
-		"expose.path.protocol": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "tcp",
-					Expose: ExposeConfig{
-						Paths: []ExposePath{
-							{
-								Protocol: "",
-							},
-						},
-					},
-				},
-			},
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "tcp",
-					Expose: ExposeConfig{
-						Paths: []ExposePath{
-							{
-								Protocol: "http",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			testCase.input.Default()
-			require.Equal(t, testCase.expected, testCase.input)
-		})
-	}
-}
-
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		input          *ServiceDefaults
