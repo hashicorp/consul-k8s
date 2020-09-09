@@ -252,6 +252,34 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	})
 }
 
+// Test that when consul node name is set to a non-default value,
+// services are synced to that node.
+func TestServiceResource_ConsulNodeName(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ConsulNodeName = "test-node"
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	// Insert an LB service with the sync=true
+	svc := lbService("foo", "namespace", "1.2.3.4")
+	_, err := client.CoreV1().Services("namespace").Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Verify that the service name has k8s namespace appended with an '-'
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 1)
+		require.Equal(r, actual[0].Node, "test-node")
+	})
+}
+
 // Test k8s namespace suffix is not appended
 // when the service name annotation is provided
 func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
@@ -1569,5 +1597,6 @@ func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceR
 		Syncer:                syncer,
 		AllowK8sNamespacesSet: mapset.NewSet("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
+		ConsulNodeName:        ConsulSyncNodeName,
 	}
 }

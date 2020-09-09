@@ -13,13 +13,8 @@ const (
 // testSyncer implements Syncer for tests, giving easy access to the
 // set of registrations.
 type testSyncer struct {
-	sync.Mutex     // Lock should be held while accessing Registrations
-	Registrations  []*api.CatalogRegistration
-	ConsulNodeName string // Consul node name to register for this syncer
-}
-
-func (s *testSyncer) ConsulNode() string {
-	return s.ConsulNodeName
+	sync.Mutex    // Lock should be held while accessing Registrations
+	Registrations []*api.CatalogRegistration
 }
 
 // Sync implements Syncer
@@ -30,5 +25,5 @@ func (s *testSyncer) Sync(rs []*api.CatalogRegistration) {
 }
 
 func newTestSyncer() *testSyncer {
-	return &testSyncer{ConsulNodeName: "k8s-sync"}
+	return &testSyncer{}
 }

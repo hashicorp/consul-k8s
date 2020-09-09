@@ -62,8 +62,8 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-resource-prefix=prefix",
 				"-sync-consul-node-name=Speci@l_Chars",
 			},
-			ExpErr: "Node name will not be discoverable via DNS due to invalid characters. Valid characters include " +
-				"all alpha-numerics and dashes. sync-consul-node-name=Speci@l_Chars",
+			ExpErr: "-sync-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
+				"via DNS due to invalid characters. Valid characters include all alpha-numerics and dashes",
 		},
 		{
 			Flags: []string{
@@ -71,8 +71,8 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-resource-prefix=prefix",
 				"-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
 			},
-			ExpErr: "Node name will not be discoverable via DNS due to it being too long. Valid lengths are between " +
-				"1 and 63 bytes. sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
+			ExpErr: "-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long is invalid: node name will not be discoverable " +
+				"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
 		},
 	}
 
@@ -895,7 +895,7 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	firstRunArgs := append(commonArgs,
 		"-acl-binding-rule-selector=serviceaccount.name!=default",
 	)
-	// Our second run, we change the binding rule selector.
+	// On the second run, we change the binding rule selector.
 	secondRunArgs := append(commonArgs,
 		"-acl-binding-rule-selector=serviceaccount.name!=changed",
 	)
@@ -955,7 +955,6 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 func TestRun_SyncPolicyUpdates(t *testing.T) {
 	t.Parallel()
 	k8s, testSvr := completeSetup(t)
-	setUpK8sServiceAccount(t, k8s)
 	defer testSvr.Stop()
 	require := require.New(t)
 
@@ -970,7 +969,7 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 	firstRunArgs := append(commonArgs,
 		"-sync-consul-node-name=k8s-sync",
 	)
-	// Our second run, we change the binding rule selector.
+	// On the second run, we change the sync node name.
 	secondRunArgs := append(commonArgs,
 		"-sync-consul-node-name=new-node-name",
 	)

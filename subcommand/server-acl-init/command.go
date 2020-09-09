@@ -767,20 +767,20 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	var InvalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
-	const MaxDNSLabelLength = 63
+	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	const maxDNSLabelLength = 63
 
-	if InvalidDnsRe.MatchString(c.flagSyncConsulNodeName) {
-		return fmt.Errorf("Node name will not be discoverable "+
+	if invalidDnsRe.MatchString(c.flagSyncConsulNodeName) {
+		return fmt.Errorf("-sync-consul-node-name=%s is invalid: node name will not be discoverable "+
 			"via DNS due to invalid characters. Valid characters include "+
-			"all alpha-numerics and dashes. sync-consul-node-name=%s",
+			"all alpha-numerics and dashes",
 			c.flagSyncConsulNodeName,
 		)
 	}
-	if len(c.flagSyncConsulNodeName) > MaxDNSLabelLength {
-		return fmt.Errorf("Node name will not be discoverable "+
+	if len(c.flagSyncConsulNodeName) > maxDNSLabelLength {
+		return fmt.Errorf("-sync-consul-node-name=%s is invalid: node name will not be discoverable "+
 			"via DNS due to it being too long. Valid lengths are between "+
-			"1 and 63 bytes. sync-consul-node-name=%s",
+			"1 and 63 bytes",
 			c.flagSyncConsulNodeName,
 		)
 	}

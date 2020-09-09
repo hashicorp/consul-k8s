@@ -280,6 +280,7 @@ func (c *Command) Run(args []string) int {
 				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+				ConsulNodeName:             c.flagConsulNodeName,
 			},
 		}
 
@@ -392,20 +393,18 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	var InvalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
-	const MaxDNSLabelLength = 63
+	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	const maxDNSLabelLength = 63
 
-	if InvalidDnsRe.MatchString(c.flagConsulNodeName) {
-		return fmt.Errorf("Node name will not be discoverable "+
-			"via DNS due to invalid characters. Valid characters include "+
-			"all alpha-numerics and dashes. consul-node-name=%s",
+	if invalidDnsRe.MatchString(c.flagConsulNodeName) {
+		return fmt.Errorf("-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to invalid characters. Valid characters include all alpha-numerics and dashes",
 			c.flagConsulNodeName,
 		)
 	}
-	if len(c.flagConsulNodeName) > MaxDNSLabelLength {
-		return fmt.Errorf("Node name will not be discoverable "+
-			"via DNS due to it being too long. Valid lengths are between "+
-			"1 and 63 bytes. consul-node-name=%s",
+	if len(c.flagConsulNodeName) > maxDNSLabelLength {
+		return fmt.Errorf("-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
 			c.flagConsulNodeName,
 		)
 	}

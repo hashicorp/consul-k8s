@@ -26,13 +26,13 @@ func TestRun_FlagValidation(t *testing.T) {
 	}{
 		{
 			Flags: []string{"-consul-node-name=Speci@l_Chars"},
-			ExpErr: "Node name will not be discoverable via DNS due to invalid characters. Valid characters include " +
-				"all alpha-numerics and dashes. consul-node-name=Speci@l_Chars",
+			ExpErr: "-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
+				"via DNS due to invalid characters. Valid characters include all alpha-numerics and dashes",
 		},
 		{
 			Flags: []string{"-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long"},
-			ExpErr: "Node name will not be discoverable via DNS due to it being too long. Valid lengths are between " +
-				"1 and 63 bytes. consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
+			ExpErr: "-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long is invalid: node name will not be discoverable " +
+				"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
 		},
 	}
 
