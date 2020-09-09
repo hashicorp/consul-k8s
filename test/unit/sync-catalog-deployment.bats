@@ -217,6 +217,41 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# consulNodeName
+
+@test "syncCatalog/Deployment: consulNodeName defaults to k8s-sync" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-node-name=k8s-sync"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "syncCatalog/Deployment: consulNodeName set to empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.consulNodeName=' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-node-name"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: can specify consulNodeName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.consulNodeName=aNodeName' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-node-name=aNodeName"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # serviceAccount
 
 @test "syncCatalog/Deployment: serviceAccount set when sync enabled" {

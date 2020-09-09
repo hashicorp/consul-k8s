@@ -734,6 +734,14 @@ syncCatalog:
   # (Kubernetes -> Consul sync)
   k8sTag: null
 
+  # consulNodeName defines the Consul synthetic node that all services
+  # will be registered to.
+  # NOTE: Changing the node name and upgrading the Helm chart will leave
+  # all of the previously sync'd services registered with Consul and
+  # register them again under the new Consul node name. The out-of-date
+  # registrations will need to be explicitly removed.
+  consulNodeName: "k8s-sync"
+
   # syncClusterIPServices syncs services of the ClusterIP type, which may
   # or may not be broadly accessible depending on your Kubernetes cluster.
   # Set this to false to skip syncing ClusterIP services.

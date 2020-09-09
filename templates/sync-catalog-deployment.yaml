@@ -145,6 +145,9 @@ spec:
                 {{- if .Values.syncCatalog.k8sTag }}
                 -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \
                 {{- end }}
+                {{- if .Values.syncCatalog.consulNodeName }}
+                -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
+                {{- end }}
                 {{- if .Values.syncCatalog.consulPrefix}}
                 -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
                 {{- end}}

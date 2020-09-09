@@ -125,6 +125,9 @@ spec:
 
                 {{- if .Values.syncCatalog.enabled }}
                 -create-sync-token=true \
+                {{- if .Values.syncCatalog.consulNodeName }}
+                -sync-consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
+                {{- end }}
                 {{- end }}
 
                 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
