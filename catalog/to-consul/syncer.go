@@ -19,10 +19,6 @@ const (
 	// ConsulServicePollPeriod is how often a service is checked for
 	// whether it has instances to reap.
 	ConsulServicePollPeriod = 60 * time.Second
-
-	// ConsulSyncNodeName is the name of the node in Consul that we register
-	// services on. It's not a real node backed by a Consul agent.
-	ConsulSyncNodeName = "k8s-sync"
 )
 
 // Syncer is responsible for syncing a set of Consul catalog registrations.
@@ -68,6 +64,9 @@ type ConsulSyncer struct {
 
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
+
+	// The Consul node name to register services with.
+	ConsulNodeName string
 
 	// ConsulNodeServicesClient is used to list services for a node. We use a
 	// separate client for this API call that handles older version of Consul.
@@ -189,7 +188,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		var meta *api.QueryMeta
 		err := backoff.Retry(func() error {
 			var err error
-			services, meta, err = s.ConsulNodeServicesClient.NodeServices(s.ConsulK8STag, ConsulSyncNodeName, *opts)
+			services, meta, err = s.ConsulNodeServicesClient.NodeServices(s.ConsulK8STag, s.ConsulNodeName, *opts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 

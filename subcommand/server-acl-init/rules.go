@@ -11,6 +11,7 @@ type rulesData struct {
 	ConsulSyncDestinationNamespace string
 	EnableSyncK8SNSMirroring       bool
 	SyncK8SNSMirroringPrefix       string
+	SyncConsulNodeName             string
 }
 
 type gatewayRulesData struct {
@@ -174,7 +175,7 @@ namespace "{{ .GatewayNamespace }}" {
 
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
-  node "k8s-sync" {
+  node "{{ .SyncConsulNodeName }}" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
@@ -246,6 +247,7 @@ func (c *Command) rulesData() rulesData {
 		ConsulSyncDestinationNamespace: c.flagConsulSyncDestinationNamespace,
 		EnableSyncK8SNSMirroring:       c.flagEnableSyncK8SNSMirroring,
 		SyncK8SNSMirroringPrefix:       c.flagSyncK8SNSMirroringPrefix,
+		SyncConsulNodeName:             c.flagSyncConsulNodeName,
 	}
 }
 

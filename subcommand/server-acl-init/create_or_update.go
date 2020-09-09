@@ -107,8 +107,10 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 	// Consul version with namespace support or changes any of their namespace
 	// settings, the policies associated with their ACL tokens will need to be
 	// updated to be namespace aware.
+	// Allowing the Consul node name to be configurable also requires any sync
+	// policy to be updated in case the node name has changed.
 	if isPolicyExistsErr(err, policy.Name) {
-		if c.flagEnableNamespaces {
+		if c.flagEnableNamespaces || c.flagCreateSyncToken {
 			c.log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
 
 			// The policy ID is required in any PolicyUpdate call, so first we need to
