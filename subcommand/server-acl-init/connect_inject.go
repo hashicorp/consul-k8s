@@ -117,7 +117,7 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 		// for this auth method, but none that match the binding
 		// rule set up here in the bootstrap method.
 		if abr.ID == "" {
-			return errors.New("Unable to find a matching ACL binding rule to update")
+			return errors.New("unable to find a matching ACL binding rule to update")
 		}
 
 		err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodName),
@@ -155,19 +155,25 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	// Because there could be multiple secrets attached to the service account,
 	// we need pick the first one of type "kubernetes.io/service-account-token".
 	var saSecret *apiv1.Secret
-	for _, secret := range authMethodServiceAccount.Secrets {
-		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secret.Name),
+	for _, secretRef := range authMethodServiceAccount.Secrets {
+		var secret *apiv1.Secret
+		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secretRef.Name),
 			func() error {
 				var err error
-				saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
+				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
 				return err
 			})
-		if saSecret.Type == apiv1.SecretTypeServiceAccountToken {
+		if secret.Type == apiv1.SecretTypeServiceAccountToken {
+			saSecret = secret
 			break
 		}
 	}
 	if err != nil {
 		return api.ACLAuthMethod{}, err
+	}
+	if saSecret == nil {
+		return api.ACLAuthMethod{},
+			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", saName)
 	}
 
 	kubernetesHost := defaultKubernetesHost
