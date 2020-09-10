@@ -1890,7 +1890,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
-		// The second secret is mimicing the behavior on Openshift,
+		// The second secret is mimicking the behavior on Openshift,
 		// where two secrets are injected: one with SA token and one with docker config.
 		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
 			context.Background(),

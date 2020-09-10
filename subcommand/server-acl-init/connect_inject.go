@@ -163,7 +163,7 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
 				return err
 			})
-		if secret.Type == apiv1.SecretTypeServiceAccountToken {
+		if secret != nil && secret.Type == apiv1.SecretTypeServiceAccountToken {
 			saSecret = secret
 			break
 		}
@@ -171,6 +171,8 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	if err != nil {
 		return api.ACLAuthMethod{}, err
 	}
+	// This is very unlikely to happen because Kubernetes ensure that there is always
+	// a secret of type ServiceAccountToken.
 	if saSecret == nil {
 		return api.ACLAuthMethod{},
 			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", saName)
