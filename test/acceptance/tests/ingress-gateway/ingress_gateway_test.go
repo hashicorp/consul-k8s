@@ -41,11 +41,10 @@ func TestIngressGateway(t *testing.T) {
 				"ingressGateways.enabled":              "true",
 				"ingressGateways.gateways[0].name":     "ingress-gateway",
 				"ingressGateways.gateways[0].replicas": "1",
-			}
-			if c.secure {
-				helmValues["global.acls.manageSystemACLs"] = "true"
-				helmValues["global.tls.enabled"] = "true"
-				helmValues["global.tls.autoEncrypt"] = strconv.FormatBool(c.autoEncrypt)
+
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.tls.autoEncrypt":       strconv.FormatBool(c.autoEncrypt),
 			}
 
 			releaseName := helpers.RandomName()

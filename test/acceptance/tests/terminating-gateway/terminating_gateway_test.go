@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/api"
@@ -45,12 +46,10 @@ func TestTerminatingGateway(t *testing.T) {
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
-			}
 
-			if c.secure {
-				helmValues["global.acls.manageSystemACLs"] = "true"
-				helmValues["global.tls.enabled"] = "true"
-				helmValues["global.tls.autoEncrypt"] = strconv.FormatBool(c.autoEncrypt)
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.tls.autoEncrypt":       strconv.FormatBool(c.autoEncrypt),
 			}
 
 			t.Log("creating consul cluster")
@@ -66,58 +65,17 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			t.Log("registering the external service")
-			_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-				Node:     "legacy_node",
-				Address:  staticServerName,
-				NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
-				Service: &api.AgentService{
-					ID:      staticServerName,
-					Service: staticServerName,
-					Port:    80,
-				},
-			}, nil)
-			require.NoError(t, err)
+			registerExternalService(t, consulClient, "")
 
 			// If ACLs are enabled we need to update the token of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can can request Connect certificates for it.
 			if c.secure {
-				// Create a write policy for the static-server
-				_, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
-					Name:  "static-server-write-policy",
-					Rules: staticServerPolicyRules,
-				}, nil)
-				require.NoError(t, err)
-
-				// Get the terminating gateway token
-				tokens, _, err := consulClient.ACL().TokenList(nil)
-				require.NoError(t, err)
-				var termGwTokenID string
-				for _, token := range tokens {
-					if strings.Contains(token.Description, "terminating-gateway-terminating-gateway-token") {
-						termGwTokenID = token.AccessorID
-						break
-					}
-				}
-				termGwToken, _, err := consulClient.ACL().TokenRead(termGwTokenID, nil)
-				require.NoError(t, err)
-
-				// Add policy to the token and update it
-				termGwToken.Policies = append(termGwToken.Policies, &api.ACLTokenPolicyLink{Name: "static-server-write-policy"})
-				_, _, err = consulClient.ACL().TokenUpdate(termGwToken, nil)
-				require.NoError(t, err)
+				updateTerminatingGatewayToken(t, consulClient, staticServerPolicyRules)
 			}
 
 			// Create the config entry for the terminating gateway
-			t.Log("creating config entry")
-			created, _, err := consulClient.ConfigEntries().Set(&api.TerminatingGatewayConfigEntry{
-				Kind:     api.TerminatingGateway,
-				Name:     "terminating-gateway",
-				Services: []api.LinkedService{{Name: staticServerName}},
-			}, nil)
-			require.NoError(t, err)
-			require.True(t, created, "config entry failed")
+			createTerminatingGatewayConfigEntry(t, consulClient, "", "")
 
 			// Deploy the static client
 			t.Log("deploying static client")
@@ -128,17 +86,7 @@ func TestTerminatingGateway(t *testing.T) {
 				// With the terminating gateway up, we test that we can make a call to it
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
-				t.Log("testing intentions prevent connections through the terminating gateway")
-				helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), false, staticClientName, "http://localhost:1234")
-
-				// Now we create the allow intention.
-				t.Log("creating static-client => static-server intention")
-				_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
-					SourceName:      staticClientName,
-					DestinationName: staticServerName,
-					Action:          api.IntentionActionAllow,
-				}, nil)
-				require.NoError(t, err)
+				assertNoConnectionAndAddIntention(t, consulClient, ctx.KubectlOptions(), "", "")
 			}
 
 			// Test that we can make a call to the terminating gateway
@@ -151,3 +99,98 @@ func TestTerminatingGateway(t *testing.T) {
 const staticServerPolicyRules = `service "static-server" {
   policy = "write"
 }`
+
+func registerExternalService(t *testing.T, consulClient *api.Client, namespace string) {
+	address := staticServerName
+	service := &api.AgentService{
+		ID:      staticServerName,
+		Service: staticServerName,
+		Port:    80,
+	}
+
+	if namespace != "" {
+		address = fmt.Sprintf("%s.%s", staticServerName, namespace)
+		service.Namespace = namespace
+
+		t.Logf("creating the %s namespace in Consul", namespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: namespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	t.Log("registering the external service")
+	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+		Node:     "legacy_node",
+		Address:  address,
+		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
+		Service:  service,
+	}, nil)
+	require.NoError(t, err)
+}
+
+func updateTerminatingGatewayToken(t *testing.T, consulClient *api.Client, rules string) {
+	// Create a write policy for the static-server
+	_, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:  "static-server-write-policy",
+		Rules: rules,
+	}, nil)
+	require.NoError(t, err)
+
+	// Get the terminating gateway token
+	tokens, _, err := consulClient.ACL().TokenList(nil)
+	require.NoError(t, err)
+	var termGwTokenID string
+	for _, token := range tokens {
+		if strings.Contains(token.Description, "terminating-gateway-terminating-gateway-token") {
+			termGwTokenID = token.AccessorID
+			break
+		}
+	}
+	termGwToken, _, err := consulClient.ACL().TokenRead(termGwTokenID, nil)
+	require.NoError(t, err)
+
+	// Add policy to the token and update it
+	termGwToken.Policies = append(termGwToken.Policies, &api.ACLTokenPolicyLink{Name: "static-server-write-policy"})
+	_, _, err = consulClient.ACL().TokenUpdate(termGwToken, nil)
+	require.NoError(t, err)
+}
+
+func createTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client, gwNamespace, serviceNamespace string) {
+	t.Log("creating config entry")
+
+	if serviceNamespace != "" {
+		t.Logf("creating the %s namespace in Consul", serviceNamespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: serviceNamespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	configEntry := &api.TerminatingGatewayConfigEntry{
+		Kind:      api.TerminatingGateway,
+		Name:      "terminating-gateway",
+		Namespace: gwNamespace,
+		Services:  []api.LinkedService{{Name: staticServerName, Namespace: serviceNamespace}},
+	}
+
+	created, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
+}
+
+func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k8sOptions *k8s.KubectlOptions, sourceNS, destinationNS string) {
+	t.Log("testing intentions prevent connections through the terminating gateway")
+	helpers.CheckStaticServerConnection(t, k8sOptions, false, staticClientName, "http://localhost:1234")
+
+	// Now we create the allow intention.
+	t.Log("creating static-client => static-server intention")
+	_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
+		SourceName:      staticClientName,
+		SourceNS:        sourceNS,
+		DestinationName: staticServerName,
+		DestinationNS:   destinationNS,
+		Action:          api.IntentionActionAllow,
+	}, nil)
+	require.NoError(t, err)
+}

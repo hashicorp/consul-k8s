@@ -57,7 +57,8 @@ func NewHelmCluster(
 		"server.replicas":        "1",
 		"server.bootstrapExpect": "1",
 	}
-	valuesFromConfig := cfg.HelmValuesFromConfig()
+	valuesFromConfig, err := cfg.HelmValuesFromConfig()
+	require.NoError(t, err)
 
 	// Merge all helm values
 	mergeMaps(values, valuesFromConfig)
