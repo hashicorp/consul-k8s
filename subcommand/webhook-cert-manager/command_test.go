@@ -297,6 +297,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 	var certificate, key []byte
 
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+        // First, check that the original secret contents are updated when the cert-manager starts.
 	retry.RunWith(timer, t, func(r *retry.R) {
 		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
 		require.NoError(r, err)
@@ -311,8 +312,10 @@ func TestRun_SecretUpdates(t *testing.T) {
 		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 	})
 
+      // Wait for certs to be rotated.
 	time.Sleep(2 * time.Second)
 
+      // Check that the certificate is rotated and the secret is updated.
 	retry.RunWith(timer, t, func(r *retry.R) {
 		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
 		require.NoError(r, err)

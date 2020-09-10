@@ -48,7 +48,7 @@ func (c *Command) init() {
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
-		"Directory that contains the tls cert and key required for the webhook")
+		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())

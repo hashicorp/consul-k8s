@@ -41,7 +41,7 @@ type Command struct {
 	help  string
 	sigCh chan os.Signal
 
-	certExpiry *time.Duration // override default cert expiry of 24 hours if set
+	certExpiry *time.Duration // override default cert expiry of 24 hours if set (only set in tests)
 }
 
 func (c *Command) init() {
@@ -162,7 +162,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 	for {
 		select {
 		case bundle = <-ch:
-			log.Info(fmt.Sprintf("updated certificate bundle received for %s. updating webhook certs.", bundle.WebhookConfigName))
+			log.Info(fmt.Sprintf("updated certificate bundle received for %s; updating webhook certs.", bundle.WebhookConfigName))
 			// Bundle is updated, set it up
 
 		case <-time.After(30 * time.Minute):
