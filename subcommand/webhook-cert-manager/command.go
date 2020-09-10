@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
@@ -34,12 +35,14 @@ type Command struct {
 	k8s     *flags.K8SFlags
 
 	flagConfigFile string
+	flagLogLevel   string
 
 	clientset kubernetes.Interface
 
-	once  sync.Once
-	help  string
-	sigCh chan os.Signal
+	once   sync.Once
+	help   string
+	sigCh  chan os.Signal
+	logger hclog.Logger
 
 	certExpiry *time.Duration // override default cert expiry of 24 hours if set (only set in tests)
 }
@@ -48,6 +51,9 @@ func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagConfigFile, "config-file", "",
 		"Path to a config file to read webhook configs from. This file must be in JSON format.")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flagSet, c.k8s.Flags())
@@ -90,6 +96,18 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
 			return 1
 		}
+	}
+
+	if c.logger == nil {
+		level := hclog.LevelFromString(c.flagLogLevel)
+		if level == hclog.NoLevel {
+			c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+			return 1
+		}
+		c.logger = hclog.New(&hclog.LoggerOptions{
+			Level:  level,
+			Output: os.Stderr,
+		})
 	}
 
 	configFile, err := ioutil.ReadFile(c.flagConfigFile)
@@ -138,7 +156,7 @@ func (c *Command) Run(args []string) int {
 		go certNotify.Start(ctx)
 	}
 
-	go c.certWatcher(ctx, certCh, c.clientset, c.UI)
+	go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 
 	closeNotifiers := func() {
 		for _, notifier := range notifiers {
@@ -157,7 +175,7 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface, log cli.Ui) {
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface, log hclog.Logger) {
 	var bundle cert.MetaBundle
 	for {
 		select {

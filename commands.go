@@ -67,7 +67,7 @@ func init() {
 		},
 
 		"controller": func() (cli.Command, error) {
-			return &cmdController.Command{}, nil
+			return &cmdController.Command{UI: ui}, nil
 		},
 		"webhook-cert-manager": func() (cli.Command, error) {
 			return &webhookCertManager.Command{UI: ui}, nil
