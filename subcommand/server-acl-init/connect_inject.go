@@ -117,7 +117,7 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 		// for this auth method, but none that match the binding
 		// rule set up here in the bootstrap method.
 		if abr.ID == "" {
-			return errors.New("Unable to find a matching ACL binding rule to update")
+			return errors.New("unable to find a matching ACL binding rule to update")
 		}
 
 		err = c.untilSucceeds(fmt.Sprintf("updating acl binding rule for %s", authMethodName),
@@ -152,18 +152,30 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 
 	// ServiceAccounts always have a secret name. The secret
 	// contains the JWT token.
-	saSecretName := authMethodServiceAccount.Secrets[0].Name
-
-	// Get the secret that will contain the ServiceAccount JWT token.
+	// Because there could be multiple secrets attached to the service account,
+	// we need pick the first one of type "kubernetes.io/service-account-token".
 	var saSecret *apiv1.Secret
-	err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", saSecretName),
-		func() error {
-			var err error
-			saSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), saSecretName, metav1.GetOptions{})
-			return err
-		})
+	for _, secretRef := range authMethodServiceAccount.Secrets {
+		var secret *apiv1.Secret
+		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secretRef.Name),
+			func() error {
+				var err error
+				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
+				return err
+			})
+		if secret != nil && secret.Type == apiv1.SecretTypeServiceAccountToken {
+			saSecret = secret
+			break
+		}
+	}
 	if err != nil {
 		return api.ACLAuthMethod{}, err
+	}
+	// This is very unlikely to happen because Kubernetes ensure that there is always
+	// a secret of type ServiceAccountToken.
+	if saSecret == nil {
+		return api.ACLAuthMethod{},
+			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", saName)
 	}
 
 	kubernetesHost := defaultKubernetesHost

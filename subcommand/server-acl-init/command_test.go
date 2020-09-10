@@ -106,6 +106,7 @@ func TestRun_Defaults(t *testing.T) {
 		clientset: k8s,
 	}
 	args := []string{
+		"-timeout=1m",
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
@@ -251,6 +252,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-timeout=1m",
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
@@ -407,6 +409,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-timeout=1m",
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
 				"-server-address", strings.Split(secondaryAddr, ":")[0],
@@ -534,6 +537,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 				clientset: k8s,
 			}
 			cmdArgs := append([]string{
+				"-timeout=1m",
 				"-k8s-namespace", ns,
 				"-bootstrap-token-file", tokenFile,
 				"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
@@ -642,6 +646,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-timeout=1m",
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(consulHTTPAddr, ":")[0],
@@ -736,6 +741,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			cmd.init()
 			bindingRuleSelector := "serviceaccount.name!=default"
 			cmdArgs := []string{
+				"-timeout=1m",
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
@@ -806,6 +812,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 
 	// First, create an auth method using the defaults
 	responseCode := cmd.Run([]string{
+		"-timeout=1m",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
@@ -848,6 +855,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 
 	// Run command again
 	responseCode = cmd.Run([]string{
+		"-timeout=1m",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
@@ -1049,6 +1057,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
+			"-timeout=1m",
 			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
 			"-server-address=127.0.0.1",
@@ -1170,6 +1179,7 @@ func TestRun_NoLeader(t *testing.T) {
 	var responseCode int
 	go func() {
 		responseCode = cmd.Run([]string{
+			"-timeout=1m",
 			"-resource-prefix=" + resourcePrefix,
 			"-k8s-namespace=" + ns,
 			"-server-address=" + serverURL.Hostname(),
@@ -1280,6 +1290,7 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 		clientset: k8s,
 	}
 	responseCode := cmd.Run([]string{
+		"-timeout=1m",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=" + serverURL.Hostname(),
@@ -1380,6 +1391,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	}
 
 	responseCode := cmd.Run([]string{
+		"-timeout=500ms",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=" + serverURL.Hostname(),
@@ -1461,6 +1473,7 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 	}
 
 	responseCode := cmd.Run([]string{
+		"-timeout=500ms",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=" + serverURL.Hostname(),
@@ -1493,10 +1506,10 @@ func TestRun_Timeout(t *testing.T) {
 	}
 
 	responseCode := cmd.Run([]string{
+		"-timeout=500ms",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-server-address=foo",
-		"-timeout=500ms",
 	})
 	require.Equal(1, responseCode, ui.ErrorWriter.String())
 }
@@ -1529,6 +1542,7 @@ func TestRun_HTTPS(t *testing.T) {
 	}
 
 	responseCode := cmd.Run([]string{
+		"-timeout=1m",
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
 		"-use-https",
@@ -1567,6 +1581,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	}
 	secondaryCmd.init()
 	secondaryCmdArgs := []string{
+		"-timeout=1m",
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(secondaryAddr, ":")[0],
 		"-server-port", strings.Split(secondaryAddr, ":")[1],
@@ -1621,6 +1636,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-timeout=1m",
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
 				"-server-address", strings.Split(serverAddr, ":")[0],
@@ -1667,6 +1683,7 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 		providers: map[string]discover.Provider{"mock": provider},
 	}
 	args := []string{
+		"-timeout=1m",
 		"-k8s-namespace=" + ns,
 		"-resource-prefix=" + resourcePrefix,
 		"-server-address", "provider=mock",
@@ -1736,6 +1753,7 @@ func TestRun_GatewayErrors(t *testing.T) {
 				clientset: k8s,
 			}
 			cmdArgs := []string{
+				"-timeout=500ms",
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
@@ -1966,6 +1984,9 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
 	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
+		// Create a service account that references two secrets.
+		// The second secret is mimicking the behavior on Openshift,
+		// where two secrets are injected: one with SA token and one with docker config.
 		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
 			context.Background(),
 			&v1.ServiceAccount{
@@ -1973,6 +1994,9 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 					Name: serviceAccountName,
 				},
 				Secrets: []v1.ObjectReference{
+					{
+						Name: resourcePrefix + "-some-other-secret",
+					},
 					{
 						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
 					},
@@ -1998,8 +2022,26 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 			"ca.crt": caCertBytes,
 			"token":  tokenBytes,
 		},
+		Type: v1.SecretTypeServiceAccountToken,
 	}
-	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
+	createOrUpdateSecret(t, k8s, secret)
+
+	// Create the second secret of a different type
+	otherSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-some-other-secret",
+		},
+		Data: map[string][]byte{},
+		Type: v1.SecretTypeDockercfg,
+	}
+	createOrUpdateSecret(t, k8s, otherSecret)
+
+	return string(caCertBytes), string(tokenBytes)
+}
+
+func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret) {
+	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(context.Background(), secret.Name, metav1.GetOptions{})
+	var err error
 	if existingSecret == nil {
 		_, err = k8s.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
 		require.NoError(t, err)
@@ -2007,8 +2049,6 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 		_, err = k8s.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
 		require.NoError(t, err)
 	}
-
-	return string(caCertBytes), string(tokenBytes)
 }
 
 // policyExists asserts that policy with name exists. Returns the policy
