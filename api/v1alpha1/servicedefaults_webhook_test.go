@@ -45,7 +45,7 @@ func TestRun_HandleErrorsIfServiceDefaultsWithSameNameExists(t *testing.T) {
 	validator := &serviceDefaultsValidator{
 		Client:       client,
 		ConsulClient: consulClient,
-		Logger:       logrtest.NullLogger{},
+		Logger:       logrtest.TestLogger{T: t},
 	}
 
 	decoder, err := admission.NewDecoder(scheme.Scheme)

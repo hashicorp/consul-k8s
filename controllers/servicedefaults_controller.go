@@ -2,10 +2,11 @@ package controllers
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,30 @@ type ServiceDefaultsReconciler struct {
 	Log          logr.Logger
 	Scheme       *runtime.Scheme
 	ConsulClient *capi.Client
+
+	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
+	// with version 1.7+ which supports namespaces.
+	EnableConsulNamespaces bool
+
+	// ConsulDestinationNamespace is the name of the Consul namespace to create
+	// all config entries in. If EnableNSMirroring is true this is ignored.
+	ConsulDestinationNamespace string
+
+	// EnableNSMirroring causes Consul namespaces to be created to match the
+	// k8s namespace of any config entry custom resource. Config entries will
+	// be created in the matching Consul namespace.
+	EnableNSMirroring bool
+
+	// NSMirroringPrefix is an optional prefix that can be added to the Consul
+	// namespaces created while mirroring. For example, if it is set to "k8s-",
+	// then the k8s `default` namespace will be mirrored in Consul's
+	// `k8s-default` namespace.
+	NSMirroringPrefix string
+
+	// CrossNSACLPolicy is the name of the ACL policy to attach to
+	// any created Consul namespaces to allow cross namespace service discovery.
+	// Only necessary if ACLs are enabled.
+	CrossNSACLPolicy string
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicedefaults,verbs=get;list;watch;create;update;patch;delete
@@ -36,14 +61,14 @@ type ServiceDefaultsReconciler struct {
 
 func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	logger := r.Log.WithValues("servicedefaults", req.NamespacedName)
+	logger := r.Log.WithValues("controller", "servicedefaults", "request", req.NamespacedName)
 	var svcDefaults consulv1alpha1.ServiceDefaults
 
 	err := r.Get(ctx, req.NamespacedName, &svcDefaults)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
-		logger.Error(err, "failed to retrieve resource")
+		logger.Error(err, "retrieving resource")
 		return ctrl.Result{}, err
 	}
 
@@ -64,9 +89,11 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			logger.Info("deletion event")
 			// Our finalizer is present, so we need to delete the config entry
 			// from consul.
-			_, err = r.ConsulClient.ConfigEntries().Delete(capi.ServiceDefaults, svcDefaults.Name, nil)
+			_, err = r.ConsulClient.ConfigEntries().Delete(capi.ServiceDefaults, svcDefaults.Name, &capi.WriteOptions{
+				Namespace: r.consulNamespace(req.Namespace),
+			})
 			if err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
 			}
 			logger.Info("deletion from Consul successful")
 
@@ -83,61 +110,55 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	}
 
 	// Check to see if consul has service defaults with the same name
-	entry, _, err := r.ConsulClient.ConfigEntries().Get(capi.ServiceDefaults, svcDefaults.Name, nil)
+	entry, _, err := r.ConsulClient.ConfigEntries().Get(capi.ServiceDefaults, svcDefaults.Name, &capi.QueryOptions{
+		Namespace: r.consulNamespace(req.Namespace),
+	})
 	// If a config entry with this name does not exist
 	if isNotFoundErr(err) {
-		// Create the config entry
-		_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), nil)
-		if err != nil {
-			svcDefaults.Status.Conditions = syncFailed(ConsulAgentError, err.Error())
-			if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-				return ctrl.Result{}, err
+		logger.Info("config entry not found in consul")
+
+		// If Consul namespaces are enabled we may need to create the
+		// destination consul namespace first.
+		if r.EnableConsulNamespaces {
+			if err := namespaces.EnsureExists(r.ConsulClient, r.consulNamespace(req.Namespace), r.CrossNSACLPolicy); err != nil {
+				return r.syncFailed(logger, svcDefaults, ConsulAgentError,
+					fmt.Errorf("creating consul namespace %q: %w", r.consulNamespace(req.Namespace), err))
 			}
-			return ctrl.Result{}, err
 		}
-		svcDefaults.Status.Conditions = syncSuccessful()
-		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-			return ctrl.Result{}, err
+
+		// Create the config entry
+		_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), &capi.WriteOptions{
+			Namespace: r.consulNamespace(req.Namespace),
+		})
+		if err != nil {
+			return r.syncFailed(logger, svcDefaults, ConsulAgentError,
+				fmt.Errorf("writing config entry to consul: %w", err))
 		}
-		return ctrl.Result{}, nil
+		return r.syncSuccessful(svcDefaults)
 	}
 
-	// If there is an error when trying to get the config entry from the api server, fail the reconcile
+	// If there is an error when trying to get the config entry from the api server,
+	// fail the reconcile.
 	if err != nil {
-		svcDefaults.Status.Conditions = syncFailed(ConsulAgentError, err.Error())
-		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, err
+		return r.syncFailed(logger, svcDefaults, ConsulAgentError, err)
 	}
 
 	svcDefaultEntry, ok := entry.(*capi.ServiceConfigEntry)
 	if !ok {
-		err := errors.New("could not cast entry as ServiceConfigEntry")
-		svcDefaults.Status.Conditions = syncUnknownWithError(CastError, err.Error())
-		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, err
+		return r.syncUnknownWithError(logger, svcDefaults, CastError,
+			fmt.Errorf("could not cast entry as ServiceConfigEntry"))
 	}
 	if !svcDefaults.MatchesConsul(svcDefaultEntry) {
-		_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), nil)
+		_, _, err := r.ConsulClient.ConfigEntries().Set(svcDefaults.ToConsul(), &capi.WriteOptions{
+			Namespace: r.consulNamespace(req.Namespace),
+		})
 		if err != nil {
-			svcDefaults.Status.Conditions = syncUnknownWithError(ConsulAgentError, err.Error())
-			if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, err
+			return r.syncUnknownWithError(logger, svcDefaults, ConsulAgentError,
+				fmt.Errorf("updating config entry in consul: %w", err))
 		}
-		svcDefaults.Status.Conditions = syncSuccessful()
-		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-			return ctrl.Result{}, err
-		}
+		return r.syncSuccessful(svcDefaults)
 	} else if !svcDefaults.Status.GetCondition(consulv1alpha1.ConditionSynced).IsTrue() {
-		svcDefaults.Status.Conditions = syncSuccessful()
-		if err := r.Status().Update(context.Background(), &svcDefaults); err != nil {
-			return ctrl.Result{}, err
-		}
+		return r.syncSuccessful(svcDefaults)
 	}
 
 	return ctrl.Result{}, nil
@@ -149,26 +170,50 @@ func (r *ServiceDefaultsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func syncFailed(reason, message string) consulv1alpha1.Conditions {
-	return consulv1alpha1.Conditions{
+// consulNamespace returns the namespace that a service should be
+// registered in based on the namespace options. It returns an
+// empty string if namespaces aren't enabled.
+func (r *ServiceDefaultsReconciler) consulNamespace(ns string) string {
+	if !r.EnableConsulNamespaces {
+		return ""
+	}
+
+	// Mirroring takes precedence.
+	if r.EnableNSMirroring {
+		return fmt.Sprintf("%s%s", r.NSMirroringPrefix, ns)
+	}
+
+	return r.ConsulDestinationNamespace
+}
+
+func (r *ServiceDefaultsReconciler) syncFailed(logger logr.Logger, svcDefaults consulv1alpha1.ServiceDefaults, errType string, err error) (ctrl.Result, error) {
+	svcDefaults.Status.Conditions = consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
 			Status:             corev1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
+			Reason:             errType,
+			Message:            err.Error(),
 		},
 	}
+	if updateErr := r.Status().Update(context.Background(), &svcDefaults); updateErr != nil {
+		// Log the original error here because we are returning the updateErr.
+		// Otherwise the original error would be lost.
+		logger.Error(err, "sync failed")
+		return ctrl.Result{}, updateErr
+	}
+	return ctrl.Result{}, err
 }
 
-func syncSuccessful() consulv1alpha1.Conditions {
-	return consulv1alpha1.Conditions{
+func (r *ServiceDefaultsReconciler) syncSuccessful(svcDefaults consulv1alpha1.ServiceDefaults) (ctrl.Result, error) {
+	svcDefaults.Status.Conditions = consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
 			Status:             corev1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 		},
 	}
+	return ctrl.Result{}, r.Status().Update(context.Background(), &svcDefaults)
 }
 
 func syncUnknown() consulv1alpha1.Conditions {
@@ -181,16 +226,23 @@ func syncUnknown() consulv1alpha1.Conditions {
 	}
 }
 
-func syncUnknownWithError(reason, message string) consulv1alpha1.Conditions {
-	return consulv1alpha1.Conditions{
+func (r *ServiceDefaultsReconciler) syncUnknownWithError(logger logr.Logger, svcDefaults consulv1alpha1.ServiceDefaults, errType string, err error) (ctrl.Result, error) {
+	svcDefaults.Status.Conditions = consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
 			Status:             corev1.ConditionUnknown,
 			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
+			Reason:             errType,
+			Message:            err.Error(),
 		},
 	}
+	if updateErr := r.Status().Update(context.Background(), &svcDefaults); updateErr != nil {
+		// Log the original error here because we are returning the updateErr.
+		// Otherwise the original error would be lost.
+		logger.Error(err, "sync status unknown")
+		return ctrl.Result{}, updateErr
+	}
+	return ctrl.Result{}, err
 }
 
 func isNotFoundErr(err error) bool {
