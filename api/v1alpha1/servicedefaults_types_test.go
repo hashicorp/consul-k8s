@@ -671,7 +671,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none" or ""`,
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none" or ""`,
 		},
 		"expose.paths[].protocol": {
 			&ServiceDefaults{
@@ -689,7 +689,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"`,
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"`,
 		},
 		"expose.paths[].path": {
 			&ServiceDefaults{
@@ -707,7 +707,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
 		"multi-error": {
 			&ServiceDefaults{
@@ -728,7 +728,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			`ServiceDefaults.consul.hashicorp.com "my-service" is invalid: [spec.meshGateway.mode: Invalid value: "invalid-mode": must be one of "remote", "local", "none" or "", spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"]`,
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.meshGateway.mode: Invalid value: "invalid-mode": must be one of "remote", "local", "none" or "", spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http" or "http2"]`,
 		},
 	}
 

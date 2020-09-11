@@ -11,6 +11,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	ConsulHashicorpGroup string = "consul.hashicorp.com"
+	ServiceDefaultsKind  string = "servicedefaults"
+)
+
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
 type ServiceDefaultsSpec struct {
 	// Protocol sets the protocol of the service. This is used by Connect proxies for
@@ -85,16 +90,15 @@ func (in *ServiceDefaults) Validate() error {
 	if err := in.Spec.MeshGateway.validate(); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := in.Spec.Expose.validate(); err != nil {
-		allErrs = append(allErrs, err...)
-	}
-	if len(allErrs) == 0 {
-		return nil
+	allErrs = append(allErrs, in.Spec.Expose.validate()...)
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKind},
+			in.Name, allErrs)
 	}
 
-	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "consul.hashicorp.com", Kind: "ServiceDefaults"},
-		in.Name, allErrs)
+	return nil
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
@@ -182,9 +186,5 @@ func (e ExposeConfig) validate() []*field.Error {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, `must be one of "http" or "http2"`))
 		}
 	}
-	if len(errs) == 0 {
-		return nil
-	} else {
-		return errs
-	}
+	return errs
 }
