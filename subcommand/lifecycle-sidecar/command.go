@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -84,10 +85,6 @@ func (c *Command) Run(args []string) int {
 		"sync-period", c.flagSyncPeriod,
 		"log-level", c.flagLogLevel)
 
-	c.consulCommand = []string{"services", "register"}
-	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
-	c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
-
 	// The main work loop. We continually re-register our service every
 	// syncPeriod. Consul is smart enough to know when the service hasn't changed
 	// and so won't update any indices. This means we won't be causing a lot
@@ -96,14 +93,69 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
+		// https://github.com/hashicorp/consul-k8s/issues/275
+		// Changing to poll per sync-period and only re-register if service is
+		// no longer registered.
+
+		// 275: get registered services
+		c.consulCommand = []string{"consul", "catalog", "services"}
 		cmd := exec.Command(c.flagConsulBinary, c.consulCommand...)
 
-		// Run the command and record the stdout and stderr output
+		// 275: Poll consul
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err)
+			logger.Error("failed to poll services", "output", strings.TrimSpace(string(output)), "err", err)
 		} else {
-			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
+			logger.Info("successfully polled services", "output", strings.TrimSpace(string(output)))
+		}
+
+		// 275: parse list of registered services from local hcl file.
+		// We set devMode to true so we can get the basic valid default
+		// configuration. devMode doesn't set any services by default so this
+		// is okay since we only look at services.
+		devMode := true
+		b, err := config.NewBuilder(config.BuilderOpts{
+			ConfigFiles: []string{c.flagServiceConfig},
+			DevMode:     &devMode,
+		})
+		if err != nil {
+			c.UI.Error("Error initializing service builder: " + err.Error())
+		}
+
+		cfg, err := b.BuildAndValidate()
+		if err != nil {
+			c.UI.Error("Error building service configuration: " + err.Error())
+		}
+		for _, w := range b.Warnings {
+			c.UI.Warn("Waring after builing service configuration: " + w)
+		}
+
+		// 275: convert output to slice of strings and check for existence of service
+		serviceIsRegistered := false
+		registeredServices := strings.Split(string(output), "\n")
+		for _, registeredService := range registeredServices {
+			for _, configuredService := range cfg.Services {
+				if registeredService == configuredService.Name {
+					serviceIsRegistered = true
+				}
+			}
+		}
+
+		// 275: if registered, register service
+		if !serviceIsRegistered {
+			// TODO: Am I allowed to reuse this object?
+			c.consulCommand = []string{"services", "register"}
+			c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
+			c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
+			cmd = exec.Command(c.flagConsulBinary, c.consulCommand...)
+
+			// Run the command and record the stdout and stderr output
+			output, err = cmd.CombinedOutput()
+			if err != nil {
+				logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err)
+			} else {
+				logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
+			}
 		}
 
 		// Re-loop after syncPeriod or exit if we receive an interrupt.
