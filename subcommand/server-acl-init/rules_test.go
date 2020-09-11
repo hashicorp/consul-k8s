@@ -513,9 +513,9 @@ func TestControllerRules(t *testing.T) {
 			Name:             "namespaces=disabled",
 			EnableNamespaces: false,
 			Expected: `operator = "write"
-service_prefix "" {
-  policy = "write"
-}`,
+  service_prefix "" {
+    policy = "write"
+  }`,
 		},
 		{
 			Name:             "namespaces=enabled, consulDestNS=consul",

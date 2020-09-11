@@ -252,13 +252,11 @@ namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
 {{- else }}
 namespace "{{ .InjectConsulDestNS }}" {
 {{- end }}
+{{- end }}
   service_prefix "" {
     policy = "write"
   }
-}
-{{- else }}
-service_prefix "" {
-  policy = "write"
+{{- if .EnableNamespaces }}
 }
 {{- end }}
 `
