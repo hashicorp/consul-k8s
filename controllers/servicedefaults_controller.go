@@ -78,8 +78,7 @@ func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		// registering our finalizer.
 		if !containsString(svcDefaults.ObjectMeta.Finalizers, FinalizerName) {
 			svcDefaults.ObjectMeta.Finalizers = append(svcDefaults.ObjectMeta.Finalizers, FinalizerName)
-			svcDefaults.Status.Conditions = syncUnknown()
-			if err := r.Update(context.Background(), &svcDefaults); err != nil {
+			if err := r.syncUnknown(&svcDefaults); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -170,7 +169,7 @@ func (r *ServiceDefaultsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// consulNamespace returns the namespace that a service should be
+// consulNamespace returns the consul namespace that a service should be
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
 func (r *ServiceDefaultsReconciler) consulNamespace(ns string) string {
@@ -216,14 +215,15 @@ func (r *ServiceDefaultsReconciler) syncSuccessful(svcDefaults consulv1alpha1.Se
 	return ctrl.Result{}, r.Status().Update(context.Background(), &svcDefaults)
 }
 
-func syncUnknown() consulv1alpha1.Conditions {
-	return consulv1alpha1.Conditions{
+func (r *ServiceDefaultsReconciler) syncUnknown(svcDefaults *consulv1alpha1.ServiceDefaults) error {
+	svcDefaults.Status.Conditions = consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
 			Status:             corev1.ConditionUnknown,
 			LastTransitionTime: metav1.Now(),
 		},
 	}
+	return r.Update(context.Background(), svcDefaults)
 }
 
 func (r *ServiceDefaultsReconciler) syncUnknownWithError(logger logr.Logger, svcDefaults consulv1alpha1.ServiceDefaults, errType string, err error) (ctrl.Result, error) {
