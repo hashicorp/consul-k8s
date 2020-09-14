@@ -120,12 +120,12 @@ func (c *Command) init() {
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
-		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flags.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
-		"[Enterprise Only] Defines which Consul namespace to register all synced services into. If 'enable-namespace-mirroring' "+
+		"[Enterprise Only] Defines which Consul namespace to register all synced services into. If '-enable-k8s-namespace-mirroring' "+
 			"is true, this is not used.")
 	c.flags.BoolVar(&c.flagEnableK8SNSMirroring, "enable-k8s-namespace-mirroring", false, "[Enterprise Only] Enables "+
-		"namespace mirroring")
+		"namespace mirroring.")
 	c.flags.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
@@ -197,19 +197,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Convert allow/deny lists to sets
-	allowSet := mapset.NewSet()
-	denySet := mapset.NewSet()
+	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
+	denySet := flags.ToSet(c.flagDenyK8sNamespacesList)
 	if c.flagK8SSourceNamespace != "" {
 		// For backwards compatibility, if `flagK8SSourceNamespace` is set,
 		// it will be the only allowed namespace
-		allowSet.Add(c.flagK8SSourceNamespace)
-	} else {
-		for _, allow := range c.flagAllowK8sNamespacesList {
-			allowSet.Add(allow)
-		}
-		for _, deny := range c.flagDenyK8sNamespacesList {
-			denySet.Add(deny)
-		}
+		allowSet = mapset.NewSet(c.flagK8SSourceNamespace)
 	}
 	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
