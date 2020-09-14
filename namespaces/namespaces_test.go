@@ -159,3 +159,52 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 		})
 	}
 }
+
+func TestConsulNamespace(t *testing.T) {
+	cases := map[string]struct {
+		kubeNS                 string
+		enableConsulNamespaces bool
+		consulDestNS           string
+		enableMirroring        bool
+		mirroringPrefix        string
+		expNS                  string
+	}{
+		"namespaces disabled": {
+			enableConsulNamespaces: false,
+			expNS:                  "",
+		},
+		"mirroring": {
+			enableConsulNamespaces: true,
+			enableMirroring:        true,
+			kubeNS:                 "kube",
+			expNS:                  "kube",
+		},
+		"mirroring with prefix": {
+			enableConsulNamespaces: true,
+			enableMirroring:        true,
+			mirroringPrefix:        "prefix-",
+			kubeNS:                 "kube",
+			expNS:                  "prefix-kube",
+		},
+		"destination consul ns": {
+			enableConsulNamespaces: true,
+			consulDestNS:           "dest",
+			kubeNS:                 "kube",
+			expNS:                  "dest",
+		},
+		"mirroring takes precedence": {
+			enableConsulNamespaces: true,
+			consulDestNS:           "dest",
+			enableMirroring:        true,
+			kubeNS:                 "kube",
+			expNS:                  "kube",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			act := ConsulNamespace(c.kubeNS, c.enableConsulNamespaces, c.consulDestNS, c.enableMirroring, c.mirroringPrefix)
+			require.Equal(t, c.expNS, act)
+		})
+	}
+}

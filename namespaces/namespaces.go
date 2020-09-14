@@ -3,6 +3,8 @@
 package namespaces
 
 import (
+	"fmt"
+
 	capi "github.com/hashicorp/consul/api"
 )
 
@@ -39,4 +41,20 @@ func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) error
 
 	_, _, err = client.Namespaces().Create(&consulNamespace, nil)
 	return err
+}
+
+// ConsulNamespace returns the consul namespace that a service should be
+// registered in based on the namespace options. It returns an
+// empty string if namespaces aren't enabled.
+func ConsulNamespace(kubeNS string, enableConsulNamespaces bool, consulDestNS string, enableMirroring bool, mirroringPrefix string) string {
+	if !enableConsulNamespaces {
+		return ""
+	}
+
+	// Mirroring takes precedence.
+	if enableMirroring {
+		return fmt.Sprintf("%s%s", mirroringPrefix, kubeNS)
+	}
+
+	return consulDestNS
 }

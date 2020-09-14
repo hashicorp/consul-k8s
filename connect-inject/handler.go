@@ -491,16 +491,7 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
 func (h *Handler) consulNamespace(ns string) string {
-	if !h.EnableNamespaces {
-		return ""
-	}
-
-	// Mirroring takes precedence
-	if h.EnableK8SNSMirroring {
-		return fmt.Sprintf("%s%s", h.K8SNSMirroringPrefix, ns)
-	} else {
-		return h.ConsulDestinationNamespace
-	}
+	return namespaces.ConsulNamespace(ns, h.EnableNamespaces, h.ConsulDestinationNamespace, h.EnableK8SNSMirroring, h.K8SNSMirroringPrefix)
 }
 
 func portValue(pod *corev1.Pod, value string) (int32, error) {

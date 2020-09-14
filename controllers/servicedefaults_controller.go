@@ -173,16 +173,7 @@ func (r *ServiceDefaultsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
 func (r *ServiceDefaultsReconciler) consulNamespace(ns string) string {
-	if !r.EnableConsulNamespaces {
-		return ""
-	}
-
-	// Mirroring takes precedence.
-	if r.EnableNSMirroring {
-		return fmt.Sprintf("%s%s", r.NSMirroringPrefix, ns)
-	}
-
-	return r.ConsulDestinationNamespace
+	return namespaces.ConsulNamespace(ns, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
 }
 
 func (r *ServiceDefaultsReconciler) syncFailed(logger logr.Logger, svcDefaults consulv1alpha1.ServiceDefaults, errType string, err error) (ctrl.Result, error) {
