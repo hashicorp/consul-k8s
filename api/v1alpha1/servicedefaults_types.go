@@ -175,15 +175,15 @@ func (e ExposeConfig) toConsul() capi.ExposeConfig {
 
 func (e ExposeConfig) validate() []*field.Error {
 	var errs field.ErrorList
+	protocols := []string{"http", "http2"}
 	for i, path := range e.Paths {
 		if path.Path != "" && !strings.HasPrefix(path.Path, "/") {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
 		}
-		switch path.Protocol {
-		case "http", "http2":
+		if sliceContains(protocols, path.Protocol) {
 			continue
-		default:
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, `must be one of "http" or "http2"`))
+		} else {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, notInSliceMessage(protocols)))
 		}
 	}
 	return errs
