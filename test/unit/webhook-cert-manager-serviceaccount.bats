@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "controller/ServiceAccount: disabled by default" {
+@test "webhookCertManager/ServiceAccount: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/controller-serviceaccount.yaml  \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
       .
 }
 
-@test "controller/ServiceAccount: enabled with controller.enabled=true" {
+@test "webhookCertManager/ServiceAccount: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/controller-serviceaccount.yaml  \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
@@ -22,10 +22,10 @@ load _helpers
 #--------------------------------------------------------------------
 # global.imagePullSecrets
 
-@test "controller/ServiceAccount: can set image pull secrets" {
+@test "webhookCertManager/ServiceAccount: can set image pull secrets" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/controller-serviceaccount.yaml  \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
       --set 'controller.enabled=true' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
