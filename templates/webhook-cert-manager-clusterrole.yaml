@@ -31,4 +31,14 @@ rules:
   - list
   - watch
   - patch
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  resourceNames:
+  - {{ template "consul.fullname" . }}-connect-injector-webhook
+  verbs:
+  - use
+{{- end }}
 {{- end }}
