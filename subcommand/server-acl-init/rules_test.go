@@ -504,28 +504,51 @@ func TestControllerRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
+		DestConsulNS     string
+		Mirroring        bool
+		MirroringPrefix  string
 		Expected         string
 	}{
 		{
-			"Namespaces are disabled",
-			false,
-			`operator = "write"
-node_prefix "" {
-  policy = "write"
-}
-service_prefix "" {
-  policy = "write"
+			Name:             "namespaces=disabled",
+			EnableNamespaces: false,
+			Expected: `operator = "write"
+  service_prefix "" {
+    policy = "write"
+  }`,
+		},
+		{
+			Name:             "namespaces=enabled, consulDestNS=consul",
+			EnableNamespaces: true,
+			DestConsulNS:     "consul",
+			Expected: `operator = "write"
+namespace "consul" {
+  service_prefix "" {
+    policy = "write"
+  }
 }`,
 		},
 		{
-			"Namespaces are enabled",
-			true,
-			`operator = "write"
-node_prefix "" {
-  policy = "write"
-}
-service_prefix "" {
-  policy = "write"
+			Name:             "namespaces=enabled, mirroring=true",
+			EnableNamespaces: true,
+			Mirroring:        true,
+			Expected: `operator = "write"
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			Name:             "namespaces=enabled, mirroring=true, mirroringPrefix=prefix-",
+			EnableNamespaces: true,
+			Mirroring:        true,
+			MirroringPrefix:  "prefix-",
+			Expected: `operator = "write"
+namespace_prefix "prefix-" {
+  service_prefix "" {
+    policy = "write"
+  }
 }`,
 		},
 	}
@@ -535,7 +558,10 @@ service_prefix "" {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnableNamespaces:                 tt.EnableNamespaces,
+				flagConsulInjectDestinationNamespace: tt.DestConsulNS,
+				flagEnableInjectK8SNSMirroring:       tt.Mirroring,
+				flagInjectK8SNSMirroringPrefix:       tt.MirroringPrefix,
 			}
 
 			rules, err := cmd.controllerRules()
