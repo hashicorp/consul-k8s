@@ -28,6 +28,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	defaultCertExpiry    = 24 * time.Hour
+	defaultRetryDuration = 30 * time.Minute
+	errorRetryDuration   = 1 * time.Second
+)
+
 type Command struct {
 	UI cli.Ui
 
@@ -112,7 +118,7 @@ func (c *Command) Run(args []string) int {
 
 	configFile, err := ioutil.ReadFile(c.flagConfigFile)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error reading config file from %s", c.flagConfigFile))
+		c.UI.Error(fmt.Sprintf("Error reading config file from %s: %s", c.flagConfigFile, err))
 		return 1
 	}
 	var configs []webhookConfig
@@ -122,13 +128,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	ctx := context.Background()
-	ctx, cancelFunc := context.WithCancel(ctx)
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	for _, config := range configs {
+	for i, config := range configs {
 		if err := config.validate(ctx, c.clientset); err != nil {
-			c.UI.Error(fmt.Sprintf("Error parsing config: %s", err))
+			c.UI.Error(fmt.Sprintf("Error parsing config at index %d: %s", i, err))
 			return 1
 		}
 	}
@@ -142,7 +147,7 @@ func (c *Command) Run(args []string) int {
 	if c.certExpiry != nil {
 		expiry = *c.certExpiry
 	} else {
-		expiry = 24 * time.Hour
+		expiry = defaultCertExpiry
 	}
 
 	for _, config := range configs {
@@ -158,32 +163,31 @@ func (c *Command) Run(args []string) int {
 
 	go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 
-	closeNotifiers := func() {
-		for _, notifier := range notifiers {
-			notifier.Stop()
-		}
-	}
-
 	// We define a signal handler for OS interrupts, and when an SIGINT is received,
 	// we gracefully shut down, by first stopping our cert notifiers and then cancelling
 	// all the contexts that have been created by the process.
 	select {
 	case <-c.sigCh:
-		closeNotifiers()
 		cancelFunc()
+		for _, notifier := range notifiers {
+			notifier.Stop()
+		}
 		return 0
 	}
 }
 
+// certWatcher listens for a new MetaBundle on the ch channel for all webhooks and updates
+// MutatingWebhooksConfigs and Secrets when a new Bundle is available on the channel.
 func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface, log hclog.Logger) {
 	var bundle cert.MetaBundle
+	retryDuration := defaultRetryDuration
 	for {
 		select {
 		case bundle = <-ch:
-			log.Info(fmt.Sprintf("updated certificate bundle received for %s; updating webhook certs.", bundle.WebhookConfigName))
+			log.Info(fmt.Sprintf("Updated certificate bundle received for %s; Updating webhook certs.", bundle.WebhookConfigName))
 			// Bundle is updated, set it up
 
-		case <-time.After(30 * time.Minute):
+		case <-time.After(retryDuration):
 			// This forces the mutating ctrlWebhook config to remain updated
 			// fairly quickly. This is done every 30 minutes to ensure the certificates
 			// are in sync. Because the certificate and key are being read from a secret,
@@ -195,87 +199,113 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 			return
 		}
 
-		log.Info("getting secret from kubernetes")
-		certSecret, err := clientset.CoreV1().Secrets(bundle.SecretNamespace).Get(ctx, bundle.SecretName, metav1.GetOptions{})
-		if err != nil && k8serrors.IsNotFound(err) {
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      bundle.SecretName,
-					Namespace: bundle.SecretNamespace,
-				},
-				Data: map[string][]byte{
-					corev1.TLSCertKey:       bundle.Cert,
-					corev1.TLSPrivateKeyKey: bundle.Key,
-				},
-				Type: corev1.SecretTypeTLS,
-			}
-
-			log.Info(fmt.Sprintf("creating Kubernetes secret with certificate for the Mutating Webhook Config %s", bundle.WebhookConfigName))
-			if _, err := clientset.CoreV1().Secrets(bundle.SecretNamespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
-				log.Error(fmt.Sprintf("Error writing secret to API server: %s", err))
-				continue
-			}
-
-			log.Info("updating webhook configuration")
-			if err := c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
-				log.Error(fmt.Sprintf("Error updating webhook configuration: %s", err))
-				continue
-			}
-			continue
-		} else if err != nil {
-			log.Error(fmt.Sprintf("Error getting secret from Kubernetes: %s", err))
-			continue
-		}
-
-		// Don't update secret if the certificate is unchanged.
-		if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) {
-			continue
-		}
-
-		certSecret.Data[corev1.TLSCertKey] = bundle.Cert
-		certSecret.Data[corev1.TLSPrivateKeyKey] = bundle.Key
-
-		log.Info("updating secret with new certificate")
-		_, err = clientset.CoreV1().Secrets(bundle.SecretNamespace).Update(ctx, certSecret, metav1.UpdateOptions{})
-		if err != nil {
-			log.Error(fmt.Sprintf("error updating secret with certificate: %s", err))
-			continue
-		}
-
-		log.Info("updating webhook configuration with new CA")
-		if err := c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
-			log.Error(fmt.Sprintf("error updating webhook configuration: %s", err))
-			continue
+		if err := c.reconcileCertificates(ctx, clientset, bundle, log); err != nil {
+			retryDuration = errorRetryDuration
+		} else {
+			retryDuration = defaultRetryDuration
 		}
 	}
 }
 
+func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernetes.Interface, bundle cert.MetaBundle, log hclog.Logger) error {
+	iterLog := log.With("mutatingwebhookconfig", bundle.WebhookConfigName, "secret", bundle.SecretName, "secretNS", bundle.SecretNamespace)
+
+	iterLog.Info("Getting secret from kubernetes")
+	certSecret, err := clientset.CoreV1().Secrets(bundle.SecretNamespace).Get(ctx, bundle.SecretName, metav1.GetOptions{})
+	if err != nil && k8serrors.IsNotFound(err) {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bundle.SecretName,
+			},
+			Data: map[string][]byte{
+				corev1.TLSCertKey:       bundle.Cert,
+				corev1.TLSPrivateKeyKey: bundle.Key,
+			},
+			Type: corev1.SecretTypeTLS,
+		}
+
+		iterLog.Info("Creating Kubernetes secret with certificate")
+		if _, err = clientset.CoreV1().Secrets(bundle.SecretNamespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+			iterLog.Error(fmt.Sprintf("Error writing secret to API server: %s", err))
+			return err
+		}
+
+		iterLog.Info("Updating webhook configuration")
+		if err = c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
+			iterLog.Error("Error updating webhook configuration")
+			return err
+		}
+		return nil
+	} else if err != nil {
+		iterLog.Error(fmt.Sprintf("Error getting secret from Kubernetes: %s", err))
+		return err
+	}
+
+	// Don't update secret if the certificate and key are unchanged.
+	if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) && bytes.Equal(certSecret.Data[corev1.TLSPrivateKeyKey], bundle.Key) && c.webhookUpdated(ctx, bundle, clientset) {
+		return nil
+	}
+
+	certSecret.Data[corev1.TLSCertKey] = bundle.Cert
+	certSecret.Data[corev1.TLSPrivateKeyKey] = bundle.Key
+
+	iterLog.Info("Updating secret with new certificate")
+	_, err = clientset.CoreV1().Secrets(bundle.SecretNamespace).Update(ctx, certSecret, metav1.UpdateOptions{})
+	if err != nil {
+		iterLog.Error("Error updating secret with certificate", "err", err)
+		return err
+	}
+
+	iterLog.Info("Updating webhook configuration with new CA")
+	if err = c.updateWebhookConfig(ctx, bundle, clientset); err != nil {
+		iterLog.Error("Error updating webhook configuration", "err", err)
+		return err
+	}
+
+	return nil
+}
+
 func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaBundle, clientset kubernetes.Interface) error {
-	if len(metaBundle.CACert) > 0 {
-		value := base64.StdEncoding.EncodeToString(metaBundle.CACert)
+	if len(metaBundle.CACert) == 0 {
+		return errors.New("no CA certificate in the bundle")
+	}
+	value := base64.StdEncoding.EncodeToString(metaBundle.CACert)
 
-		webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		var patches []patch
-		for i := range webhookCfg.Webhooks {
-			patches = append(patches, patch{
-				Op:    "add",
-				Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
-				Value: value,
-			})
-		}
-		patchesJson, err := json.Marshal(patches)
-		if err != nil {
-			return err
-		}
+	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	var patches []patch
+	for i := range webhookCfg.Webhooks {
+		patches = append(patches, patch{
+			Op:    "add",
+			Path:  fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+			Value: value,
+		})
+	}
+	patchesJson, err := json.Marshal(patches)
+	if err != nil {
+		return err
+	}
 
-		if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
-			return err
-		}
+	if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
+		return err
 	}
 	return nil
+}
+
+func (c *Command) webhookUpdated(ctx context.Context, bundle cert.MetaBundle, clientset kubernetes.Interface) bool {
+	value := base64.StdEncoding.EncodeToString(bundle.CACert)
+	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	for _, webhook := range webhookCfg.Webhooks {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, []byte(value)) {
+			return false
+		}
+	}
+	return true
 }
 
 type webhookConfig struct {
@@ -309,8 +339,9 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 			}
 			return strings.Join(errStr, ", ")
 		}
+		return err
 	}
-	return err.ErrorOrNil()
+	return nil
 }
 
 type patch struct {

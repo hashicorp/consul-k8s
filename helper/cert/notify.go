@@ -23,9 +23,16 @@ type Notify struct {
 	ctxCancel context.CancelFunc
 	doneCh    <-chan struct{}
 
+	// WebhookConfigName is the name of the MutatingWebhookConfiguration
+	// that will be updated with the CA bundle when a new CA is generated.
 	WebhookConfigName string
-	SecretName        string
-	SecretNamespace   string
+	// SecretName is the name of the Kubernetes TLS secret that will be
+	// be created/updated with the leaf certificate and it's private key when
+	// a new certificate key pair are generated.
+	SecretName string
+	// SecretNamespace is the namespace in which the aforementioned secret
+	// will be created/updated.
+	SecretNamespace string
 }
 
 // Start starts the notifier. This blocks and should be started in a goroutine.

@@ -45,18 +45,18 @@ func TestRun_FlagValidation(t *testing.T) {
 
 func TestRun_SecretDoesNotExist(t *testing.T) {
 	t.Parallel()
-	secretOne := "secret-deploy-1"
-	secretTwo := "secret-deploy-2"
+	secretOneName := "secret-deploy-1"
+	secretTwoName := "secret-deploy-2"
 
-	webhookConfigOne := "webhookOne"
-	webhookConfigTwo := "webhookTwo"
+	webhookConfigOneName := "webhookOne"
+	webhookConfigTwoName := "webhookTwo"
 
 	caBundleOne := []byte("bootstrapped-CA-one")
 	caBundleTwo := []byte("bootstrapped-CA-two")
 
 	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookConfigOne,
+			Name: webhookConfigOneName,
 		},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -69,7 +69,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 	}
 	webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookConfigTwo,
+			Name: webhookConfigTwoName,
 		},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -107,42 +107,43 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
+	ctx := context.TODO()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
+		secretOne, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOneName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.Equal(r, secret1.Type, v1.SecretTypeTLS)
+		require.Equal(r, secretOne.Type, v1.SecretTypeTLS)
 
-		secret2, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretTwo, metav1.GetOptions{})
+		secretTwo, err := k8s.CoreV1().Secrets("default").Get(ctx, secretTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.Equal(r, secret2.Type, v1.SecretTypeTLS)
+		require.Equal(r, secretTwo.Type, v1.SecretTypeTLS)
 
-		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfigOne, metav1.GetOptions{})
-		require.NoError(t, err)
-		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundleOne)
+		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfigOne.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 
-		webhookConfig2, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfigTwo, metav1.GetOptions{})
-		require.NoError(t, err)
-		require.NotEqual(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
-		require.NotEqual(r, webhookConfig2.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
-		require.Equal(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, webhookConfig2.Webhooks[1].ClientConfig.CABundle)
+		webhookConfigTwo, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
+		require.NotEqual(r, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
+		require.Equal(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle)
 	})
 }
 
 func TestRun_SecretExists(t *testing.T) {
 	t.Parallel()
-	secretOne := "secret-deploy-1"
-	secretTwo := "secret-deploy-2"
+	secretOneName := "secret-deploy-1"
+	secretTwoName := "secret-deploy-2"
 
-	webhookConfigOne := "webhookOne"
-	webhookConfigTwo := "webhookTwo"
+	webhookConfigOneName := "webhookOne"
+	webhookConfigTwoName := "webhookTwo"
 
 	caBundleOne := []byte("bootstrapped-CA-one")
 	caBundleTwo := []byte("bootstrapped-CA-two")
 
-	secret1 := &v1.Secret{
+	secretOne := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretOne,
+			Name: secretOneName,
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       "cert-1",
@@ -150,9 +151,9 @@ func TestRun_SecretExists(t *testing.T) {
 		},
 		Type: v1.SecretTypeTLS,
 	}
-	secret2 := &v1.Secret{
+	secretTwo := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretTwo,
+			Name: secretTwoName,
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       "cert-2",
@@ -163,7 +164,7 @@ func TestRun_SecretExists(t *testing.T) {
 
 	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookConfigOne,
+			Name: webhookConfigOneName,
 		},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -176,7 +177,7 @@ func TestRun_SecretExists(t *testing.T) {
 	}
 	webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookConfigTwo,
+			Name: webhookConfigTwoName,
 		},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -194,7 +195,7 @@ func TestRun_SecretExists(t *testing.T) {
 		},
 	}
 
-	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, secret1, secret2)
+	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, secretOne, secretTwo)
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
@@ -214,27 +215,28 @@ func TestRun_SecretExists(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
+	ctx := context.TODO()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
+		secretOne, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOneName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.NotEqual(r, secret1.Data[v1.TLSCertKey], []byte("cert-1"))
-		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], []byte("private-key-1"))
+		require.NotEqual(r, secretOne.Data[v1.TLSCertKey], []byte("cert-1"))
+		require.NotEqual(r, secretOne.Data[v1.TLSPrivateKeyKey], []byte("private-key-1"))
 
-		secret2, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretTwo, metav1.GetOptions{})
+		secretTwo, err := k8s.CoreV1().Secrets("default").Get(ctx, secretTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.NotEqual(r, secret2.Data[v1.TLSCertKey], []byte("cert-2"))
-		require.NotEqual(r, secret2.Data[v1.TLSPrivateKeyKey], []byte("private-key-2"))
+		require.NotEqual(r, secretTwo.Data[v1.TLSCertKey], []byte("cert-2"))
+		require.NotEqual(r, secretTwo.Data[v1.TLSPrivateKeyKey], []byte("private-key-2"))
 
-		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfigOne, metav1.GetOptions{})
-		require.NoError(t, err)
-		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundleOne)
+		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfigOne.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 
-		webhookConfig2, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfigTwo, metav1.GetOptions{})
-		require.NoError(t, err)
-		require.NotEqual(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
-		require.NotEqual(r, webhookConfig2.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
-		require.Equal(r, webhookConfig2.Webhooks[0].ClientConfig.CABundle, webhookConfig2.Webhooks[1].ClientConfig.CABundle)
+		webhookConfigTwo, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
+		require.NotEqual(r, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
+		require.Equal(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle)
 	})
 }
 
@@ -296,10 +298,11 @@ func TestRun_SecretUpdates(t *testing.T) {
 
 	var certificate, key []byte
 
+	ctx := context.TODO()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	// First, check that the original secret contents are updated when the cert-manager starts.
 	retry.RunWith(timer, t, func(r *retry.R) {
-		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
+		secret1, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOne, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, secret1.Data[v1.TLSCertKey], []byte("cert-1"))
 		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], []byte("private-key-1"))
@@ -307,20 +310,86 @@ func TestRun_SecretUpdates(t *testing.T) {
 		certificate = secret1.Data[v1.TLSCertKey]
 		key = secret1.Data[v1.TLSPrivateKeyKey]
 
-		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfigOne, metav1.GetOptions{})
-		require.NoError(t, err)
+		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOne, metav1.GetOptions{})
+		require.NoError(r, err)
 		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 	})
 
 	// Wait for certs to be rotated.
 	time.Sleep(2 * time.Second)
 
+	timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	// Check that the certificate is rotated and the secret is updated.
 	retry.RunWith(timer, t, func(r *retry.R) {
-		secret1, err := k8s.CoreV1().Secrets("default").Get(context.TODO(), secretOne, metav1.GetOptions{})
+		secret1, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOne, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, secret1.Data[v1.TLSCertKey], certificate)
 		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], key)
+	})
+}
+
+// This test verifies that when there is an error while attempting to update
+// the certs or the webhook config, it retries the update every second until
+// it succeeds.
+func TestCertWatcher(t *testing.T) {
+	t.Parallel()
+
+	webhookName := "webhookOne"
+	webhook := &admissionv1beta1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: webhookName,
+		},
+		Webhooks: []admissionv1beta1.MutatingWebhook{
+			{
+				Name:         "webhook-under-test",
+				ClientConfig: admissionv1beta1.WebhookClientConfig{},
+			},
+		},
+	}
+
+	k8s := fake.NewSimpleClientset(webhook)
+	ui := cli.NewMockUi()
+
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+
+	file, err := ioutil.TempFile("", "config.json")
+	require.NoError(t, err)
+	defer os.Remove(file.Name())
+
+	_, err = file.Write([]byte(configFileUpdates))
+	require.NoError(t, err)
+
+	exitCh := runCommandAsynchronously(&cmd, []string{
+		"-config-file", file.Name(),
+	})
+	defer stopCommand(t, &cmd, exitCh)
+
+	ctx := context.TODO()
+	// This first sleep is required to ensure the command had completed validating that the MWC does exist in the cluster
+	// It ensures the MWC is absent when the server actually attempts to update it with a bundle.
+	time.Sleep(1 * time.Millisecond)
+	err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(ctx, webhookName, metav1.DeleteOptions{})
+	require.NoError(t, err)
+
+	// This sleep ensures the cluster attempts to try updating the MWC every second and fails before we re-create it in the cluster.
+	time.Sleep(2 * time.Second)
+	_, err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(ctx, webhook, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// If this test passes, it implies that the system has recovered before a new certificate is available
+	// or its default retry timer of 30 minutes has forced the reconcile.
+	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, "")
+		// This verifies that the MWC is populated with a valid certificate which has a
+		// a len of 800 chars. But the length is not deterministic because it is encoded.
+		require.True(r, len(webhookConfig1.Webhooks[0].ClientConfig.CABundle) > 800)
 	})
 }
 
