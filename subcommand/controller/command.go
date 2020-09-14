@@ -29,6 +29,13 @@ type Command struct {
 	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
 
+	// Flags to support Consul Enterprise namespaces.
+	flagEnableNamespaces           bool
+	flagConsulDestinationNamespace string
+	flagEnableNSMirroring          bool
+	flagNSMirroringPrefix          string
+	flagCrossNSACLPolicy           string
+
 	once sync.Once
 	help string
 }
@@ -50,6 +57,18 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
+		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored.")
+	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
+		"[Enterprise Only] Defines which Consul namespace to create all config entries in, regardless of their source Kubernetes namespace."+
+			" If '-enable-k8s-namespace-mirroring' is true, this is not used.")
+	c.flagSet.BoolVar(&c.flagEnableNSMirroring, "enable-k8s-namespace-mirroring", false, "[Enterprise Only] Enables "+
+		"k8s namespace mirroring.")
+	c.flagSet.StringVar(&c.flagNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
+		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
+	c.flagSet.StringVar(&c.flagCrossNSACLPolicy, "consul-cross-namespace-acl-policy", "",
+		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
+			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 
@@ -93,10 +112,15 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err = (&controllers.ServiceDefaultsReconciler{
-		Client:       mgr.GetClient(),
-		Log:          ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
-		Scheme:       mgr.GetScheme(),
-		ConsulClient: consulClient,
+		Client:                     mgr.GetClient(),
+		Log:                        ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
+		Scheme:                     mgr.GetScheme(),
+		ConsulClient:               consulClient,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableNSMirroring,
+		NSMirroringPrefix:          c.flagNSMirroringPrefix,
+		CrossNSACLPolicy:           c.flagCrossNSACLPolicy,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceDefaults")
 		return 1
@@ -110,7 +134,6 @@ func (c *Command) Run(args []string) int {
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 	}
-
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

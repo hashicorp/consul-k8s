@@ -499,3 +499,75 @@ namespace_prefix "" {
 		})
 	}
 }
+
+func TestControllerRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		EnableNamespaces bool
+		DestConsulNS     string
+		Mirroring        bool
+		MirroringPrefix  string
+		Expected         string
+	}{
+		{
+			Name:             "namespaces=disabled",
+			EnableNamespaces: false,
+			Expected: `operator = "write"
+  service_prefix "" {
+    policy = "write"
+  }`,
+		},
+		{
+			Name:             "namespaces=enabled, consulDestNS=consul",
+			EnableNamespaces: true,
+			DestConsulNS:     "consul",
+			Expected: `operator = "write"
+namespace "consul" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			Name:             "namespaces=enabled, mirroring=true",
+			EnableNamespaces: true,
+			Mirroring:        true,
+			Expected: `operator = "write"
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			Name:             "namespaces=enabled, mirroring=true, mirroringPrefix=prefix-",
+			EnableNamespaces: true,
+			Mirroring:        true,
+			MirroringPrefix:  "prefix-",
+			Expected: `operator = "write"
+namespace_prefix "prefix-" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			cmd := Command{
+				flagEnableNamespaces:                 tt.EnableNamespaces,
+				flagConsulInjectDestinationNamespace: tt.DestConsulNS,
+				flagEnableInjectK8SNSMirroring:       tt.Mirroring,
+				flagInjectK8SNSMirroringPrefix:       tt.MirroringPrefix,
+			}
+
+			rules, err := cmd.controllerRules()
+
+			require.NoError(err)
+			require.Equal(tt.Expected, rules)
+		})
+	}
+}
