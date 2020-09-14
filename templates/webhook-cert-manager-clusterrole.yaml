@@ -2,13 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-controller-cert-manager
+  name: {{ template "consul.fullname" . }}-webhook-cert-manager
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: controller
+    component: webhook-cert-manager
 rules:
 - apiGroups:
   - ""

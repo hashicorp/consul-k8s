@@ -2,13 +2,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "consul.fullname" . }}-controller-cert-manager
+  name: {{ template "consul.fullname" . }}-webhook-cert-manager
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: controller
+    component: webhook-cert-manager
 spec:
   replicas: 1
   selector:
@@ -17,7 +17,7 @@ spec:
       chart: {{ template "consul.chart" . }}
       heritage: {{ .Release.Service }}
       release: {{ .Release.Name }}
-      component: controller
+      component: webhook-cert-manager
   template:
     metadata:
       labels:
@@ -25,10 +25,10 @@ spec:
         chart: {{ template "consul.chart" . }}
         heritage: {{ .Release.Service }}
         release: {{ .Release.Name }}
-        component: controller
+        component: webhook-cert-manager
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/controller-cert-manager-configmap.yaml") . | sha256sum }}
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
     spec:
       containers:
       - command:
@@ -36,14 +36,14 @@ spec:
         - "-ec"
         - |
           consul-k8s webhook-cert-manager \
-          -config-file=/tmp/config/webhook-config.json
+            -config-file=/bootstrap/config/webhook-config.json
         env:
         - name: NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
         image: {{ .Values.global.imageK8S }}
-        name: controller-cert-manager
+        name: webhook-cert-manager
         resources:
           limits:
             cpu: 100m
@@ -53,9 +53,9 @@ spec:
             memory: 20Mi
         volumeMounts:
         - name: config
-          mountPath: /tmp/config
+          mountPath: /bootstrap/config
       terminationGracePeriodSeconds: 10
-      serviceAccountName: {{ template "consul.fullname" . }}-controller-cert-manager
+      serviceAccountName: {{ template "consul.fullname" . }}-webhook-cert-manager
       volumes:
       - name: config
         configMap:

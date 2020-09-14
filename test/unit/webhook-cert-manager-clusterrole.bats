@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "controller-cert-manager/Configmap: disabled by default" {
+@test "webhookCertManager/ClusterRole: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/controller-cert-manager-configmap.yaml  \
+      -s templates/webhook-cert-manager-clusterrole.yaml  \
       .
 }
 
-@test "controller-cert-manager/Configmap: enabled with controller.enabled=true" {
+@test "webhookCertManager/ClusterRole: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/controller-cert-manager-configmap.yaml  \
+      -s templates/webhook-cert-manager-clusterrole.yaml  \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
