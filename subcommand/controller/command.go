@@ -54,7 +54,7 @@ func (c *Command) init() {
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
-		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored")
+		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
 		"[Enterprise Only] Defines which Consul namespace to create all config entries in, regardless of their source Kubernetes namespace."+
 			" If '-enable-k8s-namespace-mirroring' is true, this is not used.")

@@ -5,11 +5,9 @@ package namespaces
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,36 +26,18 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 		tt.Run(fmt.Sprintf("acls: %t", c.ACLsEnabled), func(t *testing.T) {
 			req := require.New(t)
 			ns := "ns"
+			masterToken := "master"
 
 			consul, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.ACL.Enabled = c.ACLsEnabled
 				cfg.ACL.DefaultPolicy = "deny"
+				cfg.ACL.Tokens.Master = masterToken
 			})
 			req.NoError(err)
 			defer consul.Stop()
-
-			var bootstrapToken string
-			if c.ACLsEnabled {
-				// Set up a client for bootstrapping
-				bootClient, err := capi.NewClient(&capi.Config{
-					Address: consul.HTTPAddr,
-				})
-				require.NoError(t, err)
-
-				// Bootstrap the server and get the bootstrap token
-				var bootstrapResp *capi.ACLToken
-				timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-				retry.RunWith(timer, t, func(r *retry.R) {
-					bootstrapResp, _, err = bootClient.ACL().Bootstrap()
-					require.NoError(r, err)
-				})
-				bootstrapToken = bootstrapResp.SecretID
-				require.NotEmpty(t, bootstrapToken)
-			}
-
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
-				Token:   bootstrapToken,
+				Token:   masterToken,
 			})
 			req.NoError(err)
 
@@ -75,8 +55,13 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 			req.NoError(err)
 
 			// Ensure it still exists.
-			_, _, err = consulClient.Namespaces().Read(ns, nil)
+			consulNS, _, err := consulClient.Namespaces().Read(ns, nil)
 			req.NoError(err)
+			// We can test that it wasn't updated by checking that the cross
+			// namespace ACL policy wasn't added (if running with acls).
+			if c.ACLsEnabled {
+				require.Nil(t, consulNS.ACLs)
+			}
 		})
 	}
 }
@@ -96,36 +81,19 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 		tt.Run(fmt.Sprintf("acls: %t", c.ACLsEnabled), func(t *testing.T) {
 			req := require.New(t)
 			ns := "ns"
+			masterToken := "master"
 
 			consul, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.ACL.Enabled = c.ACLsEnabled
 				cfg.ACL.DefaultPolicy = "deny"
+				cfg.ACL.Tokens.Master = masterToken
 			})
 			req.NoError(err)
 			defer consul.Stop()
 
-			var bootstrapToken string
-			if c.ACLsEnabled {
-				// Set up a client for bootstrapping
-				bootClient, err := capi.NewClient(&capi.Config{
-					Address: consul.HTTPAddr,
-				})
-				require.NoError(t, err)
-
-				// Bootstrap the server and get the bootstrap token
-				var bootstrapResp *capi.ACLToken
-				timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
-				retry.RunWith(timer, t, func(r *retry.R) {
-					bootstrapResp, _, err = bootClient.ACL().Bootstrap()
-					require.NoError(r, err)
-				})
-				bootstrapToken = bootstrapResp.SecretID
-				require.NotEmpty(t, bootstrapToken)
-			}
-
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
-				Token:   bootstrapToken,
+				Token:   masterToken,
 			})
 			req.NoError(err)
 
