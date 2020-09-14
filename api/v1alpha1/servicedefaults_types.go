@@ -54,9 +54,8 @@ func init() {
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (s *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
 	return &capi.ServiceConfigEntry{
-		Kind: capi.ServiceDefaults,
-		Name: s.Name,
-		//Namespace: s.Namespace, // todo: don't set this unless enterprise
+		Kind:        capi.ServiceDefaults,
+		Name:        s.Name,
 		Protocol:    s.Spec.Protocol,
 		MeshGateway: s.Spec.MeshGateway.toConsul(),
 		Expose:      s.Spec.Expose.toConsul(),

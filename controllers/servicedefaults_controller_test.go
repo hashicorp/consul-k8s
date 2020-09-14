@@ -45,7 +45,7 @@ func TestServiceDefaultsController_createsConfigEntry(t *testing.T) {
 
 	r := controllers.ServiceDefaultsReconciler{
 		Client:       client,
-		Log:          logrtest.NullLogger{},
+		Log:          logrtest.TestLogger{T: t},
 		Scheme:       s,
 		ConsulClient: consulClient,
 	}
@@ -101,7 +101,7 @@ func TestServiceDefaultsController_addsFinalizerOnCreate(t *testing.T) {
 
 	r := controllers.ServiceDefaultsReconciler{
 		Client:       client,
-		Log:          logrtest.NullLogger{},
+		Log:          logrtest.TestLogger{T: t},
 		Scheme:       s,
 		ConsulClient: consulClient,
 	}
@@ -153,7 +153,7 @@ func TestServiceDefaultsController_updatesConfigEntry(t *testing.T) {
 
 	r := controllers.ServiceDefaultsReconciler{
 		Client:       client,
-		Log:          logrtest.NullLogger{},
+		Log:          logrtest.TestLogger{T: t},
 		Scheme:       s,
 		ConsulClient: consulClient,
 	}
@@ -230,7 +230,7 @@ func TestServiceDefaultsController_deletesConfigEntry(t *testing.T) {
 
 	r := controllers.ServiceDefaultsReconciler{
 		Client:       client,
-		Log:          logrtest.NullLogger{},
+		Log:          logrtest.TestLogger{T: t},
 		Scheme:       s,
 		ConsulClient: consulClient,
 	}
@@ -286,7 +286,7 @@ func TestServiceDefaultsController_errorUpdatesSyncStatus(t *testing.T) {
 
 	r := controllers.ServiceDefaultsReconciler{
 		Client:       client,
-		Log:          logrtest.NullLogger{},
+		Log:          logrtest.TestLogger{T: t},
 		Scheme:       s,
 		ConsulClient: consulClient,
 	}
@@ -297,7 +297,8 @@ func TestServiceDefaultsController_errorUpdatesSyncStatus(t *testing.T) {
 			Name:      svcDefaults.Name,
 		},
 	})
-	req.EqualError(err, "Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address on 127.0.0.11:53: no such host")
+	req.Error(err)
+	req.Contains(err.Error(), "Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address")
 	req.False(resp.Requeue)
 
 	// Check that the status is "synced=false".
@@ -309,5 +310,5 @@ func TestServiceDefaultsController_errorUpdatesSyncStatus(t *testing.T) {
 	conditionSynced := svcDefaults.Status.GetCondition(v1alpha1.ConditionSynced)
 	req.True(conditionSynced.IsFalse())
 	req.Equal("ConsulAgentError", conditionSynced.Reason)
-	req.Equal("Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address on 127.0.0.11:53: no such host", conditionSynced.Message)
+	req.Contains(conditionSynced.Message, "Get \"http://incorrect-address/v1/config/service-defaults/foo\": dial tcp: lookup incorrect-address", conditionSynced.Message)
 }
