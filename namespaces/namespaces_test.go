@@ -5,9 +5,11 @@ package namespaces
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,6 +98,14 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 				Token:   masterToken,
 			})
 			req.NoError(err)
+
+			// Need to loop to ensure Consul is up.
+			timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
+			retry.RunWith(timer, tt, func(r *retry.R) {
+				leader, err := consulClient.Status().Leader()
+				require.NoError(r, err)
+				require.NotEmpty(r, leader)
+			})
 
 			var crossNSPolicy string
 			if c.ACLsEnabled {
