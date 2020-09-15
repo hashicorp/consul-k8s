@@ -107,7 +107,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		secretOne, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOneName, metav1.GetOptions{})
@@ -215,7 +215,7 @@ func TestRun_SecretExists(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		secretOne, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOneName, metav1.GetOptions{})
@@ -298,7 +298,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 
 	var certificate, key []byte
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	// First, check that the original secret contents are updated when the cert-manager starts.
 	retry.RunWith(timer, t, func(r *retry.R) {
@@ -368,7 +368,7 @@ func TestCertWatcher(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	// This first sleep is required to ensure the command had completed validating that the MWC does exist in the cluster
 	// It ensures the MWC is absent when the server actually attempts to update it with a bundle.
 	time.Sleep(1 * time.Millisecond)
@@ -376,7 +376,7 @@ func TestCertWatcher(t *testing.T) {
 	require.NoError(t, err)
 
 	// This sleep ensures the cluster attempts to try updating the MWC every second and fails before we re-create it in the cluster.
-	time.Sleep(2 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	_, err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(ctx, webhook, metav1.CreateOptions{})
 	require.NoError(t, err)
 
