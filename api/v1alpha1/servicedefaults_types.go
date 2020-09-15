@@ -180,9 +180,7 @@ func (e ExposeConfig) validate() []*field.Error {
 		if path.Path != "" && !strings.HasPrefix(path.Path, "/") {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
 		}
-		if sliceContains(protocols, path.Protocol) {
-			continue
-		} else {
+		if !sliceContains(protocols, path.Protocol) {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, notInSliceMessage(protocols)))
 		}
 	}
