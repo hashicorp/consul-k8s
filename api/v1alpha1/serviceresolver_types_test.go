@@ -1,0 +1,505 @@
+package v1alpha1
+
+import (
+	"testing"
+	"time"
+
+	capi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// Test MatchesConsul for cases that should return true.
+func TestServiceResolver_MatchesConsulTrue(t *testing.T) {
+	cases := map[string]struct {
+		Ours   ServiceResolver
+		Theirs *capi.ServiceResolverConfigEntry
+	}{
+		"empty fields": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+			},
+		},
+		"all fields set": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					DefaultSubset: "default_subset",
+					Subsets: map[string]ServiceResolverSubset{
+						"subset1": {
+							Filter:      "filter1",
+							OnlyPassing: true,
+						},
+						"subset2": {
+							Filter:      "filter2",
+							OnlyPassing: false,
+						},
+					},
+					Redirect: &ServiceResolverRedirect{
+						Service:       "redirect",
+						ServiceSubset: "redirect_subset",
+						Namespace:     "redirect_namespace",
+						Datacenter:    "redirect_datacenter",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failover1": {
+							Service:       "failover1",
+							ServiceSubset: "failover_subset1",
+							Namespace:     "failover_namespace1",
+							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						},
+						"failover2": {
+							Service:       "failover2",
+							ServiceSubset: "failover_subset2",
+							Namespace:     "failover_namespace2",
+							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						},
+					},
+					ConnectTimeout: 1 * time.Second,
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:          "name",
+				Kind:          capi.ServiceResolver,
+				DefaultSubset: "default_subset",
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"subset1": {
+						Filter:      "filter1",
+						OnlyPassing: true,
+					},
+					"subset2": {
+						Filter:      "filter2",
+						OnlyPassing: false,
+					},
+				},
+				Redirect: &capi.ServiceResolverRedirect{
+					Service:       "redirect",
+					ServiceSubset: "redirect_subset",
+					Namespace:     "redirect_namespace",
+					Datacenter:    "redirect_datacenter",
+				},
+				Failover: map[string]capi.ServiceResolverFailover{
+					"failover1": {
+						Service:       "failover1",
+						ServiceSubset: "failover_subset1",
+						Namespace:     "failover_namespace1",
+						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+					},
+					"failover2": {
+						Service:       "failover2",
+						ServiceSubset: "failover_subset2",
+						Namespace:     "failover_namespace2",
+						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+					},
+				},
+				ConnectTimeout: 1 * time.Second,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, c.Ours.MatchesConsul(c.Theirs))
+		})
+	}
+}
+
+// Test MatchesConsul for cases that should return false.
+func TestServiceResolver_MatchesConsulFalse(t *testing.T) {
+	cases := map[string]struct {
+		Ours   ServiceResolver
+		Theirs capi.ConfigEntry
+	}{
+		"different type": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{},
+			},
+			Theirs: &capi.ServiceConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+			},
+		},
+		"different name": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "other_name",
+				Kind: capi.ServiceResolver,
+			},
+		},
+		"different default subset": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					DefaultSubset: "default",
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:          "name",
+				Kind:          capi.ServiceResolver,
+				DefaultSubset: "different",
+			},
+		},
+		"our subsets nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+
+				Spec: ServiceResolverSpec{
+					Subsets: nil,
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"sub": {},
+				},
+			},
+		},
+		"their subsets nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Subsets: map[string]ServiceResolverSubset{
+						"sub": {},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:    "name",
+				Kind:    capi.ServiceResolver,
+				Subsets: nil,
+			},
+		},
+		"different subsets contents": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Subsets: map[string]ServiceResolverSubset{
+						"sub": {
+							Filter: "filter",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"sub": {
+						Filter: "different_filter",
+					},
+				},
+			},
+		},
+		"our redirect nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: nil,
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Redirect: &capi.ServiceResolverRedirect{
+					Service: "service",
+				},
+			},
+		},
+		"their redirect nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service: "service",
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:     "name",
+				Kind:     capi.ServiceResolver,
+				Redirect: nil,
+			},
+		},
+		"different redirect contents": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service: "service",
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Redirect: &capi.ServiceResolverRedirect{
+					Service: "different_service",
+				},
+			},
+		},
+		"our failover nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: nil,
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Failover: map[string]capi.ServiceResolverFailover{
+					"failover": {},
+				},
+			},
+		},
+		"their failover nil": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: map[string]ServiceResolverFailover{
+						"failover": {},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:     "name",
+				Kind:     capi.ServiceResolver,
+				Failover: nil,
+			},
+		},
+		"different failover contents": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: map[string]ServiceResolverFailover{
+						"failover": {
+							Service: "service",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Failover: map[string]capi.ServiceResolverFailover{
+					"failover": {
+						Service: "different_service",
+					},
+				},
+			},
+		},
+		"different connect timeout": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					ConnectTimeout: 1 * time.Second,
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:           "name",
+				Kind:           capi.ServiceResolver,
+				ConnectTimeout: 2 * time.Second,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.False(t, c.Ours.MatchesConsul(c.Theirs))
+		})
+	}
+}
+
+func TestServiceResolver_ToConsul(t *testing.T) {
+	cases := map[string]struct {
+		Ours ServiceResolver
+		Exp  *capi.ServiceResolverConfigEntry
+	}{
+		"empty fields": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{},
+			},
+			Exp: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+			},
+		},
+		"every field set": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					DefaultSubset: "default_subset",
+					Subsets: map[string]ServiceResolverSubset{
+						"subset1": {
+							Filter:      "filter1",
+							OnlyPassing: true,
+						},
+						"subset2": {
+							Filter:      "filter2",
+							OnlyPassing: false,
+						},
+					},
+					Redirect: &ServiceResolverRedirect{
+						Service:       "redirect",
+						ServiceSubset: "redirect_subset",
+						Namespace:     "redirect_namespace",
+						Datacenter:    "redirect_datacenter",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failover1": {
+							Service:       "failover1",
+							ServiceSubset: "failover_subset1",
+							Namespace:     "failover_namespace1",
+							Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+						},
+						"failover2": {
+							Service:       "failover2",
+							ServiceSubset: "failover_subset2",
+							Namespace:     "failover_namespace2",
+							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+						},
+					},
+					ConnectTimeout: 1 * time.Second,
+				},
+			},
+			Exp: &capi.ServiceResolverConfigEntry{
+				Name:          "name",
+				Kind:          capi.ServiceResolver,
+				DefaultSubset: "default_subset",
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"subset1": {
+						Filter:      "filter1",
+						OnlyPassing: true,
+					},
+					"subset2": {
+						Filter:      "filter2",
+						OnlyPassing: false,
+					},
+				},
+				Redirect: &capi.ServiceResolverRedirect{
+					Service:       "redirect",
+					ServiceSubset: "redirect_subset",
+					Namespace:     "redirect_namespace",
+					Datacenter:    "redirect_datacenter",
+				},
+				Failover: map[string]capi.ServiceResolverFailover{
+					"failover1": {
+						Service:       "failover1",
+						ServiceSubset: "failover_subset1",
+						Namespace:     "failover_namespace1",
+						Datacenters:   []string{"failover1_dc1", "failover1_dc2"},
+					},
+					"failover2": {
+						Service:       "failover2",
+						ServiceSubset: "failover_subset2",
+						Namespace:     "failover_namespace2",
+						Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
+					},
+				},
+				ConnectTimeout: 1 * time.Second,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			act := c.Ours.ToConsul()
+			resolver, ok := act.(*capi.ServiceResolverConfigEntry)
+			require.True(t, ok, "could not cast")
+			require.Equal(t, c.Exp, resolver)
+		})
+	}
+}
+
+func TestServiceResolver_AddFinalizer(t *testing.T) {
+	resolver := &ServiceResolver{}
+	resolver.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, resolver.ObjectMeta.Finalizers)
+}
+
+func TestServiceResolver_RemoveFinalizer(t *testing.T) {
+	resolver := &ServiceResolver{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"f1", "f2"},
+		},
+	}
+	resolver.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
+}
+
+func TestServiceResolver_SetConditions(t *testing.T) {
+	conditions := Conditions{
+		{
+			Type:   ConditionSynced,
+			Status: corev1.ConditionUnknown,
+		},
+	}
+	resolver := &ServiceResolver{}
+
+	resolver.SetConditions(conditions)
+	require.Equal(t, conditions, resolver.Status.Conditions)
+}
+
+func TestServiceResolver_GetCondition(t *testing.T) {
+	condition := Condition{
+		Type:   ConditionSynced,
+		Status: corev1.ConditionUnknown,
+	}
+	resolver := &ServiceResolver{
+		Status: ConfigEntryStatus{
+			Status: Status{
+				Conditions: []Condition{condition},
+			},
+		},
+	}
+
+	require.Equal(t, &condition, resolver.GetCondition(ConditionSynced))
+}
+
+func TestServiceResolver_GetConditionNil(t *testing.T) {
+	resolver := &ServiceResolver{}
+	require.Nil(t, resolver.GetCondition(ConditionSynced))
+}

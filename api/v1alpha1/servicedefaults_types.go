@@ -44,9 +44,46 @@ type ServiceDefaultsStatus struct {
 type ServiceDefaults struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Status            ConfigEntryStatus   `json:"status,omitempty"`
+	Spec              ServiceDefaultsSpec `json:"spec,omitempty"`
+}
 
-	Spec   ServiceDefaultsSpec   `json:"spec,omitempty"`
-	Status ServiceDefaultsStatus `json:"status,omitempty"`
+func (in *ServiceDefaults) Kind() string {
+	return capi.ServiceDefaults
+}
+
+func (in *ServiceDefaults) GetObjectMeta() metav1.ObjectMeta {
+	return in.ObjectMeta
+}
+
+func (in *ServiceDefaults) AddFinalizer(f string) {
+	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
+}
+
+func (in *ServiceDefaults) RemoveFinalizer(f string) {
+	var newFinalizers []string
+	for _, oldF := range in.Finalizers() {
+		if oldF != f {
+			newFinalizers = append(newFinalizers, oldF)
+		}
+	}
+	in.ObjectMeta.Finalizers = newFinalizers
+}
+
+func (in *ServiceDefaults) Finalizers() []string {
+	return in.ObjectMeta.Finalizers
+}
+
+func (in *ServiceDefaults) Name() string {
+	return in.ObjectMeta.Name
+}
+
+func (in *ServiceDefaults) SetConditions(conditions Conditions) {
+	in.Status.Conditions = conditions
+}
+
+func (in *ServiceDefaults) GetCondition(c ConditionType) *Condition {
+	return in.Status.GetCondition(c)
 }
 
 // +kubebuilder:object:root=true
@@ -63,24 +100,15 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (in *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
+func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        capi.ServiceDefaults,
-		Name:        in.Name,
+		Name:        in.Name(),
 		Protocol:    in.Spec.Protocol,
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
 	}
-}
-
-// MatchesConsul returns true if entry has the same config as this struct.
-func (in *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
-	return in.Name == entry.GetName() &&
-		in.Spec.Protocol == entry.Protocol &&
-		in.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(entry.Expose) &&
-		in.Spec.ExternalSNI == entry.ExternalSNI
 }
 
 // Validate validates the fields provided in the spec of the ServiceDefaults and
@@ -95,10 +123,23 @@ func (in *ServiceDefaults) Validate() error {
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKind},
-			in.Name, allErrs)
+			in.Name(), allErrs)
 	}
 
 	return nil
+}
+
+// MatchesConsul returns true if entry has the same config as this struct.
+func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
+	svcDefCand, ok := candidate.(*capi.ServiceConfigEntry)
+	if !ok {
+		return false
+	}
+	return in.Name() == svcDefCand.Name &&
+		in.Spec.Protocol == svcDefCand.Protocol &&
+		in.Spec.MeshGateway.Mode == string(svcDefCand.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(svcDefCand.Expose) &&
+		in.Spec.ExternalSNI == svcDefCand.ExternalSNI
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

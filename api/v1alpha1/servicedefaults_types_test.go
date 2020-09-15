@@ -5,6 +5,7 @@ import (
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -738,4 +739,54 @@ func TestValidate(t *testing.T) {
 			require.EqualError(t, err, testCase.expectedErrMsg)
 		})
 	}
+}
+
+func TestServiceDefaults_AddFinalizer(t *testing.T) {
+	resolver := &ServiceDefaults{}
+	resolver.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, resolver.ObjectMeta.Finalizers)
+}
+
+func TestServiceDefaults_RemoveFinalizer(t *testing.T) {
+	resolver := &ServiceDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"f1", "f2"},
+		},
+	}
+	resolver.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
+}
+
+func TestServiceDefaults_SetConditions(t *testing.T) {
+	conditions := Conditions{
+		{
+			Type:   ConditionSynced,
+			Status: corev1.ConditionUnknown,
+		},
+	}
+	resolver := &ServiceDefaults{}
+
+	resolver.SetConditions(conditions)
+	require.Equal(t, conditions, resolver.Status.Conditions)
+}
+
+func TestServiceDefaults_GetCondition(t *testing.T) {
+	condition := Condition{
+		Type:   ConditionSynced,
+		Status: corev1.ConditionUnknown,
+	}
+	resolver := &ServiceDefaults{
+		Status: ConfigEntryStatus{
+			Status: Status{
+				Conditions: []Condition{condition},
+			},
+		},
+	}
+
+	require.Equal(t, &condition, resolver.GetCondition(ConditionSynced))
+}
+
+func TestServiceDefaults_GetConditionNil(t *testing.T) {
+	resolver := &ServiceDefaults{}
+	require.Nil(t, resolver.GetCondition(ConditionSynced))
 }
