@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	capi "github.com/hashicorp/consul/api"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -12,9 +13,20 @@ import (
 )
 
 const (
-	ConsulHashicorpGroup string = "consul.hashicorp.com"
-	ServiceDefaultsKind  string = "servicedefaults"
+	ServiceDefaultsKubeKind string = "servicedefaults"
 )
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
+// ServiceDefaults is the Schema for the servicedefaults API
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+type ServiceDefaults struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ServiceDefaultsSpec `json:"spec,omitempty"`
+	Status            `json:"status,omitempty"`
+}
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
 type ServiceDefaultsSpec struct {
@@ -31,22 +43,59 @@ type ServiceDefaultsSpec struct {
 	ExternalSNI string `json:"externalSNI,omitempty"`
 }
 
-// ServiceDefaultsStatus defines the observed state of ServiceDefaults
-type ServiceDefaultsStatus struct {
-	Status `json:",inline"`
+func (in *ServiceDefaults) ConsulKind() string {
+	return capi.ServiceDefaults
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+func (in *ServiceDefaults) KubeKind() string {
+	return ServiceDefaultsKubeKind
+}
 
-// ServiceDefaults is the Schema for the servicedefaults API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-type ServiceDefaults struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+func (in *ServiceDefaults) GetObjectMeta() metav1.ObjectMeta {
+	return in.ObjectMeta
+}
 
-	Spec   ServiceDefaultsSpec   `json:"spec,omitempty"`
-	Status ServiceDefaultsStatus `json:"status,omitempty"`
+func (in *ServiceDefaults) AddFinalizer(f string) {
+	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
+}
+
+func (in *ServiceDefaults) RemoveFinalizer(f string) {
+	var newFinalizers []string
+	for _, oldF := range in.Finalizers() {
+		if oldF != f {
+			newFinalizers = append(newFinalizers, oldF)
+		}
+	}
+	in.ObjectMeta.Finalizers = newFinalizers
+}
+
+func (in *ServiceDefaults) Finalizers() []string {
+	return in.ObjectMeta.Finalizers
+}
+
+func (in *ServiceDefaults) Name() string {
+	return in.ObjectMeta.Name
+}
+
+func (in *ServiceDefaults) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
+	in.Status.Conditions = Conditions{
+		{
+			Type:               ConditionSynced,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            message,
+		},
+	}
+}
+
+func (in *ServiceDefaults) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+	cond := in.Status.GetCondition(ConditionSynced)
+	return cond.Status, cond.Reason, cond.Message
+}
+
+func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
+	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 // +kubebuilder:object:root=true
@@ -63,24 +112,15 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (in *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
+func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
-		Kind:        capi.ServiceDefaults,
-		Name:        in.Name,
+		Kind:        in.ConsulKind(),
+		Name:        in.Name(),
 		Protocol:    in.Spec.Protocol,
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
 	}
-}
-
-// MatchesConsul returns true if entry has the same config as this struct.
-func (in *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
-	return in.Name == entry.GetName() &&
-		in.Spec.Protocol == entry.Protocol &&
-		in.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(entry.Expose) &&
-		in.Spec.ExternalSNI == entry.ExternalSNI
 }
 
 // Validate validates the fields provided in the spec of the ServiceDefaults and
@@ -94,11 +134,24 @@ func (in *ServiceDefaults) Validate() error {
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKind},
-			in.Name, allErrs)
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKubeKind},
+			in.Name(), allErrs)
 	}
 
 	return nil
+}
+
+// MatchesConsul returns true if entry has the same config as this struct.
+func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
+	serviceDefaultsCandidate, ok := candidate.(*capi.ServiceConfigEntry)
+	if !ok {
+		return false
+	}
+	return in.Name() == serviceDefaultsCandidate.Name &&
+		in.Spec.Protocol == serviceDefaultsCandidate.Protocol &&
+		in.Spec.MeshGateway.Mode == string(serviceDefaultsCandidate.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(serviceDefaultsCandidate.Expose) &&
+		in.Spec.ExternalSNI == serviceDefaultsCandidate.ExternalSNI
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

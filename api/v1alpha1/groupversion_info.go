@@ -8,6 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
+const ConsulHashicorpGroup string = "consul.hashicorp.com"
+
 var (
 	// GroupVersion is group version used to register these objects
 	GroupVersion = schema.GroupVersion{Group: "consul.hashicorp.com", Version: "v1alpha1"}
