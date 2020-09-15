@@ -1,7 +1,11 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+
 	capi "github.com/hashicorp/consul/api"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 type MeshGatewayMode string
@@ -46,4 +50,25 @@ func (m MeshGatewayConfig) toConsul() capi.MeshGatewayConfig {
 			Mode: capi.MeshGatewayModeDefault,
 		}
 	}
+}
+
+func (m MeshGatewayConfig) validate() *field.Error {
+	modes := []string{"remote", "local", "none", ""}
+	if !sliceContains(modes, m.Mode) {
+		return field.Invalid(field.NewPath("spec").Child("meshGateway").Child("mode"), m.Mode, notInSliceMessage(modes))
+	}
+	return nil
+}
+
+func notInSliceMessage(slice []string) string {
+	return fmt.Sprintf(`must be one of "%s"`, strings.Join(slice, `", "`))
+}
+
+func sliceContains(slice []string, entry string) bool {
+	for _, s := range slice {
+		if entry == s {
+			return true
+		}
+	}
+	return false
 }
