@@ -14,6 +14,7 @@ import (
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
+	webhookCertManager "github.com/hashicorp/consul-k8s/subcommand/webhook-cert-manager"
 	"github.com/hashicorp/consul-k8s/version"
 	"github.com/mitchellh/cli"
 )
@@ -66,7 +67,10 @@ func init() {
 		},
 
 		"controller": func() (cli.Command, error) {
-			return &cmdController.Command{}, nil
+			return &cmdController.Command{UI: ui}, nil
+		},
+		"webhook-cert-manager": func() (cli.Command, error) {
+			return &webhookCertManager.Command{UI: ui}, nil
 		},
 	}
 }
