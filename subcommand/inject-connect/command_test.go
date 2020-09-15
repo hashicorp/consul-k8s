@@ -10,7 +10,6 @@ import (
 
 func TestRun_FlagValidation(t *testing.T) {
 	cases := []struct {
-		name   string
 		flags  []string
 		expErr string
 	}{

@@ -13,7 +13,7 @@ type Notify struct {
 	// Ch is where the notifications for new bundles are sent. If this
 	// blocks then the notify loop will also be blocked, so downstream
 	// users should process this channel in a timely manner.
-	Ch chan<- Bundle
+	Ch chan<- MetaBundle
 
 	// Source is the source of certificates.
 	Source Source
@@ -22,6 +22,17 @@ type Notify struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 	doneCh    <-chan struct{}
+
+	// WebhookConfigName is the name of the MutatingWebhookConfiguration
+	// that will be updated with the CA bundle when a new CA is generated.
+	WebhookConfigName string
+	// SecretName is the name of the Kubernetes TLS secret that will be
+	// be created/updated with the leaf certificate and it's private key when
+	// a new certificate key pair are generated.
+	SecretName string
+	// SecretNamespace is the namespace in which the aforementioned secret
+	// will be created/updated.
+	SecretNamespace string
 }
 
 // Start starts the notifier. This blocks and should be started in a goroutine.
@@ -67,7 +78,12 @@ func (n *Notify) Start(ctx context.Context) {
 
 		// Send the update, or quit if we were cancelled
 		select {
-		case n.Ch <- next:
+		case n.Ch <- MetaBundle{
+			Bundle:            next,
+			WebhookConfigName: n.WebhookConfigName,
+			SecretName:        n.SecretName,
+			SecretNamespace:   n.SecretNamespace,
+		}:
 		case <-ctx.Done():
 			return
 		}

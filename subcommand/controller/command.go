@@ -1,14 +1,15 @@
 package controller
 
 import (
-	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -18,11 +19,14 @@ import (
 )
 
 type Command struct {
+	UI cli.Ui
+
 	flagSet   *flag.FlagSet
 	k8s       *flags.K8SFlags
 	httpFlags *flags.HTTPFlags
 
 	flagMetricsAddr          string
+	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
 
 	// Flags to support Consul Enterprise namespaces.
@@ -65,6 +69,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCrossNSACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
+		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -72,17 +78,20 @@ func (c *Command) init() {
 }
 
 func (c *Command) Run(args []string) int {
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
-		setupLog.Error(err, "parsing flagSet")
+		c.UI.Error(fmt.Sprintf("Parsing flagset: %s", err.Error()))
 		return 1
 	}
 	if len(c.flagSet.Args()) > 0 {
-		setupLog.Error(errors.New("should have no non-flag arguments"), "invalid arguments")
+		c.UI.Error("Invalid arguments: should have no non-flag arguments")
 		return 1
 	}
-
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	if c.flagWebhookTLSCertDir == "" {
+		c.UI.Error("Invalid arguments: -webhook-tls-cert-dir must be set")
+		return 1
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -118,7 +127,10 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		//Note: The path here should be identical to the one on the kubebuilder annotation in file api/v1alpha1/servicedefaults_webhook.go
+		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
+		// automatically when new certificates are available.
+		mgr.GetWebhookServer().CertDir = c.flagWebhookTLSCertDir
+		// Note: The path here should be identical to the one on the kubebuilder annotation in file api/v1alpha1/servicedefaults_webhook.go
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 	}
