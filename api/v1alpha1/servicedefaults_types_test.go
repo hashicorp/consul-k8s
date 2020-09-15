@@ -654,3 +654,88 @@ func TestMatchesConsul(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate(t *testing.T) {
+	cases := map[string]struct {
+		input          *ServiceDefaults
+		expectedErrMsg string
+	}{
+		"meshgateway.mode": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "foobar",
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
+		},
+		"expose.paths[].protocol": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "/valid-path",
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
+		},
+		"expose.paths[].path": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "http",
+								Path:     "invalid-path",
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+		},
+		"multi-error": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "invalid-mode",
+					},
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "invalid-path",
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.meshGateway.mode: Invalid value: "invalid-mode": must be one of "remote", "local", "none", "", spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"]`,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate()
+			require.EqualError(t, err, testCase.expectedErrMsg)
+		})
+	}
+}

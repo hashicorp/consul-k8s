@@ -1,8 +1,19 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+
 	capi "github.com/hashicorp/consul/api"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+)
+
+const (
+	ConsulHashicorpGroup string = "consul.hashicorp.com"
+	ServiceDefaultsKind  string = "servicedefaults"
 )
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
@@ -52,24 +63,42 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (s *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
+func (in *ServiceDefaults) ToConsul() *capi.ServiceConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        capi.ServiceDefaults,
-		Name:        s.Name,
-		Protocol:    s.Spec.Protocol,
-		MeshGateway: s.Spec.MeshGateway.toConsul(),
-		Expose:      s.Spec.Expose.toConsul(),
-		ExternalSNI: s.Spec.ExternalSNI,
+		Name:        in.Name,
+		Protocol:    in.Spec.Protocol,
+		MeshGateway: in.Spec.MeshGateway.toConsul(),
+		Expose:      in.Spec.Expose.toConsul(),
+		ExternalSNI: in.Spec.ExternalSNI,
 	}
 }
 
 // MatchesConsul returns true if entry has the same config as this struct.
-func (s *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
-	return s.Name == entry.GetName() &&
-		s.Spec.Protocol == entry.Protocol &&
-		s.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
-		s.Spec.Expose.matches(entry.Expose) &&
-		s.Spec.ExternalSNI == entry.ExternalSNI
+func (in *ServiceDefaults) MatchesConsul(entry *capi.ServiceConfigEntry) bool {
+	return in.Name == entry.GetName() &&
+		in.Spec.Protocol == entry.Protocol &&
+		in.Spec.MeshGateway.Mode == string(entry.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(entry.Expose) &&
+		in.Spec.ExternalSNI == entry.ExternalSNI
+}
+
+// Validate validates the fields provided in the spec of the ServiceDefaults and
+// returns an error which lists all invalid fields in the resource spec.
+func (in *ServiceDefaults) Validate() error {
+	var allErrs field.ErrorList
+	if err := in.Spec.MeshGateway.validate(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	allErrs = append(allErrs, in.Spec.Expose.validate()...)
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKind},
+			in.Name, allErrs)
+	}
+
+	return nil
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
@@ -142,4 +171,18 @@ func (e ExposeConfig) toConsul() capi.ExposeConfig {
 		Checks: e.Checks,
 		Paths:  paths,
 	}
+}
+
+func (e ExposeConfig) validate() []*field.Error {
+	var errs field.ErrorList
+	protocols := []string{"http", "http2"}
+	for i, path := range e.Paths {
+		if path.Path != "" && !strings.HasPrefix(path.Path, "/") {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
+		}
+		if !sliceContains(protocols, path.Protocol) {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, notInSliceMessage(protocols)))
+		}
+	}
+	return errs
 }
