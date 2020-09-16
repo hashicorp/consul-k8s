@@ -1,3 +1,4 @@
+// Rename package to your test package.
 package example
 
 import (

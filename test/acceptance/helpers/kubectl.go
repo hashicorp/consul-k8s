@@ -29,7 +29,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testing.TestingT, options *k8s.KubectlO
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
-	if options.Namespace != "" {
+	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	cmdArgs = append(cmdArgs, args...)
@@ -79,4 +79,14 @@ func KubectlDeleteK(t testing.TestingT, options *k8s.KubectlOptions, kustomizeDi
 func RunKubectl(t testing.TestingT, options *k8s.KubectlOptions, args ...string) {
 	_, err := RunKubectlAndGetOutputE(t, options, args...)
 	require.NoError(t, err)
+}
+
+// sliceContains returns true if s contains target.
+func sliceContains(s []string, target string) bool {
+	for _, elem := range s {
+		if elem == target {
+			return true
+		}
+	}
+	return false
 }

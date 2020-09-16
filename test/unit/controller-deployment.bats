@@ -189,3 +189,135 @@ load _helpers
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
+
+#--------------------------------------------------------------------
+# namespaces
+
+@test "controller/Deployment: namespace options disabled by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-namespaces"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("consul-destination-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-k8s-namespace-mirroring"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: namespace options set with .global.enableConsulNamespaces=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("consul-destination-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-k8s-namespace-mirroring"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: mirroring options set with connectInject.consulNamespaces.mirroringK8S=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("consul-destination-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: prefix can be set with connectInject.consulNamespaces.mirroringK8SPrefix" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8SPrefix=k8s-' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("consul-destination-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: cross namespace policy is not added when global.acls.manageSystemACLs=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-cross-namespace-acl-policy"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: cross namespace policy is added when global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-cross-namespace-acl-policy"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
