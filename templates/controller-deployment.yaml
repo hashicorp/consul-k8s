@@ -52,12 +52,28 @@ spec:
       {{- end }}
       {{- end }}
       containers:
-      - args:
-        - controller
-        - --enable-leader-election
-        - --webhook-tls-cert-dir=/tmp/controller-webhook/certs
-        command:
-        - consul-k8s
+      - command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s controller \
+            --webhook-tls-cert-dir=/tmp/controller-webhook/certs \
+            --enable-leader-election \
+            {{- if .Values.global.enableConsulNamespaces }}
+            -enable-namespaces=true \
+            {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+            -consul-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
+            {{- end }}
+            {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+            -enable-k8s-namespace-mirroring=true \
+            {{- if .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}
+            -k8s-namespace-mirroring-prefix={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }} \
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            -consul-cross-namespace-acl-policy=cross-namespace-policy \
+            {{- end }}
+            {{- end }}
         env:
         - name: HOST_IP
           valueFrom:
