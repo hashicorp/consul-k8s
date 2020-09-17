@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/serf/testutil/retry"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
