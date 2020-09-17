@@ -6,14 +6,12 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,9 +22,9 @@ const (
 	ConsulAgentError = "ConsulAgentError"
 )
 
-// Reconciler is implemented by CRD-specific reconcilers. It is used by
-// ConfigEntryReconciler to abstract CRD-specific reconcilers.
-type Reconciler interface {
+// Controller is implemented by CRD-specific controllers. It is used by
+// ConfigEntryController to abstract CRD-specific controllers.
+type Controller interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, runtime.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
@@ -40,45 +38,10 @@ type Reconciler interface {
 	Logger(types.NamespacedName) logr.Logger
 }
 
-// ConfigEntryCRD is a generic config entry custom resource. It is implemented
-// by each config entry type so that they can be acted upon generically.
-type ConfigEntryCRD interface {
-	// GetObjectMeta returns object meta.
-	GetObjectMeta() metav1.ObjectMeta
-	// AddFinalizer adds a finalizer to the list of finalizers.
-	AddFinalizer(string)
-	// RemoveFinalizer removes this finalizer from the list.
-	RemoveFinalizer(string)
-	// Finalizers returns the list of finalizers for this object.
-	Finalizers() []string
-	// Kind returns the Consul config entry kind, i.e. service-defaults, not
-	// ServiceDefaults.
-	Kind() string
-	// Name returns the name of the config entry.
-	Name() string
-	// SetConditions updates conditions.
-	SetConditions(consulv1alpha1.Conditions)
-	// GetCondition returns condition of this type.
-	GetCondition(consulv1alpha1.ConditionType) *consulv1alpha1.Condition
-	// ToConsul converts the CRD to the corresponding Consul API definition.
-	// Its return type is the generic ConfigEntry but a specific config entry
-	// type should be constructed e.g. ServiceConfigEntry.
-	ToConsul() capi.ConfigEntry
-	// MatchesConsul returns true if the CRD has the same fields as the Consul
-	// config entry.
-	MatchesConsul(capi.ConfigEntry) bool
-	// GetObjectKind should be implemented by the generated code.
-	GetObjectKind() schema.ObjectKind
-	// DeepCopyObject should be implemented by the generated code.
-	DeepCopyObject() runtime.Object
-	// Validate returns an error if the CRD is invalid.
-	Validate() error
-}
-
-// ConfigEntryReconciler is a generic reconciler that is used to reconcile
+// ConfigEntryController is a generic controller that is used to reconcile
 // all config entry types, e.g. ServiceDefaults, ServiceResolver, etc, since
 // they share the same reconcile behaviour.
-type ConfigEntryReconciler struct {
+type ConfigEntryController struct {
 	ConsulClient *capi.Client
 
 	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
@@ -106,21 +69,21 @@ type ConfigEntryReconciler struct {
 	CrossNSACLPolicy string
 }
 
-// Reconcile reconciles Kubernetes' state with Consul's. CRD-specific reconciler's
+// ReconcileEntry reconciles an update to a resource. CRD-specific controller's
 // call this function because it handles reconciliation of config entries
 // generically.
-// CRD-specific reconcilers should pass themselves in as updater since we
+// CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *ConfigEntryReconciler) Reconcile(
-	updater Reconciler,
+func (r *ConfigEntryController) ReconcileEntry(
+	crdCtrl Controller,
 	req ctrl.Request,
-	configEntry ConfigEntryCRD) (ctrl.Result, error) {
+	configEntry common.ConfigEntryResource) (ctrl.Result, error) {
 
 	ctx := context.Background()
-	logger := updater.Logger(req.NamespacedName)
+	logger := crdCtrl.Logger(req.NamespacedName)
 
-	err := updater.Get(ctx, req.NamespacedName, configEntry)
+	err := crdCtrl.Get(ctx, req.NamespacedName, configEntry)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
@@ -134,7 +97,7 @@ func (r *ConfigEntryReconciler) Reconcile(
 		// registering our finalizer.
 		if !containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
 			configEntry.AddFinalizer(FinalizerName)
-			if err := r.syncUnknown(ctx, updater, configEntry); err != nil {
+			if err := r.syncUnknown(ctx, crdCtrl, configEntry); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -154,7 +117,7 @@ func (r *ConfigEntryReconciler) Reconcile(
 
 			// remove our finalizer from the list and update it.
 			configEntry.RemoveFinalizer(FinalizerName)
-			if err := updater.Update(ctx, configEntry); err != nil {
+			if err := crdCtrl.Update(ctx, configEntry); err != nil {
 				return ctrl.Result{}, err
 			}
 			logger.Info("finalizer removed")
@@ -176,7 +139,7 @@ func (r *ConfigEntryReconciler) Reconcile(
 		// destination consul namespace first.
 		if r.EnableConsulNamespaces {
 			if err := namespaces.EnsureExists(r.ConsulClient, r.consulNamespace(req.Namespace), r.CrossNSACLPolicy); err != nil {
-				return r.syncFailed(ctx, logger, updater, configEntry, ConsulAgentError,
+				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 					fmt.Errorf("creating consul namespace %q: %w", r.consulNamespace(req.Namespace), err))
 			}
 		}
@@ -186,16 +149,16 @@ func (r *ConfigEntryReconciler) Reconcile(
 			Namespace: r.consulNamespace(req.Namespace),
 		})
 		if err != nil {
-			return r.syncFailed(ctx, logger, updater, configEntry, ConsulAgentError,
+			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("writing config entry to consul: %w", err))
 		}
-		return r.syncSuccessful(ctx, updater, configEntry)
+		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 
 	// If there is an error when trying to get the config entry from the api server,
 	// fail the reconcile.
 	if err != nil {
-		return r.syncFailed(ctx, logger, updater, configEntry, ConsulAgentError, err)
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 	}
 
 	if !configEntry.MatchesConsul(entry) {
@@ -203,31 +166,23 @@ func (r *ConfigEntryReconciler) Reconcile(
 			Namespace: r.consulNamespace(req.Namespace),
 		})
 		if err != nil {
-			return r.syncUnknownWithError(ctx, logger, updater, configEntry, ConsulAgentError,
+			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("updating config entry in consul: %w", err))
 		}
-		return r.syncSuccessful(ctx, updater, configEntry)
-	} else if !configEntry.GetCondition(consulv1alpha1.ConditionSynced).IsTrue() {
-		return r.syncSuccessful(ctx, updater, configEntry)
+		return r.syncSuccessful(ctx, crdCtrl, configEntry)
+	} else if configEntry.GetSyncedConditionStatus() == corev1.ConditionTrue {
+		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigEntryReconciler) consulNamespace(kubeNS string) string {
+func (r *ConfigEntryController) consulNamespace(kubeNS string) string {
 	return namespaces.ConsulNamespace(kubeNS, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
 }
 
-func (r *ConfigEntryReconciler) syncFailed(ctx context.Context, logger logr.Logger, updater Reconciler, configEntry ConfigEntryCRD, errType string, err error) (ctrl.Result, error) {
-	configEntry.SetConditions(consulv1alpha1.Conditions{
-		{
-			Type:               consulv1alpha1.ConditionSynced,
-			Status:             corev1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             errType,
-			Message:            err.Error(),
-		},
-	})
+func (r *ConfigEntryController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, configEntry common.ConfigEntryResource, errType string, err error) (ctrl.Result, error) {
+	configEntry.SetSyncedCondition(corev1.ConditionFalse, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, configEntry); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.
 		// Otherwise the original error would be lost.
@@ -237,44 +192,24 @@ func (r *ConfigEntryReconciler) syncFailed(ctx context.Context, logger logr.Logg
 	return ctrl.Result{}, err
 }
 
-func (r *ConfigEntryReconciler) syncSuccessful(ctx context.Context, updater Reconciler, configEntry ConfigEntryCRD) (ctrl.Result, error) {
-	configEntry.SetConditions(consulv1alpha1.Conditions{
-		{
-			Type:               consulv1alpha1.ConditionSynced,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-		},
-	})
+func (r *ConfigEntryController) syncSuccessful(ctx context.Context, updater Controller, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
+	configEntry.SetSyncedCondition(corev1.ConditionTrue, "", "")
 	return ctrl.Result{}, updater.UpdateStatus(ctx, configEntry)
 }
 
-func (r *ConfigEntryReconciler) syncUnknown(ctx context.Context, updater Reconciler, configEntry ConfigEntryCRD) error {
-	configEntry.SetConditions(consulv1alpha1.Conditions{
-		{
-			Type:               consulv1alpha1.ConditionSynced,
-			Status:             corev1.ConditionUnknown,
-			LastTransitionTime: metav1.Now(),
-		},
-	})
+func (r *ConfigEntryController) syncUnknown(ctx context.Context, updater Controller, configEntry common.ConfigEntryResource) error {
+	configEntry.SetSyncedCondition(corev1.ConditionUnknown, "", "")
 	return updater.Update(ctx, configEntry)
 }
 
-func (r *ConfigEntryReconciler) syncUnknownWithError(ctx context.Context,
+func (r *ConfigEntryController) syncUnknownWithError(ctx context.Context,
 	logger logr.Logger,
-	updater Reconciler,
-	configEntry ConfigEntryCRD,
+	updater Controller,
+	configEntry common.ConfigEntryResource,
 	errType string,
 	err error) (ctrl.Result, error) {
 
-	configEntry.SetConditions(consulv1alpha1.Conditions{
-		{
-			Type:               consulv1alpha1.ConditionSynced,
-			Status:             corev1.ConditionUnknown,
-			LastTransitionTime: metav1.Now(),
-			Reason:             errType,
-			Message:            err.Error(),
-		},
-	})
+	configEntry.SetSyncedCondition(corev1.ConditionUnknown, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, configEntry); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.
 		// Otherwise the original error would be lost.

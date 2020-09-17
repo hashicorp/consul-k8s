@@ -1,11 +1,11 @@
-package controllers
+package v1alpha1
 
 import (
 	"context"
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -36,13 +36,13 @@ type serviceDefaultsValidator struct {
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mutate-servicedefaults.consul.hashicorp.com
 
 func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var svcDefaults v1alpha1.ServiceDefaults
+	var svcDefaults ServiceDefaults
 	err := v.decoder.Decode(req, &svcDefaults)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return ValidateConfigEntry(ctx,
+	return common.ValidateConfigEntry(ctx,
 		req,
 		v.Logger,
 		v,
@@ -50,14 +50,14 @@ func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 		"ServiceDefaults")
 }
 
-func (v *serviceDefaultsValidator) List(ctx context.Context) ([]ConfigEntryCRD, error) {
-	var svcDefaultsList v1alpha1.ServiceDefaultsList
+func (v *serviceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+	var svcDefaultsList ServiceDefaultsList
 	if err := v.Client.List(ctx, &svcDefaultsList); err != nil {
 		return nil, err
 	}
-	var entries []ConfigEntryCRD
+	var entries []common.ConfigEntryResource
 	for _, item := range svcDefaultsList.Items {
-		entries = append(entries, ConfigEntryCRD(&item))
+		entries = append(entries, common.ConfigEntryResource(&item))
 	}
 	return entries, nil
 }

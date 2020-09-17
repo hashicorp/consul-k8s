@@ -25,7 +25,7 @@ import (
 // we're only testing with the ServiceDefaults controller which will exercise
 // all the namespaces code.
 
-func TestConfigEntryReconciler_createsConfigEntry_consulNamespaces(tt *testing.T) {
+func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T) {
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -99,11 +99,11 @@ func TestConfigEntryReconciler_createsConfigEntry_consulNamespaces(tt *testing.T
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
+			r := controllers.ServiceDefaultsController{
 				Client: client,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryReconciler: &controllers.ConfigEntryReconciler{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClient:               consulClient,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,
@@ -142,7 +142,7 @@ func TestConfigEntryReconciler_createsConfigEntry_consulNamespaces(tt *testing.T
 	}
 }
 
-func TestConfigEntryReconciler_updatesConfigEntry_consulNamespaces(tt *testing.T) {
+func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T) {
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -217,11 +217,11 @@ func TestConfigEntryReconciler_updatesConfigEntry_consulNamespaces(tt *testing.T
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
+			r := controllers.ServiceDefaultsController{
 				Client: client,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryReconciler: &controllers.ConfigEntryReconciler{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClient:               consulClient,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,
@@ -280,7 +280,7 @@ func TestConfigEntryReconciler_updatesConfigEntry_consulNamespaces(tt *testing.T
 	}
 }
 
-func TestConfigEntryReconciler_deletesConfigEntry_consulNamespaces(tt *testing.T) {
+func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T) {
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -357,11 +357,11 @@ func TestConfigEntryReconciler_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
+			r := controllers.ServiceDefaultsController{
 				Client: client,
 				Log:    logrtest.TestLogger{T: t},
 				Scheme: s,
-				ConfigEntryReconciler: &controllers.ConfigEntryReconciler{
+				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClient:               consulClient,
 					EnableConsulNamespaces:     true,
 					EnableNSMirroring:          c.Mirror,

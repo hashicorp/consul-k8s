@@ -757,33 +757,37 @@ func TestServiceDefaults_RemoveFinalizer(t *testing.T) {
 	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
 }
 
-func TestServiceDefaults_SetConditions(t *testing.T) {
-	conditions := Conditions{
-		{
-			Type:   ConditionSynced,
-			Status: corev1.ConditionUnknown,
-		},
-	}
+func TestServiceDefaults_SetSyncedCondition(t *testing.T) {
 	resolver := &ServiceDefaults{}
+	resolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	resolver.SetConditions(conditions)
-	require.Equal(t, conditions, resolver.Status.Conditions)
+	require.Equal(t, corev1.ConditionTrue, resolver.Status.Conditions[0].Status)
+	require.Equal(t, "reason", resolver.Status.Conditions[0].Reason)
+	require.Equal(t, "message", resolver.Status.Conditions[0].Message)
+	now := metav1.Now()
+	require.True(t, resolver.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
-func TestServiceDefaults_GetCondition(t *testing.T) {
-	condition := Condition{
-		Type:   ConditionSynced,
-		Status: corev1.ConditionUnknown,
+func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
+	cases := []corev1.ConditionStatus{
+		corev1.ConditionUnknown,
+		corev1.ConditionFalse,
+		corev1.ConditionTrue,
 	}
-	resolver := &ServiceDefaults{
-		Status: ConfigEntryStatus{
-			Status: Status{
-				Conditions: []Condition{condition},
-			},
-		},
-	}
+	for _, status := range cases {
+		t.Run(string(status), func(t *testing.T) {
+			resolver := &ServiceDefaults{
+				Status: Status{
+					Conditions: []Condition{{
+						Type:   ConditionSynced,
+						Status: status,
+					}},
+				},
+			}
 
-	require.Equal(t, &condition, resolver.GetCondition(ConditionSynced))
+			require.Equal(t, status, resolver.GetSyncedConditionStatus())
+		})
+	}
 }
 
 func TestServiceDefaults_GetConditionNil(t *testing.T) {

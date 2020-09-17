@@ -1,11 +1,11 @@
-package controllers
+package v1alpha1
 
 import (
 	"context"
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -36,13 +36,13 @@ type serviceResolverValidator struct {
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-serviceresolver,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=serviceresolvers,versions=v1alpha1,name=mutate-serviceresolver.consul.hashicorp.com
 
 func (v *serviceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var svcResolver v1alpha1.ServiceResolver
+	var svcResolver ServiceResolver
 	err := v.decoder.Decode(req, &svcResolver)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return ValidateConfigEntry(ctx,
+	return common.ValidateConfigEntry(ctx,
 		req,
 		v.Logger,
 		v,
@@ -50,14 +50,14 @@ func (v *serviceResolverValidator) Handle(ctx context.Context, req admission.Req
 		"ServiceResolver")
 }
 
-func (v *serviceResolverValidator) List(ctx context.Context) ([]ConfigEntryCRD, error) {
-	var svcResolverList v1alpha1.ServiceResolverList
+func (v *serviceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+	var svcResolverList ServiceResolverList
 	if err := v.Client.List(ctx, &svcResolverList); err != nil {
 		return nil, err
 	}
-	var entries []ConfigEntryCRD
+	var entries []common.ConfigEntryResource
 	for _, item := range svcResolverList.Items {
-		entries = append(entries, ConfigEntryCRD(&item))
+		entries = append(entries, common.ConfigEntryResource(&item))
 	}
 	return entries, nil
 }

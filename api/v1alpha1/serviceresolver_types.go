@@ -5,6 +5,7 @@ import (
 	"time"
 
 	capi "github.com/hashicorp/consul/api"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,13 +17,8 @@ import (
 type ServiceResolver struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Status            ConfigEntryStatus   `json:"status,omitempty"`
 	Spec              ServiceResolverSpec `json:"spec,omitempty"`
-}
-
-// ServiceResolverStatus defines the observed state of ServiceResolver
-type ServiceResolverStatus struct {
-	Status `json:",inline"`
+	Status            `json:"status,omitempty"`
 }
 
 func (in *ServiceResolver) Kind() string {
@@ -55,12 +51,25 @@ func (in *ServiceResolver) Name() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *ServiceResolver) SetConditions(conditions Conditions) {
-	in.Status.Conditions = conditions
+func (in *ServiceResolver) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
+	in.Status.Conditions = Conditions{
+		{
+			Type:               ConditionSynced,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            message,
+		},
+	}
 }
 
-func (in *ServiceResolver) GetCondition(c ConditionType) *Condition {
-	return in.Status.GetCondition(c)
+func (in *ServiceResolver) GetSyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+	cond := in.Status.GetCondition(ConditionSynced)
+	return cond.Status, cond.Reason, cond.Message
+}
+
+func (in *ServiceResolver) GetSyncedConditionStatus() corev1.ConditionStatus {
+	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 // ToConsul converts the entry into its Consul equivalent struct.

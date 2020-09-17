@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	configEntryReconciler := &controllers.ConfigEntryReconciler{
+	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClient:               consulClient,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
@@ -119,8 +119,8 @@ func (c *Command) Run(args []string) int {
 		NSMirroringPrefix:          c.flagNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNSACLPolicy,
 	}
-	if err = (&controllers.ServiceDefaultsReconciler{
-		ConfigEntryReconciler: configEntryReconciler,
+	if err = (&controllers.ServiceDefaultsController{
+		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
 		Scheme:                mgr.GetScheme(),
@@ -128,8 +128,8 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceDefaults")
 		return 1
 	}
-	if err = (&controllers.ServiceResolverReconciler{
-		ConfigEntryReconciler: configEntryReconciler,
+	if err = (&controllers.ServiceResolverController{
+		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceResolver"),
 		Scheme:                mgr.GetScheme(),
@@ -146,9 +146,9 @@ func (c *Command) Run(args []string) int {
 		// Note: The path here should be identical to the one on the kubebuilder
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-			&webhook.Admission{Handler: controllers.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
+			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-			&webhook.Admission{Handler: controllers.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceResolver"))})
+			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceResolver"))})
 	}
 	// +kubebuilder:scaffold:builder
 

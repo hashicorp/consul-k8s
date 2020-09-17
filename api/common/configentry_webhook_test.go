@@ -1,4 +1,4 @@
-package controllers
+package common
 
 import (
 	"context"
@@ -32,8 +32,8 @@ func TestValidateConfigEntry_HandleErrorsIfConfigEntryWithSameNameExists(t *test
 
 	cases := []struct {
 		kind          string
-		existingCRD   ConfigEntryCRD
-		newCRD        ConfigEntryCRD
+		existingCRD   ConfigEntryResource
+		newCRD        ConfigEntryResource
 		addKnownTypes func(*runtime.Scheme)
 		validator     func(client.Client, *capi.Client, logr.Logger, *admission.Decoder) Validator
 	}{
@@ -56,12 +56,9 @@ func TestValidateConfigEntry_HandleErrorsIfConfigEntryWithSameNameExists(t *test
 				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaultsList{})
 			},
 			validator: func(client client.Client, consulClient *capi.Client, logger logr.Logger, decoder *admission.Decoder) Validator {
-				return &serviceDefaultsValidator{
-					Client:       client,
-					ConsulClient: consulClient,
-					Logger:       logger,
-					decoder:      decoder,
-				}
+				v := v1alpha1.NewServiceDefaultsValidator(client, consulClient, logger)
+				v.InjectDecoder(decoder)
+				return v
 			},
 		},
 		{
@@ -83,12 +80,9 @@ func TestValidateConfigEntry_HandleErrorsIfConfigEntryWithSameNameExists(t *test
 				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceResolverList{})
 			},
 			validator: func(client client.Client, consulClient *capi.Client, logger logr.Logger, decoder *admission.Decoder) Validator {
-				return &serviceResolverValidator{
-					Client:       client,
-					ConsulClient: consulClient,
-					Logger:       logger,
-					decoder:      decoder,
-				}
+				v := v1alpha1.NewServiceResolverValidator(client, consulClient, logger)
+				v.InjectDecoder(decoder)
+				return v
 			},
 		},
 	}

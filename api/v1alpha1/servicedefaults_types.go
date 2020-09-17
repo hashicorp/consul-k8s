@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	capi "github.com/hashicorp/consul/api"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,6 +16,18 @@ const (
 	ConsulHashicorpGroup string = "consul.hashicorp.com"
 	ServiceDefaultsKind  string = "servicedefaults"
 )
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
+// ServiceDefaults is the Schema for the servicedefaults API
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+type ServiceDefaults struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ServiceDefaultsSpec `json:"spec,omitempty"`
+	Status            `json:"status,omitempty"`
+}
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
 type ServiceDefaultsSpec struct {
@@ -29,23 +42,6 @@ type ServiceDefaultsSpec struct {
 	// ExternalSNI is an optional setting that allows for the TLS SNI value
 	// to be changed to a non-connect value when federating with an external system.
 	ExternalSNI string `json:"externalSNI,omitempty"`
-}
-
-// ServiceDefaultsStatus defines the observed state of ServiceDefaults
-type ServiceDefaultsStatus struct {
-	Status `json:",inline"`
-}
-
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-
-// ServiceDefaults is the Schema for the servicedefaults API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-type ServiceDefaults struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Status            ConfigEntryStatus   `json:"status,omitempty"`
-	Spec              ServiceDefaultsSpec `json:"spec,omitempty"`
 }
 
 func (in *ServiceDefaults) Kind() string {
@@ -78,12 +74,25 @@ func (in *ServiceDefaults) Name() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *ServiceDefaults) SetConditions(conditions Conditions) {
-	in.Status.Conditions = conditions
+func (in *ServiceDefaults) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
+	in.Status.Conditions = Conditions{
+		{
+			Type:               ConditionSynced,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            message,
+		},
+	}
 }
 
-func (in *ServiceDefaults) GetCondition(c ConditionType) *Condition {
-	return in.Status.GetCondition(c)
+func (in *ServiceDefaults) GetSyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+	cond := in.Status.GetCondition(ConditionSynced)
+	return cond.Status, cond.Reason, cond.Message
+}
+
+func (in *ServiceDefaults) GetSyncedConditionStatus() corev1.ConditionStatus {
+	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 // +kubebuilder:object:root=true

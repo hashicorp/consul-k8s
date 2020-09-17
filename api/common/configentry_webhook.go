@@ -1,4 +1,4 @@
-package controllers
+package common
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // ConfigEntryLister is implemented by CRD-specific webhooks.
 type ConfigEntryLister interface {
 	// List returns all resources of this type across all namespaces.
-	List(ctx context.Context) ([]ConfigEntryCRD, error)
+	List(ctx context.Context) ([]ConfigEntryResource, error)
 }
 
 // ValidateConfigEntry validates cfgEntry. It is a generic method that
@@ -25,7 +25,7 @@ func ValidateConfigEntry(
 	req admission.Request,
 	logger logr.Logger,
 	validator ConfigEntryLister,
-	cfgEntry ConfigEntryCRD,
+	cfgEntry ConfigEntryResource,
 	kind string) admission.Response {
 
 	if req.Operation == v1beta1.Create {

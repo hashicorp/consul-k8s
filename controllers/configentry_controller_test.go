@@ -8,10 +8,12 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-type TestReconciler interface {
+type testReconciler interface {
 	Reconcile(req ctrl.Request) (ctrl.Result, error)
 }
 
@@ -31,8 +33,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind       string
 		consulKind     string
-		configEntryCRD ConfigEntryCRD
-		reconciler     func(client.Client, *capi.Client, logr.Logger) TestReconciler
+		configEntryCRD common.ConfigEntryResource
+		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
 		compare        func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
@@ -47,11 +49,11 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceDefaultsReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -76,11 +78,11 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceResolverReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -129,8 +131,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			// Check that the status is "synced".
 			err = client.Get(ctx, namespacedName, c.configEntryCRD)
 			req.NoError(err)
-			conditionSynced := c.configEntryCRD.GetCondition(v1alpha1.ConditionSynced)
-			req.True(conditionSynced.IsTrue())
+			req.Equal(corev1.ConditionTrue, c.configEntryCRD.GetSyncedConditionStatus())
 
 			// Check that the finalizer is added.
 			req.Contains(c.configEntryCRD.Finalizers(), FinalizerName)
@@ -145,9 +146,9 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind       string
 		consulKind     string
-		configEntryCRD ConfigEntryCRD
-		reconciler     func(client.Client, *capi.Client, logr.Logger) TestReconciler
-		updateF        func(ConfigEntryCRD)
+		configEntryCRD common.ConfigEntryResource
+		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
+		updateF        func(common.ConfigEntryResource)
 		compare        func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
@@ -162,16 +163,16 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceDefaultsReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
 			},
-			updateF: func(crd ConfigEntryCRD) {
+			updateF: func(crd common.ConfigEntryResource) {
 				svcDefaults := crd.(*v1alpha1.ServiceDefaults)
 				svcDefaults.Spec.Protocol = "tcp"
 			},
@@ -195,16 +196,16 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceResolverReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
 			},
-			updateF: func(crd ConfigEntryCRD) {
+			updateF: func(crd common.ConfigEntryResource) {
 				svcResolver := crd.(*v1alpha1.ServiceResolver)
 				svcResolver.Spec.Redirect.Service = "different_redirect"
 			},
@@ -279,8 +280,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind                   string
 		consulKind                 string
-		configEntryCRDWithDeletion ConfigEntryCRD
-		reconciler                 func(client.Client, *capi.Client, logr.Logger) TestReconciler
+		configEntryCRDWithDeletion common.ConfigEntryResource
+		reconciler                 func(client.Client, *capi.Client, logr.Logger) testReconciler
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
@@ -296,11 +297,11 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceDefaultsReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -322,11 +323,11 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceResolverReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -387,8 +388,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	cases := []struct {
 		kubeKind       string
 		consulKind     string
-		configEntryCRD ConfigEntryCRD
-		reconciler     func(client.Client, *capi.Client, logr.Logger) TestReconciler
+		configEntryCRD common.ConfigEntryResource
+		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
 		compare        func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
@@ -403,11 +404,11 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Protocol: "http",
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceDefaultsReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -432,11 +433,11 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) TestReconciler {
-				return &ServiceResolverReconciler{
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryReconciler: &ConfigEntryReconciler{
+					ConfigEntryController: &ConfigEntryController{
 						ConsulClient: consulClient,
 					},
 				}
@@ -465,7 +466,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			})
 			req.NoError(err)
 
-			// Reconcile should result in an error.
+			// ReconcileEntry should result in an error.
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
@@ -483,10 +484,10 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			// Check that the status is "synced=false".
 			err = client.Get(ctx, namespacedName, c.configEntryCRD)
 			req.NoError(err)
-			conditionSynced := c.configEntryCRD.GetCondition(v1alpha1.ConditionSynced)
-			req.True(conditionSynced.IsFalse())
-			req.Equal("ConsulAgentError", conditionSynced.Reason)
-			req.Contains(conditionSynced.Message, expErr, conditionSynced.Message)
+			status, reason, errMsg := c.configEntryCRD.GetSyncedCondition()
+			req.Equal(corev1.ConditionFalse, status)
+			req.Equal("ConsulAgentError", reason)
+			req.Contains(errMsg, expErr)
 		})
 	}
 }
