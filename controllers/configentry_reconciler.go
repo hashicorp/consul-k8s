@@ -10,9 +10,11 @@ import (
 	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,13 +24,20 @@ const (
 	ConsulAgentError = "ConsulAgentError"
 )
 
-// StateUpdater is implemented by CRD-specific reconcilers. It is used by
+// Reconciler is implemented by CRD-specific reconcilers. It is used by
 // ConfigEntryReconciler to abstract CRD-specific reconcilers.
-type StateUpdater interface {
+type Reconciler interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, runtime.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
 	UpdateStatus(context.Context, runtime.Object, ...client.UpdateOption) error
+	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
+	// obj must be a struct pointer so that obj can be updated with the response
+	// returned by the Server.
+	Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error
+	// Logger returns a logger with values added for the specific controller
+	// and request name.
+	Logger(types.NamespacedName) logr.Logger
 }
 
 // ConfigEntryCRD is a generic config entry custom resource. It is implemented
@@ -104,11 +113,20 @@ type ConfigEntryReconciler struct {
 // need to call back into their own update methods to ensure they update their
 // internal state.
 func (r *ConfigEntryReconciler) Reconcile(
-	ctx context.Context,
-	logger logr.Logger,
-	updater StateUpdater,
+	updater Reconciler,
 	req ctrl.Request,
 	configEntry ConfigEntryCRD) (ctrl.Result, error) {
+
+	ctx := context.Background()
+	logger := updater.Logger(req.NamespacedName)
+
+	err := updater.Get(ctx, req.NamespacedName, configEntry)
+	if k8serr.IsNotFound(err) {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	} else if err != nil {
+		logger.Error(err, "retrieving resource")
+		return ctrl.Result{}, err
+	}
 
 	if configEntry.GetObjectMeta().DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
@@ -200,7 +218,7 @@ func (r *ConfigEntryReconciler) consulNamespace(kubeNS string) string {
 	return namespaces.ConsulNamespace(kubeNS, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
 }
 
-func (r *ConfigEntryReconciler) syncFailed(ctx context.Context, logger logr.Logger, updater StateUpdater, configEntry ConfigEntryCRD, errType string, err error) (ctrl.Result, error) {
+func (r *ConfigEntryReconciler) syncFailed(ctx context.Context, logger logr.Logger, updater Reconciler, configEntry ConfigEntryCRD, errType string, err error) (ctrl.Result, error) {
 	configEntry.SetConditions(consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
@@ -219,7 +237,7 @@ func (r *ConfigEntryReconciler) syncFailed(ctx context.Context, logger logr.Logg
 	return ctrl.Result{}, err
 }
 
-func (r *ConfigEntryReconciler) syncSuccessful(ctx context.Context, updater StateUpdater, configEntry ConfigEntryCRD) (ctrl.Result, error) {
+func (r *ConfigEntryReconciler) syncSuccessful(ctx context.Context, updater Reconciler, configEntry ConfigEntryCRD) (ctrl.Result, error) {
 	configEntry.SetConditions(consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
@@ -230,7 +248,7 @@ func (r *ConfigEntryReconciler) syncSuccessful(ctx context.Context, updater Stat
 	return ctrl.Result{}, updater.UpdateStatus(ctx, configEntry)
 }
 
-func (r *ConfigEntryReconciler) syncUnknown(ctx context.Context, updater StateUpdater, configEntry ConfigEntryCRD) error {
+func (r *ConfigEntryReconciler) syncUnknown(ctx context.Context, updater Reconciler, configEntry ConfigEntryCRD) error {
 	configEntry.SetConditions(consulv1alpha1.Conditions{
 		{
 			Type:               consulv1alpha1.ConditionSynced,
@@ -243,7 +261,7 @@ func (r *ConfigEntryReconciler) syncUnknown(ctx context.Context, updater StateUp
 
 func (r *ConfigEntryReconciler) syncUnknownWithError(ctx context.Context,
 	logger logr.Logger,
-	updater StateUpdater,
+	updater Reconciler,
 	configEntry ConfigEntryCRD,
 	errType string,
 	err error) (ctrl.Result, error) {

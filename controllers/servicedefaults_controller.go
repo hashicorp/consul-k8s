@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,19 +24,12 @@ type ServiceDefaultsReconciler struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicedefaults/status,verbs=get;update;patch
 
 func (r *ServiceDefaultsReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	logger := r.Log.WithValues("controller", "servicedefaults", "request", req.NamespacedName)
 	var svcDefaults consulv1alpha1.ServiceDefaults
+	return r.ConfigEntryReconciler.Reconcile(r, req, &svcDefaults)
+}
 
-	err := r.Get(ctx, req.NamespacedName, &svcDefaults)
-	if k8serr.IsNotFound(err) {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	} else if err != nil {
-		logger.Error(err, "retrieving resource")
-		return ctrl.Result{}, err
-	}
-
-	return r.ConfigEntryReconciler.Reconcile(ctx, logger, r, req, &svcDefaults)
+func (r *ServiceDefaultsReconciler) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("controller", "servicedefaults", "request", name)
 }
 
 func (r *ServiceDefaultsReconciler) UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
