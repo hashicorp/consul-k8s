@@ -3,10 +3,12 @@ package meshgateway
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -79,13 +81,12 @@ func TestMeshGatewayDefault(t *testing.T) {
 	secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
+	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
+	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
+
 	// Verify federation between servers
 	t.Log("verifying federation was successful")
-	consulClient := primaryConsulCluster.SetupConsulClient(t, false)
-	members, err := consulClient.Agent().Members(true)
-	require.NoError(t, err)
-	// Expect two consul servers
-	require.Len(t, members, 2)
+	verifyFederation(t, primaryClient, secondaryClient, false)
 
 	// Check that we can connect services over the mesh gateways
 	t.Log("creating static-server in dc2")
@@ -189,13 +190,12 @@ func TestMeshGatewaySecure(t *testing.T) {
 			secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
 
+			primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
+			secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
+
 			// Verify federation between servers
 			t.Log("verifying federation was successful")
-			consulClient := primaryConsulCluster.SetupConsulClient(t, true)
-			members, err := consulClient.Agent().Members(true)
-			require.NoError(t, err)
-			// Expect two consul servers
-			require.Len(t, members, 2)
+			verifyFederation(t, primaryClient, secondaryClient, true)
 
 			// Check that we can connect services over the mesh gateways
 			t.Log("creating static-server in dc2")
@@ -205,7 +205,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			helpers.DeployKustomize(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 			t.Log("creating intention")
-			_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
+			_, _, err = primaryClient.Connect().IntentionCreate(&api.Intention{
 				SourceName:      staticClientName,
 				DestinationName: "static-server",
 				Action:          api.IntentionActionAllow,
@@ -216,4 +216,34 @@ func TestMeshGatewaySecure(t *testing.T) {
 			helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
 		})
 	}
+}
+
+// verifyFederation checks that the WAN federation between servers is successful
+// by first checking members are alive from the perspective of both servers.
+// If secure is true, it will also check that the ACL replication is running on the secondary server.
+func verifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, secure bool) {
+	const consulMemberStatusAlive = 1
+
+	retrier := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		members, err := primaryClient.Agent().Members(true)
+		require.NoError(r, err)
+		require.Len(r, members, 2)
+		require.Equal(r, members[0].Status, consulMemberStatusAlive)
+		require.Equal(r, members[1].Status, consulMemberStatusAlive)
+
+		members, err = secondaryClient.Agent().Members(true)
+		require.NoError(r, err)
+		require.Len(r, members, 2)
+		require.Equal(r, members[0].Status, consulMemberStatusAlive)
+		require.Equal(r, members[1].Status, consulMemberStatusAlive)
+
+		if secure {
+			replicationStatus, _, err := secondaryClient.ACL().Replication(nil)
+			require.NoError(r, err)
+			require.True(r, replicationStatus.Enabled)
+			require.True(r, replicationStatus.Running)
+		}
+	})
 }
