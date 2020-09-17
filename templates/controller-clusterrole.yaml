@@ -14,6 +14,7 @@ rules:
   - consul.hashicorp.com
   resources:
   - servicedefaults
+  - serviceresolvers
   verbs:
   - create
   - delete
@@ -26,6 +27,7 @@ rules:
   - consul.hashicorp.com
   resources:
   - servicedefaults/status
+  - serviceresolvers/status
   verbs:
   - get
   - patch
