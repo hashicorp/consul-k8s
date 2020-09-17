@@ -30,8 +30,7 @@ import (
 
 const (
 	defaultCertExpiry    = 24 * time.Hour
-	defaultRetryDuration = 30 * time.Minute
-	errorRetryDuration   = 1 * time.Second
+	defaultRetryDuration = 1 * time.Second
 )
 
 type Command struct {
@@ -180,19 +179,18 @@ func (c *Command) Run(args []string) int {
 // MutatingWebhooksConfigs and Secrets when a new Bundle is available on the channel.
 func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface, log hclog.Logger) {
 	var bundle cert.MetaBundle
-	retryDuration := defaultRetryDuration
 	for {
 		select {
 		case bundle = <-ch:
 			log.Info(fmt.Sprintf("Updated certificate bundle received for %s; Updating webhook certs.", bundle.WebhookConfigName))
 			// Bundle is updated, set it up
 
-		case <-time.After(retryDuration):
+		case <-time.After(defaultRetryDuration):
 			// This forces the mutating ctrlWebhook config to remain updated
-			// fairly quickly. This is done every 30 minutes to ensure the certificates
-			// are in sync. Because the certificate and key are being read from a secret,
-			// this does not have to be processed as aggressively as the 1 sec time in
-			// the connect inject cert watcher.
+			// fairly quickly. helm upgrades will rewrite the contents of the
+			// CA bundle which will not be in sync with the certs in the system.
+			// This fast reconcile ensure the system recovers fairly quickly in case
+			// the secret or MWC gets deleted or reset.
 
 		case <-ctx.Done():
 			// Quit
@@ -200,9 +198,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 		}
 
 		if err := c.reconcileCertificates(ctx, clientset, bundle, log); err != nil {
-			retryDuration = errorRetryDuration
-		} else {
-			retryDuration = defaultRetryDuration
+			log.Error("failed to reconcile certificates", "err", err)
 		}
 	}
 }
@@ -237,7 +233,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		}
 		return nil
 	} else if err != nil {
-		iterLog.Error(fmt.Sprintf("Error getting secret from Kubernetes: %s", err))
+		iterLog.Error("getting secret from Kubernetes", "err", err)
 		return err
 	}
 
@@ -261,7 +257,6 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		iterLog.Error("Error updating webhook configuration", "err", err)
 		return err
 	}
-
 	return nil
 }
 

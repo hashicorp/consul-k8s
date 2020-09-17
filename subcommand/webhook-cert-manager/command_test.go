@@ -369,27 +369,27 @@ func TestCertWatcher(t *testing.T) {
 	defer stopCommand(t, &cmd, exitCh)
 
 	ctx := context.Background()
-	// This first sleep is required to ensure the command had completed validating that the MWC does exist in the cluster
-	// It ensures the MWC is absent when the server actually attempts to update it with a bundle.
-	time.Sleep(1 * time.Millisecond)
-	err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(ctx, webhookName, metav1.DeleteOptions{})
-	require.NoError(t, err)
-
-	// This sleep ensures the cluster attempts to try updating the MWC every second and fails before we re-create it in the cluster.
-	time.Sleep(100 * time.Millisecond)
-	_, err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(ctx, webhook, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	// If this test passes, it implies that the system has recovered before a new certificate is available
-	// or its default retry timer of 30 minutes has forced the reconcile.
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
+		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
 		require.NoError(r, err)
-		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, "")
+		//Verify that the CA cert has been initally set on the MWC
+		require.True(r, len(webhookConfig.Webhooks[0].ClientConfig.CABundle) > 800)
+	})
+	// Update the CA bundle on the MWC to `""` to replicate a helm upgrade
+	webhook.Webhooks[0].ClientConfig.CABundle = []byte("")
+	_, err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Update(ctx, webhook, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	// If this test passes, it implies that the system has recovered from the MWC
+	// getting updated to have the correct CA withing a reasonable time window
+	timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
+		require.NoError(r, err)
 		// This verifies that the MWC is populated with a valid certificate which has a
-		// a len of 800 chars. But the length is not deterministic because it is encoded.
-		require.True(r, len(webhookConfig1.Webhooks[0].ClientConfig.CABundle) > 800)
+		// a len of at least 800 chars. But the length is not deterministic because it is encoded.
+		require.True(r, len(webhookConfig.Webhooks[0].ClientConfig.CABundle) > 800)
 	})
 }
 
