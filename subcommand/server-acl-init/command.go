@@ -78,6 +78,9 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
+	// Flag to support Health Checks controller
+	flagEnableHealthChecks  bool
+
 	flagLogLevel string
 	flagTimeout  time.Duration
 
@@ -179,6 +182,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
+
+	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-health-checks", true,
+		"Enables the health check controller via updating required acls for connect-inject.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")

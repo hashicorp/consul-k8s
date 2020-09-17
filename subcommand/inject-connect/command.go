@@ -7,7 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -54,6 +57,9 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
+	// Flags to enable connect-inject health checks
+	flagEnableHealthChecks bool				// Start the health check controller
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -74,10 +80,12 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
+	k8s *flags.K8SFlags
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
 
+	sigCh  chan os.Signal
 	once sync.Once
 	help string
 	cert atomic.Value
@@ -113,6 +121,8 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
+	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", true,
+		"Enables health checks controller to be started")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -145,8 +155,18 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "50Mi", "Lifecycle sidecar memory limit.")
 
 	c.http = &flags.HTTPFlags{}
+	c.k8s = &flags.K8SFlags{}
+
 	flags.Merge(c.flagSet, c.http.Flags())
+	flags.Merge(c.flagSet, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flagSet)
+
+	// wait on an interrupt for exit, be sure to init it before running
+	// the controller so that we dont receive an interrupt before its ready
+	if c.sigCh == nil {
+		c.sigCh = make(chan os.Signal, 1)
+		signal.Notify(c.sigCh, os.Interrupt)
+	}
 }
 
 func (c *Command) Run(args []string) int {
@@ -322,14 +342,81 @@ func (c *Command) Run(args []string) int {
 		Handler:   handler,
 		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
 	}
+	lll := hclog.Default().Named("====LLLL====")
 
-	c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+	// channel used for health checks
+	// also check to see if we should enable TLS
+	var healthCh chan struct{}
+	tlsEnabled := os.Getenv("CONSUL_CACERT")
+	consulPort := "8500"
+	if tlsEnabled != "" {
+		consulPort = "8501"
+	}
+	lll.Error("here 1")
+	// create the health check handler
+	healthcheckHandler := &connectinject.HealthCheckHandler{
+		Log:                hclog.Default().Named("healthCheckHandler"),
+		AclConfig:          api.NamespaceACLConfig{},
+		HFlags:             &flags.HTTPFlags{},		// c.http
+		Clientset:          c.clientset,
+		ConsulClientScheme: runtime.NewScheme().Name(),
+		ConsulPort:         consulPort,
+	}
+	lll.Error("here 2")
+
+	// Build the health check controller and start it
+	healthcheckController := &connectinject.HealthCheckController{
+		Log:        hclog.Default().Named("healthCheckController"),
+		Clientset:  c.clientset,
+		Queue:      nil,
+		Informer:   nil,
+		Handle:     healthcheckHandler,
+		MaxRetries: 10,
+		Namespace:  "",		// TODO get this from the annotation or c.flagK8SSourceNamespace??
+	}
+
+	go func() {
+		// TODO error handling to close this
+		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+		}
+	}()
+
+	lll.Error("here 3")
+	// Start the health check controller
+	healthCh = make(chan struct{})
+	go func() {
+		lll.Error("here 4")
+		defer close(healthCh)
+		lll.Error("here 5")
+		healthcheckController.Init(ctx.Done())
+		lll.Error("here 6")
+		healthcheckController.Run(ctx.Done())
+		lll.Error("here 7")
+	}()
+
+	select {
+	// Unexpected exit
+	case <-healthCh:
+		lll.Error("here 8")
+		cancelFunc()
 		return 1
+
+	// Interrupted, gracefully exit
+	case <-c.sigCh:
+		lll.Error("here 9")
+		if healthCh != nil {
+			<-healthCh
+		}
+		return 0
 	}
 
 	return 0
+}
+
+func (c *Command) interrupt() {
+	c.sigCh <- os.Interrupt
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {

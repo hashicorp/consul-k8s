@@ -12,6 +12,7 @@ type rulesData struct {
 	EnableSyncK8SNSMirroring       bool
 	SyncK8SNSMirroringPrefix       string
 	SyncConsulNodeName             string
+	EnableHealthChecks			   bool
 }
 
 type gatewayRulesData struct {
@@ -201,10 +202,19 @@ namespace "{{ .ConsulSyncDestinationNamespace }}" {
 }
 
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector only needs permissions to create namespaces.
+	// The Connect injector needs permissions to create namespaces and also
+	// to register and update service checks.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
+{{- if .EnableHealthChecks }}
+  node_prefix "" {
+    policy = "write"
+  }
+  service_prefix "" {
+    policy = "write"
+  }
+{{- end }}
 {{- end }}
 `
 	return c.renderRules(injectRulesTpl)
@@ -248,6 +258,7 @@ func (c *Command) rulesData() rulesData {
 		EnableSyncK8SNSMirroring:       c.flagEnableSyncK8SNSMirroring,
 		SyncK8SNSMirroringPrefix:       c.flagSyncK8SNSMirroringPrefix,
 		SyncConsulNodeName:             c.flagSyncConsulNodeName,
+		EnableHealthChecks:             c.flagEnableHealthChecks,
 	}
 }
 
