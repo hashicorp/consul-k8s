@@ -1,4 +1,6 @@
-package common
+// Note: this test must be in v1alpha1 instead of common because it needs to
+// create the concrete types.
+package v1alpha1
 
 import (
 	"context"
@@ -8,7 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -32,55 +34,55 @@ func TestValidateConfigEntry_HandleErrorsIfConfigEntryWithSameNameExists(t *test
 
 	cases := []struct {
 		kind          string
-		existingCRD   ConfigEntryResource
-		newCRD        ConfigEntryResource
+		existingCRD   common.ConfigEntryResource
+		newCRD        common.ConfigEntryResource
 		addKnownTypes func(*runtime.Scheme)
 		validator     func(client.Client, *capi.Client, logr.Logger, *admission.Decoder) Validator
 	}{
 		{
 			kind: "ServiceDefaults",
-			existingCRD: &v1alpha1.ServiceDefaults{
+			existingCRD: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
 				},
 			},
-			newCRD: &v1alpha1.ServiceDefaults{
+			newCRD: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: otherNS,
 				},
 			},
 			addKnownTypes: func(s *runtime.Scheme) {
-				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
-				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaultsList{})
+				s.AddKnownTypes(GroupVersion, &ServiceDefaults{})
+				s.AddKnownTypes(GroupVersion, &ServiceDefaultsList{})
 			},
 			validator: func(client client.Client, consulClient *capi.Client, logger logr.Logger, decoder *admission.Decoder) Validator {
-				v := v1alpha1.NewServiceDefaultsValidator(client, consulClient, logger)
+				v := NewServiceDefaultsValidator(client, consulClient, logger)
 				v.InjectDecoder(decoder)
 				return v
 			},
 		},
 		{
 			kind: "ServiceResolver",
-			existingCRD: &v1alpha1.ServiceResolver{
+			existingCRD: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
 				},
 			},
-			newCRD: &v1alpha1.ServiceResolver{
+			newCRD: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: otherNS,
 				},
 			},
 			addKnownTypes: func(s *runtime.Scheme) {
-				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceResolver{})
-				s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceResolverList{})
+				s.AddKnownTypes(GroupVersion, &ServiceResolver{})
+				s.AddKnownTypes(GroupVersion, &ServiceResolverList{})
 			},
 			validator: func(client client.Client, consulClient *capi.Client, logger logr.Logger, decoder *admission.Decoder) Validator {
-				v := v1alpha1.NewServiceResolverValidator(client, consulClient, logger)
+				v := NewServiceResolverValidator(client, consulClient, logger)
 				v.InjectDecoder(decoder)
 				return v
 			},
