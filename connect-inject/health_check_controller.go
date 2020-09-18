@@ -24,7 +24,7 @@ const (
 	// this is the key by which the controller will filter it's watch/list and reconcile code
 	labelInject = "consul.hashicorp.com/connect-inject-status"
 
-	annotationServiceID = "consul.hashicorp.com/consul-service-id"
+	annotationServiceID                  = "consul.hashicorp.com/consul-service-id"
 	annotationConsulDestinationNamespace = "consul.hashicorp.com/consul-destination-namespace"
 )
 

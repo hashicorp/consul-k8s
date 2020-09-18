@@ -342,7 +342,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Container{esContainer, connectContainer},
 		"/spec/containers")...)
 
-	serviceName := ""//pod.ObjectMeta.Annotations[annotationService]
+	serviceName := "" //pod.ObjectMeta.Annotations[annotationService]
 	// Default service name is the name of the first container.
 	if serviceName == "" {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
@@ -356,9 +356,9 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	patches = append(patches, updateAnnotation(
 		pod.Annotations,
 		map[string]string{
-			annotationStatus: "injected",
+			annotationStatus:    "injected",
 			annotationServiceID: pod.Name + "-" + serviceName,
-		} )...)
+		})...)
 
 	// Consul-ENT support
 	if false {
@@ -366,13 +366,13 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			pod.Annotations,
 			map[string]string{
 				annotationConsulDestinationNamespace: "",
-			} )...)
+			})...)
 	}
 
 	// Add Pod label for health checks
 	patches = append(patches, updateLabels(
-			pod.Labels,
-			map[string]string{labelInject:"true"})...)
+		pod.Labels,
+		map[string]string{labelInject: "true"})...)
 
 	// Generate the patch
 	var patch []byte

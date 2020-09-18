@@ -79,7 +79,7 @@ type Command struct {
 	flagBootstrapTokenFile string
 
 	// Flag to support Health Checks controller
-	flagEnableHealthChecks  bool
+	flagEnableHealthChecks bool
 
 	flagLogLevel string
 	flagTimeout  time.Duration

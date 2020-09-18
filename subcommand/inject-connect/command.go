@@ -58,7 +58,7 @@ type Command struct {
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	// Flags to enable connect-inject health checks
-	flagEnableHealthChecks bool				// Start the health check controller
+	flagEnableHealthChecks bool // Start the health check controller
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -80,15 +80,15 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
-	k8s *flags.K8SFlags
+	k8s     *flags.K8SFlags
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
 
-	sigCh  chan os.Signal
-	once sync.Once
-	help string
-	cert atomic.Value
+	sigCh chan os.Signal
+	once  sync.Once
+	help  string
+	cert  atomic.Value
 }
 
 func (c *Command) init() {
@@ -369,7 +369,7 @@ func (c *Command) Run(args []string) int {
 		Informer:   nil,
 		Handle:     healthcheckHandler,
 		MaxRetries: 10,
-		Namespace:  "",		// TODO get this from the annotation or c.flagK8SSourceNamespace??
+		Namespace:  "", // TODO get this from the annotation or c.flagK8SSourceNamespace??
 	}
 
 	go func() {

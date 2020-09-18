@@ -12,7 +12,7 @@ type rulesData struct {
 	EnableSyncK8SNSMirroring       bool
 	SyncK8SNSMirroringPrefix       string
 	SyncConsulNodeName             string
-	EnableHealthChecks			   bool
+	EnableHealthChecks             bool
 }
 
 type gatewayRulesData struct {

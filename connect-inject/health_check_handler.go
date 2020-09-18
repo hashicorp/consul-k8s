@@ -26,7 +26,7 @@ type HCHandler interface {
 }
 
 const (
-	healthCheckPassing = "passing"
+	healthCheckPassing  = "passing"
 	healthCheckCritical = "critical"
 )
 
@@ -260,8 +260,6 @@ func (t *HealthCheckHandler) getReadyStatusAndReason(pod *corev1.Pod) (status co
 	}
 	return corev1.ConditionTrue, "", fmt.Errorf("unable to get pod ready status and reason for %v", pod.Name)
 }
-
-
 
 // ObjectCreated is called when a Pod transitions from Pending to Running
 func (t *HealthCheckHandler) ObjectCreated(obj interface{}) error {
