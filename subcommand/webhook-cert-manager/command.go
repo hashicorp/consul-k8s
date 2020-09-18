@@ -290,13 +290,12 @@ func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaB
 }
 
 func (c *Command) webhookUpdated(ctx context.Context, bundle cert.MetaBundle, clientset kubernetes.Interface) bool {
-	value := base64.StdEncoding.EncodeToString(bundle.CACert)
 	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
 	if err != nil {
 		return false
 	}
 	for _, webhook := range webhookCfg.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, []byte(value)) {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, bundle.CACert) {
 			return false
 		}
 	}
