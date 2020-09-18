@@ -24,8 +24,7 @@ type ServiceDefaultsController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicedefaults/status,verbs=get;update;patch
 
 func (r *ServiceDefaultsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	var svcDefaults consulv1alpha1.ServiceDefaults
-	return r.ConfigEntryController.ReconcileEntry(r, req, &svcDefaults)
+	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.ServiceDefaults{})
 }
 
 func (r *ServiceDefaultsController) Logger(name types.NamespacedName) logr.Logger {

@@ -24,8 +24,7 @@ type ServiceResolverController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=serviceresolvers/status,verbs=get;update;patch
 
 func (r *ServiceResolverController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	var svcResolver consulv1alpha1.ServiceResolver
-	return r.ConfigEntryController.ReconcileEntry(r, req, &svcResolver)
+	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.ServiceResolver{})
 }
 
 func (r *ServiceResolverController) Logger(name types.NamespacedName) logr.Logger {

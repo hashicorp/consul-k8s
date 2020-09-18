@@ -390,7 +390,6 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 		consulKind     string
 		configEntryCRD common.ConfigEntryResource
 		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
-		compare        func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
@@ -412,11 +411,6 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 						ConsulClient: consulClient,
 					},
 				}
-			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				svcDefault, ok := consulEntry.(*capi.ServiceConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, "http", svcDefault.Protocol)
 			},
 		},
 		{
@@ -441,11 +435,6 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 						ConsulClient: consulClient,
 					},
 				}
-			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				svcDefault, ok := consulEntry.(*capi.ServiceResolverConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, "redirect", svcDefault.Redirect.Service)
 			},
 		},
 	}
