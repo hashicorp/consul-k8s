@@ -50,7 +50,10 @@ func (t *HealthCheckHandler) getConsulHealthCheckID(pod *corev1.Pod) string {
 
 // return the serviceID of the connect service
 func (t *HealthCheckHandler) getConsulServiceID(pod *corev1.Pod) string {
-	return pod.Annotations[annotationServiceID]
+	return pod.Name + "-" + pod.Annotations[annotationService]
+	// TODO: I'd like to have this put into an annotation by this point, unfortunately it cannot
+	// be injected by the webhook because pod.Name isnt determined by then
+	//return pod.Annotations[annotationServiceID]
 }
 
 // deregisterConsulHealthCheck deregisters a health check for the service on this Agent.
@@ -98,7 +101,7 @@ func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) error {
 // The Agent is local to the Pod which has failed a health check.
 // This has the effect of marking the endpoint unhealthy for Consul service mesh traffic.
 func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
-	t.Log.Error("registerPassingHealthCheck, %v %v", consulHealthCheckID, serviceID)
+	t.Log.Debug("registerPassingHealthCheck, %v %v", consulHealthCheckID, serviceID)
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
 	// that the service does in fact exist, otherwise it will return 500 from Consul API.
@@ -164,10 +167,8 @@ func (t *HealthCheckHandler) setConsulHealthCheckStatus(healthCheckID, reason st
 
 // Init handles any handler initialization and is a no-op
 func (t *HealthCheckHandler) Init() error {
-	t.Log.Error("handlerInit starting")
-	err := t.Reconcile()
-	t.Log.Error("handlerInit error: %v", err)
-	return err
+	t.Log.Debug("handlerInit starting")
+	return t.Reconcile()
 }
 
 // Reconcile iterates through all Pods with the appropriate label and compares the
@@ -181,7 +182,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 		return err
 	}
 	for _, pod := range podList.Items {
-		t.Log.Error("processing Pod %v", pod.Name)
+		t.Log.Debug("processing Pod %v", pod.Name)
 		if pod.Status.Phase != corev1.PodRunning {
 			t.Log.Info("pod %v is not running", pod.Name, pod.Status.Phase)
 			continue
@@ -203,12 +204,13 @@ func (t *HealthCheckHandler) Reconcile() error {
 			continue
 		}
 		if checks == nil || len(checks) == 0 {
+			// TODO we need to handle this
 			t.Log.Error("======== we really shouldn't be here!, %v", checks)
 			continue
 		}
 		status, reason, err := t.getReadyStatusAndReason(&pod)
 		if err != nil {
-			t.Log.Error("%v", err)
+			t.Log.Error("unable to get pod status: %v", err)
 			continue
 		}
 		initialStatus := healthCheckPassing
@@ -245,7 +247,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 				}
 			}
 		}
-		t.Log.Error("no update required for %V", pod.Name)
+		t.Log.Debug("no update required for %V", pod.Name)
 	}
 	return nil
 }

@@ -150,37 +150,29 @@ func (c *HealthCheckController) Init(stopCh <-chan struct{}) {
 
 // Run is the main path of execution for the controller loop
 func (c *HealthCheckController) Run(stopCh <-chan struct{}) {
-	c.Log.Error("Controller.Run: initializing")
+	c.Log.Debug("Controller.Run: initializing")
 	// Setup the Informer
-	c.Log.Error("here 10")
 	c.setupInformer()
 	// Next setup the work queue
-	c.Log.Error("here 11")
 	c.setupWorkQueue()
 	// Next add eventHandlers, these are responsible for defining Create/Update/Delete functionality
-	c.Log.Error("here 12")
 	c.addEventHandlers()
 
 	// handle a panic with logging and exiting
 	defer utilruntime.HandleCrash()
-	c.Log.Error("here 13")
 	// block new items in the Queue in case of shutdown, drain the queue and exit
 	defer c.Queue.ShutDown()
 
 	// run the Informer to start listing and watching resources
 	go c.Informer.Run(stopCh)
 
-	c.Log.Error("here 14")
 	// do the initial synchronization (one time) to populate resources
 	if !cache.WaitForCacheSync(stopCh, c.HasSynced) {
-		c.Log.Error("here 15")
 		utilruntime.HandleError(fmt.Errorf("error syncing cache"))
 		return
 	}
 	// run the runWorker method every second with a stop channel
-	c.Log.Error("here 16")
 	wait.Until(c.runWorker, time.Second, stopCh)
-	c.Log.Error("finished controller.Run")
 }
 
 // HasSynced allows us to satisfy the HealthCheckController interface
@@ -191,25 +183,25 @@ func (c *HealthCheckController) HasSynced() bool {
 
 // runWorker executes the loop to process new items added to the Queue
 func (c *HealthCheckController) runWorker() {
-	c.Log.Error("Controller.runWorker: starting")
+	c.Log.Debug("Controller.runWorker: starting")
 	// invoke processNextItem to fetch and consume the next change
 	// to a watched or listed resource
 	for c.processNextItem() {
-		c.Log.Error("Controller.runWorker: processing next item")
+		c.Log.Debug("Controller.runWorker: processing next item")
 	}
-	c.Log.Error("Controller.runWorker: completed")
+	c.Log.Debug("Controller.runWorker: completed")
 }
 
 // processNextItem retrieves each Queued item and takes the
 // necessary Handle action based off of if the item was created, updated or deleted
 func (c *HealthCheckController) processNextItem() bool {
-	c.Log.Error("Controller.processNextItem: start")
+	c.Log.Debug("Controller.processNextItem: start")
 
 	// fetch the next item (blocking) from the Queue to process or
 	// if a shutdown is requested then return out to stop
 	key, quit := c.Queue.Get()
 	if quit {
-		c.Log.Error("we got a quit, shutting down!")
+		c.Log.Error("controller.processNextItem: shutting down")
 		return false
 	}
 	// Key format is as follows :  CREATE/namespace/name, DELETE/namespace/name, UPDATE/namespace/name
@@ -247,15 +239,15 @@ func (c *HealthCheckController) processNextItem() bool {
 	if exists {
 		if create == true {
 			// This is a Pod Create
-			c.Log.Error("controller.processNextItem: object create detected: %s", keyRaw)
+			c.Log.Debug("controller.processNextItem: object create detected: %s", keyRaw)
 			err = c.Handle.ObjectCreated(item)
 			if err == nil {
-				c.Log.Error("controller.processNextItem: object update as part of ObjectCreate: %s", keyRaw)
+				c.Log.Debug("controller.processNextItem: object update as part of ObjectCreate: %s", keyRaw)
 				err = c.Handle.ObjectUpdated(item)
 			}
 		} else {
 			// This is a Pod Status Update
-			c.Log.Error("controller.processNextItem: object update detected: %s", keyRaw)
+			c.Log.Debug("controller.processNextItem: object update detected: %s", keyRaw)
 			err = c.Handle.ObjectUpdated(item)
 		}
 		if err == nil {
@@ -270,7 +262,6 @@ func (c *HealthCheckController) processNextItem() bool {
 		// marking Done removes the key from the queue entirely
 		c.Queue.Done(key)
 	}
-	c.Log.Error("returning true..")
 	// keep the worker loop running by returning true
 	return true
 }
