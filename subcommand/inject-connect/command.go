@@ -342,7 +342,6 @@ func (c *Command) Run(args []string) int {
 		Handler:   handler,
 		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
 	}
-	lll := hclog.Default().Named("====LLLL====")
 
 	// channel used for health checks
 	// also check to see if we should enable TLS
@@ -352,17 +351,15 @@ func (c *Command) Run(args []string) int {
 	if tlsEnabled != "" {
 		consulPort = "8501"
 	}
-	lll.Error("here 1")
 	// create the health check handler
 	healthcheckHandler := &connectinject.HealthCheckHandler{
 		Log:                hclog.Default().Named("healthCheckHandler"),
 		AclConfig:          api.NamespaceACLConfig{},
-		HFlags:             &flags.HTTPFlags{},		// c.http
+		HFlags:             &flags.HTTPFlags{},
 		Clientset:          c.clientset,
 		ConsulClientScheme: runtime.NewScheme().Name(),
 		ConsulPort:         consulPort,
 	}
-	lll.Error("here 2")
 
 	// Build the health check controller and start it
 	healthcheckController := &connectinject.HealthCheckController{
@@ -383,29 +380,23 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	lll.Error("here 3")
 	// Start the health check controller
+	// First run Reconcile then start the watch
 	healthCh = make(chan struct{})
 	go func() {
-		lll.Error("here 4")
 		defer close(healthCh)
-		lll.Error("here 5")
 		healthcheckController.Init(ctx.Done())
-		lll.Error("here 6")
 		healthcheckController.Run(ctx.Done())
-		lll.Error("here 7")
 	}()
 
 	select {
 	// Unexpected exit
 	case <-healthCh:
-		lll.Error("here 8")
 		cancelFunc()
 		return 1
 
 	// Interrupted, gracefully exit
 	case <-c.sigCh:
-		lll.Error("here 9")
 		if healthCh != nil {
 			<-healthCh
 		}
