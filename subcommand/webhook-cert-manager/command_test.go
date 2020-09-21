@@ -382,7 +382,7 @@ func TestCertWatcher(t *testing.T) {
 	require.NoError(t, err)
 
 	// If this test passes, it implies that the system has recovered from the MWC
-	// getting updated to have the correct CA withing a reasonable time window
+	// getting updated to have the correct CA within a reasonable time window
 	timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})

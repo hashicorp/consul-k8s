@@ -187,9 +187,9 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 
 		case <-time.After(defaultRetryDuration):
 			// This forces the mutating ctrlWebhook config to remain updated
-			// fairly quickly. helm upgrades will rewrite the contents of the
+			// fairly quickly. Helm upgrades will rewrite the contents of the
 			// CA bundle which will not be in sync with the certs in the system.
-			// This fast reconcile ensure the system recovers fairly quickly in case
+			// This fast reconcile ensures the system recovers fairly quickly in case
 			// the secret or MWC gets deleted or reset.
 
 		case <-ctx.Done():
