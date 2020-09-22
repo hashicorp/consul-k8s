@@ -11,6 +11,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-v1alpha1-proxydefaults
+  failurePolicy: Fail
+  name: mutate-proxydefaults.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - proxydefaults
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
   name: mutate-servicedefaults.consul.hashicorp.com

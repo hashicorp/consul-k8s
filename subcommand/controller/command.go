@@ -137,6 +137,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceResolver")
 		return 1
 	}
+	if err = (&controllers.ProxyDefaultsController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controllers").WithName("ProxyDefaults"),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ProxyDefaults")
+		return 1
+	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
@@ -149,6 +158,8 @@ func (c *Command) Run(args []string) int {
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
 			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceResolver"))})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
+			&webhook.Admission{Handler: v1alpha1.NewProxyDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ProxyDefaults"))})
 	}
 	// +kubebuilder:scaffold:builder
 
