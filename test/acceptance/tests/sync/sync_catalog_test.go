@@ -59,13 +59,13 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating a static-server with a service")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
 			t.Log("checking that the service has been synced to Consul")
 			var services map[string][]string
-			syncedServiceName := fmt.Sprintf("static-server-%s", ctx.KubectlOptions().Namespace)
+			syncedServiceName := fmt.Sprintf("static-server-%s", ctx.KubectlOptions(t).Namespace)
 			counter := &retry.Counter{Count: 10, Wait: 5 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var err error

@@ -53,12 +53,12 @@ func TestIngressGateway(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating server")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			t.Log("creating static-client pod")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			t.Log("creating config entry")
@@ -83,7 +83,7 @@ func TestIngressGateway(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			k8sOptions := ctx.KubectlOptions()
+			k8sOptions := ctx.KubectlOptions(t)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
