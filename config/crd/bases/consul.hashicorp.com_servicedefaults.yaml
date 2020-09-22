@@ -95,7 +95,6 @@ spec:
               type: string
           type: object
         status:
-          description: ServiceDefaultsStatus defines the observed state of ServiceDefaults
           properties:
             conditions:
               description: Conditions indicate the latest available observations of

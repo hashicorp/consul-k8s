@@ -24,3 +24,21 @@ webhooks:
     - UPDATE
     resources:
     - servicedefaults
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-serviceresolver
+  failurePolicy: Fail
+  name: mutate-serviceresolver.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceresolvers

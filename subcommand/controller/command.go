@@ -111,18 +111,30 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err = (&controllers.ServiceDefaultsReconciler{
-		Client:                     mgr.GetClient(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
-		Scheme:                     mgr.GetScheme(),
+	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClient:               consulClient,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableNSMirroring,
 		NSMirroringPrefix:          c.flagNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNSACLPolicy,
+	}
+	if err = (&controllers.ServiceDefaultsController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
+		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceDefaults")
+		return 1
+	}
+	if err = (&controllers.ServiceResolverController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceResolver"),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ServiceResolver")
 		return 1
 	}
 
@@ -130,9 +142,13 @@ func (c *Command) Run(args []string) int {
 		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
 		// automatically when new certificates are available.
 		mgr.GetWebhookServer().CertDir = c.flagWebhookTLSCertDir
-		// Note: The path here should be identical to the one on the kubebuilder annotation in file api/v1alpha1/servicedefaults_webhook.go
+
+		// Note: The path here should be identical to the one on the kubebuilder
+		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
 			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
+			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceResolver"))})
 	}
 	// +kubebuilder:scaffold:builder
 

@@ -1,0 +1,20 @@
+# permissions for end users to view serviceresolvers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceresolver-viewer-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers/status
+  verbs:
+  - get
