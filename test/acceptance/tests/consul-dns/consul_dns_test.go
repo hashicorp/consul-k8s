@@ -1,6 +1,7 @@
 package consuldns
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -33,21 +34,21 @@ func TestConsulDNS(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			env := suite.Environment()
-			context := env.DefaultContext(t)
+			ctx := env.DefaultContext(t)
 			releaseName := helpers.RandomName()
 
-			cluster := framework.NewHelmCluster(t, c.helmValues, context, suite.Config(), releaseName)
+			cluster := framework.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
 
-			k8sClient := context.KubernetesClient(t)
-			contextNamespace := context.KubectlOptions().Namespace
+			k8sClient := ctx.KubernetesClient(t)
+			contextNamespace := ctx.KubectlOptions(t).Namespace
 
-			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
 			require.NoError(t, err)
 
 			dnsIP := dnsService.Spec.ClusterIP
 
-			consulServerList, err := k8sClient.CoreV1().Pods(contextNamespace).List(metav1.ListOptions{
+			consulServerList, err := k8sClient.CoreV1().Pods(contextNamespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=consul,component=server",
 			})
 			require.NoError(t, err)
@@ -60,7 +61,7 @@ func TestConsulDNS(t *testing.T) {
 			dnsTestPodArgs := []string{
 				"run", "-it", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
-			logs, err := helpers.RunKubectlAndGetOutputE(t, context.KubectlOptions(), dnsTestPodArgs...)
+			logs, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
 			require.NoError(t, err)
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
@@ -68,7 +69,7 @@ func TestConsulDNS(t *testing.T) {
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
 				// they should have different pod names.
-				helpers.RunKubectl(t, context.KubectlOptions(), "delete", "pod", podName)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", podName)
 			})
 
 			// When the `dig` request is successful, a section of it's response looks like the following:

@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -65,7 +66,7 @@ func NewHelmCluster(
 
 	opts := &helm.Options{
 		SetValues:      values,
-		KubectlOptions: ctx.KubectlOptions(),
+		KubectlOptions: ctx.KubectlOptions(t),
 		Logger:         logger.TestingT,
 	}
 	return &HelmCluster{
@@ -90,7 +91,8 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	h.checkForPriorInstallations(t)
 
-	helm.Install(t, h.helmOptions, helmChartPath, h.releaseName)
+	err := helm.InstallE(t, h.helmOptions, helmChartPath, h.releaseName)
+	require.NoError(t, err)
 
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -103,25 +105,29 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	helm.Delete(t, h.helmOptions, h.releaseName, false)
 
 	// delete PVCs
-	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-
-	// delete any secrets that have h.releaseName in their name
-	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(metav1.ListOptions{})
-	require.NoError(t, err)
-	for _, secret := range secrets.Items {
-		if strings.Contains(secret.Name, h.releaseName) {
-			err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).Delete(secret.Name, nil)
-			require.NoError(t, err)
-		}
-	}
+	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
 
 	// delete any serviceaccounts that have h.releaseName in their name
-	sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(metav1.ListOptions{})
+	sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	for _, sa := range sas.Items {
 		if strings.Contains(sa.Name, h.releaseName) {
-			err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).Delete(sa.Name, nil)
-			require.NoError(t, err)
+			err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), sa.Name, metav1.DeleteOptions{})
+			if !errors.IsNotFound(err) {
+				require.NoError(t, err)
+			}
+		}
+	}
+
+	// delete any secrets that have h.releaseName in their name
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	for _, secret := range secrets.Items {
+		if strings.Contains(secret.Name, h.releaseName) {
+			err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
+			if !errors.IsNotFound(err) {
+				require.NoError(t, err)
+			}
 		}
 	}
 }
@@ -155,10 +161,10 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		// and will try to read the replication token from the federation secret.
 		// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 		// Instead, we provide a replication token that serves the role of the bootstrap token.
-		aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+		aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
-			aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(federationSecret, metav1.GetOptions{})
+			aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
 			require.NoError(t, err)
 			config.Token = string(aclSecret.Data["replicationToken"])
 		} else if err == nil {

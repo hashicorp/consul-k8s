@@ -334,7 +334,7 @@ There are a number of `kubectl` commands available in the `helpers/kubectl.go` f
 For example, to call `kubectl apply` from the test write the following:
 
 ```go
-helpers.KubectlApply(t, ctx.KubectlOptions(), filepath)
+helpers.KubectlApply(t, ctx.KubectlOptions(t), filepath)
 ```
 
 Similarly, you can obtain Kubernetes client from your test context.
@@ -342,7 +342,7 @@ You can use it to, for example, read all services in a namespace:
 
 ```go
 k8sClient := ctx.KubernetesClient(t)
-services, err := k8sClient.CoreV1().Services(ctx.KubectlOptions().Namespace).List(metav1.ListOptions{})
+services, err := k8sClient.CoreV1().Services(ctx.KubectlOptions(t).Namespace).List(metav1.ListOptions{})
 ```
 
 To make Consul API calls, you can get the Consul client from the `consulCluster` object,

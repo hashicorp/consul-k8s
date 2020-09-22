@@ -7,6 +7,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -25,7 +26,7 @@ type TestEnvironment interface {
 // TestContext represents a specific context a test needs,
 // for example, information about a specific Kubernetes cluster.
 type TestContext interface {
-	KubectlOptions() *k8s.KubectlOptions
+	KubectlOptions(t *testing.T) *k8s.KubectlOptions
 	KubernetesClient(t *testing.T) kubernetes.Interface
 }
 
@@ -70,17 +71,40 @@ type kubernetesContext struct {
 	kubeContextName  string
 	namespace        string
 
-	client kubernetes.Interface
+	client  kubernetes.Interface
+	options *k8s.KubectlOptions
 
 	logDirectory string
 }
 
-func (k kubernetesContext) KubectlOptions() *k8s.KubectlOptions {
-	return &k8s.KubectlOptions{
+func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
+	if k.options != nil {
+		return k.options
+	}
+
+	k.options = &k8s.KubectlOptions{
 		ContextName: k.kubeContextName,
 		ConfigPath:  k.pathToKubeConfig,
 		Namespace:   k.namespace,
 	}
+
+	// If namespace is not explicitly set via flags,
+	// set it either from context or to the "default" namespace.
+	if k.namespace == "" {
+		configPath, err := k.options.GetConfigPath(t)
+		require.NoError(t, err)
+
+		rawConfig, err := k8s.LoadConfigFromPath(configPath).RawConfig()
+		require.NoError(t, err)
+
+		contextName := helpers.KubernetesContextFromOptions(t, k.options)
+		if rawConfig.Contexts[contextName].Namespace != "" {
+			k.options.Namespace = rawConfig.Contexts[contextName].Namespace
+		} else {
+			k.options.Namespace = metav1.NamespaceDefault
+		}
+	}
+	return k.options
 }
 
 func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
@@ -88,7 +112,7 @@ func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
 		return k.client
 	}
 
-	k.client = helpers.KubernetesClientFromOptions(t, k.KubectlOptions())
+	k.client = helpers.KubernetesClientFromOptions(t, k.KubectlOptions(t))
 
 	return k.client
 }

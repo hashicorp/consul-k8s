@@ -1,6 +1,7 @@
 package meshgateway
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -46,10 +47,10 @@ func TestMeshGatewayDefault(t *testing.T) {
 	// Get the federation secret from the primary cluster and apply it to secondary cluster
 	federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
 	t.Logf("retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
-	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions().Namespace).Get(federationSecretName, metav1.GetOptions{})
+	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 	federationSecret.ResourceVersion = ""
 	require.NoError(t, err)
-	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions().Namespace).Create(federationSecret)
+	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	// Create secondary cluster
@@ -90,13 +91,13 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	// Check that we can connect services over the mesh gateways
 	t.Log("creating static-server in dc2")
-	helpers.DeployKustomize(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	helpers.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	t.Log("creating static-client in dc1")
-	helpers.DeployKustomize(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	helpers.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
+	helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -150,10 +151,10 @@ func TestMeshGatewaySecure(t *testing.T) {
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
 			federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
 			t.Logf("retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
-			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions().Namespace).Get(federationSecretName, metav1.GetOptions{})
+			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 			require.NoError(t, err)
 			federationSecret.ResourceVersion = ""
-			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions().Namespace).Create(federationSecret)
+			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			// Create secondary cluster
@@ -199,10 +200,10 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 			// Check that we can connect services over the mesh gateways
 			t.Log("creating static-server in dc2")
-			helpers.DeployKustomize(t, secondaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			helpers.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			t.Log("creating static-client in dc1")
-			helpers.DeployKustomize(t, primaryContext.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+			helpers.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 			t.Log("creating intention")
 			_, _, err = primaryClient.Connect().IntentionCreate(&api.Intention{
@@ -213,7 +214,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(), true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
 		})
 	}
 }

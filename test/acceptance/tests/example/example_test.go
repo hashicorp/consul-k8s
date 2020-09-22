@@ -1,6 +1,7 @@
 package example
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
@@ -35,17 +36,17 @@ func TestExample(t *testing.T) {
 	// To run kubectl commands, you need to get KubectlOptions from the test context.
 	// There are a number of kubectl commands available in the helpers/kubectl.go file.
 	// For example, to call 'kubectl apply' from the test write the following:
-	helpers.KubectlApply(t, ctx.KubectlOptions(), "path/to/config")
+	helpers.KubectlApply(t, ctx.KubectlOptions(t), "path/to/config")
 
 	// Clean up any Kubernetes resources you have created
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		helpers.KubectlDelete(t, ctx.KubectlOptions(), "path/to/config")
+		helpers.KubectlDelete(t, ctx.KubectlOptions(t), "path/to/config")
 	})
 
 	// Similarly, you can obtain Kubernetes client from your test context.
 	// You can use it to, for example, read all services in a namespace:
 	k8sClient := ctx.KubernetesClient(t)
-	services, err := k8sClient.CoreV1().Services(ctx.KubectlOptions().Namespace).List(metav1.ListOptions{})
+	services, err := k8sClient.CoreV1().Services(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, services.Items)
 

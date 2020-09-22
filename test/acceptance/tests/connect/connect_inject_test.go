@@ -44,12 +44,12 @@ func TestConnectInject(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Log("creating static-server and static-client deployments")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			if c.secure {
 				t.Log("checking that the connection is not successful because there's no intention")
-				helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), false, staticClientName, "http://localhost:1234")
+				helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(t), false, staticClientName, "http://localhost:1234")
 
 				consulClient := consulCluster.SetupConsulClient(t, true)
 
@@ -63,7 +63,7 @@ func TestConnectInject(t *testing.T) {
 			}
 
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
 		})
 	}
 }

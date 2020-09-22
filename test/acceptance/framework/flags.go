@@ -42,7 +42,7 @@ func (t *TestFlags) init() {
 		"the default kubeconfig path (~/.kube/config) will be used.")
 	flag.StringVar(&t.flagKubecontext, "kubecontext", "", "The name of the Kubernetes context to use. If this is blank, "+
 		"the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagNamespace, "namespace", "default", "The Kubernetes namespace to use for tests.")
+	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
 
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
@@ -54,7 +54,7 @@ func (t *TestFlags) init() {
 		"If this is blank, the default kubeconfig path (~/.kube/config) will be used.")
 	flag.StringVar(&t.flagSecondaryKubecontext, "secondary-kubecontext", "", "The name of the Kubernetes context for the secondary cluster to use. "+
 		"If this is blank, the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagSecondaryNamespace, "secondary-namespace", "default", "The Kubernetes namespace to use in the secondary k8s cluster.")
+	flag.StringVar(&t.flagSecondaryNamespace, "secondary-namespace", "", "The Kubernetes namespace to use in the secondary k8s cluster.")
 
 	flag.BoolVar(&t.flagEnableEnterprise, "enable-enterprise", false,
 		"If true, the test suite will run tests for enterprise features. "+
