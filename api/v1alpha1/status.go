@@ -66,9 +66,6 @@ func (c *Condition) IsUnknown() bool {
 	return c.Status == corev1.ConditionUnknown
 }
 
-// Status shows how we expect folks to embed Conditions in
-// their Status field.
-// WARNING: Adding fields to this struct will add them to all Consul-k8s resources.
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 type Status struct {

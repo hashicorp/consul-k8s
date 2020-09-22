@@ -5,6 +5,7 @@ import (
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -655,7 +656,7 @@ func TestMatchesConsul(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestServiceDefaults_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input          *ServiceDefaults
 		expectedErrMsg string
@@ -738,4 +739,59 @@ func TestValidate(t *testing.T) {
 			require.EqualError(t, err, testCase.expectedErrMsg)
 		})
 	}
+}
+
+func TestServiceDefaults_AddFinalizer(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{}
+	serviceDefaults.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceDefaults.ObjectMeta.Finalizers)
+}
+
+func TestServiceDefaults_RemoveFinalizer(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"f1", "f2"},
+		},
+	}
+	serviceDefaults.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceDefaults.ObjectMeta.Finalizers)
+}
+
+func TestServiceDefaults_SetSyncedCondition(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{}
+	serviceDefaults.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+
+	require.Equal(t, corev1.ConditionTrue, serviceDefaults.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceDefaults.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceDefaults.Status.Conditions[0].Message)
+	now := metav1.Now()
+	require.True(t, serviceDefaults.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
+	cases := []corev1.ConditionStatus{
+		corev1.ConditionUnknown,
+		corev1.ConditionFalse,
+		corev1.ConditionTrue,
+	}
+	for _, status := range cases {
+		t.Run(string(status), func(t *testing.T) {
+			serviceDefaults := &ServiceDefaults{
+				Status: Status{
+					Conditions: []Condition{{
+						Type:   ConditionSynced,
+						Status: status,
+					}},
+				},
+			}
+
+			require.Equal(t, status, serviceDefaults.SyncedConditionStatus())
+		})
+	}
+}
+
+// Test that if status is empty then GetCondition returns nil.
+func TestServiceDefaults_GetConditionWhenNil(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{}
+	require.Nil(t, serviceDefaults.GetCondition(ConditionSynced))
 }

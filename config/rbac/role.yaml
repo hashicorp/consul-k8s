@@ -26,3 +26,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers/status
+  verbs:
+  - get
+  - patch
+  - update

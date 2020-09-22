@@ -14,13 +14,20 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestServiceDefaultsController_createsConfigEntry_consulNamespaces(tt *testing.T) {
+// NOTE: We're not testing each controller type here because that's done in
+// the OSS tests and it would result in too many permutations. Instead
+// we're only testing with the ServiceDefaults controller which will exercise
+// all the namespaces code.
+
+func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T) {
+	tt.Parallel()
+
 	cases := map[string]struct {
 		Mirror       bool
 		MirrorPrefix string
@@ -78,7 +85,7 @@ func TestServiceDefaultsController_createsConfigEntry_consulNamespaces(tt *testi
 					Protocol: "http",
 				},
 			}
-			s := scheme.Scheme
+			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 			ctx := context.Background()
 
@@ -92,15 +99,17 @@ func TestServiceDefaultsController_createsConfigEntry_consulNamespaces(tt *testi
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
-				Client:                     client,
-				Log:                        logrtest.TestLogger{T: t},
-				Scheme:                     s,
-				ConsulClient:               consulClient,
-				EnableConsulNamespaces:     true,
-				EnableNSMirroring:          c.Mirror,
-				NSMirroringPrefix:          c.MirrorPrefix,
-				ConsulDestinationNamespace: c.DestConsulNS,
+			r := controllers.ServiceDefaultsController{
+				Client: client,
+				Log:    logrtest.TestLogger{T: t},
+				Scheme: s,
+				ConfigEntryController: &controllers.ConfigEntryController{
+					ConsulClient:               consulClient,
+					EnableConsulNamespaces:     true,
+					EnableNSMirroring:          c.Mirror,
+					NSMirroringPrefix:          c.MirrorPrefix,
+					ConsulDestinationNamespace: c.DestConsulNS,
+				},
 			}
 
 			resp, err := r.Reconcile(ctrl.Request{
@@ -123,7 +132,7 @@ func TestServiceDefaultsController_createsConfigEntry_consulNamespaces(tt *testi
 			// Check that the status is "synced".
 			err = client.Get(ctx, types.NamespacedName{
 				Namespace: svcDefaults.Namespace,
-				Name:      svcDefaults.Name,
+				Name:      svcDefaults.Name(),
 			}, svcDefaults)
 			req.NoError(err)
 			conditionSynced := svcDefaults.Status.GetCondition(v1alpha1.ConditionSynced)
@@ -133,7 +142,9 @@ func TestServiceDefaultsController_createsConfigEntry_consulNamespaces(tt *testi
 	}
 }
 
-func TestServiceDefaultsController_updatesConfigEntry_consulNamespaces(tt *testing.T) {
+func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T) {
+	tt.Parallel()
+
 	cases := map[string]struct {
 		Mirror       bool
 		MirrorPrefix string
@@ -192,7 +203,7 @@ func TestServiceDefaultsController_updatesConfigEntry_consulNamespaces(tt *testi
 					Protocol: "http",
 				},
 			}
-			s := scheme.Scheme
+			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 			ctx := context.Background()
 
@@ -206,15 +217,17 @@ func TestServiceDefaultsController_updatesConfigEntry_consulNamespaces(tt *testi
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
-				Client:                     client,
-				Log:                        logrtest.TestLogger{T: t},
-				Scheme:                     s,
-				ConsulClient:               consulClient,
-				EnableConsulNamespaces:     true,
-				ConsulDestinationNamespace: c.DestConsulNS,
-				EnableNSMirroring:          c.Mirror,
-				NSMirroringPrefix:          c.MirrorPrefix,
+			r := controllers.ServiceDefaultsController{
+				Client: client,
+				Log:    logrtest.TestLogger{T: t},
+				Scheme: s,
+				ConfigEntryController: &controllers.ConfigEntryController{
+					ConsulClient:               consulClient,
+					EnableConsulNamespaces:     true,
+					EnableNSMirroring:          c.Mirror,
+					NSMirroringPrefix:          c.MirrorPrefix,
+					ConsulDestinationNamespace: c.DestConsulNS,
+				},
 			}
 
 			// We haven't run reconcile yet so ensure it's created in Consul.
@@ -239,7 +252,7 @@ func TestServiceDefaultsController_updatesConfigEntry_consulNamespaces(tt *testi
 				// First get it so we have the latest revision number.
 				err = client.Get(ctx, types.NamespacedName{
 					Namespace: svcDefaults.Namespace,
-					Name:      svcDefaults.Name,
+					Name:      svcDefaults.Name(),
 				}, svcDefaults)
 				req.NoError(err)
 
@@ -267,7 +280,9 @@ func TestServiceDefaultsController_updatesConfigEntry_consulNamespaces(tt *testi
 	}
 }
 
-func TestServiceDefaultsController_deletesConfigEntry_consulNamespaces(tt *testing.T) {
+func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T) {
+	tt.Parallel()
+
 	cases := map[string]struct {
 		Mirror       bool
 		MirrorPrefix string
@@ -329,7 +344,7 @@ func TestServiceDefaultsController_deletesConfigEntry_consulNamespaces(tt *testi
 					Protocol: "http",
 				},
 			}
-			s := scheme.Scheme
+			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
@@ -342,15 +357,17 @@ func TestServiceDefaultsController_deletesConfigEntry_consulNamespaces(tt *testi
 
 			client := fake.NewFakeClientWithScheme(s, svcDefaults)
 
-			r := controllers.ServiceDefaultsReconciler{
-				Client:                     client,
-				Log:                        logrtest.TestLogger{T: t},
-				Scheme:                     s,
-				ConsulClient:               consulClient,
-				EnableConsulNamespaces:     true,
-				ConsulDestinationNamespace: c.DestConsulNS,
-				EnableNSMirroring:          c.Mirror,
-				NSMirroringPrefix:          c.MirrorPrefix,
+			r := controllers.ServiceDefaultsController{
+				Client: client,
+				Log:    logrtest.TestLogger{T: t},
+				Scheme: s,
+				ConfigEntryController: &controllers.ConfigEntryController{
+					ConsulClient:               consulClient,
+					EnableConsulNamespaces:     true,
+					EnableNSMirroring:          c.Mirror,
+					NSMirroringPrefix:          c.MirrorPrefix,
+					ConsulDestinationNamespace: c.DestConsulNS,
+				},
 			}
 
 			// We haven't run reconcile yet so ensure it's created in Consul.
