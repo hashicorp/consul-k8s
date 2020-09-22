@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/subcommand/webhook-cert-manager/mocks"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -346,6 +347,7 @@ func TestCertWatcher(t *testing.T) {
 			},
 		},
 	}
+	certSource := &mocks.MockCertSource{}
 
 	k8s := fake.NewSimpleClientset(webhook)
 	ui := cli.NewMockUi()
@@ -353,6 +355,7 @@ func TestCertWatcher(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
+		source:    certSource,
 	}
 	cmd.init()
 
@@ -369,12 +372,12 @@ func TestCertWatcher(t *testing.T) {
 	defer stopCommand(t, &cmd, exitCh)
 
 	ctx := context.Background()
-	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
 		require.NoError(r, err)
-		//Verify that the CA cert has been initally set on the MWC
-		require.True(r, len(webhookConfig.Webhooks[0].ClientConfig.CABundle) > 800)
+		// Verify that the CA cert has been initally set on the MWC.
+		require.Contains(r, string(webhookConfig.Webhooks[0].ClientConfig.CABundle), "ca-certificate-string")
 	})
 	// Update the CA bundle on the MWC to `""` to replicate a helm upgrade
 	webhook.Webhooks[0].ClientConfig.CABundle = []byte("")
@@ -383,13 +386,12 @@ func TestCertWatcher(t *testing.T) {
 
 	// If this test passes, it implies that the system has recovered from the MWC
 	// getting updated to have the correct CA within a reasonable time window
-	timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+	timer = &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
 		require.NoError(r, err)
-		// This verifies that the MWC is populated with a valid certificate which has a
-		// a len of at least 800 chars. But the length is not deterministic because it is encoded.
-		require.True(r, len(webhookConfig.Webhooks[0].ClientConfig.CABundle) > 800)
+		// Verify that the CA cert has been updated with the correct CA.
+		require.Contains(r, string(webhookConfig.Webhooks[0].ClientConfig.CABundle), "ca-certificate-string")
 	})
 }
 

@@ -50,6 +50,7 @@ type Command struct {
 	logger hclog.Logger
 
 	certExpiry *time.Duration // override default cert expiry of 24 hours if set (only set in tests)
+	source     cert.Source    // override default cert source of cert.GenSource if set (only in tests)
 }
 
 func (c *Command) init() {
@@ -148,12 +149,16 @@ func (c *Command) Run(args []string) int {
 	} else {
 		expiry = defaultCertExpiry
 	}
-
+	var certSource cert.Source
 	for _, config := range configs {
-		certSource := &cert.GenSource{
-			Name:   "Consul Webhook Certificates",
-			Hosts:  config.TLSAutoHosts,
-			Expiry: expiry,
+		if c.source != nil {
+			certSource = c.source
+		} else {
+			certSource = &cert.GenSource{
+				Name:   "Consul Webhook Certificates",
+				Hosts:  config.TLSAutoHosts,
+				Expiry: expiry,
+			}
 		}
 		certNotify := &cert.Notify{Source: certSource, Ch: certCh, WebhookConfigName: config.Name, SecretName: config.SecretName, SecretNamespace: config.SecretNamespace}
 		notifiers = append(notifiers, certNotify)
@@ -203,6 +208,9 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 	}
 }
 
+// reconcileCertificates ensures the secret in the MetaBundle has the latest certificate from the MetaBundle and the caBundles on the
+// MutatingWebhookConfiguration have the latest CA certificate from the MetaBundle. It updates them if they are outdated and exits early
+// if they are up-to date.
 func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernetes.Interface, bundle cert.MetaBundle, log hclog.Logger) error {
 	iterLog := log.With("mutatingwebhookconfig", bundle.WebhookConfigName, "secret", bundle.SecretName, "secretNS", bundle.SecretNamespace)
 
@@ -260,6 +268,8 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	return nil
 }
 
+// updateWebhookConfig iterates over every webhook on the specified webhook configuration and updates
+// their caBundle with the CA from the MetaBundle.
 func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaBundle, clientset kubernetes.Interface) error {
 	if len(metaBundle.CACert) == 0 {
 		return errors.New("no CA certificate in the bundle")
@@ -289,6 +299,8 @@ func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaB
 	return nil
 }
 
+// webhookUpdated verifies if every caBundle on the specified webhook configuration matches the desired CA certificate.
+// It returns true if the CA is up-to date and false if it needs to be updated.
 func (c *Command) webhookUpdated(ctx context.Context, bundle cert.MetaBundle, clientset kubernetes.Interface) bool {
 	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
 	if err != nil {
