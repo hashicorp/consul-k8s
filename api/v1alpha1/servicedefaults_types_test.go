@@ -661,6 +661,19 @@ func TestServiceDefaults_Validate(t *testing.T) {
 		input          *ServiceDefaults
 		expectedErrMsg string
 	}{
+		"valid": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MeshGateway: MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
 		"meshgateway.mode": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -736,7 +749,11 @@ func TestServiceDefaults_Validate(t *testing.T) {
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := testCase.input.Validate()
-			require.EqualError(t, err, testCase.expectedErrMsg)
+			if testCase.expectedErrMsg != "" {
+				require.EqualError(t, err, testCase.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
