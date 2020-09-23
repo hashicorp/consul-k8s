@@ -52,10 +52,10 @@ func (m MeshGatewayConfig) toConsul() capi.MeshGatewayConfig {
 	}
 }
 
-func (m MeshGatewayConfig) validate() *field.Error {
+func (m MeshGatewayConfig) validate(path *field.Path) *field.Error {
 	modes := []string{"remote", "local", "none", ""}
 	if !sliceContains(modes, m.Mode) {
-		return field.Invalid(field.NewPath("spec").Child("meshGateway").Child("mode"), m.Mode, notInSliceMessage(modes))
+		return field.Invalid(path.Child("mode"), m.Mode, notInSliceMessage(modes))
 	}
 	return nil
 }
