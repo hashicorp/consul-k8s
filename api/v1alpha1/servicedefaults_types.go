@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	ConsulHashicorpGroup string = "consul.hashicorp.com"
-	ServiceDefaultsKind  string = "servicedefaults"
+	ServiceDefaultsKubeKind string = "servicedefaults"
 )
 
 // +kubebuilder:object:root=true
@@ -44,8 +43,12 @@ type ServiceDefaultsSpec struct {
 	ExternalSNI string `json:"externalSNI,omitempty"`
 }
 
-func (in *ServiceDefaults) Kind() string {
+func (in *ServiceDefaults) ConsulKind() string {
 	return capi.ServiceDefaults
+}
+
+func (in *ServiceDefaults) KubeKind() string {
+	return ServiceDefaultsKubeKind
 }
 
 func (in *ServiceDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -86,12 +89,12 @@ func (in *ServiceDefaults) SetSyncedCondition(status corev1.ConditionStatus, rea
 	}
 }
 
-func (in *ServiceDefaults) GetSyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+func (in *ServiceDefaults) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	return cond.Status, cond.Reason, cond.Message
 }
 
-func (in *ServiceDefaults) GetSyncedConditionStatus() corev1.ConditionStatus {
+func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 	return in.Status.GetCondition(ConditionSynced).Status
 }
 
@@ -111,7 +114,7 @@ func init() {
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
-		Kind:        capi.ServiceDefaults,
+		Kind:        in.ConsulKind(),
 		Name:        in.Name(),
 		Protocol:    in.Spec.Protocol,
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
@@ -131,7 +134,7 @@ func (in *ServiceDefaults) Validate() error {
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKind},
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKubeKind},
 			in.Name(), allErrs)
 	}
 
@@ -140,15 +143,15 @@ func (in *ServiceDefaults) Validate() error {
 
 // MatchesConsul returns true if entry has the same config as this struct.
 func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
-	svcDefCand, ok := candidate.(*capi.ServiceConfigEntry)
+	serviceDefaultsCandidate, ok := candidate.(*capi.ServiceConfigEntry)
 	if !ok {
 		return false
 	}
-	return in.Name() == svcDefCand.Name &&
-		in.Spec.Protocol == svcDefCand.Protocol &&
-		in.Spec.MeshGateway.Mode == string(svcDefCand.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(svcDefCand.Expose) &&
-		in.Spec.ExternalSNI == svcDefCand.ExternalSNI
+	return in.Name() == serviceDefaultsCandidate.Name &&
+		in.Spec.Protocol == serviceDefaultsCandidate.Protocol &&
+		in.Spec.MeshGateway.Mode == string(serviceDefaultsCandidate.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(serviceDefaultsCandidate.Expose) &&
+		in.Spec.ExternalSNI == serviceDefaultsCandidate.ExternalSNI
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

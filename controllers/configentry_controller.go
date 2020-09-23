@@ -93,7 +93,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	if configEntry.GetObjectMeta().DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
-		// then lets add the finalizer and update the object. This is equivalent
+		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
 		if !containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
 			configEntry.AddFinalizer(FinalizerName)
@@ -107,7 +107,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 			logger.Info("deletion event")
 			// Our finalizer is present, so we need to delete the config entry
 			// from consul.
-			_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.Kind(), configEntry.Name(), &capi.WriteOptions{
+			_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
 				Namespace: r.consulNamespace(req.Namespace),
 			})
 			if err != nil {
@@ -128,7 +128,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 	}
 
 	// Check to see if consul has service defaults with the same name
-	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.Kind(), configEntry.Name(), &capi.QueryOptions{
+	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.Name(), &capi.QueryOptions{
 		Namespace: r.consulNamespace(req.Namespace),
 	})
 	// If a config entry with this name does not exist
@@ -170,7 +170,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 				fmt.Errorf("updating config entry in consul: %w", err))
 		}
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
-	} else if configEntry.GetSyncedConditionStatus() == corev1.ConditionTrue {
+	} else if configEntry.SyncedConditionStatus() == corev1.ConditionTrue {
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 

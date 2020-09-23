@@ -656,7 +656,7 @@ func TestMatchesConsul(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestServiceDefaults_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input          *ServiceDefaults
 		expectedErrMsg string
@@ -742,30 +742,30 @@ func TestValidate(t *testing.T) {
 }
 
 func TestServiceDefaults_AddFinalizer(t *testing.T) {
-	resolver := &ServiceDefaults{}
-	resolver.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resolver.ObjectMeta.Finalizers)
+	serviceDefaults := &ServiceDefaults{}
+	serviceDefaults.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceDefaults.ObjectMeta.Finalizers)
 }
 
 func TestServiceDefaults_RemoveFinalizer(t *testing.T) {
-	resolver := &ServiceDefaults{
+	serviceDefaults := &ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resolver.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
+	serviceDefaults.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceDefaults.ObjectMeta.Finalizers)
 }
 
 func TestServiceDefaults_SetSyncedCondition(t *testing.T) {
-	resolver := &ServiceDefaults{}
-	resolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceDefaults := &ServiceDefaults{}
+	serviceDefaults.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resolver.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resolver.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resolver.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceDefaults.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceDefaults.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceDefaults.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resolver.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceDefaults.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
 func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
@@ -776,7 +776,7 @@ func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resolver := &ServiceDefaults{
+			serviceDefaults := &ServiceDefaults{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -785,12 +785,13 @@ func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resolver.GetSyncedConditionStatus())
+			require.Equal(t, status, serviceDefaults.SyncedConditionStatus())
 		})
 	}
 }
 
-func TestServiceDefaults_GetConditionNil(t *testing.T) {
-	resolver := &ServiceDefaults{}
-	require.Nil(t, resolver.GetCondition(ConditionSynced))
+// Test that if status is empty then GetCondition returns nil.
+func TestServiceDefaults_GetConditionWhenNil(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{}
+	require.Nil(t, serviceDefaults.GetCondition(ConditionSynced))
 }

@@ -31,16 +31,16 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind       string
-		consulKind     string
-		configEntryCRD common.ConfigEntryResource
-		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
-		compare        func(t *testing.T, consul capi.ConfigEntry)
+		kubeKind            string
+		consulKind          string
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
+		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryCRD: &v1alpha1.ServiceDefaults{
+			configEntryResource: &v1alpha1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -67,7 +67,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryCRD: &v1alpha1.ServiceResolver{
+			configEntryResource: &v1alpha1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -101,8 +101,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryCRD)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryCRD)
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -115,7 +115,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
-				Name:      c.configEntryCRD.Name(),
+				Name:      c.configEntryResource.Name(),
 			}
 			resp, err := r.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
@@ -123,18 +123,18 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			req.NoError(err)
 			req.False(resp.Requeue)
 
-			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryCRD.Name(), nil)
+			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.Name(), nil)
 			req.NoError(err)
-			req.Equal(c.configEntryCRD.Name(), cfg.GetName())
+			req.Equal(c.configEntryResource.Name(), cfg.GetName())
 			c.compare(t, cfg)
 
 			// Check that the status is "synced".
-			err = client.Get(ctx, namespacedName, c.configEntryCRD)
+			err = client.Get(ctx, namespacedName, c.configEntryResource)
 			req.NoError(err)
-			req.Equal(corev1.ConditionTrue, c.configEntryCRD.GetSyncedConditionStatus())
+			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
 
 			// Check that the finalizer is added.
-			req.Contains(c.configEntryCRD.Finalizers(), FinalizerName)
+			req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
 		})
 	}
 }
@@ -144,17 +144,17 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind       string
-		consulKind     string
-		configEntryCRD common.ConfigEntryResource
-		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
-		updateF        func(common.ConfigEntryResource)
-		compare        func(t *testing.T, consul capi.ConfigEntry)
+		kubeKind            string
+		consulKind          string
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
+		updateF             func(common.ConfigEntryResource)
+		compare             func(t *testing.T, consul capi.ConfigEntry)
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryCRD: &v1alpha1.ServiceDefaults{
+			configEntryResource: &v1alpha1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -172,8 +172,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				}
 			},
-			updateF: func(crd common.ConfigEntryResource) {
-				svcDefaults := crd.(*v1alpha1.ServiceDefaults)
+			updateF: func(resource common.ConfigEntryResource) {
+				svcDefaults := resource.(*v1alpha1.ServiceDefaults)
 				svcDefaults.Spec.Protocol = "tcp"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -185,7 +185,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryCRD: &v1alpha1.ServiceResolver{
+			configEntryResource: &v1alpha1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -205,8 +205,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					},
 				}
 			},
-			updateF: func(crd common.ConfigEntryResource) {
-				svcResolver := crd.(*v1alpha1.ServiceResolver)
+			updateF: func(resource common.ConfigEntryResource) {
+				svcResolver := resource.(*v1alpha1.ServiceResolver)
 				svcResolver.Spec.Redirect.Service = "different_redirect"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
@@ -223,8 +223,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryCRD)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryCRD)
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -237,7 +237,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryCRD.ToConsul(), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -246,15 +246,15 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryCRD.Name(),
+					Name:      c.configEntryResource.Name(),
 				}
 				// First get it so we have the latest revision number.
-				err = client.Get(ctx, namespacedName, c.configEntryCRD)
+				err = client.Get(ctx, namespacedName, c.configEntryResource)
 				req.NoError(err)
 
 				// Update the entry in Kube and run reconcile.
-				c.updateF(c.configEntryCRD)
-				err := client.Update(ctx, c.configEntryCRD)
+				c.updateF(c.configEntryResource)
+				err := client.Update(ctx, c.configEntryResource)
 				req.NoError(err)
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(ctrl.Request{
@@ -264,9 +264,9 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryCRD.Name(), nil)
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.Name(), nil)
 				req.NoError(err)
-				req.Equal(c.configEntryCRD.Name(), cfg.GetName())
+				req.Equal(c.configEntryResource.Name(), cfg.GetName())
 				c.compare(t, cfg)
 			}
 		})
@@ -278,15 +278,15 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind                   string
-		consulKind                 string
-		configEntryCRDWithDeletion common.ConfigEntryResource
-		reconciler                 func(client.Client, *capi.Client, logr.Logger) testReconciler
+		kubeKind                        string
+		consulKind                      string
+		configEntryResourceWithDeletion common.ConfigEntryResource
+		reconciler                      func(client.Client, *capi.Client, logr.Logger) testReconciler
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryCRDWithDeletion: &v1alpha1.ServiceDefaults{
+			configEntryResourceWithDeletion: &v1alpha1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
@@ -310,7 +310,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryCRDWithDeletion: &v1alpha1.ServiceResolver{
+			configEntryResourceWithDeletion: &v1alpha1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					Namespace:         kubeNS,
@@ -340,8 +340,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			req := require.New(t)
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryCRDWithDeletion)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryCRDWithDeletion)
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResourceWithDeletion)
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -354,7 +354,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryCRDWithDeletion.ToConsul(), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -363,7 +363,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryCRDWithDeletion.Name(),
+					Name:      c.configEntryResourceWithDeletion.Name(),
 				}
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(ctrl.Request{
@@ -372,10 +372,10 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryCRDWithDeletion.Name(), nil)
+				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.Name(), nil)
 				req.EqualError(err,
 					fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)",
-						c.consulKind, c.configEntryCRDWithDeletion.Name()))
+						c.consulKind, c.configEntryResourceWithDeletion.Name()))
 			}
 		})
 	}
@@ -386,15 +386,15 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind       string
-		consulKind     string
-		configEntryCRD common.ConfigEntryResource
-		reconciler     func(client.Client, *capi.Client, logr.Logger) testReconciler
+		kubeKind            string
+		consulKind          string
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 	}{
 		{
 			kubeKind:   "ServiceDefaults",
 			consulKind: capi.ServiceDefaults,
-			configEntryCRD: &v1alpha1.ServiceDefaults{
+			configEntryResource: &v1alpha1.ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -416,7 +416,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 		{
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceResolver,
-			configEntryCRD: &v1alpha1.ServiceResolver{
+			configEntryResource: &v1alpha1.ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: kubeNS,
@@ -445,8 +445,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryCRD)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryCRD)
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
 
 			// Construct a Consul client that will error by giving it
 			// an unresolvable address.
@@ -459,21 +459,21 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
-				Name:      c.configEntryCRD.Name(),
+				Name:      c.configEntryResource.Name(),
 			}
 			resp, err := r.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.Error(err)
 
-			expErr := fmt.Sprintf("Get \"http://incorrect-address/v1/config/%s/%s\": dial tcp: lookup incorrect-address", c.consulKind, c.configEntryCRD.Name())
+			expErr := fmt.Sprintf("Get \"http://incorrect-address/v1/config/%s/%s\": dial tcp: lookup incorrect-address", c.consulKind, c.configEntryResource.Name())
 			req.Contains(err.Error(), expErr)
 			req.False(resp.Requeue)
 
 			// Check that the status is "synced=false".
-			err = client.Get(ctx, namespacedName, c.configEntryCRD)
+			err = client.Get(ctx, namespacedName, c.configEntryResource)
 			req.NoError(err)
-			status, reason, errMsg := c.configEntryCRD.GetSyncedCondition()
+			status, reason, errMsg := c.configEntryResource.SyncedCondition()
 			req.Equal(corev1.ConditionFalse, status)
 			req.Equal("ConsulAgentError", reason)
 			req.Contains(errMsg, expErr)

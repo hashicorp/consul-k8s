@@ -447,38 +447,38 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul()
-			resolver, ok := act.(*capi.ServiceResolverConfigEntry)
+			serviceResolver, ok := act.(*capi.ServiceResolverConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, resolver)
+			require.Equal(t, c.Exp, serviceResolver)
 		})
 	}
 }
 
 func TestServiceResolver_AddFinalizer(t *testing.T) {
-	resolver := &ServiceResolver{}
-	resolver.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resolver.ObjectMeta.Finalizers)
+	serviceResolver := &ServiceResolver{}
+	serviceResolver.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceResolver.ObjectMeta.Finalizers)
 }
 
 func TestServiceResolver_RemoveFinalizer(t *testing.T) {
-	resolver := &ServiceResolver{
+	serviceResolver := &ServiceResolver{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resolver.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
+	serviceResolver.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceResolver.ObjectMeta.Finalizers)
 }
 
 func TestServiceResolver_SetSyncedCondition(t *testing.T) {
-	resolver := &ServiceResolver{}
-	resolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceResolver := &ServiceResolver{}
+	serviceResolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resolver.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resolver.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resolver.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceResolver.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceResolver.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceResolver.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resolver.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceResolver.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
 func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {
@@ -489,7 +489,7 @@ func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resolver := &ServiceResolver{
+			serviceResolver := &ServiceResolver{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -498,12 +498,51 @@ func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resolver.GetSyncedConditionStatus())
+			require.Equal(t, status, serviceResolver.SyncedConditionStatus())
 		})
 	}
 }
 
-func TestServiceResolver_GetConditionNil(t *testing.T) {
-	resolver := &ServiceResolver{}
-	require.Nil(t, resolver.GetCondition(ConditionSynced))
+// Test that if status is empty then GetCondition returns nil.
+func TestServiceResolver_GetConditionWhenNil(t *testing.T) {
+	serviceResolver := &ServiceResolver{}
+	require.Nil(t, serviceResolver.GetCondition(ConditionSynced))
+}
+
+func TestServiceResolver_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input          *ServiceResolver
+		expectedErrMsg string
+	}{
+		"failover service, servicesubset, namespace, datacenters empty": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:       "",
+							ServiceSubset: "",
+							Namespace:     "",
+							Datacenters:   nil,
+						},
+						"failB": {
+							Service:       "",
+							ServiceSubset: "",
+							Namespace:     "",
+							Datacenters:   nil,
+						},
+					},
+				},
+			},
+			expectedErrMsg: "serviceresolver.consul.hashicorp.com \"foo\" is invalid: [spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once, spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once]",
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate()
+			require.EqualError(t, err, testCase.expectedErrMsg)
+		})
+	}
 }

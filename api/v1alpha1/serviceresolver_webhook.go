@@ -46,8 +46,7 @@ func (v *serviceResolverValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcResolver,
-		"ServiceResolver")
+		&svcResolver)
 }
 
 func (v *serviceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

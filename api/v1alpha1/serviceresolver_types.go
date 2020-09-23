@@ -1,13 +1,20 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+const ServiceResolverKubeKind string = "serviceresolver"
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -21,8 +28,12 @@ type ServiceResolver struct {
 	Status            `json:"status,omitempty"`
 }
 
-func (in *ServiceResolver) Kind() string {
+func (in *ServiceResolver) ConsulKind() string {
 	return capi.ServiceResolver
+}
+
+func (in *ServiceResolver) KubeKind() string {
+	return ServiceResolverKubeKind
 }
 
 func (in *ServiceResolver) GetObjectMeta() metav1.ObjectMeta {
@@ -63,19 +74,19 @@ func (in *ServiceResolver) SetSyncedCondition(status corev1.ConditionStatus, rea
 	}
 }
 
-func (in *ServiceResolver) GetSyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+func (in *ServiceResolver) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	return cond.Status, cond.Reason, cond.Message
 }
 
-func (in *ServiceResolver) GetSyncedConditionStatus() corev1.ConditionStatus {
+func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
 	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 // ToConsul converts the entry into its Consul equivalent struct.
 func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
 	return &capi.ServiceResolverConfigEntry{
-		Kind:           capi.ServiceResolver,
+		Kind:           in.ConsulKind(),
 		Name:           in.Name(),
 		DefaultSubset:  in.Spec.DefaultSubset,
 		Subsets:        in.Spec.Subsets.toConsul(),
@@ -86,21 +97,49 @@ func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
 }
 
 func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
-	svcResolverCand, ok := candidate.(*capi.ServiceResolverConfigEntry)
+	serviceResolverCandidate, ok := candidate.(*capi.ServiceResolverConfigEntry)
 	if !ok {
 		return false
 	}
 
-	return in.Name() == svcResolverCand.Name &&
-		in.Spec.DefaultSubset == svcResolverCand.DefaultSubset &&
-		in.Spec.Subsets.matchesConsul(svcResolverCand.Subsets) &&
-		in.Spec.Redirect.matchesConsul(svcResolverCand.Redirect) &&
-		in.Spec.Failover.matchesConsul(svcResolverCand.Failover) &&
-		in.Spec.ConnectTimeout == svcResolverCand.ConnectTimeout
+	return in.Name() == serviceResolverCandidate.Name &&
+		in.Spec.DefaultSubset == serviceResolverCandidate.DefaultSubset &&
+		in.Spec.Subsets.matchesConsul(serviceResolverCandidate.Subsets) &&
+		in.Spec.Redirect.matchesConsul(serviceResolverCandidate.Redirect) &&
+		in.Spec.Failover.matchesConsul(serviceResolverCandidate.Failover) &&
+		in.Spec.ConnectTimeout == serviceResolverCandidate.ConnectTimeout
 }
 
 func (in *ServiceResolver) Validate() error {
-	// There is no validation to do for service resolvers.
+	var errs field.ErrorList
+
+	// Iterate through failover map keys in sorted order so tests are
+	// deterministic.
+	keys := make([]string, 0, len(in.Spec.Failover))
+	for k := range in.Spec.Failover {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		f := in.Spec.Failover[k]
+		if err := f.validate(k); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
+		in.Name(), errs)
+}
+
+func (in *ServiceResolverFailover) validate(key string) *field.Error {
+	if in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 {
+		path := field.NewPath("spec").Child(fmt.Sprintf("failover[%s]", key))
+		// NOTE: We're passing "{}" here as our value because we know that the
+		// error is we have an empty object.
+		return field.Invalid(path, "{}",
+			"service, serviceSubset, namespace and datacenters cannot all be empty at once")
+	}
 	return nil
 }
 

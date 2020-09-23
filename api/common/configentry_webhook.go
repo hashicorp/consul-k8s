@@ -12,7 +12,8 @@ import (
 
 // ConfigEntryLister is implemented by CRD-specific webhooks.
 type ConfigEntryLister interface {
-	// List returns all resources of this type across all namespaces.
+	// List returns all resources of this type across all namespaces in a
+	// Kubernetes cluster.
 	List(ctx context.Context) ([]ConfigEntryResource, error)
 }
 
@@ -24,14 +25,16 @@ func ValidateConfigEntry(
 	ctx context.Context,
 	req admission.Request,
 	logger logr.Logger,
-	validator ConfigEntryLister,
-	cfgEntry ConfigEntryResource,
-	kind string) admission.Response {
+	configEntryLister ConfigEntryLister,
+	cfgEntry ConfigEntryResource) admission.Response {
 
+	// On create we need to validate that there isn't already a resource with
+	// the same name in a different namespace since we need to map all Kube
+	// resources to a single Consul namespace.
 	if req.Operation == v1beta1.Create {
 		logger.Info("validate create", "name", cfgEntry.Name())
 
-		list, err := validator.List(ctx)
+		list, err := configEntryLister.List(ctx)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
@@ -40,14 +43,14 @@ func ValidateConfigEntry(
 				// todo: If running Consul Ent with mirroring need to change this to respect namespaces.
 				return admission.Errored(http.StatusBadRequest,
 					fmt.Errorf("%s resource with name %q is already defined – all %s resources must have unique names across namespaces",
-						kind,
+						cfgEntry.KubeKind(),
 						cfgEntry.Name(),
-						kind))
+						cfgEntry.KubeKind()))
 			}
 		}
 	}
 	if err := cfgEntry.Validate(); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	return admission.Allowed(fmt.Sprintf("valid %s request", kind))
+	return admission.Allowed(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()))
 }

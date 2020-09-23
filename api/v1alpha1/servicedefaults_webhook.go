@@ -30,8 +30,7 @@ type serviceDefaultsValidator struct {
 // If it is updated, run code-gen, update subcommand/controller/command.go
 // and the consul-helm value for the path to the webhook.
 //
-// NOTE: The below line cannot be combined with any other comment. If it is
-// it will break the code generation.
+// NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mutate-servicedefaults.consul.hashicorp.com
 
@@ -46,8 +45,7 @@ func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcDefaults,
-		"ServiceDefaults")
+		&svcDefaults)
 }
 
 func (v *serviceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
