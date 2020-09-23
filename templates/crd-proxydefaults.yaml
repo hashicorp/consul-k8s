@@ -4,7 +4,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
-  name: servicedefaults.consul.hashicorp.com
+  name: proxydefaults.consul.hashicorp.com
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.conditions[?(@.type=="Synced")].status
@@ -13,16 +13,16 @@ spec:
     type: string
   group: consul.hashicorp.com
   names:
-    kind: ServiceDefaults
-    listKind: ServiceDefaultsList
-    plural: servicedefaults
-    singular: servicedefaults
+    kind: ProxyDefaults
+    listKind: ProxyDefaultsList
+    plural: proxydefaults
+    singular: proxydefaults
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: ServiceDefaults is the Schema for the servicedefaults API
+      description: ProxyDefaults is the Schema for the proxydefaults API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -37,8 +37,14 @@ spec:
         metadata:
           type: object
         spec:
-          description: ServiceDefaultsSpec defines the desired state of ServiceDefaults
+          description: ProxyDefaultsSpec defines the desired state of ProxyDefaults
           properties:
+            config:
+              description: Config is an arbitrary map of configuration values used
+                by Connect proxies. Any values that your proxy allows can be configured
+                globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+              format: byte
+              type: string
             expose:
               description: Expose controls the default expose path configuration for
                 Envoy.
@@ -71,11 +77,6 @@ spec:
                     type: object
                   type: array
               type: object
-            externalSNI:
-              description: ExternalSNI is an optional setting that allows for the
-                TLS SNI value to be changed to a non-connect value when federating
-                with an external system.
-              type: string
             meshGateway:
               description: MeshGateway controls the default mesh gateway configuration
                 for this service.
@@ -85,12 +86,6 @@ spec:
                     connection. One of none, local, or remote.
                   type: string
               type: object
-            protocol:
-              description: Protocol sets the protocol of the service. This is used
-                by Connect proxies for things like observability features and to unlock
-                usage of the service-splitter and service-router config entries for
-                a service.
-              type: string
           type: object
         status:
           properties:

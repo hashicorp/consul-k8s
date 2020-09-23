@@ -79,6 +79,13 @@ func TestController(t *testing.T) {
 					svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
 					require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
 					require.Equal(r, "bar", svcResolverEntry.Redirect.Service)
+
+					// proxy-defaults
+					entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
+					require.NoError(r, err)
+					proxyDefaultEntry, ok := entry.(*api.ProxyConfigEntry)
+					require.True(r, ok, "could not cast to ProxyConfigEntry")
+					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
 				})
 			}
 
@@ -91,6 +98,10 @@ func TestController(t *testing.T) {
 				t.Log("patching service-resolver CRD")
 				patchRedirectSvc := "baz"
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
+
+				t.Log("patching proxy-defaults CRD")
+				patchMeshGatewayMode := "remote"
+				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -107,6 +118,13 @@ func TestController(t *testing.T) {
 					svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
 					require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
 					require.Equal(r, patchRedirectSvc, svcResolverEntry.Redirect.Service)
+
+					// proxy-defaults
+					entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
+					require.NoError(r, err)
+					proxyDefaultsEntry, ok := entry.(*api.ProxyConfigEntry)
+					require.True(r, ok, "could not cast to ProxyConfigEntry")
+					require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
 				})
 			}
 
@@ -118,6 +136,9 @@ func TestController(t *testing.T) {
 				t.Log("deleting service-resolver CRD")
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceresolver", "resolver")
 
+				t.Log("deleting proxy-defaults CRD")
+				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "proxydefaults", "global")
+
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
@@ -127,6 +148,11 @@ func TestController(t *testing.T) {
 
 					// service-resolver
 					_, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// proxy-defaults
+					_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})

@@ -46,4 +46,22 @@ webhooks:
         - UPDATE
       resources:
         - serviceresolvers
+- clientConfig:
+    caBundle: {{ quote }}
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-proxydefaults
+  failurePolicy: Fail
+  name: mutate-proxydefaults.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - proxydefaults
 {{- end }}
