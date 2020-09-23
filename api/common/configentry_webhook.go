@@ -26,12 +26,17 @@ func ValidateConfigEntry(
 	req admission.Request,
 	logger logr.Logger,
 	configEntryLister ConfigEntryLister,
-	cfgEntry ConfigEntryResource) admission.Response {
+	cfgEntry ConfigEntryResource,
+	enableConsulNamespaces bool,
+	nsMirroring bool) admission.Response {
 
 	// On create we need to validate that there isn't already a resource with
-	// the same name in a different namespace since we need to map all Kube
-	// resources to a single Consul namespace.
-	if req.Operation == v1beta1.Create {
+	// the same name in a different namespace if we're need to mapping all Kube
+	// resources to a single Consul namespace. The only case where we're not
+	// mapping all kube resources to a single Consul namespace is when we
+	// are running Consul enterprise with namespace mirroring.
+	singleConsulDestNS := !(enableConsulNamespaces && nsMirroring)
+	if req.Operation == v1beta1.Create && singleConsulDestNS {
 		logger.Info("validate create", "name", cfgEntry.Name())
 
 		list, err := configEntryLister.List(ctx)

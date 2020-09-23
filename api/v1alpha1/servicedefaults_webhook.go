@@ -11,19 +11,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func NewServiceDefaultsValidator(client client.Client, consulClient *capi.Client, logger logr.Logger) *serviceDefaultsValidator {
-	return &serviceDefaultsValidator{
-		Client:       client,
-		ConsulClient: consulClient,
-		Logger:       logger,
-	}
-}
+// +kubebuilder:object:generate=false
 
-type serviceDefaultsValidator struct {
-	client.Client
+type ServiceDefaultsValidator struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
-	decoder      *admission.Decoder
+
+	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
+	// with version 1.7+ which supports namespaces.
+	EnableConsulNamespaces bool
+
+	// EnableNSMirroring causes Consul namespaces to be created to match the
+	// k8s namespace of any config entry custom resource. Config entries will
+	// be created in the matching Consul namespace.
+	EnableNSMirroring bool
+
+	decoder *admission.Decoder
+	client.Client
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -34,7 +38,7 @@ type serviceDefaultsValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mutate-servicedefaults.consul.hashicorp.com
 
-func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcDefaults ServiceDefaults
 	err := v.decoder.Decode(req, &svcDefaults)
 	if err != nil {
@@ -45,10 +49,12 @@ func (v *serviceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcDefaults)
+		&svcDefaults,
+		v.EnableConsulNamespaces,
+		v.EnableNSMirroring)
 }
 
-func (v *serviceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var svcDefaultsList ServiceDefaultsList
 	if err := v.Client.List(ctx, &svcDefaultsList); err != nil {
 		return nil, err
@@ -60,7 +66,7 @@ func (v *serviceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEnt
 	return entries, nil
 }
 
-func (v *serviceDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
