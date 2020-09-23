@@ -127,9 +127,12 @@ func (in *ServiceResolver) Validate() error {
 		}
 	}
 
-	return apierrors.NewInvalid(
-		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
-		in.Name(), errs)
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
+			in.Name(), errs)
+	}
+	return nil
 }
 
 func (in *ServiceResolverFailover) validate(key string) *field.Error {
