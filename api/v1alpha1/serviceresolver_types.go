@@ -79,11 +79,18 @@ func (in *ServiceResolver) SetSyncedCondition(status corev1.ConditionStatus, rea
 
 func (in *ServiceResolver) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
+	if cond == nil {
+		return corev1.ConditionUnknown, "", ""
+	}
 	return cond.Status, cond.Reason, cond.Message
 }
 
 func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
-	return in.Status.GetCondition(ConditionSynced).Status
+	condition := in.Status.GetCondition(ConditionSynced)
+	if condition == nil {
+		return corev1.ConditionUnknown
+	}
+	return condition.Status
 }
 
 // ToConsul converts the entry into its Consul equivalent struct.

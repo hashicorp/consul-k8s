@@ -47,7 +47,7 @@ func (c *Command) configureConnectInject(consulClient *api.Client) error {
 			err = c.untilSucceeds(fmt.Sprintf("checking or creating namespace %s",
 				c.flagConsulInjectDestinationNamespace),
 				func() error {
-					err := namespaces.EnsureExists(consulClient, c.flagConsulInjectDestinationNamespace, "cross-namespace-policy")
+					_, err := namespaces.EnsureExists(consulClient, c.flagConsulInjectDestinationNamespace, "cross-namespace-policy")
 					return err
 				})
 			if err != nil {

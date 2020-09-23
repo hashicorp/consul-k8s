@@ -807,8 +807,36 @@ func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
 	}
 }
 
-// Test that if status is empty then GetCondition returns nil.
-func TestServiceDefaults_GetConditionWhenNil(t *testing.T) {
-	serviceDefaults := &ServiceDefaults{}
-	require.Nil(t, serviceDefaults.GetCondition(ConditionSynced))
+func TestServiceDefaults_GetConditionWhenStatusNil(t *testing.T) {
+	require.Nil(t, (&ServiceDefaults{}).GetCondition(ConditionSynced))
+}
+
+func TestServiceDefaults_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+	require.Equal(t, corev1.ConditionUnknown, (&ServiceDefaults{}).SyncedConditionStatus())
+}
+
+func TestServiceDefaults_SyncedConditionWhenStatusNil(t *testing.T) {
+	status, reason, message := (&ServiceDefaults{}).SyncedCondition()
+	require.Equal(t, corev1.ConditionUnknown, status)
+	require.Equal(t, "", reason)
+	require.Equal(t, "", message)
+}
+
+func TestServiceDefaults_ConsulKind(t *testing.T) {
+	require.Equal(t, capi.ServiceDefaults, (&ServiceDefaults{}).ConsulKind())
+}
+
+func TestServiceDefaults_KubeKind(t *testing.T) {
+	require.Equal(t, "servicedefaults", (&ServiceDefaults{}).KubeKind())
+}
+
+func TestServiceDefaults_ObjectMeta(t *testing.T) {
+	meta := metav1.ObjectMeta{
+		Name:      "name",
+		Namespace: "namespace",
+	}
+	serviceDefaults := &ServiceDefaults{
+		ObjectMeta: meta,
+	}
+	require.Equal(t, meta, serviceDefaults.GetObjectMeta())
 }

@@ -503,10 +503,38 @@ func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {
 	}
 }
 
-// Test that if status is empty then GetCondition returns nil.
-func TestServiceResolver_GetConditionWhenNil(t *testing.T) {
-	serviceResolver := &ServiceResolver{}
-	require.Nil(t, serviceResolver.GetCondition(ConditionSynced))
+func TestServiceResolver_GetConditionWhenStatusNil(t *testing.T) {
+	require.Nil(t, (&ServiceResolver{}).GetCondition(ConditionSynced))
+}
+
+func TestServiceResolver_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+	require.Equal(t, corev1.ConditionUnknown, (&ServiceResolver{}).SyncedConditionStatus())
+}
+
+func TestServiceResolver_SyncedConditionWhenStatusNil(t *testing.T) {
+	status, reason, message := (&ServiceResolver{}).SyncedCondition()
+	require.Equal(t, corev1.ConditionUnknown, status)
+	require.Equal(t, "", reason)
+	require.Equal(t, "", message)
+}
+
+func TestServiceResolver_ConsulKind(t *testing.T) {
+	require.Equal(t, capi.ServiceResolver, (&ServiceResolver{}).ConsulKind())
+}
+
+func TestServiceResolver_KubeKind(t *testing.T) {
+	require.Equal(t, "serviceresolver", (&ServiceResolver{}).KubeKind())
+}
+
+func TestServiceResolver_ObjectMeta(t *testing.T) {
+	meta := metav1.ObjectMeta{
+		Name:      "name",
+		Namespace: "namespace",
+	}
+	serviceResolver := &ServiceResolver{
+		ObjectMeta: meta,
+	}
+	require.Equal(t, meta, serviceResolver.GetObjectMeta())
 }
 
 func TestServiceResolver_Validate(t *testing.T) {

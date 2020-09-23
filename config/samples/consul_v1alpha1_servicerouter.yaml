@@ -1,0 +1,11 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceRouter
+metadata:
+  name: servicerouter-sample
+spec:
+  routes:
+    - match:
+        http:
+          pathPrefix: "/admin"
+      destination:
+        service: admin

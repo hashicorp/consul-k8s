@@ -418,7 +418,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 	for _, services := range s.namespaces {
 		for _, r := range services {
 			if s.EnableNamespaces {
-				err := namespaces.EnsureExists(s.Client, r.Service.Namespace, s.CrossNamespaceACLPolicy)
+				_, err := namespaces.EnsureExists(s.Client, r.Service.Namespace, s.CrossNamespaceACLPolicy)
 				if err != nil {
 					s.Log.Warn("error checking and creating Consul namespace",
 						"node-name", r.Node,
