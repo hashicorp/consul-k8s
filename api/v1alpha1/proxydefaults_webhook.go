@@ -2,11 +2,12 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
+	"k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -37,28 +38,36 @@ type proxyDefaultsValidator struct {
 
 func (v *proxyDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var proxyDefaults ProxyDefaults
+	var proxyDefaultsList ProxyDefaultsList
 	err := v.decoder.Decode(req, &proxyDefaults)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return common.ValidateConfigEntry(ctx,
-		req,
-		v.Logger,
-		v,
-		&proxyDefaults)
-}
+	if req.Operation == v1beta1.Create {
+		v.Logger.Info("validate create", "name", proxyDefaults.Name())
 
-func (v *proxyDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
-	var svcResolverList ProxyDefaultsList
-	if err := v.Client.List(ctx, &svcResolverList); err != nil {
-		return nil, err
+		if err := v.Client.List(ctx, &proxyDefaultsList); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+
+		if len(proxyDefaultsList.Items) > 0 {
+			return admission.Errored(http.StatusBadRequest,
+				fmt.Errorf("%s resource already defined in cluster. Currently, only one global entry is supported",
+					proxyDefaults.KubeKind()))
+		}
+
+		if proxyDefaults.Name() != "global" {
+			return admission.Errored(http.StatusBadRequest,
+				fmt.Errorf("%s resource name must be \"global\"",
+					proxyDefaults.KubeKind()))
+		}
 	}
-	var entries []common.ConfigEntryResource
-	for _, item := range svcResolverList.Items {
-		entries = append(entries, common.ConfigEntryResource(&item))
+
+	if err := proxyDefaults.Validate(); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
-	return entries, nil
+	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))
 }
 
 func (v *proxyDefaultsValidator) InjectDecoder(d *admission.Decoder) error {

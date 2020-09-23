@@ -126,8 +126,10 @@ func (in *ProxyDefaults) Validate() error {
 	if err := in.Spec.MeshGateway.validate(); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := in.validateConfig(); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	allErrs = append(allErrs, in.Spec.Expose.validate()...)
-	allErrs = append(allErrs, in.validateConfig())
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: "proxydefaults"},
@@ -173,7 +175,7 @@ func (in *ProxyDefaults) validateConfig() *field.Error {
 	}
 	var outConfig map[string]interface{}
 	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return field.Invalid(field.NewPath("spec").Child("config"), in.Spec.Config, `must be valid JSON ProxyDefaults config value`)
+		return field.Invalid(field.NewPath("spec").Child("config"), in.Spec.Config, `must be valid map value`)
 	}
 	return nil
 }

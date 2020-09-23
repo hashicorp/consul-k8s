@@ -522,6 +522,52 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 	}
 }
 
+func TestProxyDefaults_ValidateConfigValid(t *testing.T) {
+	cases := map[string]json.RawMessage{
+		"envoy_tracing_json":                     json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
+		"protocol":                               json.RawMessage(`{"protocol":  "http"}`),
+		"members":                                json.RawMessage(`{"members":  3}`),
+		"envoy_tracing_json & protocol":          json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http"}`),
+		"envoy_tracing_json & members":           json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","members":  3}`),
+		"protocol & members":                     json.RawMessage(`{"protocol": "https","members":  3}`),
+		"envoy_tracing_json, protocol & members": json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http", "members": 3}`),
+	}
+	for name, c := range cases {
+		proxyDefaults := ProxyDefaults{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "global",
+			},
+			Spec: ProxyDefaultsSpec{
+				Config: c,
+			},
+		}
+		t.Run(name, func(t *testing.T) {
+			require.Nil(t, proxyDefaults.validateConfig())
+		})
+	}
+}
+
+func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
+	cases := map[string]json.RawMessage{
+		"non_map json": json.RawMessage(`"{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"`),
+		"yaml":         json.RawMessage(`protocol: http`),
+		"json array":   json.RawMessage(`[1,2,3,4]`),
+		"json literal": json.RawMessage(`1`),
+	}
+	for name, c := range cases {
+		proxyDefaults := ProxyDefaults{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "global",
+			},
+			Spec: ProxyDefaultsSpec{
+				Config: c,
+			},
+		}
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, proxyDefaults.validateConfig().Detail, "must be valid map value")
+		})
+	}
+}
 func TestProxyDefaults_AddFinalizer(t *testing.T) {
 	resolver := &ProxyDefaults{}
 	resolver.AddFinalizer("finalizer")
