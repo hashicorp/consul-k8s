@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -112,6 +111,7 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 
 func (in *ServiceResolver) Validate() error {
 	var errs field.ErrorList
+	path := field.NewPath("spec")
 
 	// Iterate through failover map keys in sorted order so tests are
 	// deterministic.
@@ -122,19 +122,21 @@ func (in *ServiceResolver) Validate() error {
 	sort.Strings(keys)
 	for _, k := range keys {
 		f := in.Spec.Failover[k]
-		if err := f.validate(k); err != nil {
+		if err := f.validate(path.Child("failover").Key(k)); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	return apierrors.NewInvalid(
-		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
-		in.Name(), errs)
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
+			in.Name(), errs)
+	}
+	return nil
 }
 
-func (in *ServiceResolverFailover) validate(key string) *field.Error {
+func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
 	if in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 {
-		path := field.NewPath("spec").Child(fmt.Sprintf("failover[%s]", key))
 		// NOTE: We're passing "{}" here as our value because we know that the
 		// error is we have an empty object.
 		return field.Invalid(path, "{}",

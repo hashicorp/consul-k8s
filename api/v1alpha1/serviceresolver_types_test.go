@@ -514,6 +514,19 @@ func TestServiceResolver_Validate(t *testing.T) {
 		input          *ServiceResolver
 		expectedErrMsg string
 	}{
+		"valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service: "bar",
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
 		"failover service, servicesubset, namespace, datacenters empty": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -542,7 +555,11 @@ func TestServiceResolver_Validate(t *testing.T) {
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := testCase.input.Validate()
-			require.EqualError(t, err, testCase.expectedErrMsg)
+			if testCase.expectedErrMsg != "" {
+				require.EqualError(t, err, testCase.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

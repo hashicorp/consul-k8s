@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"fmt"
 	"strings"
 
 	capi "github.com/hashicorp/consul/api"
@@ -127,10 +126,12 @@ func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 // returns an error which lists all invalid fields in the resource spec.
 func (in *ServiceDefaults) Validate() error {
 	var allErrs field.ErrorList
-	if err := in.Spec.MeshGateway.validate(); err != nil {
+	path := field.NewPath("spec")
+
+	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	allErrs = append(allErrs, in.Spec.Expose.validate()...)
+	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -226,15 +227,22 @@ func (e ExposeConfig) toConsul() capi.ExposeConfig {
 	}
 }
 
-func (e ExposeConfig) validate() []*field.Error {
+func (e ExposeConfig) validate(path *field.Path) []*field.Error {
 	var errs field.ErrorList
 	protocols := []string{"http", "http2"}
-	for i, path := range e.Paths {
-		if path.Path != "" && !strings.HasPrefix(path.Path, "/") {
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("path"), path.Path, `must begin with a '/'`))
+	for i, pathCfg := range e.Paths {
+		indexPath := path.Child("paths").Index(i)
+		if pathCfg.Path != "" && !strings.HasPrefix(pathCfg.Path, "/") {
+			errs = append(errs, field.Invalid(
+				indexPath.Child("path"),
+				pathCfg.Path,
+				`must begin with a '/'`))
 		}
-		if !sliceContains(protocols, path.Protocol) {
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("expose").Child(fmt.Sprintf("paths[%d]", i)).Child("protocol"), path.Protocol, notInSliceMessage(protocols)))
+		if !sliceContains(protocols, pathCfg.Protocol) {
+			errs = append(errs, field.Invalid(
+				indexPath.Child("protocol"),
+				pathCfg.Protocol,
+				notInSliceMessage(protocols)))
 		}
 	}
 	return errs
