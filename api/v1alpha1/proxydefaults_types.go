@@ -1,11 +1,16 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+	"reflect"
+
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // +kubebuilder:object:root=true
@@ -26,7 +31,8 @@ type ProxyDefaults struct {
 type ProxyDefaultsSpec struct {
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
-	Config runtime.RawExtension `json:"config,omitempty"`
+	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+	Config json.RawMessage `json:"config,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
@@ -86,15 +92,82 @@ func (in *ProxyDefaults) GetSyncedConditionStatus() corev1.ConditionStatus {
 }
 
 func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
-	panic("implement me")
+	consulConfig := in.convertConfig()
+	return &capi.ProxyConfigEntry{
+		Kind:        capi.ProxyDefaults,
+		Name:        in.Name(),
+		MeshGateway: in.Spec.MeshGateway.toConsul(),
+		Expose:      in.Spec.Expose.toConsul(),
+		Config:      consulConfig,
+	}
 }
 
-func (in *ProxyDefaults) MatchesConsul(entry api.ConfigEntry) bool {
-	panic("implement me")
+func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
+	proxyDefCand, ok := candidate.(*capi.ProxyConfigEntry)
+	if !ok {
+		return false
+	}
+	return in.Name() == proxyDefCand.Name &&
+		in.Spec.MeshGateway.Mode == string(proxyDefCand.MeshGateway.Mode) &&
+		in.Spec.Expose.matches(proxyDefCand.Expose) &&
+		in.matchesConfig(proxyDefCand.Config)
 }
 
 func (in *ProxyDefaults) Validate() error {
-	panic("implement me")
+	var allErrs field.ErrorList
+	if err := in.Spec.MeshGateway.validate(); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	allErrs = append(allErrs, in.Spec.Expose.validate()...)
+	allErrs = append(allErrs, in.validateConfig())
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: "proxydefaults"},
+			in.Name(), allErrs)
+	}
+
+	return nil
+}
+
+// matchesConfig compares the values of the config on the spec and that on the
+// the consul proxy-default and returns true if they match and false otherwise
+func (in *ProxyDefaults) matchesConfig(config map[string]interface{}) bool {
+	if in.Spec.Config == nil || config == nil {
+		return in.Spec.Config == nil && config == nil
+	}
+	var inConfig map[string]interface{}
+	if err := json.Unmarshal(in.Spec.Config, &inConfig); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(inConfig, config)
+}
+
+// convertConfig converts the config of type json.RawMessage which is stored
+// by the resource into type map[string]interface{} which is saved by the
+// consul API.
+func (in *ProxyDefaults) convertConfig() map[string]interface{} {
+	if in.Spec.Config == nil {
+		return nil
+	}
+	var outConfig map[string]interface{}
+	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
+		return nil
+	}
+	return outConfig
+}
+
+// validateConfig attempts to unmarshall the provided config into a map[string]interface{}
+// and returns an error if the provided value for config isn't successfully unmarshalled
+// and it implies the provided value is an invalid config.
+func (in *ProxyDefaults) validateConfig() *field.Error {
+	if in.Spec.Config == nil {
+		return nil
+	}
+	var outConfig map[string]interface{}
+	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
+		return field.Invalid(field.NewPath("spec").Child("config"), in.Spec.Config, `must be valid JSON ProxyDefaults config value`)
+	}
+	return nil
 }
 
 // +kubebuilder:object:root=true
