@@ -13,6 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	ProxyDefaultsKubeKind string = "proxydefaults"
+)
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -62,8 +66,21 @@ func (in *ProxyDefaults) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *ProxyDefaults) Kind() string {
+func (in *ProxyDefaults) ConsulKind() string {
 	return capi.ProxyDefaults
+}
+
+func (in *ProxyDefaults) KubeKind() string {
+	return ProxyDefaultsKubeKind
+}
+
+func (in *ProxyDefaults) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
+	cond := in.Status.GetCondition(ConditionSynced)
+	return cond.Status, cond.Reason, cond.Message
+}
+
+func (in *ProxyDefaults) SyncedConditionStatus() corev1.ConditionStatus {
+	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 func (in *ProxyDefaults) Name() string {
@@ -80,15 +97,6 @@ func (in *ProxyDefaults) SetSyncedCondition(status corev1.ConditionStatus, reaso
 			Message:            message,
 		},
 	}
-}
-
-func (in *ProxyDefaults) GetSyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
-	cond := in.Status.GetCondition(ConditionSynced)
-	return cond.Status, cond.Reason, cond.Message
-}
-
-func (in *ProxyDefaults) GetSyncedConditionStatus() corev1.ConditionStatus {
-	return in.Status.GetCondition(ConditionSynced).Status
 }
 
 func (in *ProxyDefaults) ToConsul() api.ConfigEntry {

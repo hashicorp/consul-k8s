@@ -36,8 +36,8 @@ type proxyDefaultsValidator struct {
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-proxydefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=proxydefaults,versions=v1alpha1,name=mutate-proxydefaults.consul.hashicorp.com
 
 func (v *proxyDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var svcResolver ProxyDefaults
-	err := v.decoder.Decode(req, &svcResolver)
+	var proxyDefaults ProxyDefaults
+	err := v.decoder.Decode(req, &proxyDefaults)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -46,8 +46,7 @@ func (v *proxyDefaultsValidator) Handle(ctx context.Context, req admission.Reque
 		req,
 		v.Logger,
 		v,
-		&svcResolver,
-		"ProxyDefaults")
+		&proxyDefaults)
 }
 
 func (v *proxyDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

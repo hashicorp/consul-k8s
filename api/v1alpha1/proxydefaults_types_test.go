@@ -147,8 +147,7 @@ func TestProxyDefaults_MatchesConsulFalse(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
-				Spec: ProxyDefaultsSpec{
-				},
+				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
 				Name: "name",
@@ -238,8 +237,7 @@ func TestProxyDefaults_MatchesConsulFalse(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
-				Spec: ProxyDefaultsSpec{
-				},
+				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
 				Name: "name",
@@ -406,8 +404,7 @@ func TestProxyDefaults_MatchesConsulFalse(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
-				Spec: ProxyDefaultsSpec{
-				},
+				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
 				Name: "name",
@@ -569,7 +566,7 @@ func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resolver.GetSyncedConditionStatus())
+			require.Equal(t, status, resolver.SyncedConditionStatus())
 		})
 	}
 }
