@@ -123,13 +123,15 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 
 func (in *ProxyDefaults) Validate() error {
 	var allErrs field.ErrorList
-	if err := in.Spec.MeshGateway.validate(); err != nil {
+	path := field.NewPath("spec")
+
+	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := in.validateConfig(); err != nil {
+	if err := in.validateConfig(path.Child("config")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	allErrs = append(allErrs, in.Spec.Expose.validate()...)
+	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: "proxydefaults"},
@@ -169,13 +171,13 @@ func (in *ProxyDefaults) convertConfig() map[string]interface{} {
 // validateConfig attempts to unmarshall the provided config into a map[string]interface{}
 // and returns an error if the provided value for config isn't successfully unmarshalled
 // and it implies the provided value is an invalid config.
-func (in *ProxyDefaults) validateConfig() *field.Error {
+func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 	if in.Spec.Config == nil {
 		return nil
 	}
 	var outConfig map[string]interface{}
 	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return field.Invalid(field.NewPath("spec").Child("config"), in.Spec.Config, `must be valid map value`)
+		return field.Invalid(path, in.Spec.Config, `must be valid map value`)
 	}
 	return nil
 }

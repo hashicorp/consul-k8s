@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controllers"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -122,28 +123,28 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceDefaults"),
+		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServiceDefaults")
+		setupLog.Error(err, "unable to create controller", "controller", common.ServiceDefaults)
 		return 1
 	}
 	if err = (&controllers.ServiceResolverController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName("ServiceResolver"),
+		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceResolver),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServiceResolver")
+		setupLog.Error(err, "unable to create controller", "controller", common.ServiceResolver)
 		return 1
 	}
 	if err = (&controllers.ProxyDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName("ProxyDefaults"),
+		Log:                   ctrl.Log.WithName("controllers").WithName(common.ProxyDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ProxyDefaults")
+		setupLog.Error(err, "unable to create controller", "controller", common.ProxyDefaults)
 		return 1
 	}
 
@@ -155,11 +156,11 @@ func (c *Command) Run(args []string) int {
 		// Note: The path here should be identical to the one on the kubebuilder
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceDefaults"))})
+			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults))})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ServiceResolver"))})
+			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver))})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-			&webhook.Admission{Handler: v1alpha1.NewProxyDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName("ProxyDefaults"))})
+			&webhook.Admission{Handler: v1alpha1.NewProxyDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults))})
 	}
 	// +kubebuilder:scaffold:builder
 

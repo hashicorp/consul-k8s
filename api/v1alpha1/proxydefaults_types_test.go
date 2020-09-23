@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // Test MatchesConsul for cases that should return true.
@@ -542,7 +543,7 @@ func TestProxyDefaults_ValidateConfigValid(t *testing.T) {
 			},
 		}
 		t.Run(name, func(t *testing.T) {
-			require.Nil(t, proxyDefaults.validateConfig())
+			require.Nil(t, proxyDefaults.validateConfig(nil))
 		})
 	}
 }
@@ -564,10 +565,11 @@ func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
 			},
 		}
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, proxyDefaults.validateConfig().Detail, "must be valid map value")
+			require.Equal(t, proxyDefaults.validateConfig(field.NewPath("spec")).Detail, "must be valid map value")
 		})
 	}
 }
+
 func TestProxyDefaults_AddFinalizer(t *testing.T) {
 	resolver := &ProxyDefaults{}
 	resolver.AddFinalizer("finalizer")
