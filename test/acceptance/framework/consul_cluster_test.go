@@ -30,9 +30,9 @@ func (c *ctx) Name() string {
 	return ""
 }
 
-func (c *ctx) KubectlOptions() *k8s.KubectlOptions {
+func (c *ctx) KubectlOptions(_ *testing.T) *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{}
 }
-func (c *ctx) KubernetesClient(t *testing.T) kubernetes.Interface {
+func (c *ctx) KubernetesClient(_ *testing.T) kubernetes.Interface {
 	return fake.NewSimpleClientset()
 }

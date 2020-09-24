@@ -77,14 +77,14 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			})
 
 			t.Logf("creating Kubernetes namespace %s", testNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", testNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", testNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
 			nsK8SOptions := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   testNamespace,
 			}
 
@@ -173,26 +173,26 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
 			t.Logf("creating Kubernetes namespace %s", testNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", testNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", testNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
 			staticClientNamespace := "ns2"
 			t.Logf("creating Kubernetes namespace %s", staticClientNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", staticClientNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", staticClientNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
 			ns1K8SOptions := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   testNamespace,
 			}
 			ns2K8SOptions := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 
@@ -211,7 +211,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			}
 
 			// Create the config entry for the terminating gateway
-			createTerminatingGatewayConfigEntry(t, consulClient, ctx.KubectlOptions().Namespace, testNamespace)
+			createTerminatingGatewayConfigEntry(t, consulClient, ctx.KubectlOptions(t).Namespace, testNamespace)
 
 			// Deploy the static client
 			t.Log("deploying static client")
