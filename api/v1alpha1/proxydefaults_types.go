@@ -76,11 +76,18 @@ func (in *ProxyDefaults) KubeKind() string {
 
 func (in *ProxyDefaults) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
+	if cond == nil {
+		return corev1.ConditionUnknown, "", ""
+	}
 	return cond.Status, cond.Reason, cond.Message
 }
 
 func (in *ProxyDefaults) SyncedConditionStatus() corev1.ConditionStatus {
-	return in.Status.GetCondition(ConditionSynced).Status
+	cond := in.Status.GetCondition(ConditionSynced)
+	if cond == nil {
+		return corev1.ConditionUnknown
+	}
+	return cond.Status
 }
 
 func (in *ProxyDefaults) Name() string {

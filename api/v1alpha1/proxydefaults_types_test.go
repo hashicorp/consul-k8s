@@ -619,7 +619,36 @@ func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {
 	}
 }
 
-func TestProxyDefaults_GetConditionNil(t *testing.T) {
-	resolver := &ProxyDefaults{}
-	require.Nil(t, resolver.GetCondition(ConditionSynced))
+func TestProxyDefaults_GetConditionWhenStatusNil(t *testing.T) {
+	require.Nil(t, (&ProxyDefaults{}).GetCondition(ConditionSynced))
+}
+
+func TestProxyDefaults_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+	require.Equal(t, corev1.ConditionUnknown, (&ProxyDefaults{}).SyncedConditionStatus())
+}
+
+func TestProxyDefaults_SyncedConditionWhenStatusNil(t *testing.T) {
+	status, reason, message := (&ProxyDefaults{}).SyncedCondition()
+	require.Equal(t, corev1.ConditionUnknown, status)
+	require.Equal(t, "", reason)
+	require.Equal(t, "", message)
+}
+
+func TestProxyDefaults_ConsulKind(t *testing.T) {
+	require.Equal(t, capi.ProxyDefaults, (&ProxyDefaults{}).ConsulKind())
+}
+
+func TestProxyDefaults_KubeKind(t *testing.T) {
+	require.Equal(t, "proxydefaults", (&ProxyDefaults{}).KubeKind())
+}
+
+func TestProxyDefaults_ObjectMeta(t *testing.T) {
+	meta := metav1.ObjectMeta{
+		Name:      "name",
+		Namespace: "namespace",
+	}
+	proxyDefaults := &ProxyDefaults{
+		ObjectMeta: meta,
+	}
+	require.Equal(t, meta, proxyDefaults.GetObjectMeta())
 }
