@@ -23,6 +23,8 @@ func TestValidateConfigEntry(t *testing.T) {
 	cases := map[string]struct {
 		existingResources []ConfigEntryResource
 		newResource       ConfigEntryResource
+		enableNamespaces  bool
+		nsMirroring       bool
 		expAllow          bool
 		expErrMessage     string
 	}{
@@ -58,6 +60,34 @@ func TestValidateConfigEntry(t *testing.T) {
 			expAllow:      false,
 			expErrMessage: "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
+		"duplicate name, namespaces enabled": {
+			existingResources: []ConfigEntryResource{&mockConfigEntry{
+				MockName:      "foo",
+				MockNamespace: "default",
+			}},
+			newResource: &mockConfigEntry{
+				MockName:      "foo",
+				MockNamespace: otherNS,
+				Valid:         true,
+			},
+			enableNamespaces: true,
+			expAllow:         false,
+			expErrMessage:    "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
+		},
+		"duplicate name, namespaces enabled, mirroring enabled": {
+			existingResources: []ConfigEntryResource{&mockConfigEntry{
+				MockName:      "foo",
+				MockNamespace: "default",
+			}},
+			newResource: &mockConfigEntry{
+				MockName:      "foo",
+				MockNamespace: otherNS,
+				Valid:         true,
+			},
+			enableNamespaces: true,
+			nsMirroring:      true,
+			expAllow:         true,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -80,7 +110,9 @@ func TestValidateConfigEntry(t *testing.T) {
 			},
 				logrtest.TestLogger{T: t},
 				lister,
-				c.newResource)
+				c.newResource,
+				c.enableNamespaces,
+				c.nsMirroring)
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
