@@ -143,7 +143,6 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error
-			// here
 			authMethodServiceAccount, err = c.clientset.CoreV1().ServiceAccounts(c.flagK8sNamespace).Get(context.TODO(), saName, metav1.GetOptions{})
 			return err
 		})
