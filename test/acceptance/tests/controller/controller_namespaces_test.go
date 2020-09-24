@@ -84,12 +84,12 @@ func TestControllerNamespaces(t *testing.T) {
 			consulCluster.Create(t)
 
 			t.Logf("creating namespace %q", KubeNS)
-			out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(), "create", "ns", KubeNS)
+			out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "ns", KubeNS)
 			if err != nil && !strings.Contains(out, "(AlreadyExists)") {
 				require.NoError(t, err)
 			}
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", KubeNS)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", KubeNS)
 			})
 
 			// Make sure that config entries are created in the correct namespace.
@@ -111,7 +111,7 @@ func TestControllerNamespaces(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(), "apply", "-n", KubeNS, "-f", "../fixtures/crds")
+					out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-f", "../fixtures/crds")
 					require.NoError(r, err, out)
 					// NOTE: No need to clean up because the namespace will be deleted.
 				})
@@ -141,11 +141,11 @@ func TestControllerNamespaces(t *testing.T) {
 			{
 				t.Log("patching service-defaults CRD")
 				patchProtocol := "tcp"
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "-n", KubeNS, "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
 
 				t.Log("patching service-resolver CRD")
 				patchRedirectSvc := "baz"
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "-n", KubeNS, "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -168,10 +168,10 @@ func TestControllerNamespaces(t *testing.T) {
 			// Test a delete.
 			{
 				t.Log("deleting service-defaults CRD")
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "-n", KubeNS, "servicedefaults", "defaults")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicedefaults", "defaults")
 
 				t.Log("deleting service-resolver CRD")
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "-n", KubeNS, "serviceresolver", "resolver")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "serviceresolver", "resolver")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {

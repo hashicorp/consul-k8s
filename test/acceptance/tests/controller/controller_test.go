@@ -52,12 +52,12 @@ func TestController(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(), "apply", "-f", "../fixtures/crds")
+					out, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/crds")
 					require.NoError(r, err, out)
 					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 						// Ignore errors here because if the test ran as expected
 						// the custom resource will have been deleted.
-						helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(), "delete", "-f", "../fixtures/crds")
+						helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/crds")
 					})
 				})
 
@@ -86,11 +86,11 @@ func TestController(t *testing.T) {
 			{
 				t.Log("patching service-defaults CRD")
 				patchProtocol := "tcp"
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
 
 				t.Log("patching service-resolver CRD")
 				patchRedirectSvc := "baz"
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -113,10 +113,10 @@ func TestController(t *testing.T) {
 			// Test a delete.
 			{
 				t.Log("deleting service-defaults CRD")
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "servicedefaults", "defaults")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicedefaults", "defaults")
 
 				t.Log("deleting service-resolver CRD")
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "serviceresolver", "resolver")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceresolver", "resolver")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
