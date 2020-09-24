@@ -402,8 +402,6 @@ func (c *Command) Run(args []string) int {
 		}
 		return 0
 	}
-
-	return 0
 }
 
 func (c *Command) interrupt() {
