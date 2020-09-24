@@ -13,7 +13,7 @@ import (
 )
 
 // Test MatchesConsul for cases that should return true.
-func TestProxyDefaults_MatchesConsulTrue(t *testing.T) {
+func TestProxyDefaults_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
 		Ours   ProxyDefaults
 		Theirs *capi.ProxyConfigEntry
@@ -91,7 +91,6 @@ func TestProxyDefaults_MatchesConsulTrue(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			require.True(t, c.Ours.MatchesConsul(c.Theirs))
-			require.Equal(t, c.Ours.ToConsul(), c.Theirs)
 		})
 	}
 }

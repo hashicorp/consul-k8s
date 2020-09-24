@@ -131,7 +131,7 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 	proxyDefCand.CreateIndex = 0
 	proxyDefCand.ModifyIndex = 0
 
-	return reflect.DeepEqual(in.ToConsul().(*capi.ProxyConfigEntry), proxyDefCand)
+	return reflect.DeepEqual(in.ToConsul(), proxyDefCand)
 }
 
 func (in *ProxyDefaults) Validate() error {
@@ -155,7 +155,7 @@ func (in *ProxyDefaults) Validate() error {
 }
 
 // matchesConfig compares the values of the config on the spec and that on the
-// the consul proxy-default and returns true if they match and false otherwise
+// the consul proxy-default and returns true if they match and false otherwise.
 func (in *ProxyDefaults) matchesConfig(config map[string]interface{}) bool {
 	if in.Spec.Config == nil || config == nil {
 		return in.Spec.Config == nil && config == nil
@@ -175,7 +175,9 @@ func (in *ProxyDefaults) convertConfig() map[string]interface{} {
 		return nil
 	}
 	var outConfig map[string]interface{}
-	// We explicitly ignore the error returned by Unmarshall.
+	// We explicitly ignore the error returned by Unmarshall
+	// because validate() ensures that if we get to here that it
+	// won't return an error.
 	json.Unmarshal(in.Spec.Config, &outConfig)
 	return outConfig
 }
