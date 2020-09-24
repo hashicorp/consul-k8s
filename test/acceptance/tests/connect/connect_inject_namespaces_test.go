@@ -77,25 +77,25 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			consulCluster.Create(t)
 
 			staticServerOpts := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
 			staticClientOpts := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 
 			t.Logf("creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", staticServerNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", staticServerNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", staticClientNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", staticClientNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
 			t.Log("creating static-server and static-client deployments")

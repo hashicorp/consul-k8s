@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/serf/testutil/retry"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,15 +82,15 @@ func TestSyncCatalogNamespaces(t *testing.T) {
 			consulCluster.Create(t)
 
 			staticServerOpts := &k8s.KubectlOptions{
-				ContextName: ctx.KubectlOptions().ContextName,
-				ConfigPath:  ctx.KubectlOptions().ConfigPath,
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
 
 			t.Logf("creating namespace %s", staticServerNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(), "create", "ns", staticServerNamespace)
+			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "ns", staticServerNamespace)
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			t.Log("creating a static-server with a service")

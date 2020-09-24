@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
@@ -39,29 +41,17 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	// Wait up to 3m.
 	counter := &retry.Counter{Count: 36, Wait: 5 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: podLabelSelector})
+		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
-		var numNotReadyContainers int
-		var totalNumContainers int
+
+		var notReadyPods []string
 		for _, pod := range pods.Items {
-			if len(pod.Status.ContainerStatuses) == 0 {
-				r.Errorf("pod %s is pending", pod.Name)
-			}
-			for _, contStatus := range pod.Status.InitContainerStatuses {
-				totalNumContainers++
-				if !contStatus.Ready {
-					numNotReadyContainers++
-				}
-			}
-			for _, contStatus := range pod.Status.ContainerStatuses {
-				totalNumContainers++
-				if !contStatus.Ready {
-					numNotReadyContainers++
-				}
+			if !isReady(pod) {
+				notReadyPods = append(notReadyPods, pod.Name)
 			}
 		}
-		if numNotReadyContainers != 0 {
-			r.Errorf("%d out of %d containers are ready", totalNumContainers-numNotReadyContainers, totalNumContainers)
+		if len(notReadyPods) > 0 {
+			r.Errorf("%d pods are not ready: %s", len(notReadyPods), strings.Join(notReadyPods, ","))
 		}
 	})
 }
@@ -188,30 +178,34 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 		// Create k8s client from kubectl options
 		client := KubernetesClientFromOptions(t, kubectlOptions)
 
-		contextName := kubernetesContextFromOptions(t, kubectlOptions)
+		contextName := KubernetesContextFromOptions(t, kubectlOptions)
 
 		// Create a directory for the test
 		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
 		t.Logf("dumping logs and pod info for %s to %s", labelSelector, testDebugDirectory)
-		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(metav1.ListOptions{LabelSelector: labelSelector})
+		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		require.NoError(t, err)
 
 		for _, pod := range pods.Items {
 			// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
 			logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "logs", "--all-containers=true", pod.Name)
-			require.NoError(t, err)
 
-			// Write logs to file name <pod.Name>.log
+			// Write logs or err to file name <pod.Name>.log
 			logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
+			if err != nil {
+				logs = fmt.Sprintf("Error getting logs: %s: %s", err, logs)
+			}
 			require.NoError(t, ioutil.WriteFile(logFilename, []byte(logs), 0600))
 
 			// Describe pod
 			desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "describe", "pod", pod.Name)
-			require.NoError(t, err)
 
-			// Write pod info to file name <pod.Name>.txt
+			// Write pod info or error to file name <pod.Name>.txt
+			if err != nil {
+				desc = fmt.Sprintf("Error describing pod: %s: %s", err, desc)
+			}
 			descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.txt", pod.Name))
 			require.NoError(t, ioutil.WriteFile(descFilename, []byte(desc), 0600))
 		}
@@ -232,10 +226,10 @@ func KubernetesClientFromOptions(t *testing.T, options *k8s.KubectlOptions) kube
 	return client
 }
 
-// kubernetesContextFromOptions returns the Kubernetes context from options.
+// KubernetesContextFromOptions returns the Kubernetes context from options.
 // If context is explicitly set in options, it returns that context.
 // Otherwise, it returns the current context.
-func kubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) string {
+func KubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) string {
 	t.Helper()
 
 	// First, check if context set in options and return that
@@ -262,4 +256,23 @@ func labelMapToString(labelMap map[string]string) string {
 	}
 
 	return strings.Join(labels, ",")
+}
+
+// isReady returns true if pod is ready.
+func isReady(pod corev1.Pod) bool {
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return false
+	}
+
+	for _, contStatus := range pod.Status.InitContainerStatuses {
+		if !contStatus.Ready {
+			return false
+		}
+	}
+	for _, contStatus := range pod.Status.ContainerStatuses {
+		if !contStatus.Ready {
+			return false
+		}
+	}
+	return true
 }

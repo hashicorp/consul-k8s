@@ -59,7 +59,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service
 			t.Log("creating static-server deployment")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
@@ -79,19 +79,19 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Deploy the static client
 			t.Log("deploying static client")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
 				// With the terminating gateway up, we test that we can make a call to it
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
-				assertNoConnectionAndAddIntention(t, consulClient, ctx.KubectlOptions(), "", "")
+				assertNoConnectionAndAddIntention(t, consulClient, ctx.KubectlOptions(t), "", "")
 			}
 
 			// Test that we can make a call to the terminating gateway
 			t.Log("trying calls to terminating gateway")
-			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(), true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
 		})
 	}
 }
