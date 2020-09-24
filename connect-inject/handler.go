@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
@@ -342,25 +342,14 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Container{esContainer, connectContainer},
 		"/spec/containers")...)
 
-	serviceName := "" //pod.ObjectMeta.Annotations[annotationService]
-	// Default service name is the name of the first container.
-	if serviceName == "" {
-		if cs := pod.Spec.Containers; len(cs) > 0 {
-			// Create the patch for this first, so that the Annotation
-			// object will be created if necessary
-			serviceName = cs[0].Name
-		}
-	}
-
-	// Add annotations so that we know we're injected and so we can use service-id consistently
+	// Add annotations so that we know we're injected
 	patches = append(patches, updateAnnotation(
 		pod.Annotations,
 		map[string]string{
-			annotationStatus:    "injected",
-			annotationServiceID: pod.Name + "-" + serviceName,
+			annotationStatus: "injected",
 		})...)
 
-	// Consul-ENT support
+	// TODO: Consul-ENT support
 	if false {
 		patches = append(patches, updateAnnotation(
 			pod.Annotations,
