@@ -98,7 +98,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			consulKind: capi.ProxyDefaults,
 			configEntryResource: &v1alpha1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "global",
+					Name:      common.Global,
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
@@ -249,7 +249,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			consulKind: capi.ProxyDefaults,
 			configEntryResource: &v1alpha1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "global",
+					Name:      common.Global,
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
@@ -400,7 +400,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			consulKind: capi.ProxyDefaults,
 			configEntryResourceWithDeletion: &v1alpha1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "global",
+					Name:              common.Global,
 					Namespace:         kubeNS,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
@@ -530,7 +530,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			consulKind: capi.ProxyDefaults,
 			configEntryResource: &v1alpha1.ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "global",
+					Name:      common.Global,
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{

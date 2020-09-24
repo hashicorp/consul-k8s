@@ -160,7 +160,7 @@ func (c *Command) Run(args []string) int {
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
 			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver))})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-			&webhook.Admission{Handler: v1alpha1.NewProxyDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults))})
+			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsValidator{Client: mgr.GetClient(), ConsulClient: consulClient, Logger: ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults)}})
 	}
 	// +kubebuilder:scaffold:builder
 

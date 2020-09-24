@@ -2,7 +2,10 @@
 package common
 
 const (
-	ServiceDefaults string = "ServiceDefaults"
-	ProxyDefaults   string = "ProxyDefaults"
-	ServiceResolver string = "ServiceResolver"
+	ServiceDefaults string = "servicedefaults"
+	ProxyDefaults   string = "proxydefaults"
+	ServiceResolver string = "serviceresolver"
+
+	Global                 string = "global"
+	DefaultConsulNamespace string = "default"
 )

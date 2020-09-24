@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/hashicorp/consul/api"
@@ -29,7 +30,7 @@ type ProxyDefaults struct {
 	Status            `json:"status,omitempty"`
 }
 
-// RawExtension for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
+// RawMessage for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
 
 // ProxyDefaultsSpec defines the desired state of ProxyDefaults
 type ProxyDefaultsSpec struct {
@@ -68,6 +69,10 @@ func (in *ProxyDefaults) Finalizers() []string {
 
 func (in *ProxyDefaults) ConsulKind() string {
 	return capi.ProxyDefaults
+}
+
+func (in *ProxyDefaults) ConsulNamespaced() bool {
+	return false
 }
 
 func (in *ProxyDefaults) KubeKind() string {
@@ -109,7 +114,7 @@ func (in *ProxyDefaults) SetSyncedCondition(status corev1.ConditionStatus, reaso
 func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
-		Kind:        capi.ProxyDefaults,
+		Kind:        in.ConsulKind(),
 		Name:        in.Name(),
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
@@ -122,10 +127,10 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return in.Name() == proxyDefCand.Name &&
-		in.Spec.MeshGateway.Mode == string(proxyDefCand.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(proxyDefCand.Expose) &&
-		in.matchesConfig(proxyDefCand.Config)
+	proxyDefCand.CreateIndex = 0
+	proxyDefCand.ModifyIndex = 0
+
+	return reflect.DeepEqual(in.ToConsul().(*capi.ProxyConfigEntry), proxyDefCand)
 }
 
 func (in *ProxyDefaults) Validate() error {
@@ -141,7 +146,7 @@ func (in *ProxyDefaults) Validate() error {
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: "proxydefaults"},
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ProxyDefaultsKubeKind},
 			in.Name(), allErrs)
 	}
 
@@ -169,9 +174,8 @@ func (in *ProxyDefaults) convertConfig() map[string]interface{} {
 		return nil
 	}
 	var outConfig map[string]interface{}
-	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return nil
-	}
+	// We explicitly ignore the error returned by Unmarshall.
+	json.Unmarshal(in.Spec.Config, &outConfig)
 	return outConfig
 }
 
@@ -184,7 +188,7 @@ func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 	}
 	var outConfig map[string]interface{}
 	if err := json.Unmarshal(in.Spec.Config, &outConfig); err != nil {
-		return field.Invalid(path, in.Spec.Config, `must be valid map value`)
+		return field.Invalid(path, in.Spec.Config, fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
 }

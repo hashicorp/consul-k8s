@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			existingResources: nil,
 			newResource: &ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{},
 			},
@@ -37,7 +38,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			existingResources: nil,
 			newResource: &ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage("1"),
@@ -50,12 +51,12 @@ func TestValidateConfigEntry(t *testing.T) {
 		"proxy default exists": {
 			existingResources: []runtime.Object{&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 			}},
 			newResource: &ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
 					MeshGateway: MeshGatewayConfig{
@@ -88,7 +89,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
-			validator := &proxyDefaultsValidator{
+			validator := &ProxyDefaultsValidator{
 				Client:       client,
 				ConsulClient: nil,
 				Logger:       logrtest.TestLogger{T: t},

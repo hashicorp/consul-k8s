@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -20,19 +21,19 @@ func TestProxyDefaults_MatchesConsulTrue(t *testing.T) {
 		"empty fields": {
 			Ours: ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
-				Name: "global",
+				Name: common.Global,
 				Kind: capi.ProxyDefaults,
 			},
 		},
 		"all fields set": {
 			Ours: ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
+					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
@@ -60,7 +61,7 @@ func TestProxyDefaults_MatchesConsulTrue(t *testing.T) {
 			},
 			Theirs: &capi.ProxyConfigEntry{
 				Kind: capi.ProxyDefaults,
-				Name: "global",
+				Name: common.Global,
 				Config: map[string]interface{}{
 					"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}",
 				},
@@ -536,7 +537,7 @@ func TestProxyDefaults_ValidateConfigValid(t *testing.T) {
 	for name, c := range cases {
 		proxyDefaults := ProxyDefaults{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "global",
+				Name: common.Global,
 			},
 			Spec: ProxyDefaultsSpec{
 				Config: c,
@@ -558,7 +559,7 @@ func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
 	for name, c := range cases {
 		proxyDefaults := ProxyDefaults{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "global",
+				Name: common.Global,
 			},
 			Spec: ProxyDefaultsSpec{
 				Config: c,
