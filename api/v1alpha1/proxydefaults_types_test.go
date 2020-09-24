@@ -566,7 +566,7 @@ func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
 			},
 		}
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, proxyDefaults.validateConfig(field.NewPath("spec")).Detail, "must be valid map value")
+			require.Contains(t, proxyDefaults.validateConfig(field.NewPath("spec")).Detail, "must be valid map value")
 		})
 	}
 }

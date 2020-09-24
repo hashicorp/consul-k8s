@@ -46,7 +46,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			},
 			expAllow: false,
 			// This error message is because the value "1" is valid JSON but is an invalid map
-			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.config: Invalid value: json.RawMessage{0x31}: must be valid map value",
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.config: Invalid value: json.RawMessage{0x31}: must be valid map value: json: cannot unmarshal number into Go value of type map[string]interface {}",
 		},
 		"proxy default exists": {
 			existingResources: []runtime.Object{&ProxyDefaults{
@@ -65,7 +65,7 @@ func TestValidateConfigEntry(t *testing.T) {
 				},
 			},
 			expAllow:      false,
-			expErrMessage: "proxydefaults resource already defined in cluster. Currently, only one global entry is supported",
+			expErrMessage: "proxydefaults resource already defined - only one global entry is supported",
 		},
 		"name not global": {
 			existingResources: []runtime.Object{},

@@ -15,9 +15,11 @@ import (
 
 type ProxyDefaultsValidator struct {
 	client.Client
-	ConsulClient *capi.Client
-	Logger       logr.Logger
-	decoder      *admission.Decoder
+	ConsulClient           *capi.Client
+	Logger                 logr.Logger
+	decoder                *admission.Decoder
+	EnableConsulNamespaces bool
+	EnableNSMirroring      bool
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

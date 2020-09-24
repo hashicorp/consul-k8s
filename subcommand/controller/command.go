@@ -156,11 +156,29 @@ func (c *Command) Run(args []string) int {
 		// Note: The path here should be identical to the one on the kubebuilder
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-			&webhook.Admission{Handler: v1alpha1.NewServiceDefaultsValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults))})
+			&webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-			&webhook.Admission{Handler: v1alpha1.NewServiceResolverValidator(mgr.GetClient(), consulClient, ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver))})
+			&webhook.Admission{Handler: &v1alpha1.ServiceResolverValidator{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsValidator{Client: mgr.GetClient(), ConsulClient: consulClient, Logger: ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults)}})
+			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsValidator{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
 	}
 	// +kubebuilder:scaffold:builder
 

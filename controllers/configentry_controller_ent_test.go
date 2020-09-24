@@ -775,7 +775,7 @@ func TestConfigEntryController_deletesGlobalConfigEntry_consulNamespaces(tt *tes
 					MeshGateway: capi.MeshGatewayConfig{
 						Mode: "local",
 					},
-				}, &capi.WriteOptions{Namespace: c.ExpConsulNS})
+				}, &capi.WriteOptions{Namespace: common.DefaultConsulNamespace})
 				req.NoError(err)
 				req.True(written)
 			}

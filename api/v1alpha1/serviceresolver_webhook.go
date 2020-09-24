@@ -11,19 +11,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func NewServiceResolverValidator(client client.Client, consulClient *capi.Client, logger logr.Logger) *serviceResolverValidator {
-	return &serviceResolverValidator{
-		Client:       client,
-		ConsulClient: consulClient,
-		Logger:       logger,
-	}
-}
+// +kubebuilder:object:generate=false
 
-type serviceResolverValidator struct {
-	client.Client
+type ServiceResolverValidator struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
-	decoder      *admission.Decoder
+
+	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
+	// with version 1.7+ which supports namespaces.
+	EnableConsulNamespaces bool
+
+	// EnableNSMirroring causes Consul namespaces to be created to match the
+	// k8s namespace of any config entry custom resource. Config entries will
+	// be created in the matching Consul namespace.
+	EnableNSMirroring bool
+
+	decoder *admission.Decoder
+	client.Client
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -35,7 +39,7 @@ type serviceResolverValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-serviceresolver,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=serviceresolvers,versions=v1alpha1,name=mutate-serviceresolver.consul.hashicorp.com
 
-func (v *serviceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcResolver ServiceResolver
 	err := v.decoder.Decode(req, &svcResolver)
 	if err != nil {
@@ -46,10 +50,12 @@ func (v *serviceResolverValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcResolver)
+		&svcResolver,
+		v.EnableConsulNamespaces,
+		v.EnableNSMirroring)
 }
 
-func (v *serviceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var svcResolverList ServiceResolverList
 	if err := v.Client.List(ctx, &svcResolverList); err != nil {
 		return nil, err
@@ -61,7 +67,7 @@ func (v *serviceResolverValidator) List(ctx context.Context) ([]common.ConfigEnt
 	return entries, nil
 }
 
-func (v *serviceResolverValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceResolverValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

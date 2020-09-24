@@ -127,6 +127,7 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+	proxyDefCand.Namespace = ""
 	proxyDefCand.CreateIndex = 0
 	proxyDefCand.ModifyIndex = 0
 
