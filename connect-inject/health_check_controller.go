@@ -50,7 +50,6 @@ func (c *HealthCheckController) setupInformer() {
 					metav1.ListOptions{LabelSelector: labelInject})
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = labelInject
 				return c.Clientset.CoreV1().Pods(metav1.NamespaceAll).Watch(ctx.Background(),
 					metav1.ListOptions{LabelSelector: labelInject})
 			},
@@ -87,25 +86,23 @@ func (c *HealthCheckController) addEventHandlers() {
 				return
 			}
 			// Check to see if the object really was modified
-			if reflect.DeepEqual(oldObj, newObj) == false {
-				c.Log.Info("pod was updated : " + newPod.Name)
-			} else {
-				c.Log.Info("pod was not updated " + newPod.Name)
+			if reflect.DeepEqual(oldObj, newObj) == true {
 				return
 			}
 			// First we check if this is a transition from Pending to Running, at this point
 			// we have a Pod scheduled and running on a host so we have a hostIP that we can
 			// reference. This is the ObjectCreate path
 			if oldPod.Status.Phase == corev1.PodPending && newPod.Status.Phase == corev1.PodRunning {
-				key, err := cache.MetaNamespaceKeyFunc(newObj)
-				c.Log.Info("Add Pod: %s", key)
-				if err == nil {
-					c.Queue.Add("ADD/" + key)
+				if err != nil {
+					// We return here, due to startup timing on probes there is a case where we receive
+					// the failed readiness probe before processing the transition from Pending to Running.
+					// When we process ObjectCreate from processNextItem() we will append an ObjectUpdate()
+					// which has the effect of setting the health status of the newly created TTL to the current state
+					c.Log.Error(fmt.Sprintf("Failed to get key from cache for pod %s", newPod.Name))
+					return
 				}
-				// We return here, due to startup timing on probes there is a case where we receive
-				// the failed readiness probe before processing the transition from Pending to Running.
-				// When we process ObjectCreate from processNextItem() we will append an ObjectUpdate()
-				// which has the effect of setting the health status of the newly created TTL to the current state
+				c.Log.Info("Add Pod: %s", key)
+				c.Queue.Add("ADD/" + key)
 				return
 			}
 			// We will only process events for PodRunning Pods
@@ -118,10 +115,13 @@ func (c *HealthCheckController) addEventHandlers() {
 				// If the Pod Status has changed, we queue the newObj and set the TTL to the newObj status
 				if oldPodStatus != newPodStatus {
 					key, err := cache.MetaNamespaceKeyFunc(newObj)
-					c.Log.Info("Update pod: %s", key)
-					if err == nil {
-						c.Queue.Add("UPDATE/" + key)
+					if err != nil {
+						c.Log.Error(fmt.Sprintf("Failed to get key from cache for pod %s", newPod.Name))
+						return
 					}
+					c.Log.Info("Update pod: %s", key)
+					c.Queue.Add("UPDATE/" + key)
+					return
 				}
 			}
 		},
@@ -133,16 +133,16 @@ func (c *HealthCheckController) addEventHandlers() {
 }
 
 func (c *HealthCheckController) getReadyStatus(pod *corev1.Pod) corev1.ConditionStatus {
-	for _, y := range pod.Status.Conditions {
-		if y.Type == "Ready" {
-			return y.Status
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == "Ready" {
+			return cond.Status
 		}
 	}
 	return corev1.ConditionTrue
 }
 
 // Init is used at startup to force a Reconcile phase
-func (c *HealthCheckController) Init(stopCh <-chan struct{}) {
+func (c *HealthCheckController) Init(_ <-chan struct{}) {
 	if err := c.Handle.Init(); err != nil {
 		c.Log.Error("Error during Reconcile phase: %v", err)
 	}

@@ -45,7 +45,7 @@ type HealthCheckHandler struct {
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
 // where the health check is registered and deregistered.
 func (t *HealthCheckHandler) getConsulHealthCheckID(pod *corev1.Pod) string {
-	return pod.Namespace + "_" + t.getConsulServiceID(pod) + "_kubernetes-health-check-ttl"
+	return fmt.Sprintf("%s_%s_kubernetes-health-check-ttl", pod.Namespace, t.getConsulServiceID(pod))
 }
 
 // return the serviceID of the connect service
@@ -68,7 +68,7 @@ func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) error {
 	if t.ConsulPort == "8501" {
 		httpFmt = "https"
 	}
-	newAddr := fmt.Sprintf("%v://%v:%v", httpFmt, pod.Status.HostIP, t.ConsulPort)
+	newAddr := fmt.Sprintf("%s://%s:%s", httpFmt, pod.Status.HostIP, t.ConsulPort)
 	t.HFlags.SetAddress(newAddr)
 
 	// Set client api to point to the new host IP
@@ -98,10 +98,10 @@ func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHe
 			return nil
 		}
 		retries++
-		svc, err := t.Client.Agent().Services()
+		services, err := t.Client.Agent().Services()
 		if err == nil {
-			for _, y := range svc {
-				if y.Service == serviceID {
+			for _, svc := range services {
+				if svc.Service == serviceID {
 					return nil
 				}
 			}
@@ -142,7 +142,7 @@ func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHe
 
 // setConsulHealthCheckStatus will update the TTL status of the check
 func (t *HealthCheckHandler) setConsulHealthCheckStatus(healthCheckID, reason string, fail bool) error {
-	if fail == true {
+	if fail {
 		// TODO: Use UpdateTTL() instead for both of these
 		return t.Client.Agent().FailTTL(healthCheckID, reason)
 	} else {
@@ -238,9 +238,9 @@ func (t *HealthCheckHandler) Reconcile() error {
 }
 
 func (t *HealthCheckHandler) getReadyStatusAndReason(pod *corev1.Pod) (status corev1.ConditionStatus, reason string, err error) {
-	for _, y := range pod.Status.Conditions {
-		if y.Type == "Ready" {
-			return y.Status, y.Reason, nil
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == "Ready" {
+			return cond.Status, cond.Reason, nil
 		}
 	}
 	return corev1.ConditionTrue, "", fmt.Errorf("unable to get pod ready status and reason for %v", pod.Name)
