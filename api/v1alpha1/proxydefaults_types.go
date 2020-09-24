@@ -47,14 +47,14 @@ func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
 
-func (in *ProxyDefaults) AddFinalizer(f string) {
-	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
+func (in *ProxyDefaults) AddFinalizer(name string) {
+	in.ObjectMeta.Finalizers = append(in.Finalizers(), name)
 }
 
-func (in *ProxyDefaults) RemoveFinalizer(f string) {
+func (in *ProxyDefaults) RemoveFinalizer(name string) {
 	var newFinalizers []string
 	for _, oldF := range in.Finalizers() {
-		if oldF != f {
+		if oldF != name {
 			newFinalizers = append(newFinalizers, oldF)
 		}
 	}
