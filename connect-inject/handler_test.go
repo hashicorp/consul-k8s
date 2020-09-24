@@ -109,6 +109,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
 			},
 		},
 
@@ -122,6 +126,9 @@ func TestHandlerHandle(t *testing.T) {
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"testLabel": "123",
+						},
 						Annotations: map[string]string{
 							annotationUpstreams: "echo:1234,db:1234",
 						},
@@ -171,6 +178,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
 				},
 			},
 		},
@@ -241,6 +252,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
 			},
 		},
 
@@ -285,6 +300,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
 			},
 		},
 
@@ -328,6 +347,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
 				},
 			},
 		},
@@ -375,6 +398,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
 				},
 			},
 		},
