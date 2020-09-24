@@ -361,7 +361,9 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// Add Pod label for health checks
 	patches = append(patches, updateLabels(
 		pod.Labels,
-		map[string]string{labelInject: "true"})...)
+		map[string]string{
+			labelInject: "injected",
+		})...)
 
 	// Generate the patch
 	var patch []byte
