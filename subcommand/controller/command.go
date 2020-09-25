@@ -125,7 +125,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceDefaults),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceDefaults)
@@ -134,7 +134,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceResolverController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceResolver),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceResolver),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceResolver)
@@ -143,7 +143,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ProxyDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ProxyDefaults),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ProxyDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyDefaults)
