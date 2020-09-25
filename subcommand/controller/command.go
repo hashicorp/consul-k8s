@@ -3,7 +3,6 @@ package controller
 import (
 	"flag"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
@@ -28,6 +27,7 @@ type Command struct {
 	flagMetricsAddr          string
 	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
+	flagEnableWebhooks       bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -71,6 +71,8 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.StringVar(&c.flagWebhookTLSCertDir, "webhook-tls-cert-dir", "",
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
+	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
+		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -88,7 +90,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Invalid arguments: should have no non-flag arguments")
 		return 1
 	}
-	if c.flagWebhookTLSCertDir == "" {
+	if c.flagEnableWebhooks && c.flagWebhookTLSCertDir == "" {
 		c.UI.Error("Invalid arguments: -webhook-tls-cert-dir must be set")
 		return 1
 	}
@@ -138,7 +140,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+	if c.flagEnableWebhooks {
 		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
 		// automatically when new certificates are available.
 		mgr.GetWebhookServer().CertDir = c.flagWebhookTLSCertDir
