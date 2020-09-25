@@ -77,6 +77,7 @@ func (c *HealthCheckController) addEventHandlers() {
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newPod := newObj.(*corev1.Pod)
 			oldPod := oldObj.(*corev1.Pod)
+
 			if newPod.Annotations[annotationInject] != "true" {
 				return
 			}
