@@ -1,0 +1,24 @@
+# permissions for end users to edit proxydefaults.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: proxydefaults-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - proxydefaults
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - proxydefaults/status
+  verbs:
+  - get

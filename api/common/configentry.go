@@ -23,6 +23,9 @@ type ConfigEntryResource interface {
 	// ConsulKind returns the Consul config entry kind, i.e. service-defaults, not
 	// servicedefaults.
 	ConsulKind() string
+	// ConsulNamespaced returns if the resource is namespaced in Consul.
+	// e.g. proxy-defaults are global resources and will return false.
+	ConsulNamespaced() bool
 	// KubeKind returns the Kube config entry kind, i.e. servicedefaults, not
 	// service-defaults.
 	KubeKind() string

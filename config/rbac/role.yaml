@@ -9,6 +9,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - proxydefaults
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - proxydefaults/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - servicedefaults
   verbs:
   - create

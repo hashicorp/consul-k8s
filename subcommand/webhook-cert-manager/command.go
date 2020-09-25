@@ -214,7 +214,6 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernetes.Interface, bundle cert.MetaBundle, log hclog.Logger) error {
 	iterLog := log.With("mutatingwebhookconfig", bundle.WebhookConfigName, "secret", bundle.SecretName, "secretNS", bundle.SecretNamespace)
 
-	iterLog.Info("Getting secret from kubernetes")
 	certSecret, err := clientset.CoreV1().Secrets(bundle.SecretNamespace).Get(ctx, bundle.SecretName, metav1.GetOptions{})
 	if err != nil && k8serrors.IsNotFound(err) {
 		secret := &corev1.Secret{

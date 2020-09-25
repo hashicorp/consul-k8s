@@ -108,7 +108,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 			// Our finalizer is present, so we need to delete the config entry
 			// from consul.
 			_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
-				Namespace: r.consulNamespace(req.Namespace),
+				Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 			})
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
@@ -129,7 +129,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	// Check to see if consul has service defaults with the same name
 	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.Name(), &capi.QueryOptions{
-		Namespace: r.consulNamespace(req.Namespace),
+		Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 	})
 	// If a config entry with this name does not exist
 	if isNotFoundErr(err) {
@@ -138,15 +138,15 @@ func (r *ConfigEntryController) ReconcileEntry(
 		// If Consul namespaces are enabled we may need to create the
 		// destination consul namespace first.
 		if r.EnableConsulNamespaces {
-			if err := namespaces.EnsureExists(r.ConsulClient, r.consulNamespace(req.Namespace), r.CrossNSACLPolicy); err != nil {
+			if err := namespaces.EnsureExists(r.ConsulClient, r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()), r.CrossNSACLPolicy); err != nil {
 				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
-					fmt.Errorf("creating consul namespace %q: %w", r.consulNamespace(req.Namespace), err))
+					fmt.Errorf("creating consul namespace %q: %w", r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()), err))
 			}
 		}
 
 		// Create the config entry
 		_, _, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
-			Namespace: r.consulNamespace(req.Namespace),
+			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -163,7 +163,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	if !configEntry.MatchesConsul(entry) {
 		_, _, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
-			Namespace: r.consulNamespace(req.Namespace),
+			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -177,8 +177,14 @@ func (r *ConfigEntryController) ReconcileEntry(
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigEntryController) consulNamespace(kubeNS string) string {
-	return namespaces.ConsulNamespace(kubeNS, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
+func (r *ConfigEntryController) consulNamespace(kubeNS string, isConsulNamespaced bool) string {
+	if isConsulNamespaced {
+		return namespaces.ConsulNamespace(kubeNS, r.EnableConsulNamespaces, r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix)
+	}
+	if r.EnableConsulNamespaces {
+		return common.DefaultConsulNamespace
+	}
+	return ""
 }
 
 func (r *ConfigEntryController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, configEntry common.ConfigEntryResource, errType string, err error) (ctrl.Result, error) {
