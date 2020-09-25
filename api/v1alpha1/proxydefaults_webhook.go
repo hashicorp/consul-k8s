@@ -13,6 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+// +kubebuilder:object:generate=false
+
 type ProxyDefaultsValidator struct {
 	client.Client
 	ConsulClient           *capi.Client
