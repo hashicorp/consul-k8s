@@ -369,7 +369,6 @@ func (c *Command) Run(args []string) int {
 		Informer:   nil,
 		Handle:     healthcheckHandler,
 		MaxRetries: 10,
-		Namespace:  "", // TODO get this from the annotation or c.flagK8SSourceNamespace??
 	}
 
 	go func() {

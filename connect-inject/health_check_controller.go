@@ -38,7 +38,6 @@ type HealthCheckController struct {
 	Informer   cache.SharedIndexInformer
 	Handle     HCHandler
 	MaxRetries int
-	Namespace  string
 }
 
 func (c *HealthCheckController) setupInformer() {
@@ -75,10 +74,6 @@ func (c *HealthCheckController) addEventHandlers() {
 	// Update: pod.Status.PodConditions.["Ready"] True->False || False->True
 	// Delete: handled by connect-inject webhook
 	c.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			// AddFunc is a no-op as we handle ObjectCreate path in the UpdateFunc
-			return
-		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newPod := newObj.(*corev1.Pod)
 			oldPod := oldObj.(*corev1.Pod)
@@ -93,6 +88,7 @@ func (c *HealthCheckController) addEventHandlers() {
 			// we have a Pod scheduled and running on a host so we have a hostIP that we can
 			// reference. This is the ObjectCreate path
 			if oldPod.Status.Phase == corev1.PodPending && newPod.Status.Phase == corev1.PodRunning {
+				key, err := cache.MetaNamespaceKeyFunc(newObj)
 				if err != nil {
 					// We return here, due to startup timing on probes there is a case where we receive
 					// the failed readiness probe before processing the transition from Pending to Running.
@@ -124,10 +120,6 @@ func (c *HealthCheckController) addEventHandlers() {
 					return
 				}
 			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			// Deletion is handled by connect-inject preStop!
-			return
 		},
 	})
 }
