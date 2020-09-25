@@ -101,7 +101,7 @@ func TestController(t *testing.T) {
 
 				t.Log("patching proxy-defaults CRD")
 				patchMeshGatewayMode := "remote"
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "patch", "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -137,7 +137,7 @@ func TestController(t *testing.T) {
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceresolver", "resolver")
 
 				t.Log("deleting proxy-defaults CRD")
-				helpers.RunKubectl(t, ctx.KubectlOptions(), "delete", "proxydefaults", "global")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "proxydefaults", "global")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
