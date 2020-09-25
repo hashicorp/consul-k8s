@@ -93,6 +93,35 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "redirect", svcDefault.Redirect.Service)
 			},
 		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Global,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				proxyDefault, ok := consulEntry.(*capi.ProxyConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.MeshGatewayModeRemote, proxyDefault.MeshGateway.Mode)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -215,6 +244,39 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "different_redirect", svcDefault.Redirect.Service)
 			},
 		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Global,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				proxyDefault := resource.(*v1alpha1.ProxyDefaults)
+				proxyDefault.Spec.MeshGateway.Mode = "local"
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				proxyDefault, ok := consulEntry.(*capi.ProxyConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.MeshGatewayModeLocal, proxyDefault.MeshGateway.Mode)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -333,6 +395,32 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResourceWithDeletion: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              common.Global,
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -429,6 +517,30 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ServiceResolverController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Global,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
