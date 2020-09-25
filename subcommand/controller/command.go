@@ -25,7 +25,6 @@ type Command struct {
 	k8s       *flags.K8SFlags
 	httpFlags *flags.HTTPFlags
 
-	flagMetricsAddr          string
 	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
 
@@ -53,7 +52,6 @@ func init() {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.StringVar(&c.flagMetricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -94,11 +92,10 @@ func (c *Command) Run(args []string) int {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: c.flagMetricsAddr,
-		Port:               9443,
-		LeaderElection:     c.flagEnableLeaderElection,
-		LeaderElectionID:   "consul.hashicorp.com",
+		Scheme:           scheme,
+		Port:             9443,
+		LeaderElection:   c.flagEnableLeaderElection,
+		LeaderElectionID: "consul.hashicorp.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
