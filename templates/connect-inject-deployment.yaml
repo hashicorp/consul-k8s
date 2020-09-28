@@ -261,6 +261,9 @@ spec:
       {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- end }}
+      {{- if .Values.connectInject.priorityClassName }}
+      priorityClassName: {{ .Values.connectInject.priorityClassName | quote }}
+      {{- end }}
       {{- if .Values.connectInject.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.connectInject.nodeSelector . | indent 8 | trim }}

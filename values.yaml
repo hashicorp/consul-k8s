@@ -645,6 +645,9 @@ syncCatalog:
   image: null
   default: true # true will sync by default, otherwise requires annotation
 
+  # Optional priorityClassName.
+  priorityClassName: ""
+
   # toConsul and toK8S control whether syncing is enabled to Consul or K8S
   # as a destination. If both of these are disabled, the sync will do nothing.
   toConsul: true
@@ -801,6 +804,9 @@ connectInject:
   enabled: false
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
+
+  # Optional priorityClassName.
+  priorityClassName: ""
 
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
