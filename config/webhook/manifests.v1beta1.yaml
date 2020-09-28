@@ -24,6 +24,7 @@ webhooks:
     - UPDATE
     resources:
     - proxydefaults
+  sideEffects: None
 - clientConfig:
     caBundle: Cg==
     service:
@@ -42,6 +43,7 @@ webhooks:
     - UPDATE
     resources:
     - servicedefaults
+  sideEffects: None
 - clientConfig:
     caBundle: Cg==
     service:
@@ -60,6 +62,7 @@ webhooks:
     - UPDATE
     resources:
     - serviceresolvers
+  sideEffects: None
 - clientConfig:
     caBundle: Cg==
     service:
@@ -78,3 +81,23 @@ webhooks:
     - UPDATE
     resources:
     - servicerouter
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-servicesplitter
+  failurePolicy: Fail
+  name: mutate-servicesplitter.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicesplitters
+  sideEffects: None

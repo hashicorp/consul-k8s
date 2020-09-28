@@ -33,7 +33,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
-		consulPrereq        capi.ConfigEntry
+		consulPrereq        []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		compare             func(t *testing.T, consul capi.ConfigEntry)
@@ -126,10 +126,12 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
-			consulPrereq: &capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Name:     "foo",
-				Protocol: "http",
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
 			},
 			configEntryResource: &v1alpha1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
@@ -163,6 +165,44 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "/admin", configEntry.Routes[0].Match.HTTP.PathPrefix)
 			},
 		},
+		{
+			kubeKind:   "ServiceSplitter",
+			consulKind: capi.ServiceSplitter,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceSplitterSpec{
+					Splits: []v1alpha1.ServiceSplit{
+						{
+							Weight: 100,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceSplitterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				svcDefault, ok := consulEntry.(*capi.ServiceSplitterConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, float32(100), svcDefault.Splits[0].Weight)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -182,9 +222,11 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			})
 			req.NoError(err)
 			if c.consulPrereq != nil {
-				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
-				req.NoError(err)
-				req.True(written)
+				for _, configEntry := range c.consulPrereq {
+					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+					req.NoError(err)
+					req.True(written)
+				}
 			}
 
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
@@ -221,7 +263,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
-		consulPrereq        capi.ConfigEntry
+		consulPrereq        []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		updateF             func(common.ConfigEntryResource)
@@ -325,12 +367,71 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			},
 		},
 		{
+			kubeKind:   "ServiceSplitter",
+			consulKind: capi.ServiceSplitter,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceSplitterSpec{
+					Splits: []v1alpha1.ServiceSplit{
+						{
+							Weight: 100,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceSplitterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				serviceSplitter := resource.(*v1alpha1.ServiceSplitter)
+				serviceSplitter.Spec.Splits = []v1alpha1.ServiceSplit{
+					{
+						Weight: 80,
+					},
+					{
+						Weight:  20,
+						Service: "bar",
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				svcDefault, ok := consulEntry.(*capi.ServiceSplitterConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, float32(80), svcDefault.Splits[0].Weight)
+				require.Equal(t, float32(20), svcDefault.Splits[1].Weight)
+				require.Equal(t, "bar", svcDefault.Splits[1].Service)
+			},
+		},
+		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
-			consulPrereq: &capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Name:     "foo",
-				Protocol: "http",
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
 			},
 			configEntryResource: &v1alpha1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
@@ -389,9 +490,11 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			// Create any prereqs.
 			if c.consulPrereq != nil {
-				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
-				req.NoError(err)
-				req.True(written)
+				for _, configEntry := range c.consulPrereq {
+					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+					req.NoError(err)
+					req.True(written)
+				}
 			}
 
 			// We haven't run reconcile yet so we must create the config entry
@@ -440,7 +543,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind                        string
 		consulKind                      string
-		consulPrereq                    capi.ConfigEntry
+		consulPrereq                    []capi.ConfigEntry
 		configEntryResourceWithDeletion common.ConfigEntryResource
 		reconciler                      func(client.Client, *capi.Client, logr.Logger) testReconciler
 	}{
@@ -523,10 +626,12 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
-			consulPrereq: &capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Name:     "foo",
-				Protocol: "http",
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
 			},
 			configEntryResourceWithDeletion: &v1alpha1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
@@ -547,8 +652,44 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					},
 				},
 			},
+
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceSplitter",
+			consulKind: capi.ServiceSplitter,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceSplitterSpec{
+					Splits: []v1alpha1.ServiceSplit{
+						{
+							Weight: 100,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceSplitterController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -577,9 +718,11 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			// Create any prereqs.
 			if c.consulPrereq != nil {
-				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
-				req.NoError(err)
-				req.True(written)
+				for _, configEntry := range c.consulPrereq {
+					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+					req.NoError(err)
+					req.True(written)
+				}
 			}
 
 			// We haven't run reconcile yet so we must create the config entry

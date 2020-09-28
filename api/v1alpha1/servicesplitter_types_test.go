@@ -1,0 +1,317 @@
+package v1alpha1
+
+import (
+	"testing"
+
+	capi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// Test MatchesConsul for cases that should return true.
+func TestServiceSplitter_MatchesConsulTrue(t *testing.T) {
+	cases := map[string]struct {
+		Ours   ServiceSplitter
+		Theirs *capi.ServiceSplitterConfigEntry
+	}{
+		"empty fields": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{},
+			},
+			Theirs: &capi.ServiceSplitterConfigEntry{
+				Kind:        capi.ServiceSplitter,
+				Name:        "name",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+			},
+		},
+		"all fields set": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight:        100,
+							Service:       "foo",
+							ServiceSubset: "bar",
+							Namespace:     "baz",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceSplitterConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceSplitter,
+				Splits: []capi.ServiceSplit{
+					{
+						Weight:        100,
+						Service:       "foo",
+						ServiceSubset: "bar",
+						Namespace:     "baz",
+					},
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, c.Ours.MatchesConsul(c.Theirs))
+		})
+	}
+}
+
+// Test MatchesConsul for cases that should return false.
+func TestServiceSplitter_MatchesConsulFalse(t *testing.T) {
+	cases := map[string]struct {
+		Ours   ServiceSplitter
+		Theirs capi.ConfigEntry
+	}{
+		"different type": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{},
+			},
+			Theirs: &capi.ServiceConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceSplitter,
+			},
+		},
+		"different name": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{},
+			},
+			Theirs: &capi.ServiceSplitterConfigEntry{
+				Name: "other_name",
+				Kind: capi.ServiceSplitter,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.False(t, c.Ours.MatchesConsul(c.Theirs))
+		})
+	}
+}
+
+func TestServiceSplitter_ToConsul(t *testing.T) {
+	cases := map[string]struct {
+		Ours ServiceSplitter
+		Exp  *capi.ServiceSplitterConfigEntry
+	}{
+		"empty fields": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{},
+			},
+			Exp: &capi.ServiceSplitterConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceSplitter,
+			},
+		},
+		"every field set": {
+			Ours: ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight:        100,
+							Service:       "foo",
+							ServiceSubset: "bar",
+							Namespace:     "baz",
+						},
+					},
+				},
+			},
+			Exp: &capi.ServiceSplitterConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceSplitter,
+				Splits: []capi.ServiceSplit{
+					{
+						Weight:        100,
+						Service:       "foo",
+						ServiceSubset: "bar",
+						Namespace:     "baz",
+					},
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			act := c.Ours.ToConsul()
+			ServiceSplitter, ok := act.(*capi.ServiceSplitterConfigEntry)
+			require.True(t, ok, "could not cast")
+			require.Equal(t, c.Exp, ServiceSplitter)
+		})
+	}
+}
+
+func TestServiceSplitter_AddFinalizer(t *testing.T) {
+	ServiceSplitter := &ServiceSplitter{}
+	ServiceSplitter.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, ServiceSplitter.ObjectMeta.Finalizers)
+}
+
+func TestServiceSplitter_RemoveFinalizer(t *testing.T) {
+	ServiceSplitter := &ServiceSplitter{
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"f1", "f2"},
+		},
+	}
+	ServiceSplitter.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, ServiceSplitter.ObjectMeta.Finalizers)
+}
+
+func TestServiceSplitter_SetSyncedCondition(t *testing.T) {
+	ServiceSplitter := &ServiceSplitter{}
+	ServiceSplitter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+
+	require.Equal(t, corev1.ConditionTrue, ServiceSplitter.Status.Conditions[0].Status)
+	require.Equal(t, "reason", ServiceSplitter.Status.Conditions[0].Reason)
+	require.Equal(t, "message", ServiceSplitter.Status.Conditions[0].Message)
+	now := metav1.Now()
+	require.True(t, ServiceSplitter.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
+	cases := []corev1.ConditionStatus{
+		corev1.ConditionUnknown,
+		corev1.ConditionFalse,
+		corev1.ConditionTrue,
+	}
+	for _, status := range cases {
+		t.Run(string(status), func(t *testing.T) {
+			ServiceSplitter := &ServiceSplitter{
+				Status: Status{
+					Conditions: []Condition{{
+						Type:   ConditionSynced,
+						Status: status,
+					}},
+				},
+			}
+
+			require.Equal(t, status, ServiceSplitter.SyncedConditionStatus())
+		})
+	}
+}
+
+func TestServiceSplitter_GetConditionWhenStatusNil(t *testing.T) {
+	require.Nil(t, (&ServiceSplitter{}).GetCondition(ConditionSynced))
+}
+
+func TestServiceSplitter_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+	require.Equal(t, corev1.ConditionUnknown, (&ServiceSplitter{}).SyncedConditionStatus())
+}
+
+func TestServiceSplitter_SyncedConditionWhenStatusNil(t *testing.T) {
+	status, reason, message := (&ServiceSplitter{}).SyncedCondition()
+	require.Equal(t, corev1.ConditionUnknown, status)
+	require.Equal(t, "", reason)
+	require.Equal(t, "", message)
+}
+
+func TestServiceSplitter_ConsulKind(t *testing.T) {
+	require.Equal(t, capi.ServiceSplitter, (&ServiceSplitter{}).ConsulKind())
+}
+
+func TestServiceSplitter(t *testing.T) {
+	require.Equal(t, "servicesplitter", (&ServiceSplitter{}).KubeKind())
+}
+
+func TestServiceSplitter_ObjectMeta(t *testing.T) {
+	meta := metav1.ObjectMeta{
+		Name:      "name",
+		Namespace: "namespace",
+	}
+	ServiceSplitter := &ServiceSplitter{
+		ObjectMeta: meta,
+	}
+	require.Equal(t, meta, ServiceSplitter.GetObjectMeta())
+}
+
+func TestServiceSplitter_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input          *ServiceSplitter
+		expectedErrMsg string
+	}{
+		"valid": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight: 99.99,
+						},
+						{
+							Weight: 0.01,
+						},
+					},
+				},
+			},
+		},
+		"sum of weights must be 100": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight: 90,
+						},
+						{
+							Weight: 5,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: spec.splits: Invalid value: 95: the sum of weights across all splits must add up to 100%`,
+		},
+		"weight must be between 0.01 and 100": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight: 101,
+						},
+						{
+							Weight: 0.001,
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: [spec.splits[0].weight: Invalid value: 101: weight must be between 0.01% and 100%, spec.splits[1].weight: Invalid value: 0.001: weight must be between 0.01% and 100%, spec.splits: Invalid value: 101.001: the sum of weights across all splits must add up to 100%]`,
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate()
+			if testCase.expectedErrMsg != "" {
+				require.EqualError(t, err, testCase.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

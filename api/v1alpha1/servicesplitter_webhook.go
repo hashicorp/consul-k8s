@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceResolverValidator struct {
+type ServiceSplitterValidator struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -34,13 +34,14 @@ type ServiceResolverValidator struct {
 // If it is updated, run code-gen, update subcommand/controller/command.go
 // and the consul-helm value for the path to the webhook.
 //
-// NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
+// NOTE: The below line cannot be combined with any other comment. If it is
+// it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-serviceresolver,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=serviceresolvers,versions=v1alpha1,name=mutate-serviceresolver.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicesplitter,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicesplitters,versions=v1alpha1,name=mutate-servicesplitter.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var svcResolver ServiceResolver
-	err := v.decoder.Decode(req, &svcResolver)
+func (v *ServiceSplitterValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var serviceSplitter ServiceSplitter
+	err := v.decoder.Decode(req, &serviceSplitter)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -49,24 +50,24 @@ func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcResolver,
+		&serviceSplitter,
 		v.EnableConsulNamespaces,
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
-	var svcResolverList ServiceResolverList
-	if err := v.Client.List(ctx, &svcResolverList); err != nil {
+func (v *ServiceSplitterValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+	var serviceSplitterList ServiceSplitterList
+	if err := v.Client.List(ctx, &serviceSplitterList); err != nil {
 		return nil, err
 	}
 	var entries []common.ConfigEntryResource
-	for _, item := range svcResolverList.Items {
+	for _, item := range serviceSplitterList.Items {
 		entries = append(entries, common.ConfigEntryResource(&item))
 	}
 	return entries, nil
 }
 
-func (v *ServiceResolverValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceSplitterValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
