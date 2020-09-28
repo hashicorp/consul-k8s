@@ -2,7 +2,6 @@ package connectinject
 
 import (
 	ctx "context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -16,70 +15,40 @@ import (
 // In this test the Controller is started against a fake k8s clientset
 // we create and update pods and validate the handlers are being reached
 // from the controller's informer + queue processing algorithms
-
-var ObjCreated bool
-var ObjUpdated_passing bool
-var ObjUpdated_failing bool
-var ObjUpdated_unknown bool
+const (
+	testPodName   = "test-pod"
+	objectUpdated = "objectUpdated"
+	objectCreated = "objectCreated"
+)
 
 type fakeHealthCheckHandler struct {
-	ObjCreated         bool
-	ObjReconciled      bool
-	ObjUpdated_passing bool
-	ObjUpdated_failing bool
-	ObjUpdated_unknown bool
-	controller         *HealthCheckController
+	ObjCreated bool
+	ObjUpdated bool
+	controller *HealthCheckController
 }
 
-// TODO: figure out how to test reconciler from here
-func (f fakeHealthCheckHandler) Init() error {
-	// This triggers the reconciler
+// Init only calls the Reconciler and returns, this is tested in the handler test
+func (f *fakeHealthCheckHandler) Init() error {
+	// This triggers the reconciler in the handler
 	return nil
 }
 
-func (f fakeHealthCheckHandler) ObjectCreated(obj interface{}) error {
-	ObjCreated = true
+func (f *fakeHealthCheckHandler) ObjectCreated(obj interface{}) error {
+	f.ObjCreated = true
 	return nil
 }
 
-func (f fakeHealthCheckHandler) ObjectDeleted(obj interface{}) error {
+func (f *fakeHealthCheckHandler) ObjectDeleted(obj interface{}) error {
 	return nil
 }
 
-func (f fakeHealthCheckHandler) ObjectUpdated(objNew interface{}) error {
-	pod := objNew.(*corev1.Pod)
-	status := f.controller.getReadyStatus(pod)
-	if status == corev1.ConditionTrue {
-		ObjUpdated_passing = true
-	} else if status == corev1.ConditionFalse {
-		ObjUpdated_failing = true
-	} else {
-		ObjUpdated_unknown = true
-		return fmt.Errorf("unknown status! %v", status)
-	}
+func (f *fakeHealthCheckHandler) ObjectUpdated(objNew interface{}) error {
+	f.ObjUpdated = true
 	return nil
 }
 
-func (f fakeHealthCheckHandler) Reconcile() error {
+func (f *fakeHealthCheckHandler) Reconcile() error {
 	return nil
-}
-
-func testPod(name string) corev1.Pod {
-	return corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   "default",
-			Labels:      map[string]string{labelInject: "true"},
-			Annotations: map[string]string{annotationInject: "true"},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				corev1.Container{
-					Name: name,
-				},
-			},
-		},
-	}
 }
 
 // This forces a Reconcile phase
@@ -89,13 +58,10 @@ func TestHealthCheckController_Init(t *testing.T) {
 	return
 }
 
-// Run tests a suite that validates Create/Update paths are caught
-// by the informer, filtered, and passed to the handler
-func TestHealthCheckController_Run(t *testing.T) {
-
-	clientset := fake.NewSimpleClientset()
+func testGetControllerAndStart(t *testing.T, start *corev1.Pod) (*HealthCheckController, chan struct{}) {
+	stopCh := make(chan struct{})
+	clientset := fake.NewSimpleClientset(start)
 	fakeHandler := &fakeHealthCheckHandler{}
-	// setup the controller
 	controller := &HealthCheckController{
 		Log:        hclog.Default(),
 		Clientset:  clientset,
@@ -104,116 +70,292 @@ func TestHealthCheckController_Run(t *testing.T) {
 		Handle:     fakeHandler,
 		MaxRetries: 0,
 	}
-	fakeHandler.controller = controller
-
-	context, cancelFunc := ctx.WithCancel(ctx.Background())
-	defer cancelFunc()
-	healthCh := make(chan struct{})
 	go func() {
-		defer close(healthCh)
-		controller.Run(context.Done())
+		controller.Run(stopCh)
 	}()
-	time.Sleep(time.Second * 3)
-	testRunNewPod(t, controller)
-	testRunUpdatePodFailing(t, controller)
-	testRunUpdatePodPassing(t, controller)
-}
-func reset() {
-	ObjCreated = false
-	ObjUpdated_unknown = false
-	ObjUpdated_passing = false
-	ObjUpdated_failing = false
-}
-
-// testRunNewPod creates a new Pod, then simulates scheduling and running
-// by updating it to phase PodScheduling then PodRunning
-func testRunNewPod(t *testing.T, c *HealthCheckController) {
-	require := require.New(t)
-	reset()
-
-	podName := "test-pod-create"
-	pod := testPod(podName)
-	_, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Create(ctx.Background(), &pod, metav1.CreateOptions{})
-	require.NoError(err)
-	podget, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Get(ctx.Background(), podName, metav1.GetOptions{})
-	require.NoError(err)
-	podget.Status.Phase = corev1.PodPending
-	_, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podget, metav1.UpdateOptions{})
-	require.NoError(err)
-	podget, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Get(ctx.Background(), podName, metav1.GetOptions{})
-	require.NoError(err)
-	podget.Status.Phase = corev1.PodRunning
-	_, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podget, metav1.UpdateOptions{})
-	require.NoError(err)
 	time.Sleep(time.Second * 1)
-	require.Equal(true, ObjCreated)
-	require.Equal(true, ObjUpdated_passing)
-
+	return controller, stopCh
 }
 
-// testRunUpdatePodFailing creates a new Pod and then marks it failed
-func testRunUpdatePodFailing(t *testing.T, c *HealthCheckController) {
-	require := require.New(t)
-	reset()
-
-	podName := "test-pod-failing"
-	pod := testPod(podName)
-	_, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Create(ctx.Background(), &pod, metav1.CreateOptions{})
-	require.NoError(err)
-	podget, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Get(ctx.Background(), podName, metav1.GetOptions{})
-	require.NoError(err)
-	podget.Status.Phase = corev1.PodPending
-	_, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podget, metav1.UpdateOptions{})
-	require.NoError(err)
-	podget, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Get(ctx.Background(), podName, metav1.GetOptions{})
-	require.NoError(err)
-	podget.Status.Phase = corev1.PodRunning
-	podget.Status.Conditions = findAndReplaceConditionStatus(podget.Status.Conditions, corev1.ConditionFalse)
-	_, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podget, metav1.UpdateOptions{})
-	require.NoError(err)
-	time.Sleep(time.Second * 1)
-	require.Equal(true, ObjCreated)
-	require.Equal(true, ObjUpdated_failing)
-	require.Equal(false, ObjUpdated_passing)
-	require.Equal(false, ObjUpdated_unknown)
-}
-
-// testRunUpdatePodPassing uses the failed pod from testRunUpdatePodFailing
-// and marks it passing
-func testRunUpdatePodPassing(t *testing.T, c *HealthCheckController) {
-	require := require.New(t)
-	reset()
-
-	podName := "test-pod-failing"
-	podget, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Get(ctx.Background(), podName, metav1.GetOptions{})
-	require.NoError(err)
-	podget.Status.Conditions = findAndReplaceConditionStatus(podget.Status.Conditions, corev1.ConditionTrue)
-	_, err = c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podget, metav1.UpdateOptions{})
-	require.NoError(err)
-	time.Sleep(time.Second * 1)
-	require.Equal(true, ObjUpdated_passing)
-	require.Equal(false, ObjCreated)
-	require.Equal(false, ObjUpdated_failing)
-	require.Equal(false, ObjUpdated_unknown)
-}
-
-func findAndReplaceConditionStatus(cs []corev1.PodCondition, status corev1.ConditionStatus) []corev1.PodCondition {
-	var ret []corev1.PodCondition
-	found := false
-	for _, cond := range cs {
-		if cond.Type == "Ready" {
-			found = true
-			cond.Status = status
-		}
-		ret = append(ret, cond)
+func TestHealthCheckController(t *testing.T) {
+	cases := []struct {
+		Name     string
+		PodStart *corev1.Pod
+		PodNext  *corev1.Pod
+		Expected map[string]bool
+		Err      string
+	}{
+		{
+			"PodPending to PodRunning objectCreate",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase:      corev1.PodPhase(corev1.PodPending),
+					Conditions: nil,
+				},
+			},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase:      corev1.PodPhase(corev1.PodRunning),
+					Conditions: nil,
+				},
+			},
+			map[string]bool{
+				objectUpdated: true,
+				objectCreated: true,
+			},
+			"",
+		},
+		{
+			"PodUpdate from health check passing to fail",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionFalse,
+					}},
+				},
+			},
+			map[string]bool{
+				objectUpdated: true,
+				objectCreated: false,
+			},
+			"",
+		},
+		{
+			"PodUpdate from health check fail to passing",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionFalse,
+					}},
+				},
+			},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			map[string]bool{
+				objectUpdated: true,
+				objectCreated: false,
+			},
+			"",
+		},
+		{
+			"No PodUpdate with no change",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testPodName,
+					Namespace:   "default",
+					Labels:      map[string]string{labelInject: "true"},
+					Annotations: map[string]string{annotationInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			map[string]bool{
+				objectUpdated: false,
+				objectCreated: false,
+			},
+			"",
+		},
+		{
+			"No Update without annotations or label",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPhase(corev1.PodRunning),
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			map[string]bool{
+				objectUpdated: false,
+				objectCreated: false,
+			},
+			"",
+		},
 	}
-	if !found {
-		ret = append(ret, corev1.PodCondition{
-			Type:    "Ready",
-			Status:  status,
-			Reason:  "test",
-			Message: "test",
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			c, stopCh := testGetControllerAndStart(t, tt.PodStart)
+			defer close(stopCh)
+			hch := fakeHealthCheckHandler{}
+			c.Handle = &hch
+			testSetTransition(t, c, tt.PodNext)
+			time.Sleep(time.Second * 3)
+			actual := map[string]bool{
+				objectCreated: hch.ObjCreated,
+				objectUpdated: hch.ObjUpdated,
+			}
+			require.Equal(tt.Expected, actual)
 		})
 	}
-	return ret
+}
+
+func testSetTransition(t *testing.T, c *HealthCheckController, podNext *corev1.Pod) {
+	require := require.New(t)
+	_, err := c.Clientset.CoreV1().Pods(metav1.NamespaceDefault).Update(ctx.Background(), podNext, metav1.UpdateOptions{})
+	require.NoError(err)
 }
