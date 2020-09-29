@@ -4,9 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/mitchellh/cli"
-
 	"github.com/hashicorp/consul-k8s/version"
+	"github.com/mitchellh/cli"
 )
 
 func main() {
