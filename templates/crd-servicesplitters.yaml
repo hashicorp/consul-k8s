@@ -6,25 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.0
   creationTimestamp: null
-  name: proxydefaults.consul.hashicorp.com
+  name: servicesplitters.consul.hashicorp.com
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .status.conditions[?(@.type=="Synced")].status
-    description: The sync status of the resource with Consul
-    name: Synced
-    type: string
   group: consul.hashicorp.com
   names:
-    kind: ProxyDefaults
-    listKind: ProxyDefaultsList
-    plural: proxydefaults
-    singular: proxydefaults
+    kind: ServiceSplitter
+    listKind: ServiceSplitterList
+    plural: servicesplitters
+    singular: servicesplitter
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: ProxyDefaults is the Schema for the proxydefaults API
+      description: ServiceSplitter is the Schema for the servicesplitters API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -35,43 +30,26 @@ spec:
         metadata:
           type: object
         spec:
-          description: ProxyDefaultsSpec defines the desired state of ProxyDefaults
+          description: ServiceSplitterSpec defines the desired state of ServiceSplitter
           properties:
-            config:
-              description: Config is an arbitrary map of configuration values used by Connect proxies. Any values that your proxy allows can be configured globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
-              type: Any
-            expose:
-              description: Expose controls the default expose path configuration for Envoy.
-              properties:
-                checks:
-                  description: Checks defines whether paths associated with Consul checks will be exposed. This flag triggers exposing all HTTP and GRPC check paths registered for the service.
-                  type: boolean
-                paths:
-                  description: Paths is the list of paths exposed through the proxy.
-                  items:
-                    properties:
-                      listenerPort:
-                        description: ListenerPort defines the port of the proxy's listener for exposed paths.
-                        type: integer
-                      localPathPort:
-                        description: LocalPathPort is the port that the service is listening on for the given path.
-                        type: integer
-                      path:
-                        description: Path is the path to expose through the proxy, ie. "/metrics".
-                        type: string
-                      protocol:
-                        description: Protocol describes the upstream's service protocol. Valid values are "http" and "http2", defaults to "http".
-                        type: string
-                    type: object
-                  type: array
-              type: object
-            meshGateway:
-              description: MeshGateway controls the default mesh gateway configuration for this service.
-              properties:
-                mode:
-                  description: Mode is the mode that should be used for the upstream connection. One of none, local, or remote.
-                  type: string
-              type: object
+            splits:
+              description: Splits defines how much traffic to send to which set of service instances during a traffic split. The sum of weights across all splits must add up to 100.
+              items:
+                properties:
+                  namespace:
+                    description: The namespace to resolve the service from instead of the current namespace. If empty the current namespace is assumed.
+                    type: string
+                  service:
+                    description: Service is the service to resolve instead of the default.
+                    type: string
+                  serviceSubset:
+                    description: ServiceSubset is a named subset of the given service to resolve instead of one defined as that service's DefaultSubset. If empty the default subset is used.
+                    type: string
+                  weight:
+                    description: Weight is a value between 0 and 100 reflecting what portion of traffic should be directed to this split. The smallest representable weight is 1/10000 or .01%.
+                    type: number
+                type: object
+              type: array
           type: object
         status:
           properties:

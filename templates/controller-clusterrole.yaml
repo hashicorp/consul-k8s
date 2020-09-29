@@ -17,6 +17,7 @@ rules:
   - serviceresolvers
   - proxydefaults
   - servicerouters
+  - servicesplitters
   verbs:
   - create
   - delete
@@ -32,6 +33,7 @@ rules:
   - serviceresolvers/status
   - proxydefaults/status
   - servicerouters/status
+  - servicesplitters/status
   verbs:
   - get
   - patch
