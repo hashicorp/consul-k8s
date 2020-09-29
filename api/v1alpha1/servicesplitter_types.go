@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -170,7 +171,8 @@ func (in ServiceSplits) validate(path *field.Path) field.ErrorList {
 	}
 
 	if sumOfWeights != 100 {
-		errs = append(errs, field.Invalid(path, sumOfWeights,
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON),
 			fmt.Sprintf("the sum of weights across all splits must add up to a 100 percent, but adds up to %f", sumOfWeights)))
 	}
 
