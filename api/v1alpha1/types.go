@@ -72,3 +72,7 @@ func sliceContains(slice []string, entry string) bool {
 	}
 	return false
 }
+
+func invalidPathPrefix(path string) bool {
+	return path != "" && !strings.HasPrefix(path, "/")
+}

@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceResolverValidator struct {
+type ServiceRouterValidator struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -36,11 +36,11 @@ type ServiceResolverValidator struct {
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-serviceresolver,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=serviceresolvers,versions=v1alpha1,name=mutate-serviceresolver.consul.hashicorp.com
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicerouter,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicerouter,versions=v1alpha1,name=mutate-servicerouter.consul.hashicorp.com
 
-func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var svcResolver ServiceResolver
-	err := v.decoder.Decode(req, &svcResolver)
+func (v *ServiceRouterValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var svcRouter ServiceRouter
+	err := v.decoder.Decode(req, &svcRouter)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -49,24 +49,24 @@ func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Req
 		req,
 		v.Logger,
 		v,
-		&svcResolver,
+		&svcRouter,
 		v.EnableConsulNamespaces,
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
-	var svcResolverList ServiceResolverList
-	if err := v.Client.List(ctx, &svcResolverList); err != nil {
+func (v *ServiceRouterValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+	var svcRouterList ServiceRouterList
+	if err := v.Client.List(ctx, &svcRouterList); err != nil {
 		return nil, err
 	}
 	var entries []common.ConfigEntryResource
-	for _, item := range svcResolverList.Items {
+	for _, item := range svcRouterList.Items {
 		entries = append(entries, common.ConfigEntryResource(&item))
 	}
 	return entries, nil
 }
 
-func (v *ServiceResolverValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceRouterValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

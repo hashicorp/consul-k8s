@@ -371,7 +371,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// all patches are created to guarantee no errors were encountered in
 	// that process before modifying the Consul cluster.
 	if h.EnableNamespaces {
-		if err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
+		if _, err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
 			h.Log.Error("Error checking or creating namespace", "err", err,
 				"Namespace", h.consulNamespace(req.Namespace), "Request Name", req.Name)
 			return &v1beta1.AdmissionResponse{
