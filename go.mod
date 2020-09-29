@@ -6,6 +6,7 @@ require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/digitalocean/godo v1.10.0 // indirect
 	github.com/go-logr/logr v0.1.0
+	github.com/google/go-cmp v0.4.0
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/hashicorp/consul/api v1.4.1-0.20200924193849-85d223b73c1d
 	github.com/hashicorp/consul/sdk v0.6.0

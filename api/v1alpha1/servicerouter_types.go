@@ -2,9 +2,10 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"reflect"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -365,7 +366,8 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	configEntry.Namespace = ""
 	configEntry.ModifyIndex = 0
 	configEntry.CreateIndex = 0
-	return reflect.DeepEqual(in.ToConsul(), configEntry)
+
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceRouter) Validate() error {

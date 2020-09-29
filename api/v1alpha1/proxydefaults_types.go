@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -123,15 +125,16 @@ func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
 }
 
 func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
-	proxyDefCand, ok := candidate.(*capi.ProxyConfigEntry)
+	configEntry, ok := candidate.(*capi.ProxyConfigEntry)
 	if !ok {
 		return false
 	}
-	proxyDefCand.Namespace = ""
-	proxyDefCand.CreateIndex = 0
-	proxyDefCand.ModifyIndex = 0
+	// Zero out fields from consul that we don't want to compare on.
+	configEntry.Namespace = ""
+	configEntry.CreateIndex = 0
+	configEntry.ModifyIndex = 0
 
-	return reflect.DeepEqual(in.ToConsul(), proxyDefCand)
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ProxyDefaults) Validate() error {

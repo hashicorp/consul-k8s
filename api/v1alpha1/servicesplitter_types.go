@@ -3,8 +3,9 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -137,11 +138,12 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+	// Zero out fields from consul that we don't want to compare on.
 	serviceSplitterCandidate.Namespace = ""
 	serviceSplitterCandidate.CreateIndex = 0
 	serviceSplitterCandidate.ModifyIndex = 0
 
-	return reflect.DeepEqual(in.ToConsul(), candidate)
+	return cmp.Equal(in.ToConsul(), candidate, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceSplitter) Validate() error {

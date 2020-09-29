@@ -286,13 +286,12 @@ func TestToConsul(t *testing.T) {
 	}
 }
 
-func TestMatchesConsul(t *testing.T) {
+func TestMatchesConsul_Matches(t *testing.T) {
 	cases := map[string]struct {
 		internal *ServiceDefaults
 		consul   *capi.ServiceConfigEntry
-		matches  bool
 	}{
-		"name:matches": {
+		"empty fields": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-test-service",
@@ -300,11 +299,82 @@ func TestMatchesConsul(t *testing.T) {
 				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Name: "my-test-service",
+				Kind:        capi.ServiceDefaults,
+				Name:        "my-test-service",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
 			},
-			true,
 		},
+		"all fields populated": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-test-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Protocol: "http",
+					MeshGateway: MeshGatewayConfig{
+						Mode: "remote",
+					},
+					Expose: ExposeConfig{
+						Paths: []ExposePath{
+							{
+								ListenerPort:  8080,
+								Path:          "/second/test/path",
+								LocalPathPort: 11,
+								Protocol:      "https",
+							},
+							{
+								ListenerPort:  80,
+								Path:          "/test/path",
+								LocalPathPort: 42,
+								Protocol:      "tcp",
+							},
+						},
+					},
+					ExternalSNI: "sni-value",
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "my-test-service",
+				Protocol: "http",
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeRemote,
+				},
+				Expose: capi.ExposeConfig{
+					Paths: []capi.ExposePath{
+						{
+							ListenerPort:  8080,
+							Path:          "/second/test/path",
+							LocalPathPort: 11,
+							Protocol:      "https",
+						},
+						{
+							ListenerPort:  80,
+							Path:          "/test/path",
+							LocalPathPort: 42,
+							Protocol:      "tcp",
+						},
+					},
+				},
+				ExternalSNI: "sni-value",
+			},
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, testCase.internal.MatchesConsul(testCase.consul))
+		})
+	}
+}
+
+func TestMatchesConsul_NotMatch(t *testing.T) {
+	cases := map[string]struct {
+		internal *ServiceDefaults
+		consul   *capi.ServiceConfigEntry
+	}{
 		"name:mismatched": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -316,19 +386,6 @@ func TestMatchesConsul(t *testing.T) {
 				Kind: capi.ServiceDefaults,
 				Name: "differently-named-service",
 			},
-			false,
-		},
-		"protocol:matches": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Protocol: "http",
-			},
-			true,
 		},
 		"protocol:mismatched": {
 			&ServiceDefaults{
@@ -340,23 +397,6 @@ func TestMatchesConsul(t *testing.T) {
 				Kind:     capi.ServiceDefaults,
 				Protocol: "https",
 			},
-			false,
-		},
-		"gatewayConfig:matches": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeRemote,
-				},
-			},
-			true,
 		},
 		"gatewayConfig:mismatched": {
 			&ServiceDefaults{
@@ -372,19 +412,6 @@ func TestMatchesConsul(t *testing.T) {
 					Mode: capi.MeshGatewayModeLocal,
 				},
 			},
-			false,
-		},
-		"externalSNI:matches": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					ExternalSNI: "test-external-sni",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:        capi.ServiceDefaults,
-				ExternalSNI: "test-external-sni",
-			},
-			true,
 		},
 		"externalSNI:mismatched": {
 			&ServiceDefaults{
@@ -396,23 +423,6 @@ func TestMatchesConsul(t *testing.T) {
 				Kind:        capi.ServiceDefaults,
 				ExternalSNI: "different-external-sni",
 			},
-			false,
-		},
-		"expose.checks:matches": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
-						Checks: true,
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Checks: true,
-				},
-			},
-			true,
 		},
 		"expose.checks:mismatched": {
 			&ServiceDefaults{
@@ -428,49 +438,6 @@ func TestMatchesConsul(t *testing.T) {
 					Checks: false,
 				},
 			},
-			false,
-		},
-		"expose.paths:matches": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
-						Paths: []ExposePath{
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-							{
-								ListenerPort:  8080,
-								Path:          "/second/test/path",
-								LocalPathPort: 11,
-								Protocol:      "https",
-							},
-						},
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-						{
-							ListenerPort:  8080,
-							Path:          "/second/test/path",
-							LocalPathPort: 11,
-							Protocol:      "https",
-						},
-					},
-				},
-			},
-			true,
 		},
 		"expose.paths.listenerPort:mismatched": {
 			&ServiceDefaults{
@@ -494,7 +461,6 @@ func TestMatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			false,
 		},
 		"expose.paths.path:mismatched": {
 			&ServiceDefaults{
@@ -518,7 +484,6 @@ func TestMatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			false,
 		},
 		"expose.paths.localPathPort:mismatched": {
 			&ServiceDefaults{
@@ -542,7 +507,6 @@ func TestMatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			false,
 		},
 		"expose.paths.protocol:mismatched": {
 			&ServiceDefaults{
@@ -566,7 +530,6 @@ func TestMatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			false,
 		},
 		"expose.paths:mismatched when path lengths are different": {
 			&ServiceDefaults{
@@ -602,56 +565,12 @@ func TestMatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			false,
-		},
-		"expose.paths:match when paths orders are different": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
-						Paths: []ExposePath{
-							{
-								ListenerPort:  8080,
-								Path:          "/second/test/path",
-								LocalPathPort: 11,
-								Protocol:      "https",
-							},
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-						},
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-						{
-							ListenerPort:  8080,
-							Path:          "/second/test/path",
-							LocalPathPort: 11,
-							Protocol:      "https",
-						},
-					},
-				},
-			},
-			true,
 		},
 	}
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			result := testCase.internal.MatchesConsul(testCase.consul)
-			require.Equal(t, testCase.matches, result)
+			require.False(t, testCase.internal.MatchesConsul(testCase.consul))
 		})
 	}
 }

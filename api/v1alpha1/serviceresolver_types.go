@@ -6,6 +6,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,16 +111,16 @@ func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
 }
 
 func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
-	serviceResolverCandidate, ok := candidate.(*capi.ServiceResolverConfigEntry)
+	configEntry, ok := candidate.(*capi.ServiceResolverConfigEntry)
 	if !ok {
 		return false
 	}
 	// Zero out fields from consul that we don't want to compare on.
-	serviceResolverCandidate.Namespace = ""
-	serviceResolverCandidate.ModifyIndex = 0
-	serviceResolverCandidate.CreateIndex = 0
+	configEntry.Namespace = ""
+	configEntry.ModifyIndex = 0
+	configEntry.CreateIndex = 0
 
-	return reflect.DeepEqual(in.ToConsul(), serviceResolverCandidate)
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceResolver) Validate() error {

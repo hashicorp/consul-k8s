@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -153,15 +155,16 @@ func (in *ServiceDefaults) Validate() error {
 
 // MatchesConsul returns true if entry has the same config as this struct.
 func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
-	serviceDefaultsCandidate, ok := candidate.(*capi.ServiceConfigEntry)
+	configEntry, ok := candidate.(*capi.ServiceConfigEntry)
 	if !ok {
 		return false
 	}
-	return in.Name() == serviceDefaultsCandidate.Name &&
-		in.Spec.Protocol == serviceDefaultsCandidate.Protocol &&
-		in.Spec.MeshGateway.Mode == string(serviceDefaultsCandidate.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(serviceDefaultsCandidate.Expose) &&
-		in.Spec.ExternalSNI == serviceDefaultsCandidate.ExternalSNI
+	// Zero out fields from consul that we don't want to compare on.
+	configEntry.Namespace = ""
+	configEntry.CreateIndex = 0
+	configEntry.ModifyIndex = 0
+
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
