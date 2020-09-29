@@ -152,6 +152,13 @@ func TestControllerNamespaces(t *testing.T) {
 					svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
 					require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
 					require.Equal(r, "/foo", svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
+
+					// service-splitter
+					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", queryOpts)
+					require.NoError(r, err)
+					svcSplitterEntry, ok := entry.(*api.ServiceSplitterConfigEntry)
+					require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
+					require.Equal(r, float32(100), svcSplitterEntry.Splits[0].Weight)
 				})
 			}
 
@@ -172,6 +179,9 @@ func TestControllerNamespaces(t *testing.T) {
 				t.Log("patching service-router custom resource")
 				patchPathPrefix := "/baz"
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicerouter", "router", "-p", fmt.Sprintf(`{"spec":{"routes":[{"match":{"http":{"pathPrefix":"%s"}}}]}}`, patchPathPrefix), "--type=merge")
+
+				t.Log("patching service-splitter custom resource")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicesplitter", "splitter", "-p", `{"spec": {"splits": [{"weight": 50}, {"weight": 50, "service": "other-splitter"}]}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -202,6 +212,15 @@ func TestControllerNamespaces(t *testing.T) {
 					svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
 					require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
 					require.Equal(r, patchPathPrefix, svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
+
+					// service-splitter
+					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", queryOpts)
+					require.NoError(r, err)
+					svcSplitter, ok := entry.(*api.ServiceSplitterConfigEntry)
+					require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
+					require.Equal(r, float32(50), svcSplitter.Splits[0].Weight)
+					require.Equal(r, float32(50), svcSplitter.Splits[1].Weight)
+					require.Equal(r, "other-splitter", svcSplitter.Splits[1].Service)
 				})
 			}
 
@@ -219,6 +238,9 @@ func TestControllerNamespaces(t *testing.T) {
 				t.Log("deleting service-router custom resource")
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicerouter", "router")
 
+				t.Log("deleting service-splitter custom resource")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicesplitter", "splitter")
+
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
@@ -233,9 +255,16 @@ func TestControllerNamespaces(t *testing.T) {
 
 					// proxy-defaults
 					_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", defaultOpts)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
 
 					// service-router
 					_, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", queryOpts)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// service-splitter
+					_, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", queryOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})

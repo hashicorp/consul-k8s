@@ -11,7 +11,26 @@ metadata:
     component: controller
 webhooks:
 - clientConfig:
-    caBundle: {{ quote }}
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-proxydefaults
+  failurePolicy: Fail
+  name: mutate-proxydefaults.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - proxydefaults
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -19,17 +38,18 @@ webhooks:
   failurePolicy: Fail
   name: mutate-servicedefaults.consul.hashicorp.com
   rules:
-  - apiGroups:
-    - consul.hashicorp.com
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - servicedefaults
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - servicedefaults
+  sideEffects: None
 - clientConfig:
-    caBundle: {{ quote }}
+    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -38,34 +58,17 @@ webhooks:
   name: mutate-serviceresolver.consul.hashicorp.com
   rules:
     - apiGroups:
-        - consul.hashicorp.com
+      - consul.hashicorp.com
       apiVersions:
-        - v1alpha1
+      - v1alpha1
       operations:
-        - CREATE
-        - UPDATE
+      - CREATE
+      - UPDATE
       resources:
-        - serviceresolvers
+      - serviceresolvers
+  sideEffects: None
 - clientConfig:
-    caBundle: {{ quote }}
-    service:
-      name: {{ template "consul.fullname" . }}-controller-webhook
-      namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-proxydefaults
-  failurePolicy: Fail
-  name: mutate-proxydefaults.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - consul.hashicorp.com
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - proxydefaults
-- clientConfig:
-    caBundle: {{ quote }}
+    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -74,12 +77,32 @@ webhooks:
   name: mutate-servicerouter.consul.hashicorp.com
   rules:
     - apiGroups:
-        - consul.hashicorp.com
+      - consul.hashicorp.com
       apiVersions:
-        - v1alpha1
+      - v1alpha1
       operations:
-        - CREATE
-        - UPDATE
+      - CREATE
+      - UPDATE
       resources:
-        - servicerouters
+      - servicerouters
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicesplitter
+  failurePolicy: Fail
+  name: mutate-servicesplitter.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - servicesplitters
+  sideEffects: None
 {{- end }}
