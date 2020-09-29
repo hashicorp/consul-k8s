@@ -159,12 +159,7 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	// Zero out fields from consul that we don't want to compare on.
-	configEntry.Namespace = ""
-	configEntry.CreateIndex = 0
-	configEntry.ModifyIndex = 0
-
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

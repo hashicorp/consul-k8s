@@ -114,12 +114,7 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	// Zero out fields from consul that we don't want to compare on.
-	configEntry.Namespace = ""
-	configEntry.ModifyIndex = 0
-	configEntry.CreateIndex = 0
-
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceResolver) Validate() error {
