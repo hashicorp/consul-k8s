@@ -12,10 +12,11 @@ import (
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours   ServiceResolver
-		Theirs *capi.ServiceResolverConfigEntry
+		Ours    ServiceResolver
+		Theirs  capi.ConfigEntry
+		Matches bool
 	}{
-		"empty fields": {
+		"empty fields matches": {
 			Ours: ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -23,11 +24,15 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 				Spec: ServiceResolverSpec{},
 			},
 			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
+				Name:        "name",
+				Kind:        capi.ServiceResolver,
+				Namespace:   "foobar",
+				CreateIndex: 1,
+				ModifyIndex: 2,
 			},
+			Matches: true,
 		},
-		"all fields set": {
+		"all fields set matches": {
 			Ours: ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -149,11 +154,28 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					},
 				},
 			},
+			Matches: true,
+		},
+		"different types does not match": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{},
+			},
+			Theirs: &capi.ProxyConfigEntry{
+				Name:        "name",
+				Kind:        capi.ServiceResolver,
+				Namespace:   "foobar",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+			},
+			Matches: false,
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.True(t, c.Ours.MatchesConsul(c.Theirs))
+			require.Equal(t, c.Matches, c.Ours.MatchesConsul(c.Theirs))
 		})
 	}
 }

@@ -10,13 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test MatchesConsul for cases that should return true.
-func TestServiceRouter_MatchesConsulTrue(t *testing.T) {
+// Test MatchesConsul.
+func TestServiceRouter_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours   ServiceRouter
-		Theirs *capi.ServiceRouterConfigEntry
+		Ours    ServiceRouter
+		Theirs  capi.ConfigEntry
+		Matches bool
 	}{
-		"empty fields": {
+		"empty fields matches": {
 			Ours: ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -30,8 +31,9 @@ func TestServiceRouter_MatchesConsulTrue(t *testing.T) {
 				CreateIndex: 1,
 				ModifyIndex: 2,
 			},
+			Matches: true,
 		},
-		"all fields set": {
+		"all fields set matches": {
 			Ours: ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -125,49 +127,28 @@ func TestServiceRouter_MatchesConsulTrue(t *testing.T) {
 					},
 				},
 			},
+			Matches: true,
 		},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			require.True(t, c.Ours.MatchesConsul(c.Theirs))
-		})
-	}
-}
-
-// Test MatchesConsul for cases that should return false.
-func TestServiceRouter_MatchesConsulFalse(t *testing.T) {
-	cases := map[string]struct {
-		Ours   ServiceRouter
-		Theirs capi.ConfigEntry
-	}{
-		"different type": {
+		"mismatched type does not match": {
 			Ours: ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
 				Spec: ServiceRouterSpec{},
 			},
-			Theirs: &capi.ServiceConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceRouter,
+			Theirs: &capi.ProxyConfigEntry{
+				Kind:        capi.ServiceRouter,
+				Name:        "name",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
 			},
-		},
-		"different name": {
-			Ours: ServiceRouter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceRouterSpec{},
-			},
-			Theirs: &capi.ServiceRouterConfigEntry{
-				Name: "other_name",
-				Kind: capi.ServiceRouter,
-			},
+			Matches: false,
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.False(t, c.Ours.MatchesConsul(c.Theirs))
+			require.Equal(t, c.Matches, c.Ours.MatchesConsul(c.Theirs))
 		})
 	}
 }

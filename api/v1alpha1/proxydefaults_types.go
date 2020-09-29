@@ -3,8 +3,9 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -123,15 +124,11 @@ func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
 }
 
 func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
-	proxyDefCand, ok := candidate.(*capi.ProxyConfigEntry)
+	configEntry, ok := candidate.(*capi.ProxyConfigEntry)
 	if !ok {
 		return false
 	}
-	proxyDefCand.Namespace = ""
-	proxyDefCand.CreateIndex = 0
-	proxyDefCand.ModifyIndex = 0
-
-	return reflect.DeepEqual(in.ToConsul(), proxyDefCand)
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ProxyDefaults) Validate() error {
@@ -152,19 +149,6 @@ func (in *ProxyDefaults) Validate() error {
 	}
 
 	return nil
-}
-
-// matchesConfig compares the values of the config on the spec and that on the
-// the consul proxy-default and returns true if they match and false otherwise.
-func (in *ProxyDefaults) matchesConfig(config map[string]interface{}) bool {
-	if in.Spec.Config == nil || config == nil {
-		return in.Spec.Config == nil && config == nil
-	}
-	var inConfig map[string]interface{}
-	if err := json.Unmarshal(in.Spec.Config, &inConfig); err != nil {
-		return false
-	}
-	return reflect.DeepEqual(inConfig, config)
 }
 
 // convertConfig converts the config of type json.RawMessage which is stored
