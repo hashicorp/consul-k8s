@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"reflect"
 	"sort"
 	"time"
@@ -103,6 +104,7 @@ func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
 		Redirect:       in.Spec.Redirect.toConsul(),
 		Failover:       in.Spec.Failover.toConsul(),
 		ConnectTimeout: in.Spec.ConnectTimeout,
+		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
 	}
 }
 
@@ -111,13 +113,12 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+	// Zero out fields from consul that we don't want to compare on.
+	serviceResolverCandidate.Namespace = ""
+	serviceResolverCandidate.ModifyIndex = 0
+	serviceResolverCandidate.CreateIndex = 0
 
-	return in.Name() == serviceResolverCandidate.Name &&
-		in.Spec.DefaultSubset == serviceResolverCandidate.DefaultSubset &&
-		in.Spec.Subsets.matchesConsul(serviceResolverCandidate.Subsets) &&
-		in.Spec.Redirect.matchesConsul(serviceResolverCandidate.Redirect) &&
-		in.Spec.Failover.matchesConsul(serviceResolverCandidate.Failover) &&
-		in.Spec.ConnectTimeout == serviceResolverCandidate.ConnectTimeout
+	return reflect.DeepEqual(in.ToConsul(), serviceResolverCandidate)
 }
 
 func (in *ServiceResolver) Validate() error {
@@ -137,6 +138,8 @@ func (in *ServiceResolver) Validate() error {
 			errs = append(errs, err)
 		}
 	}
+
+	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -191,6 +194,9 @@ type ServiceResolverSpec struct {
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
 	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
+	// LoadBalancer determines the load balancing policy and configuration for services
+	// issuing requests to this upstream service.
+	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
 }
 
 type ServiceResolverRedirect struct {
@@ -238,6 +244,117 @@ type ServiceResolverFailover struct {
 	Namespace string `json:"namespaces,omitempty"`
 	// Datacenters is a fixed list of datacenters to try during failover.
 	Datacenters []string `json:"datacenters,omitempty"`
+}
+
+type LoadBalancer struct {
+	// Policy is the load balancing policy used to select a host.
+	Policy string `json:"policy,omitempty"`
+
+	// RingHashConfig contains configuration for the "ringHash" policy type.
+	RingHashConfig *RingHashConfig `json:"ringHashConfig,omitempty"`
+
+	// LeastRequestConfig contains configuration for the "leastRequest" policy type.
+	LeastRequestConfig *LeastRequestConfig `json:"leastRequestConfig,omitempty"`
+
+	// HashPolicies is a list of hash policies to use for hashing load balancing algorithms.
+	// Hash policies are evaluated individually and combined such that identical lists
+	// result in the same hash.
+	// If no hash policies are present, or none are successfully evaluated,
+	// then a random backend host will be selected.
+	HashPolicies []HashPolicy `json:"hashPolicies,omitempty"`
+}
+
+func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+	for i, p := range in.HashPolicies {
+		if err := p.validate(path.Child("hashPolicies").Index(i)); err != nil {
+			errs = append(errs, err...)
+		}
+	}
+	return errs
+}
+
+type RingHashConfig struct {
+	// MinimumRingSize determines the minimum number of entries in the hash ring.
+	MinimumRingSize uint64 `json:"minimumRingSize,omitempty"`
+
+	// MaximumRingSize determines the maximum number of entries in the hash ring.
+	MaximumRingSize uint64 `json:"maximumRingSize,omitempty"`
+}
+
+type LeastRequestConfig struct {
+	// ChoiceCount determines the number of random healthy hosts from which to select the one with the least requests.
+	ChoiceCount uint32 `json:"choiceCount,omitempty"`
+}
+
+type HashPolicy struct {
+	// Field is the attribute type to hash on.
+	// Must be one of "header", "cookie", or "query_parameter".
+	// Cannot be specified along with sourceIP.
+	Field string `json:"field,omitempty"`
+
+	// FieldValue is the value to hash.
+	// ie. header name, cookie name, URL query parameter name
+	// Cannot be specified along with sourceIP.
+	FieldValue string `json:"fieldValue,omitempty"`
+
+	// CookieConfig contains configuration for the "cookie" hash policy type.
+	CookieConfig *CookieConfig `json:"cookieConfig,omitempty"`
+
+	// SourceIP determines whether the hash should be of the source IP rather than of a field and field value.
+	// Cannot be specified along with field or fieldValue.
+	SourceIP bool `json:"sourceIP,omitempty"`
+
+	// Terminal will short circuit the computation of the hash when multiple hash policies are present.
+	// If a hash is computed when a Terminal policy is evaluated,
+	// then that hash will be used and subsequent hash policies will be ignored.
+	Terminal bool `json:"terminal,omitempty"`
+}
+
+func (in HashPolicy) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	validFields := []string{"header", "cookie", "query_parameter"}
+	if !sliceContains(validFields, in.Field) {
+		errs = append(errs, field.Invalid(path.Child("field"), in.Field,
+			notInSliceMessage(validFields)))
+	}
+
+	if in.Field != "" && in.SourceIP {
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"cannot set both field and sourceIP"))
+	}
+
+	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {
+		errs = append(errs, err)
+	}
+	return errs
+}
+
+type CookieConfig struct {
+	// Session generates a session cookie with no expiration.
+	Session bool `json:"session,omitempty"`
+
+	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
+	TTL time.Duration `json:"ttl,omitempty"`
+
+	// Path is the path to set for the cookie.
+	Path string `json:"path,omitempty"`
+}
+
+func (in *CookieConfig) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+
+	if in.Session && in.TTL > 0 {
+		asJSON, _ := json.Marshal(in)
+		return field.Invalid(path, string(asJSON), "cannot set both session and ttl")
+	}
+	return nil
 }
 
 func init() {
@@ -348,4 +465,61 @@ func (in ServiceResolverFailover) matchesConsul(candidate capi.ServiceResolverFa
 		in.ServiceSubset == candidate.ServiceSubset &&
 		in.Namespace == candidate.Namespace &&
 		reflect.DeepEqual(in.Datacenters, candidate.Datacenters)
+}
+
+func (in *LoadBalancer) toConsul() *capi.LoadBalancer {
+	if in == nil {
+		return nil
+	}
+	var policies []capi.HashPolicy
+	for _, p := range in.HashPolicies {
+		policies = append(policies, p.toConsul())
+	}
+	return &capi.LoadBalancer{
+		Policy:             in.Policy,
+		RingHashConfig:     in.RingHashConfig.toConsul(),
+		LeastRequestConfig: in.LeastRequestConfig.toConsul(),
+		HashPolicies:       policies,
+	}
+}
+
+func (in *RingHashConfig) toConsul() *capi.RingHashConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.RingHashConfig{
+		MinimumRingSize: in.MinimumRingSize,
+		MaximumRingSize: in.MaximumRingSize,
+	}
+}
+
+func (in *LeastRequestConfig) toConsul() *capi.LeastRequestConfig {
+	if in == nil {
+		return nil
+	}
+
+	return &capi.LeastRequestConfig{
+		ChoiceCount: in.ChoiceCount,
+	}
+}
+
+func (in HashPolicy) toConsul() capi.HashPolicy {
+	return capi.HashPolicy{
+		Field:        in.Field,
+		FieldValue:   in.FieldValue,
+		CookieConfig: in.CookieConfig.toConsul(),
+		SourceIP:     in.SourceIP,
+		Terminal:     in.Terminal,
+	}
+}
+
+func (in *CookieConfig) toConsul() *capi.CookieConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.CookieConfig{
+		Session: in.Session,
+		TTL:     in.TTL,
+		Path:    in.Path,
+	}
 }
