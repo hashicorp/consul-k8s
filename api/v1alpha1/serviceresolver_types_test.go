@@ -10,8 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test MatchesConsul for cases that should return true.
-func TestServiceResolver_MatchesConsulTrue(t *testing.T) {
+func TestServiceResolver_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
 		Ours   ServiceResolver
 		Theirs *capi.ServiceResolverConfigEntry
@@ -66,6 +65,29 @@ func TestServiceResolver_MatchesConsulTrue(t *testing.T) {
 						},
 					},
 					ConnectTimeout: 1 * time.Second,
+					LoadBalancer: &LoadBalancer{
+						Policy: "policy",
+						RingHashConfig: &RingHashConfig{
+							MinimumRingSize: 1,
+							MaximumRingSize: 2,
+						},
+						LeastRequestConfig: &LeastRequestConfig{
+							ChoiceCount: 1,
+						},
+						HashPolicies: []HashPolicy{
+							{
+								Field:      "field",
+								FieldValue: "value",
+								CookieConfig: &CookieConfig{
+									Session: true,
+									TTL:     1,
+									Path:    "path",
+								},
+								SourceIP: true,
+								Terminal: true,
+							},
+						},
+					},
 				},
 			},
 			Theirs: &capi.ServiceResolverConfigEntry{
@@ -103,248 +125,35 @@ func TestServiceResolver_MatchesConsulTrue(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				LoadBalancer: &capi.LoadBalancer{
+					Policy: "policy",
+					RingHashConfig: &capi.RingHashConfig{
+						MinimumRingSize: 1,
+						MaximumRingSize: 2,
+					},
+					LeastRequestConfig: &capi.LeastRequestConfig{
+						ChoiceCount: 1,
+					},
+					HashPolicies: []capi.HashPolicy{
+						{
+							Field:      "field",
+							FieldValue: "value",
+							CookieConfig: &capi.CookieConfig{
+								Session: true,
+								TTL:     1,
+								Path:    "path",
+							},
+							SourceIP: true,
+							Terminal: true,
+						},
+					},
+				},
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			require.True(t, c.Ours.MatchesConsul(c.Theirs))
-		})
-	}
-}
-
-// Test MatchesConsul for cases that should return false.
-func TestServiceResolver_MatchesConsulFalse(t *testing.T) {
-	cases := map[string]struct {
-		Ours   ServiceResolver
-		Theirs capi.ConfigEntry
-	}{
-		"different type": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{},
-			},
-			Theirs: &capi.ServiceConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-			},
-		},
-		"different name": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "other_name",
-				Kind: capi.ServiceResolver,
-			},
-		},
-		"different default subset": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					DefaultSubset: "default",
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name:          "name",
-				Kind:          capi.ServiceResolver,
-				DefaultSubset: "different",
-			},
-		},
-		"our subsets nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-
-				Spec: ServiceResolverSpec{
-					Subsets: nil,
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Subsets: map[string]capi.ServiceResolverSubset{
-					"sub": {},
-				},
-			},
-		},
-		"their subsets nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Subsets: map[string]ServiceResolverSubset{
-						"sub": {},
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name:    "name",
-				Kind:    capi.ServiceResolver,
-				Subsets: nil,
-			},
-		},
-		"different subsets contents": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Subsets: map[string]ServiceResolverSubset{
-						"sub": {
-							Filter: "filter",
-						},
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Subsets: map[string]capi.ServiceResolverSubset{
-					"sub": {
-						Filter: "different_filter",
-					},
-				},
-			},
-		},
-		"our redirect nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Redirect: nil,
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Redirect: &capi.ServiceResolverRedirect{
-					Service: "service",
-				},
-			},
-		},
-		"their redirect nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service: "service",
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name:     "name",
-				Kind:     capi.ServiceResolver,
-				Redirect: nil,
-			},
-		},
-		"different redirect contents": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Redirect: &ServiceResolverRedirect{
-						Service: "service",
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Redirect: &capi.ServiceResolverRedirect{
-					Service: "different_service",
-				},
-			},
-		},
-		"our failover nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Failover: nil,
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Failover: map[string]capi.ServiceResolverFailover{
-					"failover": {},
-				},
-			},
-		},
-		"their failover nil": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Failover: map[string]ServiceResolverFailover{
-						"failover": {},
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name:     "name",
-				Kind:     capi.ServiceResolver,
-				Failover: nil,
-			},
-		},
-		"different failover contents": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					Failover: map[string]ServiceResolverFailover{
-						"failover": {
-							Service: "service",
-						},
-					},
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceResolver,
-				Failover: map[string]capi.ServiceResolverFailover{
-					"failover": {
-						Service: "different_service",
-					},
-				},
-			},
-		},
-		"different connect timeout": {
-			Ours: ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceResolverSpec{
-					ConnectTimeout: 1 * time.Second,
-				},
-			},
-			Theirs: &capi.ServiceResolverConfigEntry{
-				Name:           "name",
-				Kind:           capi.ServiceResolver,
-				ConnectTimeout: 2 * time.Second,
-			},
-		},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			require.False(t, c.Ours.MatchesConsul(c.Theirs))
 		})
 	}
 }
@@ -404,6 +213,29 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						},
 					},
 					ConnectTimeout: 1 * time.Second,
+					LoadBalancer: &LoadBalancer{
+						Policy: "policy",
+						RingHashConfig: &RingHashConfig{
+							MinimumRingSize: 1,
+							MaximumRingSize: 2,
+						},
+						LeastRequestConfig: &LeastRequestConfig{
+							ChoiceCount: 1,
+						},
+						HashPolicies: []HashPolicy{
+							{
+								Field:      "field",
+								FieldValue: "value",
+								CookieConfig: &CookieConfig{
+									Session: true,
+									TTL:     1,
+									Path:    "path",
+								},
+								SourceIP: true,
+								Terminal: true,
+							},
+						},
+					},
 				},
 			},
 			Exp: &capi.ServiceResolverConfigEntry{
@@ -441,6 +273,29 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				LoadBalancer: &capi.LoadBalancer{
+					Policy: "policy",
+					RingHashConfig: &capi.RingHashConfig{
+						MinimumRingSize: 1,
+						MaximumRingSize: 2,
+					},
+					LeastRequestConfig: &capi.LeastRequestConfig{
+						ChoiceCount: 1,
+					},
+					HashPolicies: []capi.HashPolicy{
+						{
+							Field:      "field",
+							FieldValue: "value",
+							CookieConfig: &capi.CookieConfig{
+								Session: true,
+								TTL:     1,
+								Path:    "path",
+							},
+							SourceIP: true,
+							Terminal: true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -578,6 +433,62 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "serviceresolver.consul.hashicorp.com \"foo\" is invalid: [spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once, spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once]",
+		},
+		"hashPolicy.field invalid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								Field: "invalid",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+		},
+		"hashPolicy sourceIP and field set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								Field:    "header",
+								SourceIP: true,
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+		},
+		"cookieConfig session and ttl set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								Field: "cookie",
+								CookieConfig: &CookieConfig{
+									Session: true,
+									TTL:     100,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
 		},
 	}
 	for name, testCase := range cases {
