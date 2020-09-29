@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -167,7 +166,7 @@ func (in *ProxyDefaults) matchesConfig(config map[string]interface{}) bool {
 	if err := json.Unmarshal(in.Spec.Config, &inConfig); err != nil {
 		return false
 	}
-	return reflect.DeepEqual(inConfig, config)
+	return cmp.Equal(inConfig, config)
 }
 
 // convertConfig converts the config of type json.RawMessage which is stored

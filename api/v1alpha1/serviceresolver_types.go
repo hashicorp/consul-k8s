@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"reflect"
 	"sort"
 	"time"
 
@@ -466,7 +465,7 @@ func (in ServiceResolverFailover) matchesConsul(candidate capi.ServiceResolverFa
 	return in.Service == candidate.Service &&
 		in.ServiceSubset == candidate.ServiceSubset &&
 		in.Namespace == candidate.Namespace &&
-		reflect.DeepEqual(in.Datacenters, candidate.Datacenters)
+		cmp.Equal(in.Datacenters, candidate.Datacenters)
 }
 
 func (in *LoadBalancer) toConsul() *capi.LoadBalancer {
