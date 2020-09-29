@@ -33,7 +33,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
-		consulPrereq        []capi.ConfigEntry
+		consulPrereqs       []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		compare             func(t *testing.T, consul capi.ConfigEntry)
@@ -126,7 +126,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
-			consulPrereq: []capi.ConfigEntry{
+			consulPrereqs: []capi.ConfigEntry{
 				&capi.ServiceConfigEntry{
 					Kind:     capi.ServiceDefaults,
 					Name:     "foo",
@@ -168,7 +168,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceSplitter",
 			consulKind: capi.ServiceSplitter,
-			consulPrereq: []capi.ConfigEntry{
+			consulPrereqs: []capi.ConfigEntry{
 				&capi.ServiceConfigEntry{
 					Kind:     capi.ServiceDefaults,
 					Name:     "foo",
@@ -221,12 +221,10 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				Address: consul.HTTPAddr,
 			})
 			req.NoError(err)
-			if c.consulPrereq != nil {
-				for _, configEntry := range c.consulPrereq {
-					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-					req.NoError(err)
-					req.True(written)
-				}
+			for _, configEntry := range c.consulPrereqs {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
 			}
 
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
@@ -263,7 +261,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
-		consulPrereq        []capi.ConfigEntry
+		consulPrereqs       []capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		updateF             func(common.ConfigEntryResource)
@@ -369,7 +367,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceSplitter",
 			consulKind: capi.ServiceSplitter,
-			consulPrereq: []capi.ConfigEntry{
+			consulPrereqs: []capi.ConfigEntry{
 				&capi.ServiceConfigEntry{
 					Kind:     capi.ServiceDefaults,
 					Name:     "foo",
@@ -426,7 +424,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
-			consulPrereq: []capi.ConfigEntry{
+			consulPrereqs: []capi.ConfigEntry{
 				&capi.ServiceConfigEntry{
 					Kind:     capi.ServiceDefaults,
 					Name:     "foo",
@@ -489,12 +487,10 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			req.NoError(err)
 
 			// Create any prereqs.
-			if c.consulPrereq != nil {
-				for _, configEntry := range c.consulPrereq {
-					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-					req.NoError(err)
-					req.True(written)
-				}
+			for _, configEntry := range c.consulPrereqs {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
 			}
 
 			// We haven't run reconcile yet so we must create the config entry
@@ -717,12 +713,10 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			req.NoError(err)
 
 			// Create any prereqs.
-			if c.consulPrereq != nil {
-				for _, configEntry := range c.consulPrereq {
-					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-					req.NoError(err)
-					req.True(written)
-				}
+			for _, configEntry := range c.consulPrereq {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
 			}
 
 			// We haven't run reconcile yet so we must create the config entry

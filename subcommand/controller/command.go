@@ -158,7 +158,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceSplitterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceSplitter),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceSplitter),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceSplitter)

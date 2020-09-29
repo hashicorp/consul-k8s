@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/hashicorp/consul-k8s/api/common"
@@ -143,26 +144,7 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 }
 
 func (in *ServiceSplitter) Validate() error {
-	var errs field.ErrorList
-	path := field.NewPath("spec").Child("splits")
-
-	// The sum of weights across all splits must add up to 100.
-	sumOfWeights := float32(0)
-	for i, split := range in.Spec.Splits {
-		// Validate that the weight value is between 0.01 and 100.
-		if split.Weight > 100 || split.Weight < 0.01 {
-			errs = append(errs, field.Invalid(path.Index(i).Child("weight"), split.Weight,
-				"weight must be between 0.01% and 100%"))
-		}
-
-		// If valid, add to sumOfWeights.
-		sumOfWeights += split.Weight
-	}
-
-	if sumOfWeights != 100 {
-		errs = append(errs, field.Invalid(path, sumOfWeights,
-			"the sum of weights across all splits must add up to 100%"))
-	}
+	errs := in.Spec.Splits.validate(field.NewPath("spec").Child("splits"))
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -172,18 +154,54 @@ func (in *ServiceSplitter) Validate() error {
 	return nil
 }
 
+func (in ServiceSplits) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	// The sum of weights across all splits must add up to 100.
+	sumOfWeights := float32(0)
+	for i, split := range in {
+		// First, validate each split.
+		if err := split.validate(path.Index(i).Child("weight")); err != nil {
+			errs = append(errs, err)
+		}
+
+		// If valid, add its weight to sumOfWeights.
+		sumOfWeights += split.Weight
+	}
+
+	if sumOfWeights != 100 {
+		errs = append(errs, field.Invalid(path, sumOfWeights,
+			fmt.Sprintf("the sum of weights across all splits must add up to a 100 percent, but adds up to %f", sumOfWeights)))
+	}
+
+	return errs
+}
+
+func (in ServiceSplit) validate(path *field.Path) *field.Error {
+	// Validate that the weight value is between 0.01 and 100.
+	if in.Weight > 100 || in.Weight < 0.01 {
+		return field.Invalid(path, in.Weight, "weight must be a percentage between 0.01 and 100")
+	}
+
+	return nil
+}
+
 func (in ServiceSplits) toConsul() []capi.ServiceSplit {
 	var consulServiceSplits []capi.ServiceSplit
 	for _, split := range in {
-		consulServiceSplits = append(consulServiceSplits, capi.ServiceSplit{
-			Weight:        split.Weight,
-			Service:       split.Service,
-			ServiceSubset: split.ServiceSubset,
-			Namespace:     split.Namespace,
-		})
+		consulServiceSplits = append(consulServiceSplits, split.toConsul())
 	}
 
 	return consulServiceSplits
+}
+
+func (in ServiceSplit) toConsul() capi.ServiceSplit {
+	return capi.ServiceSplit{
+		Weight:        in.Weight,
+		Service:       in.Service,
+		ServiceSubset: in.ServiceSubset,
+		Namespace:     in.Namespace,
+	}
 }
 
 func init() {
