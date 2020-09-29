@@ -134,16 +134,16 @@ func (in *ServiceSplitter) ToConsul() capi.ConfigEntry {
 }
 
 func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
-	serviceSplitterCandidate, ok := candidate.(*capi.ServiceSplitterConfigEntry)
+	configEntry, ok := candidate.(*capi.ServiceSplitterConfigEntry)
 	if !ok {
 		return false
 	}
 	// Zero out fields from consul that we don't want to compare on.
-	serviceSplitterCandidate.Namespace = ""
-	serviceSplitterCandidate.CreateIndex = 0
-	serviceSplitterCandidate.ModifyIndex = 0
+	configEntry.Namespace = ""
+	configEntry.CreateIndex = 0
+	configEntry.ModifyIndex = 0
 
-	return cmp.Equal(in.ToConsul(), candidate, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceSplitter) Validate() error {

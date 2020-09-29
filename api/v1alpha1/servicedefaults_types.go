@@ -193,35 +193,6 @@ type ExposePath struct {
 	Protocol string `json:"protocol,omitempty"`
 }
 
-// matches returns true if the expose config of the entry is the same as the struct
-func (e ExposeConfig) matches(expose capi.ExposeConfig) bool {
-	if e.Checks != expose.Checks {
-		return false
-	}
-
-	if len(e.Paths) != len(expose.Paths) {
-		return false
-	}
-
-	for _, path := range e.Paths {
-		found := false
-		for _, entryPath := range expose.Paths {
-			if path.Protocol == entryPath.Protocol &&
-				path.Path == entryPath.Path &&
-				path.ListenerPort == entryPath.ListenerPort &&
-				path.LocalPathPort == entryPath.LocalPathPort {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return false
-		}
-	}
-	return true
-}
-
 // toConsul returns the ExposeConfig for the entry
 func (e ExposeConfig) toConsul() capi.ExposeConfig {
 	var paths []capi.ExposePath

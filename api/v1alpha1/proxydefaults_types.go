@@ -156,19 +156,6 @@ func (in *ProxyDefaults) Validate() error {
 	return nil
 }
 
-// matchesConfig compares the values of the config on the spec and that on the
-// the consul proxy-default and returns true if they match and false otherwise.
-func (in *ProxyDefaults) matchesConfig(config map[string]interface{}) bool {
-	if in.Spec.Config == nil || config == nil {
-		return in.Spec.Config == nil && config == nil
-	}
-	var inConfig map[string]interface{}
-	if err := json.Unmarshal(in.Spec.Config, &inConfig); err != nil {
-		return false
-	}
-	return cmp.Equal(inConfig, config)
-}
-
 // convertConfig converts the config of type json.RawMessage which is stored
 // by the resource into type map[string]interface{} which is saved by the
 // consul API.

@@ -373,32 +373,11 @@ func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSub
 	return m
 }
 
-func (in ServiceResolverSubsetMap) matchesConsul(candidate map[string]capi.ServiceResolverSubset) bool {
-	if len(in) != len(candidate) {
-		return false
-	}
-
-	for thisKey, thisVal := range in {
-		candidateVal, ok := candidate[thisKey]
-		if !ok {
-			return false
-		}
-		if !thisVal.matchesConsul(candidateVal) {
-			return false
-		}
-	}
-	return true
-}
-
 func (in ServiceResolverSubset) toConsul() capi.ServiceResolverSubset {
 	return capi.ServiceResolverSubset{
 		Filter:      in.Filter,
 		OnlyPassing: in.OnlyPassing,
 	}
-}
-
-func (in ServiceResolverSubset) matchesConsul(candidate capi.ServiceResolverSubset) bool {
-	return in.OnlyPassing == candidate.OnlyPassing && in.Filter == candidate.Filter
 }
 
 func (in *ServiceResolverRedirect) toConsul() *capi.ServiceResolverRedirect {
@@ -413,16 +392,6 @@ func (in *ServiceResolverRedirect) toConsul() *capi.ServiceResolverRedirect {
 	}
 }
 
-func (in *ServiceResolverRedirect) matchesConsul(candidate *capi.ServiceResolverRedirect) bool {
-	if in == nil || candidate == nil {
-		return in == nil && candidate == nil
-	}
-	return in.Service == candidate.Service &&
-		in.ServiceSubset == candidate.ServiceSubset &&
-		in.Namespace == candidate.Namespace &&
-		in.Datacenter == candidate.Datacenter
-}
-
 func (in ServiceResolverFailoverMap) toConsul() map[string]capi.ServiceResolverFailover {
 	if in == nil {
 		return nil
@@ -434,24 +403,6 @@ func (in ServiceResolverFailoverMap) toConsul() map[string]capi.ServiceResolverF
 	return m
 }
 
-func (in ServiceResolverFailoverMap) matchesConsul(candidate map[string]capi.ServiceResolverFailover) bool {
-	if len(in) != len(candidate) {
-		return false
-	}
-
-	for thisKey, thisVal := range in {
-		candidateVal, ok := candidate[thisKey]
-		if !ok {
-			return false
-		}
-
-		if !thisVal.matchesConsul(candidateVal) {
-			return false
-		}
-	}
-	return true
-}
-
 func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 	return capi.ServiceResolverFailover{
 		Service:       in.Service,
@@ -459,13 +410,6 @@ func (in ServiceResolverFailover) toConsul() capi.ServiceResolverFailover {
 		Namespace:     in.Namespace,
 		Datacenters:   in.Datacenters,
 	}
-}
-
-func (in ServiceResolverFailover) matchesConsul(candidate capi.ServiceResolverFailover) bool {
-	return in.Service == candidate.Service &&
-		in.ServiceSubset == candidate.ServiceSubset &&
-		in.Namespace == candidate.Namespace &&
-		cmp.Equal(in.Datacenters, candidate.Datacenters)
 }
 
 func (in *LoadBalancer) toConsul() *capi.LoadBalancer {
