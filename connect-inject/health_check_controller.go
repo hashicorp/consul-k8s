@@ -26,6 +26,7 @@ const (
 
 	annotationServiceID                  = "consul.hashicorp.com/consul-service-id"
 	annotationConsulDestinationNamespace = "consul.hashicorp.com/consul-destination-namespace"
+	kubernetesSuccessReasonMsg           = "Kubernetes Health Checks Passing"
 )
 
 // HealthCheckController struct defines how a controller should encapsulate

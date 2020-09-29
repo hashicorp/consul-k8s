@@ -78,7 +78,7 @@ func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) error {
 		t.Log.Error("unable to get Consul API Client for address %s: %s", newAddr, err)
 		t.Client = nil
 	}
-	t.Log.Info("setting consul client to the following agent: %v", newAddr)
+	t.Log.Debug("setting consul client to the following agent: %v", newAddr)
 	return err
 }
 
@@ -169,7 +169,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 	for _, pod := range podList.Items {
 		t.Log.Debug("processing Pod %v", pod.Name)
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.Info("pod %v is not running", pod.Name, pod.Status.Phase)
+			t.Log.Info("pod is not running, skipping", pod.Name, pod.Status.Phase)
 			continue
 		}
 		// 1. Fetch the health checks for this agent
@@ -185,12 +185,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 		filter := "Name == `" + healthCheckID + "`"
 		checks, err := t.Client.Agent().ChecksWithFilter(filter)
 		if err != nil {
-			t.Log.Error("unable to get agent health checks for %v", healthCheckID, filter)
-			continue
-		}
-		if checks == nil || len(checks) == 0 {
-			// TODO we need to handle this
-			t.Log.Error("======== we really shouldn't be here!, %v", checks)
+			t.Log.Error("unable to get agent health checks for %v, %v", healthCheckID, filter, err)
 			continue
 		}
 		status, reason, err := t.getReadyStatusAndReason(&pod)
@@ -204,10 +199,9 @@ func (t *HealthCheckHandler) Reconcile() error {
 			if status == corev1.ConditionFalse {
 				initialStatus = healthCheckCritical
 			} else {
-				// no need to store a reason if passing
-				reason = ""
+				reason = kubernetesSuccessReasonMsg
 			}
-			t.Log.Info("registering new health check for %v", pod.Name)
+			t.Log.Debug("registering new health check for %v", pod.Name, healthCheckID)
 			err = t.registerConsulHealthCheck(&pod, healthCheckID, serviceID, initialStatus, reason)
 			if err != nil {
 				t.Log.Error("unable to register health check %v", err)
@@ -220,16 +214,16 @@ func (t *HealthCheckHandler) Reconcile() error {
 			if checkStatus == healthCheckCritical && status == corev1.ConditionTrue {
 				// set to passing
 				fail = false
-				reason = ""
+				reason = kubernetesSuccessReasonMsg
 			}
 			if (checkStatus == healthCheckPassing && status == corev1.ConditionFalse) || fail == false {
-				t.Log.Info("updating pod check for %v", pod.Name)
+				t.Log.Debug("updating pod check for %v", pod.Name)
 				// Update the health check!
 				err = t.setConsulHealthCheckStatus(healthCheckID, reason, fail)
 				if err != nil {
 					t.Log.Error("unable to update health check status for %v", pod.Name)
-					continue
 				}
+				continue
 			}
 		}
 		t.Log.Debug("no update required for %V", pod.Name)
