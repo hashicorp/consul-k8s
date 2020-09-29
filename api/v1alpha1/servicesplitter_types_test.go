@@ -9,13 +9,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test MatchesConsul for cases that should return true.
-func TestServiceSplitter_MatchesConsulTrue(t *testing.T) {
+// Test MatchesConsul.
+func TestServiceSplitter_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours   ServiceSplitter
-		Theirs *capi.ServiceSplitterConfigEntry
+		Ours    ServiceSplitter
+		Theirs  capi.ConfigEntry
+		Matches bool
 	}{
-		"empty fields": {
+		"empty fields matches": {
 			Ours: ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -29,8 +30,9 @@ func TestServiceSplitter_MatchesConsulTrue(t *testing.T) {
 				CreateIndex: 1,
 				ModifyIndex: 2,
 			},
+			Matches: true,
 		},
-		"all fields set": {
+		"all fields set matches": {
 			Ours: ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
@@ -58,49 +60,28 @@ func TestServiceSplitter_MatchesConsulTrue(t *testing.T) {
 					},
 				},
 			},
+			Matches: true,
 		},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			require.True(t, c.Ours.MatchesConsul(c.Theirs))
-		})
-	}
-}
-
-// Test MatchesConsul for cases that should return false.
-func TestServiceSplitter_MatchesConsulFalse(t *testing.T) {
-	cases := map[string]struct {
-		Ours   ServiceSplitter
-		Theirs capi.ConfigEntry
-	}{
-		"different type": {
+		"different types does not match": {
 			Ours: ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
 				Spec: ServiceSplitterSpec{},
 			},
-			Theirs: &capi.ServiceConfigEntry{
-				Name: "name",
-				Kind: capi.ServiceSplitter,
+			Theirs: &capi.ProxyConfigEntry{
+				Kind:        capi.ServiceSplitter,
+				Name:        "name",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
 			},
-		},
-		"different name": {
-			Ours: ServiceSplitter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: ServiceSplitterSpec{},
-			},
-			Theirs: &capi.ServiceSplitterConfigEntry{
-				Name: "other_name",
-				Kind: capi.ServiceSplitter,
-			},
+			Matches: false,
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.False(t, c.Ours.MatchesConsul(c.Theirs))
+			require.Equal(t, c.Ours.MatchesConsul(c.Theirs), c.Matches)
 		})
 	}
 }
