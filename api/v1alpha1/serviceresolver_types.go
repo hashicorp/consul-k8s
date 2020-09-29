@@ -335,7 +335,7 @@ func (in HashPolicy) validate(path *field.Path) field.ErrorList {
 }
 
 type CookieConfig struct {
-	// Session generates a session cookie with no expiration.
+	// Session determines whether to generate a session cookie with no expiration.
 	Session bool `json:"session,omitempty"`
 
 	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
