@@ -80,7 +80,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - servicerouter
+    - servicerouters
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
