@@ -109,7 +109,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, c.Ours.MatchesConsul(c.Theirs), c.Matches)
+			require.Equal(t, c.Matches, c.Ours.MatchesConsul(c.Theirs))
 		})
 	}
 }

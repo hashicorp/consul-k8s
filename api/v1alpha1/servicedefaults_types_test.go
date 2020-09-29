@@ -384,7 +384,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, testCase.internal.MatchesConsul(testCase.consul), testCase.matches)
+			require.Equal(t, testCase.matches, testCase.internal.MatchesConsul(testCase.consul))
 		})
 	}
 }
