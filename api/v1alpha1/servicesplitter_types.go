@@ -3,8 +3,9 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -133,15 +134,11 @@ func (in *ServiceSplitter) ToConsul() capi.ConfigEntry {
 }
 
 func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
-	serviceSplitterCandidate, ok := candidate.(*capi.ServiceSplitterConfigEntry)
+	configEntry, ok := candidate.(*capi.ServiceSplitterConfigEntry)
 	if !ok {
 		return false
 	}
-	serviceSplitterCandidate.Namespace = ""
-	serviceSplitterCandidate.CreateIndex = 0
-	serviceSplitterCandidate.ModifyIndex = 0
-
-	return reflect.DeepEqual(in.ToConsul(), candidate)
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceSplitterConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceSplitter) Validate() error {

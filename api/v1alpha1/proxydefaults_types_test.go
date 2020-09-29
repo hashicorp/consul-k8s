@@ -15,10 +15,11 @@ import (
 // Test MatchesConsul for cases that should return true.
 func TestProxyDefaults_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours   ProxyDefaults
-		Theirs *capi.ProxyConfigEntry
+		Ours    ProxyDefaults
+		Theirs  capi.ConfigEntry
+		Matches bool
 	}{
-		"empty fields": {
+		"empty fields matches": {
 			Ours: ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: common.Global,
@@ -26,11 +27,15 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
-				Name: common.Global,
-				Kind: capi.ProxyDefaults,
+				Name:        common.Global,
+				Kind:        capi.ProxyDefaults,
+				Namespace:   "default",
+				CreateIndex: 1,
+				ModifyIndex: 2,
 			},
+			Matches: true,
 		},
-		"all fields set": {
+		"all fields set matches": {
 			Ours: ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: common.Global,
@@ -86,11 +91,25 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 			},
+			Matches: true,
+		},
+		"mismatched types does not match": {
+			Ours: ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Global,
+				},
+				Spec: ProxyDefaultsSpec{},
+			},
+			Theirs: &capi.ServiceConfigEntry{
+				Name: common.Global,
+				Kind: capi.ProxyDefaults,
+			},
+			Matches: false,
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.True(t, c.Ours.MatchesConsul(c.Theirs))
+			require.Equal(t, c.Matches, c.Ours.MatchesConsul(c.Theirs))
 		})
 	}
 }

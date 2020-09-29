@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -153,15 +155,11 @@ func (in *ServiceDefaults) Validate() error {
 
 // MatchesConsul returns true if entry has the same config as this struct.
 func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
-	serviceDefaultsCandidate, ok := candidate.(*capi.ServiceConfigEntry)
+	configEntry, ok := candidate.(*capi.ServiceConfigEntry)
 	if !ok {
 		return false
 	}
-	return in.Name() == serviceDefaultsCandidate.Name &&
-		in.Spec.Protocol == serviceDefaultsCandidate.Protocol &&
-		in.Spec.MeshGateway.Mode == string(serviceDefaultsCandidate.MeshGateway.Mode) &&
-		in.Spec.Expose.matches(serviceDefaultsCandidate.Expose) &&
-		in.Spec.ExternalSNI == serviceDefaultsCandidate.ExternalSNI
+	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
@@ -188,35 +186,6 @@ type ExposePath struct {
 	// Protocol describes the upstream's service protocol.
 	// Valid values are "http" and "http2", defaults to "http".
 	Protocol string `json:"protocol,omitempty"`
-}
-
-// matches returns true if the expose config of the entry is the same as the struct
-func (e ExposeConfig) matches(expose capi.ExposeConfig) bool {
-	if e.Checks != expose.Checks {
-		return false
-	}
-
-	if len(e.Paths) != len(expose.Paths) {
-		return false
-	}
-
-	for _, path := range e.Paths {
-		found := false
-		for _, entryPath := range expose.Paths {
-			if path.Protocol == entryPath.Protocol &&
-				path.Path == entryPath.Path &&
-				path.ListenerPort == entryPath.ListenerPort &&
-				path.LocalPathPort == entryPath.LocalPathPort {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 // toConsul returns the ExposeConfig for the entry
