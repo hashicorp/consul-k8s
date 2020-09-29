@@ -138,20 +138,26 @@ func (r *ConfigEntryController) ReconcileEntry(
 		// If Consul namespaces are enabled we may need to create the
 		// destination consul namespace first.
 		if r.EnableConsulNamespaces {
-			if err := namespaces.EnsureExists(r.ConsulClient, r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()), r.CrossNSACLPolicy); err != nil {
+			consulNS := r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced())
+			created, err := namespaces.EnsureExists(r.ConsulClient, consulNS, r.CrossNSACLPolicy)
+			if err != nil {
 				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
-					fmt.Errorf("creating consul namespace %q: %w", r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()), err))
+					fmt.Errorf("creating consul namespace %q: %w", consulNS, err))
+			}
+			if created {
+				logger.Info("consul namespace created", "ns", consulNS)
 			}
 		}
 
 		// Create the config entry
-		_, _, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
 			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("writing config entry to consul: %w", err))
 		}
+		logger.Info("config entry created", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 
@@ -162,15 +168,17 @@ func (r *ConfigEntryController) ReconcileEntry(
 	}
 
 	if !configEntry.MatchesConsul(entry) {
-		_, _, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
+		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
 			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("updating config entry in consul: %w", err))
 		}
+		logger.Info("config entry updated", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
-	} else if configEntry.SyncedConditionStatus() == corev1.ConditionTrue {
+	} else if configEntry.SyncedConditionStatus() != corev1.ConditionTrue {
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 

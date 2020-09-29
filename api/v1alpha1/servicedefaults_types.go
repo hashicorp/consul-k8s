@@ -1,8 +1,6 @@
 package v1alpha1
 
 import (
-	"strings"
-
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,14 +56,14 @@ func (in *ServiceDefaults) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
 
-func (in *ServiceDefaults) AddFinalizer(f string) {
-	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
+func (in *ServiceDefaults) AddFinalizer(name string) {
+	in.ObjectMeta.Finalizers = append(in.Finalizers(), name)
 }
 
-func (in *ServiceDefaults) RemoveFinalizer(f string) {
+func (in *ServiceDefaults) RemoveFinalizer(name string) {
 	var newFinalizers []string
 	for _, oldF := range in.Finalizers() {
-		if oldF != f {
+		if oldF != name {
 			newFinalizers = append(newFinalizers, oldF)
 		}
 	}
@@ -94,11 +92,18 @@ func (in *ServiceDefaults) SetSyncedCondition(status corev1.ConditionStatus, rea
 
 func (in *ServiceDefaults) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
+	if cond == nil {
+		return corev1.ConditionUnknown, "", ""
+	}
 	return cond.Status, cond.Reason, cond.Message
 }
 
 func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
-	return in.Status.GetCondition(ConditionSynced).Status
+	condition := in.Status.GetCondition(ConditionSynced)
+	if condition == nil {
+		return corev1.ConditionUnknown
+	}
+	return condition.Status
 }
 
 // +kubebuilder:object:root=true
@@ -236,7 +241,7 @@ func (e ExposeConfig) validate(path *field.Path) []*field.Error {
 	protocols := []string{"http", "http2"}
 	for i, pathCfg := range e.Paths {
 		indexPath := path.Child("paths").Index(i)
-		if pathCfg.Path != "" && !strings.HasPrefix(pathCfg.Path, "/") {
+		if invalidPathPrefix(pathCfg.Path) {
 			errs = append(errs, field.Invalid(
 				indexPath.Child("path"),
 				pathCfg.Path,

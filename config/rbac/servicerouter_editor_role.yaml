@@ -1,0 +1,24 @@
+# permissions for end users to edit servicerouters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: servicerouter-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters/status
+  verbs:
+  - get

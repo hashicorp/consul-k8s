@@ -33,6 +33,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
+		consulPrereq        capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		compare             func(t *testing.T, consul capi.ConfigEntry)
@@ -122,6 +123,46 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, capi.MeshGatewayModeRemote, proxyDefault.MeshGateway.Mode)
 			},
 		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereq: &capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "http",
+			},
+			configEntryResource: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				configEntry, ok := consulEntry.(*capi.ServiceRouterConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, "/admin", configEntry.Routes[0].Match.HTTP.PathPrefix)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -140,6 +181,11 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				Address: consul.HTTPAddr,
 			})
 			req.NoError(err)
+			if c.consulPrereq != nil {
+				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
+				req.NoError(err)
+				req.True(written)
+			}
 
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
@@ -175,6 +221,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind            string
 		consulKind          string
+		consulPrereq        capi.ConfigEntry
 		configEntryResource common.ConfigEntryResource
 		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
 		updateF             func(common.ConfigEntryResource)
@@ -277,6 +324,50 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, capi.MeshGatewayModeLocal, proxyDefault.MeshGateway.Mode)
 			},
 		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereq: &capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "http",
+			},
+			configEntryResource: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				svcRouter := resource.(*v1alpha1.ServiceRouter)
+				svcRouter.Spec.Routes[0].Match.HTTP.PathPrefix = "/different_path"
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				configEntry, ok := consulEntry.(*capi.ServiceRouterConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, "/different_path", configEntry.Routes[0].Match.HTTP.PathPrefix)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -295,6 +386,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				Address: consul.HTTPAddr,
 			})
 			req.NoError(err)
+
+			// Create any prereqs.
+			if c.consulPrereq != nil {
+				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
+				req.NoError(err)
+				req.True(written)
+			}
 
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
@@ -342,6 +440,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 	cases := []struct {
 		kubeKind                        string
 		consulKind                      string
+		consulPrereq                    capi.ConfigEntry
 		configEntryResourceWithDeletion common.ConfigEntryResource
 		reconciler                      func(client.Client, *capi.Client, logr.Logger) testReconciler
 	}{
@@ -421,6 +520,43 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereq: &capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "http",
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -438,6 +574,13 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				Address: consul.HTTPAddr,
 			})
 			req.NoError(err)
+
+			// Create any prereqs.
+			if c.consulPrereq != nil {
+				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
+				req.NoError(err)
+				req.True(written)
+			}
 
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
@@ -549,6 +692,36 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			configEntryResource: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -589,6 +762,208 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			req.Equal(corev1.ConditionFalse, status)
 			req.Equal("ConsulAgentError", reason)
 			req.Contains(errMsg, expErr)
+		})
+	}
+}
+
+// Test that if the config entry hasn't changed in Consul but our resource
+// synced status isn't set to true then we update its status.
+func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
+	t.Parallel()
+	kubeNS := "default"
+
+	cases := []struct {
+		kubeKind            string
+		consulKind          string
+		consulPrereq        capi.ConfigEntry
+		configEntryResource common.ConfigEntryResource
+		reconciler          func(client.Client, *capi.Client, logr.Logger) testReconciler
+	}{
+		{
+			kubeKind:   "ServiceDefaults",
+			consulKind: capi.ServiceDefaults,
+			configEntryResource: &v1alpha1.ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceDefaultsSpec{
+					Protocol: "http",
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceResolver",
+			consulKind: capi.ServiceResolver,
+			configEntryResource: &v1alpha1.ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceResolverSpec{
+					Redirect: &v1alpha1.ServiceResolverRedirect{
+						Service: "redirect",
+					},
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Global,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereq: &capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "http",
+			},
+			configEntryResource: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient: consulClient,
+					},
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.kubeKind, func(t *testing.T) {
+			req := require.New(t)
+			ctx := context.Background()
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+
+			// The config entry exists in kube but its status will be nil.
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
+
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			req.NoError(err)
+			defer consul.Stop()
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			req.NoError(err)
+
+			// Create any prereqs.
+			if c.consulPrereq != nil {
+				written, _, err := consulClient.ConfigEntries().Set(c.consulPrereq, nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// Create the resource in Consul to mimic that it was created
+			// successfully (but its status hasn't been updated).
+			_, _, err = consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(), nil)
+			require.NoError(t, err)
+
+			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
+			namespacedName := types.NamespacedName{
+				Namespace: kubeNS,
+				Name:      c.configEntryResource.Name(),
+			}
+			resp, err := r.Reconcile(ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			req.NoError(err)
+			req.False(resp.Requeue)
+
+			// Check that the status is now "synced".
+			err = client.Get(ctx, namespacedName, c.configEntryResource)
+			req.NoError(err)
+			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
 		})
 	}
 }

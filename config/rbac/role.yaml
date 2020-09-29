@@ -66,3 +66,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters/status
+  verbs:
+  - get
+  - patch
+  - update

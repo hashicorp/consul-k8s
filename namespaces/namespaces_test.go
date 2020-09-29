@@ -53,8 +53,9 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 			if c.ACLsEnabled {
 				crossNSPolicy = "cross-ns-policy"
 			}
-			err = EnsureExists(consulClient, ns, crossNSPolicy)
+			created, err := EnsureExists(consulClient, ns, crossNSPolicy)
 			req.NoError(err)
+			require.False(t, created)
 
 			// Ensure it still exists.
 			consulNS, _, err := consulClient.Namespaces().Read(ns, nil)
@@ -120,8 +121,9 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 				req.NoError(err)
 			}
 
-			err = EnsureExists(consulClient, ns, crossNSPolicy)
+			created, err := EnsureExists(consulClient, ns, crossNSPolicy)
 			req.NoError(err)
+			require.True(t, created)
 
 			// Ensure it was created.
 			cNS, _, err := consulClient.Namespaces().Read(ns, nil)

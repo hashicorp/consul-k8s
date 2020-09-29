@@ -1,0 +1,20 @@
+# permissions for end users to view servicerouters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: servicerouter-viewer-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicerouters/status
+  verbs:
+  - get

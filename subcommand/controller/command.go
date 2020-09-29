@@ -122,7 +122,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceDefaults),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceDefaults)
@@ -131,7 +131,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ServiceResolverController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ServiceResolver),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceResolver),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceResolver)
@@ -140,10 +140,19 @@ func (c *Command) Run(args []string) int {
 	if err = (&controllers.ProxyDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controllers").WithName(common.ProxyDefaults),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ProxyDefaults),
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyDefaults)
+		return 1
+	}
+	if err = (&controllers.ServiceRouterController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceRouter),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ServiceRouter)
 		return 1
 	}
 
@@ -175,6 +184,14 @@ func (c *Command) Run(args []string) int {
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
+			&webhook.Admission{Handler: &v1alpha1.ServiceRouterValidator{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
 				EnableConsulNamespaces: c.flagEnableNamespaces,
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})

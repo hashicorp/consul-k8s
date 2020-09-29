@@ -10,14 +10,15 @@ import (
 
 // EnsureExists ensures a Consul namespace with name ns exists. If it doesn't,
 // it will create it and set crossNSACLPolicy as a policy default.
-func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) error {
+// Boolean return value indicates if the namespace was created by this call.
+func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) (bool, error) {
 	// Check if the Consul namespace exists.
 	namespaceInfo, _, err := client.Namespaces().Read(ns, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if namespaceInfo != nil {
-		return nil
+		return false, nil
 	}
 
 	// If not, create it.
@@ -40,7 +41,7 @@ func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) error
 	}
 
 	_, _, err = client.Namespaces().Create(&consulNamespace, nil)
-	return err
+	return true, err
 }
 
 // ConsulNamespace returns the consul namespace that a service should be
