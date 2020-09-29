@@ -6,6 +6,7 @@ const (
 	ProxyDefaults   string = "proxydefaults"
 	ServiceResolver string = "serviceresolver"
 	ServiceRouter   string = "servicerouter"
+	ServiceSplitter string = "servicesplitter"
 
 	Global                 string = "global"
 	DefaultConsulNamespace string = "default"
