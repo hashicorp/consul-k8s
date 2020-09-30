@@ -140,7 +140,8 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=hashicorpdev/consul-k8s:crd-controller-base-latest
+              -consul-k8s-image=ashwinvenkatesh/consul-k8s:meta@sha256:531a8865c4c585b53962bef8ff7e7df375741b16ee4f012d53f348deb30ba5f9 \
+              -consul-image=ashwinvenkatesh/consul:meta@sha256:ba215ab440990e19e87f5fa0952f981dcbf2605175b97899dfec259ee1abeca5
 
       - store_test_results:
           path: /tmp/test-results
