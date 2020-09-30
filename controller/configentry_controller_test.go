@@ -1327,7 +1327,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				req.True(written)
 			}
 
-			// Now run reconcile which should update the entry in Consul.
+			// Now run reconcile which should **not** update the entry in Consul.
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
