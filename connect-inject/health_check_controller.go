@@ -169,10 +169,13 @@ func (c *HealthCheckController) Run(stopCh <-chan struct{}) {
 		utilruntime.HandleError(fmt.Errorf("error syncing cache"))
 		return
 	}
-	// run the runWorker method every second with a stop channel
+	// This is used to block processing events while Reconcile is running, however,
+	// the informer is already started and is queuing events that happen until reconcile
+	// finishes.
 	if !c.SkipWait {
 		<-c.Ready
 	}
+	// run the runWorker method every second with a stop channel
 	wait.Until(c.runWorker, time.Second, stopCh)
 }
 

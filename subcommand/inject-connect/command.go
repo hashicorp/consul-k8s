@@ -383,9 +383,13 @@ func (c *Command) Run(args []string) int {
 	// Start the health check controller
 	// First run Reconcile then start the watch
 	healthCh = make(chan struct{})
+	// Init starts and begins processing the Reconcile loop
+	go healthcheckController.Init(ctx.Done())
+	// the Informer is also started at the same time so that it can queue
+	// events that occur during Reconcile if it takes a while. Run blocks processing
+	// of the events until after Reconcile is finished.
 	go func() {
 		defer close(healthCh)
-		healthcheckController.Init(ctx.Done())
 		healthcheckController.Run(ctx.Done())
 	}()
 
