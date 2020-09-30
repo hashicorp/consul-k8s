@@ -189,9 +189,9 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	// Check if the config entry is managed by our datacenter.
 	// Do not process resource if the entry was not created within our datacenter
-	// as it was created in a different cluster within the federation.
+	// as it was created in a different cluster which will be managing that config entry.
 	if entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
-		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, errors.New(fmt.Sprintf("config entry managed in different datacenter: %s", entry.GetMeta()[common.DatacenterKey])))
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, fmt.Errorf("config entry managed in different datacenter: %q", entry.GetMeta()[common.DatacenterKey]))
 	}
 
 	if !configEntry.MatchesConsul(entry) {
