@@ -130,7 +130,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
-		Meta:        getMeta(datacenter),
+		Meta:        meta(datacenter),
 	}
 }
 

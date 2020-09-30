@@ -354,7 +354,7 @@ func (in *ServiceRouter) ToConsul(datacenter string) capi.ConfigEntry {
 		Kind:   in.ConsulKind(),
 		Name:   in.Name(),
 		Routes: routes,
-		Meta:   getMeta(datacenter),
+		Meta:   meta(datacenter),
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const DatacenterName = "datacenter"
+const datacenterName = "datacenter"
 
 type testReconciler interface {
 	Reconcile(req ctrl.Request) (ctrl.Result, error)
@@ -58,7 +58,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -88,7 +88,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -118,7 +118,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -161,7 +161,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -200,7 +200,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -292,7 +292,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -326,7 +326,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -360,7 +360,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -408,7 +408,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -465,7 +465,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -508,7 +508,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(DatacenterName), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(datacenterName), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -575,7 +575,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -602,7 +602,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -629,7 +629,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -670,7 +670,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -706,7 +706,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -739,7 +739,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(DatacenterName), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(datacenterName), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -794,7 +794,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -819,7 +819,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -844,7 +844,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -875,7 +875,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -963,7 +963,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -996,7 +996,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1029,7 +1029,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1073,7 +1073,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1108,7 +1108,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 
 			// Create the resource in Consul to mimic that it was created
 			// successfully (but its status hasn't been updated).
-			_, _, err = consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(DatacenterName), nil)
+			_, _, err = consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(datacenterName), nil)
 			require.NoError(t, err)
 
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
@@ -1161,7 +1161,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1186,7 +1186,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1211,7 +1211,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1250,7 +1250,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1288,7 +1288,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1342,7 +1342,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				resp, err := r.Reconcile(ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.EqualError(err, "config entry managed in different datacenter: different-datacenter")
+				req.EqualError(err, "config entry managed in different datacenter: \"different-datacenter\"")
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
@@ -1356,7 +1356,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				status, reason, errMsg := c.configEntryResource.SyncedCondition()
 				req.Equal(corev1.ConditionFalse, status)
 				req.Equal("ExternallyManagedConfigError", reason)
-				req.Equal(errMsg, "config entry managed in different datacenter: different-datacenter")
+				req.Equal(errMsg, "config entry managed in different datacenter: \"different-datacenter\"")
 			}
 		})
 	}
@@ -1396,7 +1396,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1428,7 +1428,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1460,7 +1460,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1505,7 +1505,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
@@ -1546,7 +1546,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
-						DatacenterName: DatacenterName,
+						DatacenterName: datacenterName,
 					},
 				}
 			},
