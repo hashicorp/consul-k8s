@@ -15,7 +15,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ProxyDefaultsValidator struct {
+type ProxyDefaultsWebhook struct {
 	client.Client
 	ConsulClient           *capi.Client
 	Logger                 logr.Logger
@@ -33,7 +33,7 @@ type ProxyDefaultsValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-proxydefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=proxydefaults,versions=v1alpha1,name=mutate-proxydefaults.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ProxyDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var proxyDefaults ProxyDefaults
 	var proxyDefaultsList ProxyDefaultsList
 	err := v.decoder.Decode(req, &proxyDefaults)
@@ -67,7 +67,7 @@ func (v *ProxyDefaultsValidator) Handle(ctx context.Context, req admission.Reque
 	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))
 }
 
-func (v *ProxyDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ProxyDefaultsWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
