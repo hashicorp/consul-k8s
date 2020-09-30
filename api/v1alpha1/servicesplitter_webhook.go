@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceSplitterValidator struct {
+type ServiceSplitterWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -39,7 +39,7 @@ type ServiceSplitterValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicesplitter,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicesplitters,versions=v1alpha1,name=mutate-servicesplitter.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ServiceSplitterValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceSplitterWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var serviceSplitter ServiceSplitter
 	err := v.decoder.Decode(req, &serviceSplitter)
 	if err != nil {
@@ -55,7 +55,7 @@ func (v *ServiceSplitterValidator) Handle(ctx context.Context, req admission.Req
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceSplitterValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceSplitterWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var serviceSplitterList ServiceSplitterList
 	if err := v.Client.List(ctx, &serviceSplitterList); err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (v *ServiceSplitterValidator) List(ctx context.Context) ([]common.ConfigEnt
 	return entries, nil
 }
 
-func (v *ServiceSplitterValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceSplitterWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

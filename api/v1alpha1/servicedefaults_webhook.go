@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceDefaultsValidator struct {
+type ServiceDefaultsWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -38,7 +38,7 @@ type ServiceDefaultsValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicedefaults,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicedefaults,versions=v1alpha1,name=mutate-servicedefaults.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceDefaultsWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcDefaults ServiceDefaults
 	err := v.decoder.Decode(req, &svcDefaults)
 	if err != nil {
@@ -54,7 +54,7 @@ func (v *ServiceDefaultsValidator) Handle(ctx context.Context, req admission.Req
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceDefaultsWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var svcDefaultsList ServiceDefaultsList
 	if err := v.Client.List(ctx, &svcDefaultsList); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (v *ServiceDefaultsValidator) List(ctx context.Context) ([]common.ConfigEnt
 	return entries, nil
 }
 
-func (v *ServiceDefaultsValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceDefaultsWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

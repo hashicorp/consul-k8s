@@ -89,7 +89,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
-			validator := &ProxyDefaultsValidator{
+			validator := &ProxyDefaultsWebhook{
 				Client:       client,
 				ConsulClient: nil,
 				Logger:       logrtest.TestLogger{T: t},
