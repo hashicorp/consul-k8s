@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -96,7 +97,7 @@ func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
 }
 
 // ToConsul converts the entry into its Consul equivalent struct.
-func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
+func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceResolverConfigEntry{
 		Kind:           in.ConsulKind(),
 		Name:           in.Name(),
@@ -106,6 +107,10 @@ func (in *ServiceResolver) ToConsul() capi.ConfigEntry {
 		Failover:       in.Spec.Failover.toConsul(),
 		ConnectTimeout: in.Spec.ConnectTimeout,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
+		Meta: map[string]string{
+			common.SourceKey:     common.SourceValue,
+			common.DatacenterKey: datacenter,
+		},
 	}
 }
 
@@ -114,7 +119,8 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceResolver) Validate() error {

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,10 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 				Namespace:   "foobar",
 				CreateIndex: 1,
 				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 			Matches: true,
 		},
@@ -195,6 +200,10 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 			Exp: &capi.ServiceResolverConfigEntry{
 				Name: "name",
 				Kind: capi.ServiceResolver,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 		"every field set": {
@@ -318,12 +327,16 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						},
 					},
 				},
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			act := c.Ours.ToConsul()
+			act := c.Ours.ToConsul("datacenter")
 			serviceResolver, ok := act.(*capi.ServiceResolverConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, serviceResolver)
