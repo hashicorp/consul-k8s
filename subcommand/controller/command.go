@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/controllers"
+	"github.com/hashicorp/consul-k8s/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	configEntryReconciler := &controllers.ConfigEntryController{
+	configEntryReconciler := &controller.ConfigEntryController{
 		ConsulClient:               consulClient,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
@@ -119,7 +119,7 @@ func (c *Command) Run(args []string) int {
 		NSMirroringPrefix:          c.flagNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNSACLPolicy,
 	}
-	if err = (&controllers.ServiceDefaultsController{
+	if err = (&controller.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceDefaults),
@@ -128,7 +128,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceDefaults)
 		return 1
 	}
-	if err = (&controllers.ServiceResolverController{
+	if err = (&controller.ServiceResolverController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceResolver),
@@ -137,7 +137,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceResolver)
 		return 1
 	}
-	if err = (&controllers.ProxyDefaultsController{
+	if err = (&controller.ProxyDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(common.ProxyDefaults),
@@ -146,7 +146,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyDefaults)
 		return 1
 	}
-	if err = (&controllers.ServiceRouterController{
+	if err = (&controller.ServiceRouterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceRouter),
@@ -155,7 +155,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceRouter)
 		return 1
 	}
-	if err = (&controllers.ServiceSplitterController{
+	if err = (&controller.ServiceSplitterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceSplitter),
@@ -173,7 +173,7 @@ func (c *Command) Run(args []string) int {
 		// Note: The path here should be identical to the one on the kubebuilder
 		// annotation in each webhook file.
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-			&webhook.Admission{Handler: &v1alpha1.ServiceDefaultsValidator{
+			&webhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceDefaults),
@@ -181,7 +181,7 @@ func (c *Command) Run(args []string) int {
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-			&webhook.Admission{Handler: &v1alpha1.ServiceResolverValidator{
+			&webhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceResolver),
@@ -189,7 +189,7 @@ func (c *Command) Run(args []string) int {
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsValidator{
+			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
@@ -197,7 +197,7 @@ func (c *Command) Run(args []string) int {
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-			&webhook.Admission{Handler: &v1alpha1.ServiceRouterValidator{
+			&webhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceRouter),
@@ -205,7 +205,7 @@ func (c *Command) Run(args []string) int {
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
-			&webhook.Admission{Handler: &v1alpha1.ServiceSplitterValidator{
+			&webhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),

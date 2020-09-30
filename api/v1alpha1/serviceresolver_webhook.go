@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceResolverValidator struct {
+type ServiceResolverWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -38,7 +38,7 @@ type ServiceResolverValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-serviceresolver,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=serviceresolvers,versions=v1alpha1,name=mutate-serviceresolver.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceResolverWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcResolver ServiceResolver
 	err := v.decoder.Decode(req, &svcResolver)
 	if err != nil {
@@ -54,7 +54,7 @@ func (v *ServiceResolverValidator) Handle(ctx context.Context, req admission.Req
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceResolverValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceResolverWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var svcResolverList ServiceResolverList
 	if err := v.Client.List(ctx, &svcResolverList); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (v *ServiceResolverValidator) List(ctx context.Context) ([]common.ConfigEnt
 	return entries, nil
 }
 
-func (v *ServiceResolverValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceResolverWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

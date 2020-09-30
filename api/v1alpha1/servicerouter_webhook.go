@@ -13,7 +13,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type ServiceRouterValidator struct {
+type ServiceRouterWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
@@ -38,7 +38,7 @@ type ServiceRouterValidator struct {
 //
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-servicerouter,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=servicerouters,versions=v1alpha1,name=mutate-servicerouter.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
 
-func (v *ServiceRouterValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (v *ServiceRouterWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var svcRouter ServiceRouter
 	err := v.decoder.Decode(req, &svcRouter)
 	if err != nil {
@@ -54,7 +54,7 @@ func (v *ServiceRouterValidator) Handle(ctx context.Context, req admission.Reque
 		v.EnableNSMirroring)
 }
 
-func (v *ServiceRouterValidator) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+func (v *ServiceRouterWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
 	var svcRouterList ServiceRouterList
 	if err := v.Client.List(ctx, &svcRouterList); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (v *ServiceRouterValidator) List(ctx context.Context) ([]common.ConfigEntry
 	return entries, nil
 }
 
-func (v *ServiceRouterValidator) InjectDecoder(d *admission.Decoder) error {
+func (v *ServiceRouterWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
