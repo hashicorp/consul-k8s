@@ -106,7 +106,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Failover:       in.Spec.Failover.toConsul(),
 		ConnectTimeout: in.Spec.ConnectTimeout,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
-		Meta:           getMeta(datacenter),
+		Meta:           meta(datacenter),
 	}
 }
 

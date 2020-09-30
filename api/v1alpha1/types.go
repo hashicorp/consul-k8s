@@ -78,7 +78,7 @@ func invalidPathPrefix(path string) bool {
 	return path != "" && !strings.HasPrefix(path, "/")
 }
 
-func getMeta(datacenter string) map[string]string {
+func meta(datacenter string) map[string]string {
 	return map[string]string{
 		common.SourceKey:     common.SourceValue,
 		common.DatacenterKey: datacenter,

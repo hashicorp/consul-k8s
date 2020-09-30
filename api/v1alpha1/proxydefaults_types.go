@@ -120,7 +120,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		Config:      consulConfig,
-		Meta:        getMeta(datacenter),
+		Meta:        meta(datacenter),
 	}
 }
 
