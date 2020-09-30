@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -131,10 +130,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
-		Meta: map[string]string{
-			common.SourceKey:     common.SourceValue,
-			common.DatacenterKey: datacenter,
-		},
+		Meta:        getMeta(datacenter),
 	}
 }
 

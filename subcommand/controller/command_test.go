@@ -19,12 +19,12 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-webhook-tls-cert-dir must be set",
 		},
 		{
-			flags:  []string{"-datacenter-name", "foo"},
+			flags:  []string{"-datacenter", "foo"},
 			expErr: "-webhook-tls-cert-dir must be set",
 		},
 		{
 			flags:  []string{"-webhook-tls-cert-dir", "/foo"},
-			expErr: "-datacenter-name must be set",
+			expErr: "-datacenter must be set",
 		},
 	}
 

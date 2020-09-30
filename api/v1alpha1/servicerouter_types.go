@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -355,10 +354,7 @@ func (in *ServiceRouter) ToConsul(datacenter string) capi.ConfigEntry {
 		Kind:   in.ConsulKind(),
 		Name:   in.Name(),
 		Routes: routes,
-		Meta: map[string]string{
-			common.SourceKey:     common.SourceValue,
-			common.DatacenterKey: datacenter,
-		},
+		Meta:   getMeta(datacenter),
 	}
 }
 
