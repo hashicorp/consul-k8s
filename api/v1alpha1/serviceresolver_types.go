@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -107,10 +106,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Failover:       in.Spec.Failover.toConsul(),
 		ConnectTimeout: in.Spec.ConnectTimeout,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
-		Meta: map[string]string{
-			common.SourceKey:     common.SourceValue,
-			common.DatacenterKey: datacenter,
-		},
+		Meta:           getMeta(datacenter),
 	}
 }
 

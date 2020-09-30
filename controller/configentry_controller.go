@@ -131,6 +131,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 					return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
 				}
 				logger.Info("deletion from Consul successful")
+			} else {
+				logger.Info("config entry in Consul was created in another datacenter - skipping delete from Consul", "external-datacenter", entry.GetMeta()[common.DatacenterKey])
 			}
 
 			// remove our finalizer from the list and update it.
@@ -189,7 +191,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 	// Do not process resource if the entry was not created within our datacenter
 	// as it was created in a different cluster within the federation.
 	if entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
-		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, errors.New("config entry managed in different datacenter"))
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, errors.New(fmt.Sprintf("config entry managed in different datacenter: %s", entry.GetMeta()[common.DatacenterKey])))
 	}
 
 	if !configEntry.MatchesConsul(entry) {

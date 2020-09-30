@@ -130,10 +130,7 @@ func (in *ServiceSplitter) ToConsul(datacenter string) capi.ConfigEntry {
 		Kind:   in.ConsulKind(),
 		Name:   in.Name(),
 		Splits: in.Spec.Splits.toConsul(),
-		Meta: map[string]string{
-			common.SourceKey:     common.SourceValue,
-			common.DatacenterKey: datacenter,
-		},
+		Meta:   getMeta(datacenter),
 	}
 }
 

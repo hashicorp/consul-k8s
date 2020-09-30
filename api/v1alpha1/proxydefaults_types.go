@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -121,10 +120,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		Config:      consulConfig,
-		Meta: map[string]string{
-			common.SourceKey:     common.SourceValue,
-			common.DatacenterKey: datacenter,
-		},
+		Meta:        getMeta(datacenter),
 	}
 }
 
