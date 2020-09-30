@@ -38,6 +38,8 @@ type HealthCheckController struct {
 	Queue      workqueue.RateLimitingInterface
 	Informer   cache.SharedIndexInformer
 	Handle     HCHandler
+	Ready      chan bool
+	SkipWait   bool
 	MaxRetries int
 }
 
@@ -140,6 +142,8 @@ func (c *HealthCheckController) Init(_ <-chan struct{}) {
 	if err := c.Handle.Init(); err != nil {
 		c.Log.Error("Error during Reconcile phase: %v", err)
 	}
+	// send signal to worker to start processing
+	c.Ready <- true
 }
 
 // Run is the main path of execution for the controller loop
@@ -166,6 +170,9 @@ func (c *HealthCheckController) Run(stopCh <-chan struct{}) {
 		return
 	}
 	// run the runWorker method every second with a stop channel
+	if !c.SkipWait {
+		<-c.Ready
+	}
 	wait.Until(c.runWorker, time.Second, stopCh)
 }
 

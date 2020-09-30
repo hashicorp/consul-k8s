@@ -355,7 +355,7 @@ func (c *Command) Run(args []string) int {
 	healthcheckHandler := &connectinject.HealthCheckHandler{
 		Log:                hclog.Default().Named("healthCheckHandler"),
 		AclConfig:          api.NamespaceACLConfig{},
-		HFlags:             &flags.HTTPFlags{},
+		ClientConfig:       api.DefaultConfig(),
 		Clientset:          c.clientset,
 		ConsulClientScheme: runtime.NewScheme().Name(),
 		ConsulPort:         consulPort,
@@ -365,6 +365,7 @@ func (c *Command) Run(args []string) int {
 	healthcheckController := &connectinject.HealthCheckController{
 		Log:        hclog.Default().Named("healthCheckController"),
 		Clientset:  c.clientset,
+		SkipWait:   false,
 		Queue:      nil,
 		Informer:   nil,
 		Handle:     healthcheckHandler,

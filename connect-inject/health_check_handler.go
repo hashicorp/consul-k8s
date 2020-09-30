@@ -11,7 +11,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	log "github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
@@ -35,8 +34,7 @@ const (
 type HealthCheckHandler struct {
 	Log                log.Logger
 	AclConfig          api.NamespaceACLConfig
-	Client             *api.Client
-	HFlags             *flags.HTTPFlags
+	ClientConfig       *api.Config
 	Clientset          kubernetes.Interface
 	ConsulClientScheme string
 	ConsulPort         string
@@ -59,7 +57,7 @@ func (t *HealthCheckHandler) getConsulServiceID(pod *corev1.Pod) string {
 // updateConsulClient updates the Consul Client metadata to point to a new hostIP:port
 // which is the IP of the host that the Pod runs on, in order to make Agent calls locally
 // for health check registration/deregistration.
-func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) error {
+func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) (*api.Client, error) {
 	var err error
 	// We use the whole schema including http/https here because that is normally set in the
 	// CONSUL_HTTP_ADDR environment variable, without https the client will default to http even if the port
@@ -69,23 +67,23 @@ func (t *HealthCheckHandler) updateConsulClient(pod *corev1.Pod) error {
 		httpFmt = "https"
 	}
 	newAddr := fmt.Sprintf("%s://%s:%s", httpFmt, pod.Status.HostIP, t.ConsulPort)
-	t.HFlags.SetAddress(newAddr)
 
 	// Set client api to point to the new host IP
 	// TODO: APIClient() reads the ENV, see if we can avoid this for perf
-	t.Client, err = t.HFlags.APIClient()
+	localConfig := t.ClientConfig
+	localConfig.Address = newAddr
+	localclient, err := api.NewClient(localConfig)
 	if err != nil {
 		t.Log.Error("unable to get Consul API Client for address %s: %s", newAddr, err)
-		t.Client = nil
 	}
 	t.Log.Debug("setting consul client to the following agent: %v", newAddr)
-	return err
+	return localclient, err
 }
 
 // registerConsulHealthCheck registers a Failing TTL health check for the service on this Agent.
 // The Agent is local to the Pod which has failed a health check.
 // This has the effect of marking the endpoint unhealthy for Consul service mesh traffic.
-func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
+func (t *HealthCheckHandler) registerConsulHealthCheck(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
 	t.Log.Debug("registerConsulHealthCheck, %v %v", consulHealthCheckID, serviceID)
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
@@ -98,7 +96,7 @@ func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHe
 			return nil
 		}
 		retries++
-		services, err := t.Client.Agent().Services()
+		services, err := client.Agent().Services()
 		if err == nil {
 			for _, svc := range services {
 				if svc.Service == serviceID {
@@ -117,7 +115,7 @@ func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHe
 	}
 
 	// Now create a TTL health check in Consul associated with this service.
-	err = t.Client.Agent().CheckRegister(&api.AgentCheckRegistration{
+	err = client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      consulHealthCheckID,
 		Notes:     "Kubernetes Health Check " + reason,
 		ServiceID: serviceID,
@@ -141,12 +139,12 @@ func (t *HealthCheckHandler) registerConsulHealthCheck(pod *corev1.Pod, consulHe
 }
 
 // setConsulHealthCheckStatus will update the TTL status of the check
-func (t *HealthCheckHandler) setConsulHealthCheckStatus(healthCheckID, reason string, fail bool) error {
+func (t *HealthCheckHandler) setConsulHealthCheckStatus(client *api.Client, healthCheckID, reason string, fail bool) error {
 	if fail {
 		// TODO: Use UpdateTTL() instead for both of these
-		return t.Client.Agent().FailTTL(healthCheckID, reason)
+		return client.Agent().FailTTL(healthCheckID, reason)
 	} else {
-		return t.Client.Agent().PassTTL(healthCheckID, reason)
+		return client.Agent().PassTTL(healthCheckID, reason)
 	}
 }
 
@@ -173,7 +171,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 			continue
 		}
 		// 1. Fetch the health checks for this agent
-		err = t.updateConsulClient(&pod)
+		client, err := t.updateConsulClient(&pod)
 		if err != nil {
 			t.Log.Error("unable to set client connection for %v", pod.Name)
 			continue
@@ -183,7 +181,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 
 		// 2. Fetch the health checks on this agent related to this healthCheckID
 		filter := "Name == `" + healthCheckID + "`"
-		checks, err := t.Client.Agent().ChecksWithFilter(filter)
+		checks, err := client.Agent().ChecksWithFilter(filter)
 		if err != nil {
 			t.Log.Error("unable to get agent health checks for %v, %v", healthCheckID, filter, err)
 			continue
@@ -202,7 +200,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 				reason = kubernetesSuccessReasonMsg
 			}
 			t.Log.Debug("registering new health check for %v", pod.Name, healthCheckID)
-			err = t.registerConsulHealthCheck(&pod, healthCheckID, serviceID, initialStatus, reason)
+			err = t.registerConsulHealthCheck(client, &pod, healthCheckID, serviceID, initialStatus, reason)
 			if err != nil {
 				t.Log.Error("unable to register health check %v", err)
 			}
@@ -219,7 +217,7 @@ func (t *HealthCheckHandler) Reconcile() error {
 			if (checkStatus == healthCheckPassing && status == corev1.ConditionFalse) || fail == false {
 				t.Log.Debug("updating pod check for %v", pod.Name)
 				// Update the health check!
-				err = t.setConsulHealthCheckStatus(healthCheckID, reason, fail)
+				err = t.setConsulHealthCheckStatus(client, healthCheckID, reason, fail)
 				if err != nil {
 					t.Log.Error("unable to update health check status for %v", pod.Name)
 				}
@@ -246,13 +244,13 @@ func (t *HealthCheckHandler) ObjectCreated(obj interface{}) error {
 	pod := obj.(*corev1.Pod)
 
 	consulHealthCheckID := t.getConsulHealthCheckID(pod)
-	err = t.updateConsulClient(pod)
+	client, err := t.updateConsulClient(pod)
 	if err != nil {
 		t.Log.Error("unable to update Consul client: %v", err)
 		return err
 	}
 
-	err = t.registerConsulHealthCheck(pod, consulHealthCheckID, t.getConsulServiceID(pod), healthCheckPassing, "")
+	err = t.registerConsulHealthCheck(client, pod, consulHealthCheckID, t.getConsulServiceID(pod), healthCheckPassing, "")
 	if err != nil {
 		t.Log.Error("unable to register health check: %v", err)
 		return err
@@ -275,7 +273,7 @@ func (t *HealthCheckHandler) ObjectUpdated(objNew interface{}) error {
 	pod := objNew.(*corev1.Pod)
 	t.Log.Debug("ObjectUpdated, %v %v", pod.Status.HostIP, pod.Status.Conditions)
 
-	err := t.updateConsulClient(pod)
+	client, err := t.updateConsulClient(pod)
 	if err != nil {
 		t.Log.Error("unable to update Consul client: %v", err)
 		return err
@@ -286,7 +284,7 @@ func (t *HealthCheckHandler) ObjectUpdated(objNew interface{}) error {
 	for _, y := range pod.Status.Conditions {
 		if y.Type == "Ready" && y.Status != corev1.ConditionTrue {
 			// Set the status of the TTL health check to failed!
-			err = t.setConsulHealthCheckStatus(consulHealthCheckID, y.Message, true)
+			err = t.setConsulHealthCheckStatus(client, consulHealthCheckID, y.Message, true)
 			if err != nil {
 				t.Log.Error("unable to update health check to fail: %v", err)
 			}
@@ -294,7 +292,7 @@ func (t *HealthCheckHandler) ObjectUpdated(objNew interface{}) error {
 		} else {
 			if y.Type == "Ready" && y.Status == corev1.ConditionTrue {
 				// Set the Consul TTL to passing for this Pod
-				err = t.setConsulHealthCheckStatus(consulHealthCheckID, y.Message, false)
+				err = t.setConsulHealthCheckStatus(client, consulHealthCheckID, y.Message, false)
 				if err != nil {
 					t.Log.Error("unable to update health check to pass: %v", err)
 				}
@@ -302,7 +300,6 @@ func (t *HealthCheckHandler) ObjectUpdated(objNew interface{}) error {
 			}
 		}
 	}
-	t.Client = nil
 	// TODO: how to drop the client connection cleanly?
 	if err == nil {
 		t.Log.Debug("ObjectUpdated, %v %v", pod.Status.HostIP, pod.Status.Conditions)

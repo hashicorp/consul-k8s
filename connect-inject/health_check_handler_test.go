@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -26,19 +25,16 @@ func testServerAgentAndHandler(t *testing.T, pod *corev1.Pod) (*testutil.TestSer
 	s, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 
-	client, err := api.NewClient(&api.Config{
-		Address: s.HTTPAddr,
-	})
+	clientConfig := &api.Config{Address: s.HTTPAddr}
 	require.NoError(err)
-	hflags := flags.HTTPFlags{}
-	hflags.SetAddress(s.HTTPAddr)
+	client, err := api.NewClient(clientConfig)
+	require.NoError(err)
 	hc := HealthCheckHandler{
-		Log:        hclog.Default(),
-		AclConfig:  api.NamespaceACLConfig{},
-		Client:     client,
-		HFlags:     &hflags,
-		Clientset:  fake.NewSimpleClientset(pod),
-		ConsulPort: strings.Split(s.HTTPAddr, ":")[1],
+		Log:          hclog.Default(),
+		AclConfig:    api.NamespaceACLConfig{},
+		ClientConfig: clientConfig,
+		Clientset:    fake.NewSimpleClientset(pod),
+		ConsulPort:   strings.Split(s.HTTPAddr, ":")[1],
 	}
 	return s, client, &hc, nil
 }

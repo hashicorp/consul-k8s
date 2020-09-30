@@ -67,6 +67,7 @@ func testGetControllerAndStart(t *testing.T, start *corev1.Pod) (*HealthCheckCon
 		Clientset:  clientset,
 		Queue:      nil,
 		Informer:   nil,
+		SkipWait:   true,
 		Handle:     fakeHandler,
 		MaxRetries: 0,
 	}
