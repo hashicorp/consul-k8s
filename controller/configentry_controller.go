@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -18,8 +19,9 @@ import (
 )
 
 const (
-	FinalizerName    = "finalizers.consul.hashicorp.com"
-	ConsulAgentError = "ConsulAgentError"
+	FinalizerName                = "finalizers.consul.hashicorp.com"
+	ConsulAgentError             = "ConsulAgentError"
+	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
 
 // Controller is implemented by CRD-specific controllers. It is used by
@@ -43,6 +45,10 @@ type Controller interface {
 // they share the same reconcile behaviour.
 type ConfigEntryController struct {
 	ConsulClient *capi.Client
+
+	// DatacenterName indicates the Consul Datacenter name the controller is
+	// operating in. Adds this value as metadata on managed resources.
+	DatacenterName string
 
 	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which supports namespaces.
@@ -105,15 +111,27 @@ func (r *ConfigEntryController) ReconcileEntry(
 		// The object is being deleted
 		if containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
 			logger.Info("deletion event")
-			// Our finalizer is present, so we need to delete the config entry
-			// from consul.
-			_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
+			// Check to see if consul has config entry with the same name
+			entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.Name(), &capi.QueryOptions{
 				Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 			})
+
 			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
+				return ctrl.Result{}, fmt.Errorf("getting config entry from consul: %w", err)
 			}
-			logger.Info("deletion from Consul successful")
+
+			// Only delete the resource from Consul if it is owned by our datacenter.
+			if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
+				// Our finalizer is present, so we need to delete the config entry
+				// from consul.
+				_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
+					Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
+				})
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
+				}
+				logger.Info("deletion from Consul successful")
+			}
 
 			// remove our finalizer from the list and update it.
 			configEntry.RemoveFinalizer(FinalizerName)
@@ -127,7 +145,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 		return ctrl.Result{}, nil
 	}
 
-	// Check to see if consul has service defaults with the same name
+	// Check to see if consul has config entry with the same name
 	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.Name(), &capi.QueryOptions{
 		Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 	})
@@ -150,7 +168,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 		}
 
 		// Create the config entry
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(r.DatacenterName), &capi.WriteOptions{
 			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {
@@ -167,9 +185,16 @@ func (r *ConfigEntryController) ReconcileEntry(
 		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 	}
 
+	// Check if the config entry is managed by our datacenter.
+	// Do not process resource if the entry was not created within our datacenter
+	// as it was created in a different cluster within the federation.
+	if entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, errors.New("config entry managed in different datacenter"))
+	}
+
 	if !configEntry.MatchesConsul(entry) {
 		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(), &capi.WriteOptions{
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(r.DatacenterName), &capi.WriteOptions{
 			Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 		})
 		if err != nil {

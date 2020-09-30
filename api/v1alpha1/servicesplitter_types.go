@@ -125,11 +125,15 @@ func (in *ServiceSplitter) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-func (in *ServiceSplitter) ToConsul() capi.ConfigEntry {
+func (in *ServiceSplitter) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceSplitterConfigEntry{
 		Kind:   in.ConsulKind(),
 		Name:   in.Name(),
 		Splits: in.Spec.Splits.toConsul(),
+		Meta: map[string]string{
+			common.SourceKey:     common.SourceValue,
+			common.DatacenterKey: datacenter,
+		},
 	}
 }
 
@@ -138,7 +142,8 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceSplitterConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceSplitterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceSplitter) Validate() error {

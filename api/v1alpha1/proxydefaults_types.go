@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -112,7 +113,7 @@ func (in *ProxyDefaults) SetSyncedCondition(status corev1.ConditionStatus, reaso
 	}
 }
 
-func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
+func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
 		Kind:        in.ConsulKind(),
@@ -120,6 +121,10 @@ func (in *ProxyDefaults) ToConsul() api.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		Config:      consulConfig,
+		Meta: map[string]string{
+			common.SourceKey:     common.SourceValue,
+			common.DatacenterKey: datacenter,
+		},
 	}
 }
 
@@ -128,7 +133,8 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ProxyDefaults) Validate() error {

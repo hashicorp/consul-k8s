@@ -22,6 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const DatacenterName = "datacenter"
+
 type testReconciler interface {
 	Reconcile(req ctrl.Request) (ctrl.Result, error)
 }
@@ -55,7 +57,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -84,7 +87,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -113,7 +117,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -155,7 +160,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -193,7 +199,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -284,7 +291,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -317,7 +325,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -350,7 +359,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -397,7 +407,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -453,7 +464,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -496,7 +508,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(DatacenterName), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -562,7 +574,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -588,7 +601,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -614,7 +628,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -654,7 +669,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -689,7 +705,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -722,7 +739,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			// We haven't run reconcile yet so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(), nil)
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(DatacenterName), nil)
 				req.NoError(err)
 				req.True(written)
 			}
@@ -776,7 +793,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -800,7 +818,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -824,7 +843,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -854,7 +874,8 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -941,7 +962,8 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -973,7 +995,8 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -1005,7 +1028,8 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -1048,7 +1072,8 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
-						ConsulClient: consulClient,
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
 					},
 				}
 			},
@@ -1083,7 +1108,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 
 			// Create the resource in Consul to mimic that it was created
 			// successfully (but its status hasn't been updated).
-			_, _, err = consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(), nil)
+			_, _, err = consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(DatacenterName), nil)
 			require.NoError(t, err)
 
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
@@ -1101,6 +1126,231 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 			err = client.Get(ctx, namespacedName, c.configEntryResource)
 			req.NoError(err)
 			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
+		})
+	}
+}
+
+// Test that if the config entry exists in Consul but is not managed by the
+// controller, deleting the resource does not delete the Consul config entry
+func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
+	t.Parallel()
+	kubeNS := "default"
+
+	cases := []struct {
+		kubeKind                        string
+		consulKind                      string
+		consulPrereq                    []capi.ConfigEntry
+		configEntryResourceWithDeletion common.ConfigEntryResource
+		reconciler                      func(client.Client, *capi.Client, logr.Logger) testReconciler
+	}{
+		{
+			kubeKind:   "ServiceDefaults",
+			consulKind: capi.ServiceDefaults,
+			configEntryResourceWithDeletion: &v1alpha1.ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceDefaultsSpec{
+					Protocol: "http",
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceResolver",
+			consulKind: capi.ServiceResolver,
+			configEntryResourceWithDeletion: &v1alpha1.ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceResolverSpec{
+					Redirect: &v1alpha1.ServiceResolverRedirect{
+						Service: "redirect",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceResolverController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ProxyDefaults",
+			consulKind: capi.ProxyDefaults,
+			configEntryResourceWithDeletion: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              common.Global,
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGatewayConfig{
+						Mode: "remote",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "ServiceSplitter",
+			consulKind: capi.ServiceSplitter,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceSplitterSpec{
+					Splits: []v1alpha1.ServiceSplit{
+						{
+							Weight: 100,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceSplitterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: DatacenterName,
+					},
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.kubeKind, func(t *testing.T) {
+			req := require.New(t)
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
+			client := fake.NewFakeClientWithScheme(s, c.configEntryResourceWithDeletion)
+
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			req.NoError(err)
+			defer consul.Stop()
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			req.NoError(err)
+
+			// Create any prereqs.
+			for _, configEntry := range c.consulPrereq {
+				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// We haven't run reconcile yet so we must create the config entry
+			// in Consul ourselves.
+			{
+				// Create the resource with differnt datacenter on metadata
+				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul("different-datacenter"), nil)
+				req.NoError(err)
+				req.True(written)
+			}
+
+			// Now run reconcile. It's marked for deletion so this should delete the kubernetes resource
+			// but not the consul config entry.
+			{
+				namespacedName := types.NamespacedName{
+					Namespace: kubeNS,
+					Name:      c.configEntryResourceWithDeletion.Name(),
+				}
+				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
+				resp, err := r.Reconcile(ctrl.Request{
+					NamespacedName: namespacedName,
+				})
+				req.NoError(err)
+				req.False(resp.Requeue)
+
+				entry, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.Name(), nil)
+				req.NoError(err)
+				req.Equal(entry.GetMeta()[common.DatacenterKey], "different-datacenter")
+			}
 		})
 	}
 }

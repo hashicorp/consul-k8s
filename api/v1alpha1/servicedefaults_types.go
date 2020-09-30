@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -122,7 +123,7 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
+func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        in.ConsulKind(),
 		Name:        in.Name(),
@@ -130,6 +131,10 @@ func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
+		Meta: map[string]string{
+			common.SourceKey:     common.SourceValue,
+			common.DatacenterKey: datacenter,
+		},
 	}
 }
 
@@ -159,7 +164,8 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
