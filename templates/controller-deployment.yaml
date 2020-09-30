@@ -57,9 +57,9 @@ spec:
         - "-ec"
         - |
           consul-k8s controller \
-            --webhook-tls-cert-dir=/tmp/controller-webhook/certs \
-            --datacenter={{ .Values.global.datacenter }}
-            --enable-leader-election \
+            -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
+            -datacenter={{ .Values.global.datacenter }} \
+            -enable-leader-election \
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \
             {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
