@@ -47,7 +47,7 @@ commands:
           name: download and install dev consul/consul-enterprise
           command: |
             aws s3 cp s3://${<< parameters.bucket >>}/${<< parameters.path >>}/${<< parameters.sha >>}.tar.gz /tmp
-            tar -xzvf /tmp/${<< parameters.sha >>}.tar.gz /usr/local/bin
+            tar -xzvf /tmp/${<< parameters.sha >>}.tar.gz -C /usr/local/bin
             consul version
 
 jobs:
