@@ -102,13 +102,10 @@ spec:
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
+        {{- with .Values.controller.resources }}
         resources:
-          limits:
-            cpu: 100m
-            memory: 30Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
         volumeMounts:
         - mountPath: /tmp/controller-webhook/certs
           name: cert
@@ -148,4 +145,19 @@ spec:
       {{- end }}
       {{- end }}
       serviceAccountName: {{ template "consul.fullname" . }}-controller
+      {{- if .Values.controller.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.controller.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.controller.affinity }}
+      affinity:
+        {{ tpl .Values.controller.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.controller.tolerations }}
+      tolerations:
+        {{ tpl .Values.controller.tolerations . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.controller.priorityClassName }}
+      priorityClassName: {{ .Values.controller.priorityClassName | quote }}
+      {{- end }}
 {{- end }}

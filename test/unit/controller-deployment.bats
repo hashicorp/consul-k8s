@@ -321,3 +321,126 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-cross-namespace-acl-policy"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# affinity
+
+@test "controller/Deployment: affinity not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: affinity can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.affinity=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .affinity == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# nodeSelector
+
+@test "controller/Deployment: nodeSelector is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "controller/Deployment: nodeSelector can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'controller.nodeSelector=testing' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+#--------------------------------------------------------------------
+# tolerations
+
+@test "controller/Deployment: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.tolerations=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .tolerations == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# priorityClassName
+
+@test "controller/Deployment: priorityClassName not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.priorityClassName == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: priorityClassName can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.priorityClassName=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .priorityClassName == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# resources
+
+@test "controller/Deployment: default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"30Mi"},"requests":{"cpu":"100m","memory":"20Mi"}}' ]
+}
+
+@test "controller/Deployment: can set resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'controller.resources.requests.memory=100Mi' \
+      --set 'controller.resources.requests.cpu=100m' \
+      --set 'controller.resources.limits.memory=200Mi' \
+      --set 'controller.resources.limits.cpu=200m' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"200m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
+}

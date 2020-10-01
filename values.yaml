@@ -998,9 +998,34 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
+# [Consul 1.9 Beta Support Only]
+# Controller handles config entry custom resources.
 controller:
-  enabled: false #todo
+  enabled: false
+
   replicas: 1
+
+  # Resource settings for controller pods.
+  resources:
+    limits:
+      cpu: 100m
+      memory: 30Mi
+    requests:
+      cpu: 100m
+      memory: 20Mi
+
+  # Optional YAML string to specify a nodeSelector config.
+  nodeSelector: null
+
+  # Optional YAML string to specify tolerations.
+  tolerations: null
+
+  # Affinity Settings
+  # This should be a multi-line string matching the affinity object
+  affinity: null
+
+  # Optional priorityClassName.
+  priorityClassName: ""
 
 # Mesh Gateways enable Consul Connect to work across Consul datacenters.
 meshGateway:
