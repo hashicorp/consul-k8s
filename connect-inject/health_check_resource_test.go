@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -14,12 +15,13 @@ import (
 )
 
 const (
+	testPodName               = "test-pod"
 	testServiceNameAnnotation = "test-service"
 	testServiceNameReg        = "test-pod-test-service"
 	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
 )
 
-func testServerAgentAndHandler(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckHandler, error) {
+func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource, *controller.Controller) {
 	require := require.New(t)
 	// Set up server, client
 	s, err := testutil.NewTestServerConfigT(t, nil)
@@ -29,19 +31,25 @@ func testServerAgentAndHandler(t *testing.T, pod *corev1.Pod) (*testutil.TestSer
 	require.NoError(err)
 	client, err := api.NewClient(clientConfig)
 	require.NoError(err)
-	hc := HealthCheckHandler{
-		Log:          hclog.Default(),
-		AclConfig:    api.NamespaceACLConfig{},
-		ClientConfig: clientConfig,
+
+	healthResource := HealthCheckResource{
+		Log:          hclog.Default().Named("healthCheckResource"),
 		Clientset:    fake.NewSimpleClientset(pod),
+		ClientConfig: api.DefaultConfig(),
 		ConsulPort:   strings.Split(s.HTTPAddr, ":")[1],
+		SyncPeriod:   0,
 	}
-	return s, client, &hc, nil
+
+	ctl := &controller.Controller{
+		Log:      hclog.Default().Named("healthCheckController"),
+		Resource: &healthResource,
+	}
+	return s, client, &healthResource, ctl
 }
 
-func registerHealthCheck(t *testing.T, name string, server *testutil.TestServer, client *api.Client, h *HealthCheckHandler, initialState string) error {
+func registerHealthCheck(t *testing.T, client *api.Client, ctl *controller.Controller, initialState string) error {
 	require := require.New(t)
-	h.Log.Error("Registering a new check from test: ", testHealthCheckID, testServiceNameReg)
+	ctl.Log.Error("Registering a new check from test: ", testHealthCheckID, testServiceNameReg)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      testHealthCheckID,
 		ServiceID: testServiceNameReg,
@@ -55,7 +63,7 @@ func registerHealthCheck(t *testing.T, name string, server *testutil.TestServer,
 }
 
 // We expect to already be pointed at the correct agent
-func testGetConsulAgentChecks(t *testing.T, handler *HealthCheckHandler, client *api.Client, pod *corev1.Pod) *api.AgentCheck {
+func testGetConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 	require := require.New(t)
 	filter := "Name == `" + testHealthCheckID + "`"
 	checks, err := client.Agent().ChecksWithFilter(filter)
@@ -254,20 +262,20 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			server, client, handler, err := testServerAgentAndHandler(t, tt.Pod)
-			require.NoError(err)
+			server, client, resource, ctl := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
 
 			// Create a passing service
 			server.AddService(t, testServiceNameReg, "passing", nil)
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err = registerHealthCheck(t, testHealthCheckID, server, client, handler, tt.InitialState)
+				err := registerHealthCheck(t, client, ctl, tt.InitialState)
 				require.NoError(err)
 			}
-			err = handler.Reconcile()
+
+			err := resource.Reconcile(nil)
 			require.NoError(err)
-			actual := testGetConsulAgentChecks(t, handler, client, tt.Pod)
+			actual := testGetConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
 				require.Equal(tt.Expected, actual)
 			} else {
@@ -308,9 +316,12 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					},
 				},
 				Status: corev1.PodStatus{
-					HostIP:     "127.0.0.1",
-					Phase:      corev1.PodPending,
-					Conditions: nil,
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
 				},
 			},
 			&api.AgentCheck{
@@ -320,7 +331,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning Object Update to Failed",
+			"PodRunning Upsert to Failed",
 			true,
 			healthCheckPassing,
 			&corev1.Pod{
@@ -356,7 +367,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning Object Update to Passing",
+			"PodRunning Upsert to Passing",
 			true,
 			healthCheckCritical,
 			&corev1.Pod{
@@ -392,7 +403,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning Object Update no changes",
+			"PodRunning Upsert no changes",
 			true,
 			healthCheckCritical,
 			&corev1.Pod{
@@ -427,26 +438,111 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			},
 			"",
 		},
+		{
+			"PodNotRunning no changes",
+			false,
+			"",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Labels:    map[string]string{labelInject: "true"},
+					Annotations: map[string]string{
+						annotationInject:  "true",
+						annotationService: testServiceNameAnnotation,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodPending,
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			nil,
+			"",
+		},
+		{
+			"PodRunning no annotations",
+			false,
+			"",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Labels:    map[string]string{labelInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			nil,
+			"",
+		},
+		{
+			"PodRunning no Ready Status",
+			false,
+			"",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Labels:    map[string]string{labelInject: "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+				},
+			},
+			nil,
+			"",
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 			// Get a server, client, and handler
-			server, client, handler, err := testServerAgentAndHandler(t, tt.Pod)
-			require.NoError(err)
+			server, client, resource, ctl := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
 
-			// Create a passing service
 			server.AddService(t, testServiceNameReg, "passing", nil)
+			// Create a passing service
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err = registerHealthCheck(t, testHealthCheckID, server, client, handler, tt.InitialState)
+				err := registerHealthCheck(t, client, ctl, tt.InitialState)
 				require.NoError(err)
-			} else {
-				handler.ObjectCreated(tt.Pod)
 			}
-			handler.ObjectUpdated(tt.Pod)
-			actual := testGetConsulAgentChecks(t, handler, client, tt.Pod)
+			err := resource.Upsert("", tt.Pod)
+			require.NoError(err)
+			actual := testGetConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
 				require.Equal(tt.Expected, actual)
 			} else {

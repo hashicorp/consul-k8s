@@ -22,7 +22,7 @@ require (
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/radovskyb/watcher v1.0.2
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect

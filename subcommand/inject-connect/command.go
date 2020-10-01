@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/helper/controller"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -58,7 +58,8 @@ type Command struct {
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	// Flags to enable connect-inject health checks
-	flagEnableHealthChecks bool // Start the health check controller
+	flagEnableHealthChecks                      bool   // Start the health check controller
+	flagConnectInjectHealthCheckReconcilePeriod string // period for health check reconcile
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -123,6 +124,7 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", true,
 		"Enables health checks controller to be started")
+	c.flagSet.StringVar(&c.flagConnectInjectHealthCheckReconcilePeriod, "health-checks-reconcile-period", "1m", "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -351,26 +353,6 @@ func (c *Command) Run(args []string) int {
 	if tlsEnabled != "" {
 		consulPort = "8501"
 	}
-	// create the health check handler
-	healthcheckHandler := &connectinject.HealthCheckHandler{
-		Log:                hclog.Default().Named("healthCheckHandler"),
-		AclConfig:          api.NamespaceACLConfig{},
-		ClientConfig:       api.DefaultConfig(),
-		Clientset:          c.clientset,
-		ConsulClientScheme: runtime.NewScheme().Name(),
-		ConsulPort:         consulPort,
-	}
-
-	// Build the health check controller and start it
-	healthcheckController := &connectinject.HealthCheckController{
-		Log:        hclog.Default().Named("healthCheckController"),
-		Clientset:  c.clientset,
-		SkipWait:   false,
-		Queue:      nil,
-		Informer:   nil,
-		Handle:     healthcheckHandler,
-		MaxRetries: 10,
-	}
 
 	go func() {
 		// TODO error handling to close this
@@ -380,17 +362,31 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Start the health check controller
-	// First run Reconcile then start the watch
+	syncPeriod, err := time.ParseDuration(c.flagConnectInjectHealthCheckReconcilePeriod)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing health-checks-reconcile-period: %s", err))
+		return 1
+	}
+
+	healthResource := connectinject.HealthCheckResource{
+		Log:          hclog.Default().Named("healthCheckResource"),
+		Clientset:    c.clientset,
+		ClientConfig: api.DefaultConfig(),
+		ConsulPort:   consulPort,
+		SyncPeriod:   syncPeriod,
+	}
+
+	ctl := &controller.Controller{
+		Log:      hclog.Default().Named("healthCheckController"),
+		Resource: &healthResource,
+	}
+
+	// Start the health check controller, reconcile is started at the same time
+	// and new events will queue in the informer
 	healthCh = make(chan struct{})
-	// Init starts and begins processing the Reconcile loop
-	go healthcheckController.Init(ctx.Done())
-	// the Informer is also started at the same time so that it can queue
-	// events that occur during Reconcile if it takes a while. Run blocks processing
-	// of the events until after Reconcile is finished.
 	go func() {
 		defer close(healthCh)
-		healthcheckController.Run(ctx.Done())
+		ctl.Run(ctx.Done())
 	}()
 
 	select {
