@@ -32,6 +32,10 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Namespace:   "default",
 				CreateIndex: 1,
 				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 			Matches: true,
 		},
@@ -129,6 +133,10 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 			Exp: &capi.ProxyConfigEntry{
 				Name: "name",
 				Kind: capi.ProxyDefaults,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 		"every field set": {
@@ -187,12 +195,16 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						},
 					},
 				},
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			act := c.Ours.ToConsul()
+			act := c.Ours.ToConsul("datacenter")
 			resolver, ok := act.(*capi.ProxyConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, resolver)

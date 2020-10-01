@@ -181,7 +181,7 @@ func (in *mockConfigEntry) SyncedConditionStatus() corev1.ConditionStatus {
 	return corev1.ConditionTrue
 }
 
-func (in *mockConfigEntry) ToConsul() capi.ConfigEntry {
+func (in *mockConfigEntry) ToConsul(string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{}
 }
 

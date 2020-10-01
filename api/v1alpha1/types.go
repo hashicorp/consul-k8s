@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -75,4 +76,11 @@ func sliceContains(slice []string, entry string) bool {
 
 func invalidPathPrefix(path string) bool {
 	return path != "" && !strings.HasPrefix(path, "/")
+}
+
+func meta(datacenter string) map[string]string {
+	return map[string]string{
+		common.SourceKey:     common.SourceValue,
+		common.DatacenterKey: datacenter,
+	}
 }

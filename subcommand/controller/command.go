@@ -28,6 +28,7 @@ type Command struct {
 	flagWebhookTLSCertDir    string
 	flagEnableLeaderElection bool
 	flagEnableWebhooks       bool
+	flagDatacenter           string
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -56,6 +57,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	c.flagSet.StringVar(&c.flagDatacenter, "datacenter", "",
+		"Name of the Consul datacenter the controller is operating in. This is added as metadata on managed custom resources.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -93,6 +96,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Invalid arguments: -webhook-tls-cert-dir must be set")
 		return 1
 	}
+	if c.flagDatacenter == "" {
+		c.UI.Error("Invalid arguments: -datacenter must be set")
+		return 1
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
@@ -113,6 +120,7 @@ func (c *Command) Run(args []string) int {
 
 	configEntryReconciler := &controller.ConfigEntryController{
 		ConsulClient:               consulClient,
+		DatacenterName:             c.flagDatacenter,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableNSMirroring,

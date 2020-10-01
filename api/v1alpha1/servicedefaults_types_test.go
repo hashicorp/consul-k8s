@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -14,265 +15,80 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 		input    *ServiceDefaults
 		expected *capi.ServiceConfigEntry
 	}{
-		"kind:service-defaults": {
-			&ServiceDefaults{},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-			},
-		},
-		"name:resource-name": {
+		"empty fields": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "resource-name",
+					Name: "foo",
 				},
+				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
+				Name: "foo",
 				Kind: capi.ServiceDefaults,
-				Name: "resource-name",
-			},
-		},
-		"protocol:http": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "http",
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
 				},
 			},
-			&capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Protocol: "http",
-			},
 		},
-		"protocol:https": {
+		"every field set": {
 			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "https",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Protocol: "https",
-			},
-		},
-		"protocol:''": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Protocol: "",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Protocol: "",
-			},
-		},
-		"mode:unsupported": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "unsupported",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
-			},
-		},
-		"mode:local": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
 					MeshGateway: MeshGatewayConfig{
 						Mode: "local",
 					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
-			},
-		},
-		"mode:remote": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "remote",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeRemote,
-				},
-			},
-		},
-		"mode:none": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "none",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeNone,
-				},
-			},
-		},
-		"mode:default": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "default",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
-			},
-		},
-		"mode:''": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
-						Mode: "",
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeDefault,
-				},
-			},
-		},
-		"externalSNI:test-external-sni": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					ExternalSNI: "test-external-sni",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:        capi.ServiceDefaults,
-				ExternalSNI: "test-external-sni",
-			},
-		},
-		"externalSNI:''": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					ExternalSNI: "",
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind:        capi.ServiceDefaults,
-				ExternalSNI: "",
-			},
-		},
-		"expose.checks:false": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
-						Checks: false,
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Checks: false,
-				},
-			},
-		},
-		"expose.checks:true": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
 					Expose: ExposeConfig{
 						Checks: true,
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Checks: true,
-				},
-			},
-		},
-		"expose.paths:single": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
 						Paths: []ExposePath{
 							{
 								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
-								Protocol:      "tcp",
-							},
-						},
-					},
-				},
-			},
-			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
-				Expose: capi.ExposeConfig{
-					Paths: []capi.ExposePath{
-						{
-							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
-							Protocol:      "tcp",
-						},
-					},
-				},
-			},
-		},
-		"expose.paths:multiple": {
-			&ServiceDefaults{
-				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
-						Paths: []ExposePath{
-							{
-								ListenerPort:  80,
-								Path:          "/test/path",
-								LocalPathPort: 42,
+								Path:          "/path",
+								LocalPathPort: 9000,
 								Protocol:      "tcp",
 							},
 							{
 								ListenerPort:  8080,
-								Path:          "/root/test/path",
-								LocalPathPort: 4201,
-								Protocol:      "https",
+								Path:          "/another-path",
+								LocalPathPort: 9091,
+								Protocol:      "http2",
 							},
 						},
 					},
+					ExternalSNI: "external-sni",
 				},
 			},
 			&capi.ServiceConfigEntry{
-				Kind: capi.ServiceDefaults,
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "https",
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
 				Expose: capi.ExposeConfig{
+					Checks: true,
 					Paths: []capi.ExposePath{
 						{
 							ListenerPort:  80,
-							Path:          "/test/path",
-							LocalPathPort: 42,
+							Path:          "/path",
+							LocalPathPort: 9000,
 							Protocol:      "tcp",
 						},
 						{
 							ListenerPort:  8080,
-							Path:          "/root/test/path",
-							LocalPathPort: 4201,
-							Protocol:      "https",
+							Path:          "/another-path",
+							LocalPathPort: 9091,
+							Protocol:      "http2",
 						},
 					},
+				},
+				ExternalSNI: "external-sni",
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
 				},
 			},
 		},
@@ -280,7 +96,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			output := testCase.input.ToConsul()
+			output := testCase.input.ToConsul("datacenter")
 			require.Equal(t, testCase.expected, output)
 		})
 	}
@@ -305,6 +121,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				Namespace:   "namespace",
 				CreateIndex: 1,
 				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 			true,
 		},
