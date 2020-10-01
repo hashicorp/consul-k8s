@@ -115,25 +115,24 @@ func (r *ConfigEntryController) ReconcileEntry(
 				Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
 			})
 
-			if err != nil {
+			// Ignore the error where the config entry isn't found in Consul.
+			// It is indicative of desired state.
+			if err != nil && !isNotFoundErr(err) {
 				return ctrl.Result{}, fmt.Errorf("getting config entry from consul: %w", err)
-			}
-
-			// Only delete the resource from Consul if it is owned by our datacenter.
-			if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
-				// Our finalizer is present, so we need to delete the config entry
-				// from consul.
-				_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
-					Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
-				})
-				if err != nil {
-					return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
+			} else if err == nil {
+				// Only delete the resource from Consul if it is owned by our datacenter.
+				if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
+					_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.Name(), &capi.WriteOptions{
+						Namespace: r.consulNamespace(req.Namespace, configEntry.ConsulNamespaced()),
+					})
+					if err != nil {
+						return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
+					}
+					logger.Info("deletion from Consul successful")
+				} else {
+					logger.Info("config entry in Consul was created in another datacenter - skipping delete from Consul", "external-datacenter", entry.GetMeta()[common.DatacenterKey])
 				}
-				logger.Info("deletion from Consul successful")
-			} else {
-				logger.Info("config entry in Consul was created in another datacenter - skipping delete from Consul", "external-datacenter", entry.GetMeta()[common.DatacenterKey])
 			}
-
 			// remove our finalizer from the list and update it.
 			configEntry.RemoveFinalizer(FinalizerName)
 			if err := crdCtrl.Update(ctx, configEntry); err != nil {
