@@ -231,7 +231,7 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 // The Agent is local to the Pod which has a kubernetes health check.
 // This has the effect of marking the endpoint health/unhealthy for Consul service mesh traffic.
 func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
-	h.Log.Debug("registerConsulHealthCheck, %v %v", consulHealthCheckID, serviceID)
+	h.Log.Debug("registerConsulHealthCheck: ", consulHealthCheckID, serviceID, pod.Annotations[annotationConsulDestinationNamespace])
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
 	// that the service does in fact exist, otherwise it will return 500 from Consul API.
@@ -326,10 +326,12 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	if h.ConsulPort == "8501" {
 		httpFmt = "https"
 	}
-	// TODO: what is the role of Schema here? will this always work?
 	newAddr := fmt.Sprintf("%s://%s:%s", httpFmt, pod.Status.HostIP, h.ConsulPort)
 	localConfig := h.ClientConfig
 	localConfig.Address = newAddr
+	if pod.Annotations[annotationConsulDestinationNamespace] != "" {
+		localConfig.Namespace = pod.Annotations[annotationConsulDestinationNamespace]
+	}
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {
 		h.Log.Error("unable to get Consul API Client for address %s: %s", newAddr, err)

@@ -350,11 +350,11 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		})...)
 
 	// TODO: Consul-ENT support
-	if false {
+	if h.EnableNamespaces && h.EnableK8SNSMirroring {
 		patches = append(patches, updateAnnotation(
 			pod.Annotations,
 			map[string]string{
-				annotationConsulDestinationNamespace: "",
+				annotationConsulDestinationNamespace: h.consulNamespace(req.Namespace),
 			})...)
 	}
 
