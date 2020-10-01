@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,10 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 				Namespace:   "namespace",
 				CreateIndex: 1,
 				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 			Matches: true,
 		},
@@ -101,6 +106,10 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 			Exp: &capi.ServiceSplitterConfigEntry{
 				Name: "name",
 				Kind: capi.ServiceSplitter,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 		"every field set": {
@@ -130,12 +139,16 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 						Namespace:     "baz",
 					},
 				},
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			act := c.Ours.ToConsul()
+			act := c.Ours.ToConsul("datacenter")
 			ServiceSplitter, ok := act.(*capi.ServiceSplitterConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, ServiceSplitter)

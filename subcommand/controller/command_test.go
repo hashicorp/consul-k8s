@@ -18,6 +18,14 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  nil,
 			expErr: "-webhook-tls-cert-dir must be set",
 		},
+		{
+			flags:  []string{"-datacenter", "foo"},
+			expErr: "-webhook-tls-cert-dir must be set",
+		},
+		{
+			flags:  []string{"-webhook-tls-cert-dir", "/foo"},
+			expErr: "-datacenter must be set",
+		},
 	}
 
 	for _, c := range cases {

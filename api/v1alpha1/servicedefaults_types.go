@@ -122,7 +122,7 @@ func init() {
 }
 
 // ToConsul converts the entry into it's Consul equivalent struct.
-func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
+func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        in.ConsulKind(),
 		Name:        in.Name(),
@@ -130,6 +130,7 @@ func (in *ServiceDefaults) ToConsul() capi.ConfigEntry {
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		ExternalSNI: in.Spec.ExternalSNI,
+		Meta:        meta(datacenter),
 	}
 }
 
@@ -159,7 +160,8 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

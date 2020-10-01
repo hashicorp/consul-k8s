@@ -40,7 +40,7 @@ type ConfigEntryResource interface {
 	// ToConsul converts the resource to the corresponding Consul API definition.
 	// Its return type is the generic ConfigEntry but a specific config entry
 	// type should be constructed e.g. ServiceConfigEntry.
-	ToConsul() api.ConfigEntry
+	ToConsul(datacenter string) api.ConfigEntry
 	// MatchesConsul returns true if the resource has the same fields as the Consul
 	// config entry.
 	MatchesConsul(candidate api.ConfigEntry) bool

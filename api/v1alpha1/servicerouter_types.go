@@ -345,7 +345,7 @@ func (in *ServiceRouter) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-func (in *ServiceRouter) ToConsul() capi.ConfigEntry {
+func (in *ServiceRouter) ToConsul(datacenter string) capi.ConfigEntry {
 	var routes []capi.ServiceRoute
 	for _, r := range in.Spec.Routes {
 		routes = append(routes, r.toConsul())
@@ -354,6 +354,7 @@ func (in *ServiceRouter) ToConsul() capi.ConfigEntry {
 		Kind:   in.ConsulKind(),
 		Name:   in.Name(),
 		Routes: routes,
+		Meta:   meta(datacenter),
 	}
 }
 
@@ -362,7 +363,8 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Namespace", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceRouter) Validate() error {
