@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -72,8 +73,8 @@ func (in *ProxyDefaults) ConsulKind() string {
 	return capi.ProxyDefaults
 }
 
-func (in *ProxyDefaults) ConsulNamespaced() bool {
-	return false
+func (in *ProxyDefaults) ConsulNamespace() string {
+	return common.DefaultConsulNamespace
 }
 
 func (in *ProxyDefaults) KubeKind() string {
@@ -96,7 +97,15 @@ func (in *ProxyDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 	return cond.Status
 }
 
-func (in *ProxyDefaults) Name() string {
+func (in *ProxyDefaults) ConsulName() string {
+	return in.ObjectMeta.Name
+}
+
+func (in *ProxyDefaults) ConsulGlobalResource() bool {
+	return true
+}
+
+func (in *ProxyDefaults) KubernetesName() string {
 	return in.ObjectMeta.Name
 }
 
@@ -116,7 +125,7 @@ func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
 		Kind:        in.ConsulKind(),
-		Name:        in.Name(),
+		Name:        in.ConsulName(),
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
 		Config:      consulConfig,
@@ -147,7 +156,7 @@ func (in *ProxyDefaults) Validate() error {
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ProxyDefaultsKubeKind},
-			in.Name(), allErrs)
+			in.KubernetesName(), allErrs)
 	}
 
 	return nil

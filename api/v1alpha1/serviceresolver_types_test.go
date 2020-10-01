@@ -416,6 +416,22 @@ func TestServiceResolver_KubeKind(t *testing.T) {
 	require.Equal(t, "serviceresolver", (&ServiceResolver{}).KubeKind())
 }
 
+func TestServiceResolver_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceResolver{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestServiceResolver_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceResolver{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+}
+
+func TestServiceResolver_ConsulNamespace(t *testing.T) {
+	require.Equal(t, "bar", (&ServiceResolver{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulNamespace())
+}
+
+func TestServiceResolver_ConsulGlobalResource(t *testing.T) {
+	require.False(t, (&ServiceResolver{}).ConsulGlobalResource())
+}
+
 func TestServiceResolver_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",

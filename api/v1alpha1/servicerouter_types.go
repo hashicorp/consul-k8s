@@ -279,6 +279,10 @@ type ServiceRouter struct {
 	Status `json:"status,omitempty"`
 }
 
+func (in *ServiceRouter) ConsulNamespace() string {
+	return in.Namespace
+}
+
 func (in *ServiceRouter) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
@@ -305,15 +309,15 @@ func (in *ServiceRouter) ConsulKind() string {
 	return capi.ServiceRouter
 }
 
-func (in *ServiceRouter) ConsulNamespaced() bool {
-	return true
-}
-
 func (in *ServiceRouter) KubeKind() string {
 	return ServiceRouterKubeKind
 }
 
-func (in *ServiceRouter) Name() string {
+func (in *ServiceRouter) ConsulName() string {
+	return in.ObjectMeta.Name
+}
+
+func (in *ServiceRouter) KubernetesName() string {
 	return in.ObjectMeta.Name
 }
 
@@ -345,6 +349,10 @@ func (in *ServiceRouter) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
+func (in *ServiceRouter) ConsulGlobalResource() bool {
+	return false
+}
+
 func (in *ServiceRouter) ToConsul(datacenter string) capi.ConfigEntry {
 	var routes []capi.ServiceRoute
 	for _, r := range in.Spec.Routes {
@@ -352,7 +360,7 @@ func (in *ServiceRouter) ToConsul(datacenter string) capi.ConfigEntry {
 	}
 	return &capi.ServiceRouterConfigEntry{
 		Kind:   in.ConsulKind(),
-		Name:   in.Name(),
+		Name:   in.ConsulName(),
 		Routes: routes,
 		Meta:   meta(datacenter),
 	}
@@ -379,7 +387,7 @@ func (in *ServiceRouter) Validate() error {
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceRouterKubeKind},
-			in.Name(), errs)
+			in.KubernetesName(), errs)
 	}
 	return nil
 }

@@ -46,8 +46,8 @@ func (in *ServiceDefaults) ConsulKind() string {
 	return capi.ServiceDefaults
 }
 
-func (in *ServiceDefaults) ConsulNamespaced() bool {
-	return true
+func (in *ServiceDefaults) ConsulNamespace() string {
+	return in.Namespace
 }
 
 func (in *ServiceDefaults) KubeKind() string {
@@ -76,7 +76,11 @@ func (in *ServiceDefaults) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *ServiceDefaults) Name() string {
+func (in *ServiceDefaults) ConsulName() string {
+	return in.ObjectMeta.Name
+}
+
+func (in *ServiceDefaults) KubernetesName() string {
 	return in.ObjectMeta.Name
 }
 
@@ -125,7 +129,7 @@ func init() {
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
 		Kind:        in.ConsulKind(),
-		Name:        in.Name(),
+		Name:        in.ConsulName(),
 		Protocol:    in.Spec.Protocol,
 		MeshGateway: in.Spec.MeshGateway.toConsul(),
 		Expose:      in.Spec.Expose.toConsul(),
@@ -148,7 +152,7 @@ func (in *ServiceDefaults) Validate() error {
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceDefaultsKubeKind},
-			in.Name(), allErrs)
+			in.KubernetesName(), allErrs)
 	}
 
 	return nil
@@ -162,6 +166,10 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+}
+
+func (in *ServiceDefaults) ConsulGlobalResource() bool {
+	return false
 }
 
 // ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.

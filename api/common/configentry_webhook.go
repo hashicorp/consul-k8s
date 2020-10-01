@@ -37,19 +37,18 @@ func ValidateConfigEntry(
 	// are running Consul enterprise with namespace mirroring.
 	singleConsulDestNS := !(enableConsulNamespaces && nsMirroring)
 	if req.Operation == v1beta1.Create && singleConsulDestNS {
-		logger.Info("validate create", "name", cfgEntry.Name())
+		logger.Info("validate create", "name", cfgEntry.KubernetesName())
 
 		list, err := configEntryLister.List(ctx)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 		for _, item := range list {
-			if item.Name() == cfgEntry.Name() {
-				// todo: If running Consul Ent with mirroring need to change this to respect namespaces.
+			if item.KubernetesName() == cfgEntry.KubernetesName() {
 				return admission.Errored(http.StatusBadRequest,
 					fmt.Errorf("%s resource with name %q is already defined – all %s resources must have unique names across namespaces",
 						cfgEntry.KubeKind(),
-						cfgEntry.Name(),
+						cfgEntry.KubernetesName(),
 						cfgEntry.KubeKind()))
 			}
 		}

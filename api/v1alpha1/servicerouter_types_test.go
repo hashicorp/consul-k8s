@@ -357,8 +357,24 @@ func TestServiceRouter_ConsulKind(t *testing.T) {
 	require.Equal(t, capi.ServiceRouter, (&ServiceRouter{}).ConsulKind())
 }
 
-func TestServiceRouter(t *testing.T) {
+func TestServiceRouter_KubeKind(t *testing.T) {
 	require.Equal(t, "servicerouter", (&ServiceRouter{}).KubeKind())
+}
+
+func TestServiceRouter_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceRouter{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestServiceRouter_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceRouter{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+}
+
+func TestServiceRouter_ConsulNamespace(t *testing.T) {
+	require.Equal(t, "bar", (&ServiceRouter{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulNamespace())
+}
+
+func TestServiceRouter_ConsulGlobalResource(t *testing.T) {
+	require.False(t, (&ServiceRouter{}).ConsulGlobalResource())
 }
 
 func TestServiceRouter_ObjectMeta(t *testing.T) {

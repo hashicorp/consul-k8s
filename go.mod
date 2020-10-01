@@ -43,4 +43,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.6.3
 )
 
+replace github.com/hashicorp/consul/api v1.4.1-0.20200930131338-207491eaa7c3 => github.com/hashicorp/consul-enterprise/api v0.0.0-20201002164756-9dace59b0684
+
+replace github.com/hashicorp/consul/sdk v0.6.0 => github.com/hashicorp/consul-enterprise/sdk v0.0.0-20201002164756-9dace59b0684
+
 go 1.14

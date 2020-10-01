@@ -23,14 +23,19 @@ type ConfigEntryResource interface {
 	// ConsulKind returns the Consul config entry kind, i.e. service-defaults, not
 	// servicedefaults.
 	ConsulKind() string
-	// ConsulNamespaced returns if the resource is namespaced in Consul.
-	// e.g. proxy-defaults are global resources and will return false.
-	ConsulNamespaced() bool
+	// ConsulGlobalResource returns if the the resource exists in the default
+	// consul namespace only.
+	ConsulGlobalResource() bool
+	// ConsulNamespace returns the namespace that the config-entry would
+	// exist in Consul Enterprise if namespaces and mirroring are enabled.
+	ConsulNamespace() string
 	// KubeKind returns the Kube config entry kind, i.e. servicedefaults, not
 	// service-defaults.
 	KubeKind() string
-	// Name returns the name of the config entry.
-	Name() string
+	// ConsulName returns the name of the config entry as saved in Consul.
+	ConsulName() string
+	// KubernetesName returns the name of the KubernetesResource.
+	KubernetesName() string
 	// SetSyncedCondition updates the synced condition.
 	SetSyncedCondition(status corev1.ConditionStatus, reason, message string)
 	// SyncedCondition gets the synced condition.
