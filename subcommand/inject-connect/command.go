@@ -355,54 +355,62 @@ func (c *Command) Run(args []string) int {
 		consulPort = "8501"
 	}
 
-	go func() {
-		// TODO error handling to close this
+	if c.flagEnableHealthChecks {
+		go func() {
+			// TODO error handling to close this
+			c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
+			if err := server.ListenAndServeTLS("", ""); err != nil {
+				c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+			}
+		}()
+
+		syncPeriod, err := time.ParseDuration(c.flagConnectInjectHealthCheckReconcilePeriod)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error parsing health-checks-reconcile-period: %s", err))
+			return 1
+		}
+
+		healthResource := connectinject.HealthCheckResource{
+			Log:          hclog.Default().Named("healthCheckResource"),
+			Clientset:    c.clientset,
+			ClientConfig: api.DefaultConfig(),
+			ConsulPort:   consulPort,
+			SyncPeriod:   syncPeriod,
+		}
+
+		ctl := &controller.Controller{
+			Log:      hclog.Default().Named("healthCheckController"),
+			Resource: &healthResource,
+		}
+
+		// Start the health check controller, reconcile is started at the same time
+		// and new events will queue in the informer
+		healthCh = make(chan struct{})
+		go func() {
+			defer close(healthCh)
+			ctl.Run(ctx.Done())
+		}()
+
+		select {
+		// Unexpected exit
+		case <-healthCh:
+			cancelFunc()
+			return 1
+
+		// Interrupted, gracefully exit
+		case <-c.sigCh:
+			if healthCh != nil {
+				<-healthCh
+			}
+			return 0
+		}
+	} else {
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 		if err := server.ListenAndServeTLS("", ""); err != nil {
 			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
 		}
-	}()
-
-	syncPeriod, err := time.ParseDuration(c.flagConnectInjectHealthCheckReconcilePeriod)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error parsing health-checks-reconcile-period: %s", err))
-		return 1
 	}
-
-	healthResource := connectinject.HealthCheckResource{
-		Log:          hclog.Default().Named("healthCheckResource"),
-		Clientset:    c.clientset,
-		ClientConfig: api.DefaultConfig(),
-		ConsulPort:   consulPort,
-		SyncPeriod:   syncPeriod,
-	}
-
-	ctl := &controller.Controller{
-		Log:      hclog.Default().Named("healthCheckController"),
-		Resource: &healthResource,
-	}
-
-	// Start the health check controller, reconcile is started at the same time
-	// and new events will queue in the informer
-	healthCh = make(chan struct{})
-	go func() {
-		defer close(healthCh)
-		ctl.Run(ctx.Done())
-	}()
-
-	select {
-	// Unexpected exit
-	case <-healthCh:
-		cancelFunc()
-		return 1
-
-	// Interrupted, gracefully exit
-	case <-c.sigCh:
-		if healthCh != nil {
-			<-healthCh
-		}
-		return 0
-	}
+	return 0
 }
 
 func (c *Command) interrupt() {
