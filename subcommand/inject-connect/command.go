@@ -16,8 +16,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
-
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -82,7 +81,6 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
-	k8s     *flags.K8SFlags
 
 	consulClient *api.Client
 	clientset    kubernetes.Interface
@@ -158,10 +156,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLifecycleSidecarMemoryLimit, "lifecycle-sidecar-memory-limit", "50Mi", "Lifecycle sidecar memory limit.")
 
 	c.http = &flags.HTTPFlags{}
-	c.k8s = &flags.K8SFlags{}
 
 	flags.Merge(c.flagSet, c.http.Flags())
-	flags.Merge(c.flagSet, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 
 	// wait on an interrupt for exit, be sure to init it before running

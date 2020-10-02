@@ -286,7 +286,6 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 }
 
 // getServiceCheck will return the health check for this pod+service or nil if it doesnt exist yet
-// TODO: based on consul-ent integration we may also need pod+serviceID
 func (h *HealthCheckResource) getServiceCheck(client *api.Client, pod *corev1.Pod, serviceID, healthCheckID string) (*api.AgentCheck, error) {
 	filter := "Name == `" + healthCheckID + "`"
 	checks, err := client.Agent().ChecksWithFilter(filter)

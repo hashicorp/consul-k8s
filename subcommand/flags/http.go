@@ -62,10 +62,6 @@ func (f *HTTPFlags) Addr() string {
 	return f.address.String()
 }
 
-func (f *HTTPFlags) SetAddress(v string) error {
-	return f.address.Set(v)
-}
-
 func (f *HTTPFlags) Token() string {
 	return f.token.String()
 }

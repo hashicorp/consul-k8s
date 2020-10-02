@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
@@ -349,7 +349,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			annotationStatus: "injected",
 		})...)
 
-	// TODO: Consul-ENT support
+	// Consul-ENT support
 	if h.EnableNamespaces && h.EnableK8SNSMirroring {
 		patches = append(patches, updateAnnotation(
 			pod.Annotations,
