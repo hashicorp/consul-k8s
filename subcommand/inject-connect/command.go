@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/helper/controller"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -16,8 +15,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/connect-inject"
+	"github.com/hashicorp/consul-k8s/helper/controller"
+
+	mapset "github.com/deckarep/golang-set"
+	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
@@ -122,7 +123,7 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
-	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", true,
+	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", true,
 		"Enables health checks controller to be started")
 	c.flagSet.StringVar(&c.flagConnectInjectHealthCheckReconcilePeriod, "health-checks-reconcile-period", "1m", "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
