@@ -25,12 +25,39 @@ type Destination struct {
 }
 
 type SourceIntentions []*SourceIntention
+type IntentionPermissions []*IntentionPermission
 
 type SourceIntention struct {
-	Name        string          `json:"name,omitempty"`
-	Namespace   string          `json:"namespace,omitempty"`
-	Action      IntentionAction `json:"action,omitempty"`
-	Description string          `json:"description,omitempty"`
+	Name        string               `json:"name,omitempty"`
+	Namespace   string               `json:"namespace,omitempty"`
+	Action      IntentionAction      `json:"action,omitempty"`
+	Permissions IntentionPermissions `json:"permissions,omitempty"`
+	Description string               `json:"description,omitempty"`
+}
+
+type IntentionPermission struct {
+	Action IntentionAction          `json:"action,omitempty"`
+	HTTP   *IntentionHTTPPermission `json:"http,omitempty"`
+}
+
+type IntentionHTTPPermission struct {
+	PathExact  string `json:"pathExact,omitempty"`
+	PathPrefix string `json:"pathPrefix,omitempty"`
+	PathRegex  string `json:"pathRegex,omitempty"`
+
+	Header []IntentionHTTPHeaderPermission `json:"header,omitempty"`
+
+	Methods []string `json:"methods,omitempty"`
+}
+
+type IntentionHTTPHeaderPermission struct {
+	Name    string `json:"name,omitempty"`
+	Present bool   `json:"present,omitempty"`
+	Exact   string `json:"exact,omitempty"`
+	Prefix  string `json:"prefix,omitempty"`
+	Suffix  string `json:"suffix,omitempty"`
+	Regex   string `json:"regex,omitempty"`
+	Invert  bool   `json:"invert,omitempty"`
 }
 
 // IntentionAction is the action that the intention represents. This
