@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	// labelInject is the label which is applied by the connect-inject webhook to all pods
-	// this is the key by which the controller will filter it's watch/list and reconcile code
+	// labelInject is the label which is applied by the connect-inject webhook to all pods.
+	// This is the key the controller will use on the label filter for its lister, watcher and reconciler.
 	labelInject = "consul.hashicorp.com/connect-inject-status"
 
 	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul
@@ -233,24 +233,23 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
 	// that the service does in fact exist, otherwise it will return 500 from Consul API.
 	retries := 0
-	var err error
-	err = backoff.Retry(func() error {
+	err := backoff.Retry(func() error {
 		if retries > 10 {
-			err = fmt.Errorf("did not find serviceID: %v", serviceID)
-			return nil
+			return &backoff.PermanentError{Err: fmt.Errorf("did not find serviceID: %v", serviceID)}
 		}
 		retries++
 		services, err := client.Agent().Services()
-		if err == nil {
-			for _, svc := range services {
-				if svc.Service == serviceID {
-					return nil
-				}
-			}
-			return fmt.Errorf("did not find serviceID: %v", serviceID)
+		if err != nil {
+			return err
 		}
-		return err
+		for _, svc := range services {
+			if svc.Service == serviceID {
+				return nil
+			}
+		}
+		return fmt.Errorf("did not find serviceID: %v", serviceID)
 	}, backoff.NewConstantBackOff(1*time.Second))
+	
 	if err != nil {
 		// We were unable to find the service on this host, this is due to :
 		// 1. the pod is no longer on this host, has moved or was deregistered from the Agent by Consul
@@ -282,7 +281,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 
 // getServiceCheck will return the health check for this pod+service or nil if it doesnt exist yet
 func (h *HealthCheckResource) getServiceCheck(client *api.Client, pod *corev1.Pod, serviceID, healthCheckID string) (*api.AgentCheck, error) {
-	filter := "Name == `" + healthCheckID + "`"
+	filter := fmt.Sprintf("Name == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	if err != nil {
 		h.Log.Error("unable to get agent health checks for %v, %v", healthCheckID, filter, err)
@@ -335,12 +334,7 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 // shouldProcess is a simple filter which determines if Upsert should attempt to process the pod
 // this is done without making any client api calls so it is fastpath
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
-	if pod.Annotations[annotationInject] != "true" {
-		return false
-	} else if pod.Status.Phase != corev1.PodRunning {
-		return false
-	}
-	return true
+	return pod.Annotations[annotationInject] == "true" &&  pod.Status.Phase == corev1.PodRunning
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
@@ -351,5 +345,5 @@ func (h *HealthCheckResource) getConsulHealthCheckID(pod *corev1.Pod) string {
 
 // getConsulServiceID returns the serviceID of the connect service
 func (h *HealthCheckResource) getConsulServiceID(pod *corev1.Pod) string {
-	return pod.Name + "-" + pod.Annotations[annotationService]
+	return fmt.Sprintf("%s-%s", pod.Name, pod.Annotations[annotationService])
 }
