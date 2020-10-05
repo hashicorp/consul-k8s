@@ -7,9 +7,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -26,6 +24,7 @@ type Destination struct {
 
 type SourceIntentions []*SourceIntention
 type IntentionPermissions []*IntentionPermission
+type IntentionHTTPHeaderPermissions []IntentionHTTPHeaderPermission
 
 type SourceIntention struct {
 	Name        string               `json:"name,omitempty"`
@@ -45,7 +44,7 @@ type IntentionHTTPPermission struct {
 	PathPrefix string `json:"pathPrefix,omitempty"`
 	PathRegex  string `json:"pathRegex,omitempty"`
 
-	Header []IntentionHTTPHeaderPermission `json:"header,omitempty"`
+	Header IntentionHTTPHeaderPermissions `json:"header,omitempty"`
 
 	Methods []string `json:"methods,omitempty"`
 }
@@ -175,6 +174,7 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 		Name:        in.Name,
 		Namespace:   in.Namespace,
 		Action:      in.Action.toConsul(),
+		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,
 	}
 }
@@ -182,6 +182,51 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 func (in IntentionAction) toConsul() capi.IntentionAction {
 	return capi.IntentionAction(in)
 }
+
+func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
+	if in == nil {
+		return nil
+	}
+	var consulIntentionPermissions []*capi.IntentionPermission
+	for _, permission := range in {
+		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
+			Action: permission.Action.toConsul(),
+			HTTP:   permission.HTTP.ToConsul(),
+		})
+	}
+	return consulIntentionPermissions
+}
+
+func (in *IntentionHTTPPermission) ToConsul() *capi.IntentionHTTPPermission {
+	if in == nil {
+		return nil
+	}
+	return &capi.IntentionHTTPPermission{
+		PathExact:  in.PathExact,
+		PathPrefix: in.PathPrefix,
+		PathRegex:  in.PathRegex,
+		Header:     in.Header.toConsul(),
+		Methods:    in.Methods,
+	}
+}
+
+func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPermission {
+	var headerPermissions []capi.IntentionHTTPHeaderPermission
+	for _, permission := range in {
+		headerPermissions = append(headerPermissions, capi.IntentionHTTPHeaderPermission{
+			Name:    permission.Name,
+			Present: permission.Present,
+			Exact:   permission.Exact,
+			Prefix:  permission.Prefix,
+			Suffix:  permission.Suffix,
+			Regex:   permission.Regex,
+			Invert:  permission.Invert,
+		})
+	}
+
+	return headerPermissions
+}
+
 func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
 	if !ok {
@@ -199,18 +244,18 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 }
 
 func (in *ServiceIntentions) Validate() error {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	for i, source := range in.Spec.Sources {
-		if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) > 0 {
-		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
-			in.KubernetesName(), errs)
-	}
+	//var errs field.ErrorList
+	//path := field.NewPath("spec")
+	//for i, source := range in.Spec.Sources {
+	//	if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
+	//		errs = append(errs, err)
+	//	}
+	//}
+	//if len(errs) > 0 {
+	//	return apierrors.NewInvalid(
+	//		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
+	//		in.KubernetesName(), errs)
+	//}
 	return nil
 }
 
