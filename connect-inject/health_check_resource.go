@@ -23,9 +23,6 @@ const (
 	// this is the key by which the controller will filter it's watch/list and reconcile code
 	labelInject = "consul.hashicorp.com/connect-inject-status"
 
-	// annotationConsulDestinationNamespace will be used by consul-ent for destination namespace
-	annotationConsulDestinationNamespace = "consul.hashicorp.com/consul-destination-namespace"
-
 	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul
 	kubernetesSuccessReasonMsg = "Kubernetes Health Checks Passing"
 
@@ -231,7 +228,7 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 // The Agent is local to the Pod which has a kubernetes health check.
 // This has the effect of marking the endpoint health/unhealthy for Consul service mesh traffic.
 func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
-	h.Log.Debug("registerConsulHealthCheck: ", consulHealthCheckID, serviceID, pod.Annotations[annotationConsulDestinationNamespace])
+	h.Log.Debug("registerConsulHealthCheck: ", consulHealthCheckID, serviceID)
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
 	// that the service does in fact exist, otherwise it will return 500 from Consul API.
@@ -275,8 +272,6 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 			FailuresBeforeCritical:         1,
 			DeregisterCriticalServiceAfter: "",
 		},
-		// For Consul-ENT only, this will be omitted for OSS, aka ""
-		Namespace: pod.Annotations[annotationConsulDestinationNamespace],
 	})
 	if err != nil {
 		h.Log.Error("unable to register health check with Consul from k8s: %v", err)
@@ -328,9 +323,6 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	newAddr := fmt.Sprintf("%s://%s:%s", httpFmt, pod.Status.HostIP, h.ConsulPort)
 	localConfig := h.ClientConfig
 	localConfig.Address = newAddr
-	if pod.Annotations[annotationConsulDestinationNamespace] != "" {
-		localConfig.Namespace = pod.Annotations[annotationConsulDestinationNamespace]
-	}
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {
 		h.Log.Error("unable to get Consul API Client for address %s: %s", newAddr, err)

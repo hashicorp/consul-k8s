@@ -349,15 +349,6 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			annotationStatus: "injected",
 		})...)
 
-	// Consul-ENT support
-	if h.EnableNamespaces && h.EnableK8SNSMirroring {
-		patches = append(patches, updateAnnotation(
-			pod.Annotations,
-			map[string]string{
-				annotationConsulDestinationNamespace: h.consulNamespace(req.Namespace),
-			})...)
-	}
-
 	// Add Pod label for health checks
 	patches = append(patches, updateLabels(
 		pod.Labels,
