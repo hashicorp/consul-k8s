@@ -22,7 +22,7 @@ jobs:
           command: bats ./test/unit
   unit-helm3:
     docker:
-      - image: hashicorpdev/consul-helm-test:0.5.0
+      - image: hashicorpdev/consul-helm-test:0.6.0
 
     steps:
       - checkout
@@ -153,6 +153,59 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
+  acceptance-openshift:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+      # Primary and secondary Azure OpenShift clusters (created manually) that are used to run acceptance tests.
+      - OC_PRIMARY_NAME: consul-helm-test-2757871175
+      - OC_SECONDARY_NAME: consul-helm-test-3737660519
+    docker:
+      # This image is build from test/docker/Test.dockerfile
+      - image: hashicorpdev/consul-helm-test:0.6.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: openshift login
+          command: |
+            az login --service-principal -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null
+
+            for cluster_name in "$OC_PRIMARY_NAME" "$OC_SECONDARY_NAME"; do
+              apiServer=$(az aro show -g "$cluster_name" -n "$cluster_name" --query apiserverProfile.url -o tsv)
+              kubeUser=$(az aro list-credentials -g "$cluster_name" -n "$cluster_name" | jq -r .kubeadminUsername)
+              kubePassword=$(az aro list-credentials -g "$cluster_name" -n "$cluster_name" | jq -r .kubeadminPassword)
+
+              KUBECONFIG="$HOME/.kube/$cluster_name" oc login "$apiServer" -u "$kubeUser" -p "$kubePassword"
+              KUBECONFIG="$HOME/.kube/$cluster_name" oc project consul
+            done
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run acceptance tests
+          working_directory: test/acceptance/tests
+          no_output_timeout: 30m
+          command: |
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 30m -failfast \
+              -enable-openshift \
+              -enable-enterprise \
+              -enable-multi-cluster \
+              -kubeconfig="$HOME/.kube/$OC_PRIMARY_NAME" \
+              -secondary-kubeconfig="$HOME/.kube/$OC_SECONDARY_NAME" \
+              -debug-directory="$TEST_RESULTS/debug" \
+              -consul-k8s-image=hashicorpdev/consul-k8s:latest
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   update-helm-charts-index:
     docker:
       - image: circleci/golang:latest
@@ -196,6 +249,16 @@ workflows:
             - unit-helm2
             - unit-helm3
             - unit-acceptance-framework
+  nightly-acceptance-tests:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - acceptance-openshift
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:

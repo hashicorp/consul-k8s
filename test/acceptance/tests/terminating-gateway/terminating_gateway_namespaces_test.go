@@ -211,7 +211,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			}
 
 			// Create the config entry for the terminating gateway
-			createTerminatingGatewayConfigEntry(t, consulClient, ctx.KubectlOptions(t).Namespace, testNamespace)
+			createTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace)
 
 			// Deploy the static client
 			t.Log("deploying static client")

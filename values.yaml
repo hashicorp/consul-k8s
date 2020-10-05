@@ -233,6 +233,14 @@ global:
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   imageEnvoy: "envoyproxy/envoy-alpine:v1.14.2"
 
+  # openshift contains configuration for running this Helm chart
+  # on the Red Hat OpenShift platform.
+  # This Helm chart currently supports OpenShift v4.x+.
+  openshift:
+    # If true, the Helm chart will create necessary configuration for running its components
+    # on OpenShift.
+    enabled: false
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
@@ -365,10 +373,6 @@ server:
     # http_proxy: http://localhost:3128,
     # https_proxy: http://localhost:3128,
     # no_proxy: internal.domain.com
-
-  # disableFsGroupSecurityContext disables setting the fsGroup securityContext for the server statefulset,
-  # this is required when using the OpenShift platform as fsGroup is automatically set to an arbitrary gid.
-  disableFsGroupSecurityContext : false
 
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended

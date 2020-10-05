@@ -45,5 +45,14 @@ RUN curl -sSL https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.ta
     && tar -zxf /tmp/bats.tgz -C /tmp \
     && /bin/bash /tmp/bats-core-${BATS_VERSION}/install.sh /usr/local
 
+# Azure CLI
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# OpenShift CLI
+# https://docs.microsoft.com/en-us/azure/openshift/tutorial-connect-cluster
+RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz \
+    && tar -zxvf /tmp/oc.tar.gz -C /tmp  \
+    && mv /tmp/oc /usr/local/bin/oc
+
 # change the user back to what circleci/golang image has
 USER circleci

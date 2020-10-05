@@ -67,6 +67,15 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			},
 			map[string]string{},
 		},
+		{
+			"sets openshift value when EnableOpenshift is set",
+			TestConfig{
+				EnableOpenshift: true,
+			},
+			map[string]string{
+				"global.openshift.enabled": "true",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
