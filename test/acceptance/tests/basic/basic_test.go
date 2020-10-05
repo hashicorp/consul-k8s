@@ -1,6 +1,8 @@
 package basic
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
@@ -14,38 +16,33 @@ import (
 // and subsequently reading it from Consul.
 func TestBasicInstallation(t *testing.T) {
 	cases := []struct {
-		name       string
-		helmValues map[string]string
-		secure     bool
+		secure      bool
+		autoEncrypt bool
 	}{
 		{
-			"Default installation",
-			nil,
+			false,
 			false,
 		},
 		{
-			"Secure installation (with TLS and ACLs enabled)",
-			map[string]string{
-				"global.tls.enabled":           "true",
-				"global.acls.manageSystemACLs": "true",
-			},
 			true,
+			false,
 		},
 		{
-			"Secure installation (with TLS with auto-encrypt and ACLs enabled)",
-			map[string]string{
-				"global.tls.enabled":           "true",
-				"global.tls.enableAutoEncrypt": "true",
-				"global.acls.manageSystemACLs": "true",
-			},
+			true,
 			true,
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		name := fmt.Sprintf("secure: %t, auto-encrypt: %t", c.secure, c.autoEncrypt)
+		t.Run(name, func(t *testing.T) {
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, c.helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
+			helmValues := map[string]string{
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
+			}
+			consulCluster := framework.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 
 			consulCluster.Create(t)
 

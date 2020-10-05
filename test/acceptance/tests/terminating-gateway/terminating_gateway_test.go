@@ -16,7 +16,7 @@ import (
 const staticClientName = "static-client"
 const staticServerName = "static-server"
 
-// Test that terminating gateways work in a default installation.
+// Test that terminating gateways work in a default and secure installations.
 func TestTerminatingGateway(t *testing.T) {
 	cases := []struct {
 		secure      bool
@@ -57,7 +57,7 @@ func TestTerminatingGateway(t *testing.T) {
 			consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 			consulCluster.Create(t)
 
-			// Deploy a static-server that will play the role of an external service
+			// Deploy a static-server that will play the role of an external service.
 			t.Log("creating static-server deployment")
 			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
@@ -74,7 +74,7 @@ func TestTerminatingGateway(t *testing.T) {
 				updateTerminatingGatewayToken(t, consulClient, staticServerPolicyRules)
 			}
 
-			// Create the config entry for the terminating gateway
+			// Create the config entry for the terminating gateway.
 			createTerminatingGatewayConfigEntry(t, consulClient, "", "")
 
 			// Deploy the static client
@@ -89,7 +89,7 @@ func TestTerminatingGateway(t *testing.T) {
 				assertNoConnectionAndAddIntention(t, consulClient, ctx.KubectlOptions(t), "", "")
 			}
 
-			// Test that we can make a call to the terminating gateway
+			// Test that we can make a call to the terminating gateway.
 			t.Log("trying calls to terminating gateway")
 			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
 		})
@@ -130,14 +130,14 @@ func registerExternalService(t *testing.T, consulClient *api.Client, namespace s
 }
 
 func updateTerminatingGatewayToken(t *testing.T, consulClient *api.Client, rules string) {
-	// Create a write policy for the static-server
+	// Create a write policy for the static-server.
 	_, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
 		Name:  "static-server-write-policy",
 		Rules: rules,
 	}, nil)
 	require.NoError(t, err)
 
-	// Get the terminating gateway token
+	// Get the terminating gateway token.
 	tokens, _, err := consulClient.ACL().TokenList(nil)
 	require.NoError(t, err)
 	var termGwTokenID string
@@ -183,7 +183,6 @@ func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k
 	t.Log("testing intentions prevent connections through the terminating gateway")
 	helpers.CheckStaticServerConnection(t, k8sOptions, false, staticClientName, "http://localhost:1234")
 
-	// Now we create the allow intention.
 	t.Log("creating static-client => static-server intention")
 	_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
 		SourceName:      staticClientName,

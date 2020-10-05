@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -59,10 +60,8 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			dnsTestPodArgs := []string{
-				"run", "-it", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-i", podName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
-			logs, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
-			require.NoError(t, err)
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
 				// Note: this delete command won't wait for pods to be fully terminated.
@@ -72,23 +71,28 @@ func TestConsulDNS(t *testing.T) {
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", podName)
 			})
 
-			// When the `dig` request is successful, a section of it's response looks like the following:
-			//
-			// ;; ANSWER SECTION:
-			// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
-			//
-			// ;; Query time: 2 msec
-			// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
-			// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
-			// ;; MSG SIZE  rcvd: 98
-			//
-			// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
+			retry.Run(t, func(r *retry.R) {
+				logs, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
+				require.NoError(r, err)
 
-			require.Contains(t, logs, fmt.Sprintf("SERVER: %s", dnsIP))
-			require.Contains(t, logs, "ANSWER SECTION:")
-			for _, ip := range serverIPs {
-				require.Contains(t, logs, fmt.Sprintf("consul.service.consul.\t0\tIN\tA\t%s", ip))
-			}
+				// When the `dig` request is successful, a section of it's response looks like the following:
+				//
+				// ;; ANSWER SECTION:
+				// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
+				//
+				// ;; Query time: 2 msec
+				// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
+				// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
+				// ;; MSG SIZE  rcvd: 98
+				//
+				// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
+
+				require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
+				require.Contains(r, logs, "ANSWER SECTION:")
+				for _, ip := range serverIPs {
+					require.Contains(r, logs, fmt.Sprintf("consul.service.consul.\t0\tIN\tA\t%s", ip))
+				}
+			})
 		})
 	}
 }

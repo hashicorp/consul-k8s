@@ -20,6 +20,8 @@ type TestFlags struct {
 	flagEnterpriseLicenseSecretName string
 	flagEnterpriseLicenseSecretKey  string
 
+	flagEnableOpenshift bool
+
 	flagConsulImage    string
 	flagConsulK8sImage string
 
@@ -64,6 +66,9 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagEnterpriseLicenseSecretKey, "enterprise-license-secret-key", "",
 		"The key of the Kubernetes secret containing the enterprise license.")
 
+	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
+		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
+
 	flag.BoolVar(&t.flagNoCleanupOnFailure, "no-cleanup-on-failure", false,
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
@@ -104,6 +109,8 @@ func (t *TestFlags) testConfigFromFlags() *TestConfig {
 		EnableEnterprise:            t.flagEnableEnterprise,
 		EnterpriseLicenseSecretName: t.flagEnterpriseLicenseSecretName,
 		EnterpriseLicenseSecretKey:  t.flagEnterpriseLicenseSecretKey,
+
+		EnableOpenshift: t.flagEnableOpenshift,
 
 		ConsulImage:    t.flagConsulImage,
 		ConsulK8SImage: t.flagConsulK8sImage,

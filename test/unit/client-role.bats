@@ -76,7 +76,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "client/Role: allows secret access with global.bootsrapACLs=true" {
+@test "client/Role: allows secret access with global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-role.yaml  \
@@ -87,7 +87,7 @@ load _helpers
   [ "${actual}" = "secrets" ]
 }
 
-@test "client/Role: allows secret access with global.bootsrapACLs=true and global.enablePodSecurityPolicies=true" {
+@test "client/Role: allows secret access with global.acls.manageSystemACLs=true and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-role.yaml  \
@@ -97,4 +97,73 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.rules[1].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "secrets" ]
+}
+
+#--------------------------------------------------------------------
+# global.openshift.enabled
+
+@test "client/Role: allows securitycontextconstraints access with global.openshift.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-role.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[] | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-client" ]
+}
+
+@test "client/Role: allows securitycontextconstraints and acl secret access with global.openshift.enabled=true and global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local rules=$(helm template \
+      -s templates/client-role.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[]' | tee /dev/stderr)
+
+  local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
+  [ "${scc_resource}" = "release-name-consul-client" ]
+
+  local secrets_resource=$(echo $rules | jq -r '. | select(.resources==["secrets"]) | .resourceNames[0]')
+  [ "${secrets_resource}" = "release-name-consul-client-acl-token" ]
+}
+
+@test "client/Role: allows securitycontextconstraints and psp access with global.openshift.enabled=true and global.enablePodSecurityPolices=true" {
+  cd `chart_dir`
+  local rules=$(helm template \
+      -s templates/client-role.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[]' | tee /dev/stderr)
+
+  local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
+  [ "${scc_resource}" = "release-name-consul-client" ]
+
+  local psp_resource=$(echo $rules | jq -r '. | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]')
+  [ "${psp_resource}" = "release-name-consul-client" ]
+}
+
+@test "client/Role: allows securitycontextconstraints, acl secret, and psp access when all global.openshift.enabled, global.enablePodSecurityPolices, and global.acls.manageSystemACLs are true " {
+  cd `chart_dir`
+  local rules=$(helm template \
+      -s templates/client-role.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[]' | tee /dev/stderr)
+
+  local scc_resource=$(echo $rules | jq -r '. | select(.resources==["securitycontextconstraints"]) | .resourceNames[0]')
+  [ "${scc_resource}" = "release-name-consul-client" ]
+
+  local secrets_resource=$(echo $rules | jq -r '. | select(.resources==["secrets"]) | .resourceNames[0]')
+  [ "${secrets_resource}" = "release-name-consul-client-acl-token" ]
+
+  local psp_resource=$(echo $rules | jq -r '. | select(.resources==["podsecuritypolicies"]) | .resourceNames[0]')
+  [ "${psp_resource}" = "release-name-consul-client" ]
 }

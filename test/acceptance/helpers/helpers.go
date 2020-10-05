@@ -38,8 +38,8 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 	t.Log("Waiting for pods to be ready.")
 
-	// Wait up to 3m.
-	counter := &retry.Counter{Count: 36, Wait: 5 * time.Second}
+	// Wait up to 5m.
+	counter := &retry.Counter{Count: 60, Wait: 5 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
@@ -105,7 +105,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 		KubectlDeleteK(t, options, kustomizeDir)
 	})
 
-	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("deploy/%s", deployment.Name))
+	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=1m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 // CheckStaticServerConnection execs into a pod of the deployment given by deploymentName

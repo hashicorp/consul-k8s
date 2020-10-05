@@ -56,6 +56,7 @@ spec:
           # Note that in the subsequent runs of the job, POST requests will
           # return a 409 because these secrets would already exist;
           # we are ignoring these response codes.
+          workingDir: /tmp
           command:
             - "/bin/sh"
             - "-ec"
@@ -116,10 +117,10 @@ spec:
           {{- end }}
           resources:
             requests:
-              memory: "25Mi"
+              memory: "50Mi"
               cpu: "50m"
             limits:
-              memory: "25Mi"
+              memory: "50Mi"
               cpu: "50m"
 {{- end }}
 {{- end }}

@@ -446,13 +446,22 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# server.disableFsGroupSecurityContext
+# global.openshift.enabled
 
-@test "server/StatefulSet: can disable fsGroup security context settings" {
+@test "server/StatefulSet: setting server.disableFsGroupSecurityContext fails" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.disableFsGroupSecurityContext=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." ]]
+}
+
+@test "server/StatefulSet: fsGroup is not set when global.openshift.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.disableFsGroupSecurityContext=true' \
+      --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -462,7 +471,6 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.disableFsGroupSecurityContext=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext.fsGroup' | tee /dev/stderr)
   [ "${actual}" = "1000" ]
