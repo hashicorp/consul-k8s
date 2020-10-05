@@ -179,8 +179,8 @@ func (in ServiceSplits) validate(path *field.Path) field.ErrorList {
 }
 
 func (in ServiceSplit) validate(path *field.Path) *field.Error {
-	// Validate that the weight value is between 0.01 and 100.
-	if in.Weight > 100 || in.Weight < 0.01 {
+	// Validate that the weight value is between 0.01 and 100 but allow a weight to be 0.
+	if in.Weight != 0 && (in.Weight > 100 || in.Weight < 0.01) {
 		return field.Invalid(path, in.Weight, "weight must be a percentage between 0.01 and 100")
 	}
 
