@@ -105,7 +105,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -141,7 +141,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
 					}},
 				},
@@ -177,7 +177,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
 					}},
 				},
@@ -213,7 +213,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -249,7 +249,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodFailed,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
 					}},
 				},
@@ -319,7 +319,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -355,7 +355,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
 					}},
 				},
@@ -391,7 +391,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -427,7 +427,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -463,7 +463,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodPending,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},
@@ -492,7 +492,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   "Ready",
+						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
 					}},
 				},

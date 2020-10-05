@@ -104,49 +104,53 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	if !h.shouldProcess(pod) {
 		return nil
 	}
-	// First grab the IDs which we will use for interacting with Consul agent
-	healthCheckID := h.getConsulHealthCheckID(pod)
-	serviceID := h.getConsulServiceID(pod)
-	consulStatus, reason, err := h.getReadyStatusAndReason(pod)
+	err := h.reconcilePod(pod)
 	if err != nil {
-		h.Log.Error("unable to get ready status", err)
+		h.Log.Error("%s", fmt.Sprintf("unable to update pod: %s", err))
 		return err
 	}
-	// create a new client connection to the respective agent for this pod+service
+	return nil
+}
+
+func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
+	h.Log.Debug("processing Pod %v", pod.Name)
+	if pod.Status.Phase != corev1.PodRunning {
+		h.Log.Info("pod is not running, skipping", pod.Name, pod.Status.Phase)
+		return nil
+	}
+	// fetch the identifiers we will use to interact with the Consul agent for this pod
+	serviceID := h.getConsulServiceID(pod)
+	healthCheckID := h.getConsulHealthCheckID(pod)
+	status, reason, err := h.getReadyStatusAndReason(pod)
+	if err != nil {
+		// health check does not exist, some other error
+		return fmt.Errorf("unable to get pod status: %s", err)
+	}
+	// get a client connection to the correct agent
 	client, err := h.getConsulClient(pod)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to set client connection for %s", pod.Name)
 	}
-	// Check to see if a serviceCheck exists for this service+healthCheckID
+	// retrieve the health check that would exist if the service had one registered for this pod
 	serviceCheck, err := h.getServiceCheck(client, pod, serviceID, healthCheckID)
 	if err != nil {
-		h.Log.Error("error getting service check : ", err)
-		return err
-		// health check does not exist, some other error
-	} else if serviceCheck == nil {
-		//
-		// create a new health check
-		//
-		h.Log.Info("upsert registering new health check for ", pod.Name)
-		err = h.registerConsulHealthCheck(client, pod, healthCheckID, serviceID, consulStatus, reason)
-		if err != nil {
-			h.Log.Error("error registering health check : ", err)
-			return err
-		}
-		return nil
-	} else if serviceCheck.Status != consulStatus {
-		//
-		// Update the health check
-		//
-		h.Log.Info("upsert updating existing health check")
-		err = h.updateConsulHealthCheckStatus(client, pod, healthCheckID, serviceID, consulStatus, reason)
-		if err != nil {
-			h.Log.Error("error updating health check : ", err)
-			return err
-		}
-		return nil
+		return fmt.Errorf("unable to get agent health checks for %s, %s", healthCheckID, err)
 	}
-	h.Log.Info("no update needed for pod", pod.Name)
+	if serviceCheck == nil {
+		// create a new health check
+		h.Log.Debug("registering new health check for %v", pod.Name, healthCheckID)
+		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status, reason)
+		if err != nil {
+			return fmt.Errorf("unable to register health check %s", err)
+		}
+	} else if serviceCheck.Status != status {
+		// update the healthCheck
+		err = h.updateConsulHealthCheckStatus(client, healthCheckID, status, reason)
+		if err != nil {
+			return fmt.Errorf("error updating health check : %s", err)
+		}
+	}
+	h.Log.Debug("no update required for %V", pod.Name)
 	return nil
 }
 
@@ -167,59 +171,17 @@ func (h *HealthCheckResource) Reconcile(stopCh <-chan struct{}) error {
 	// For each pod in the podlist, determine if a new health check needs to be registered
 	// or: if a health check exists, determine if it needs to be updated
 	for _, pod := range podList.Items {
-		h.Log.Debug("processing Pod %v", pod.Name)
-		if pod.Status.Phase != corev1.PodRunning {
-			h.Log.Info("pod is not running, skipping", pod.Name, pod.Status.Phase)
-			continue
-		}
-		// fetch the identifiers we will use to interact with the Consul agent for this pod
-		serviceID := h.getConsulServiceID(&pod)
-		healthCheckID := h.getConsulHealthCheckID(&pod)
-		consulStatus, reason, err := h.getReadyStatusAndReason(&pod)
+		err = h.reconcilePod(&pod)
 		if err != nil {
-			h.Log.Error("unable to get pod status: %v", err)
-			continue
+			h.Log.Error("%s", fmt.Sprintf("unable to update pod: %s", err))
 		}
-		// get a client connection to the correct agent
-		client, err := h.getConsulClient(&pod)
-		if err != nil {
-			h.Log.Error("unable to set client connection for %v", pod.Name)
-			continue
-		}
-		// retrieve the health check that would exist if the service had one registered for this pod
-		serviceCheck, err := h.getServiceCheck(client, &pod, serviceID, healthCheckID)
-		if err != nil {
-			h.Log.Error("unable to get agent health checks for %v, %v", healthCheckID, err)
-			continue
-		} else if serviceCheck == nil {
-			//
-			// create a new health check
-			//
-			h.Log.Debug("registering new health check for %v", pod.Name, healthCheckID)
-			err = h.registerConsulHealthCheck(client, &pod, healthCheckID, serviceID, consulStatus, reason)
-			if err != nil {
-				h.Log.Error("unable to register health check %v", err)
-			}
-			continue
-		} else if serviceCheck.Status != consulStatus {
-			//
-			// update the healthCheck
-			//
-			err = h.updateConsulHealthCheckStatus(client, &pod, healthCheckID, serviceID, consulStatus, reason)
-			if err != nil {
-				h.Log.Error("error updating health check : ", err)
-				continue
-			}
-		}
-		h.Log.Debug("no update required for %V", pod.Name)
 	}
 	h.Log.Debug("finished reconcile")
 	return nil
 }
 
-// TODO: for consul-ent we need to figure out how to namespace health checks on UpdateTTL() path
-// it seems like consul-ent only supports namespaced Alias checks
-func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, status, reason string) error {
+// updateConsulHealthCheckStatus updates the consul health check status
+func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, consulHealthCheckID, status, reason string) error {
 	h.Log.Debug("updating health check: ", consulHealthCheckID)
 	return client.Agent().UpdateTTL(consulHealthCheckID, reason, status)
 }
@@ -227,7 +189,7 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 // registerConsulHealthCheck registers a TTL health check for the service on this Agent.
 // The Agent is local to the Pod which has a kubernetes health check.
 // This has the effect of marking the endpoint health/unhealthy for Consul service mesh traffic.
-func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, initialStatus, reason string) error {
+func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status, reason string) error {
 	h.Log.Debug("registerConsulHealthCheck: ", consulHealthCheckID, serviceID)
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
 	// completed the registration of the service with the Consul Agent on this node. Retry a few times to be sure
@@ -249,7 +211,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 		}
 		return fmt.Errorf("did not find serviceID: %v", serviceID)
 	}, backoff.NewConstantBackOff(1*time.Second))
-	
+
 	if err != nil {
 		// We were unable to find the service on this host, this is due to :
 		// 1. the pod is no longer on this host, has moved or was deregistered from the Agent by Consul
@@ -258,13 +220,15 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 	}
 
 	// Now create a TTL health check in Consul associated with this service and pod.
+	// The TTL time is 100000h which should ensure that the check never fails due to timeout
+	// of the TTL check.
 	err = client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      consulHealthCheckID,
 		Notes:     "Kubernetes Health Check " + reason,
 		ServiceID: serviceID,
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:                            "100000h",
-			Status:                         initialStatus,
+			Status:                         status,
 			Notes:                          reason,
 			TLSSkipVerify:                  true,
 			SuccessBeforePassing:           1,
@@ -295,16 +259,14 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, pod *corev1.Po
 // ready state of the pod along with the reason message which will be passed into the Notes
 // field of the Consul health check.
 func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, string, error) {
-	status := corev1.ConditionTrue
-	reason := ""
 	for _, cond := range pod.Status.Conditions {
-		if cond.Type == "Ready" {
-			status = cond.Status
-			reason = cond.Message
-			consulStatus := healthCheckPassing
-			if status == corev1.ConditionFalse {
+		var consulStatus, reason string
+		if cond.Type == corev1.PodReady {
+			if cond.Status != corev1.ConditionTrue {
 				consulStatus = healthCheckCritical
+				reason = cond.Message
 			} else {
+				consulStatus = healthCheckPassing
 				reason = kubernetesSuccessReasonMsg
 			}
 			return consulStatus, reason, nil
@@ -334,7 +296,7 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 // shouldProcess is a simple filter which determines if Upsert should attempt to process the pod
 // this is done without making any client api calls so it is fastpath
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
-	return pod.Annotations[annotationInject] == "true" &&  pod.Status.Phase == corev1.PodRunning
+	return pod.Annotations[annotationInject] == "true" && pod.Status.Phase == corev1.PodRunning
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
