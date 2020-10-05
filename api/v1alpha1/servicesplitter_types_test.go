@@ -261,6 +261,30 @@ func TestServiceSplitter_Validate(t *testing.T) {
 				},
 			},
 		},
+
+		"valid - splits with 0 weight": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight: 50.0,
+						},
+						{
+							Weight: 50,
+						},
+						{
+							Weight: 0.0,
+						},
+						{
+							Weight: 0,
+						},
+					},
+				},
+			},
+		},
 		"sum of weights must be 100": {
 			input: &ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
