@@ -205,6 +205,9 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
+      - slack/status:
+          fail_only: true
+          failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   update-helm-charts-index:
     docker:
