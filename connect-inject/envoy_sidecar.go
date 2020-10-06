@@ -66,7 +66,6 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 		},
 		Command: []string{
 			"envoy",
-			"--max-obj-name-len", "256",
 			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 		},
 	}
