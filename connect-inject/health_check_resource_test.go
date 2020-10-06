@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -22,7 +21,7 @@ const (
 	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
 )
 
-func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource, *controller.Controller) {
+func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
 	require := require.New(t)
 	// Set up server, client
 	s, err := testutil.NewTestServerConfigT(t, nil)
@@ -43,17 +42,11 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 		ConsulUrl:           consulUrl,
 		ReconcilePeriod:     0,
 	}
-
-	ctl := &controller.Controller{
-		Log:      hclog.Default().Named("healthCheckController"),
-		Resource: &healthResource,
-	}
-	return s, client, &healthResource, ctl
+	return s, client, &healthResource
 }
 
-func registerHealthCheck(t *testing.T, client *api.Client, ctl *controller.Controller, initialState string) error {
+func registerHealthCheck(t *testing.T, client *api.Client, initialState string) error {
 	require := require.New(t)
-	ctl.Log.Error("Registering a new check from test: ", testHealthCheckID, testServiceNameReg)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "K8s health check",
 		ID:        testHealthCheckID,
@@ -95,7 +88,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -131,7 +124,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -167,7 +160,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -203,7 +196,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -239,7 +232,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -267,14 +260,14 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			server, client, resource, ctl := testServerAgentResourceAndController(t, tt.Pod)
+			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
 
 			// Create a passing service
 			server.AddService(t, testServiceNameReg, "passing", nil)
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err := registerHealthCheck(t, client, ctl, tt.InitialState)
+				err := registerHealthCheck(t, client, tt.InitialState)
 				require.NoError(err)
 			}
 
@@ -309,7 +302,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -345,7 +338,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -381,7 +374,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -417,7 +410,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -453,7 +446,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationInject:  "true",
+						annotationStatus:  "injected",
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -535,14 +528,14 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 			// Get a server, client, and handler
-			server, client, resource, ctl := testServerAgentResourceAndController(t, tt.Pod)
+			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
 
 			server.AddService(t, testServiceNameReg, "passing", nil)
 			// Create a passing service
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err := registerHealthCheck(t, client, ctl, tt.InitialState)
+				err := registerHealthCheck(t, client, tt.InitialState)
 				require.NoError(err)
 			}
 			err := resource.Upsert("", tt.Pod)

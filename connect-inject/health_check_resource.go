@@ -100,7 +100,10 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 // registered against their respective agent and service, and updates to pods will have
 // this TTL health check updated to reflect the pod status.
 func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
-	pod := raw.(*corev1.Pod)
+	pod, ok := raw.(*corev1.Pod)
+	if !ok {
+		return fmt.Errorf("invalid pod object")
+	}
 	if !h.shouldProcess(pod) {
 		// Skip pods that are not running or have not been properly injected
 		return nil
@@ -265,7 +268,7 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 // this is done without making any client api calls so it is fast. We only are interested in running
 // pods as the have valid readiness probe status.
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
-	return pod.Annotations[annotationInject] == "true" && pod.Status.Phase == corev1.PodRunning
+	return pod.Annotations[annotationStatus] == "injected" && pod.Status.Phase == corev1.PodRunning
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
