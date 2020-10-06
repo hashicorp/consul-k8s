@@ -102,7 +102,7 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	pod, ok := raw.(*corev1.Pod)
 	if !ok {
-		return fmt.Errorf("invalid pod object")
+		return fmt.Errorf("failed to cast to a pod object")
 	}
 	if !h.shouldProcess(pod) {
 		// Skip pods that are not running or have not been properly injected
@@ -223,7 +223,7 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID 
 	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	if err != nil {
-		h.Log.Error("unable to get agent health checks for %v, %v", healthCheckID, filter, err)
+		h.Log.Error("unable to get agent health check", "checkID", healthCheckID, "filter", filter, "err", err)
 		return nil, err
 	}
 	// This will be nil (does not exist) or an actual check!
@@ -257,10 +257,10 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	localConfig.Address = newAddr
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {
-		h.Log.Error("unable to get Consul API Client for address %s: %s", newAddr, err)
+		h.Log.Error("unable to get Consul API Client", "addr", newAddr, "err", err)
 		return nil, err
 	}
-	h.Log.Debug("setting consul client to the following agent: %v", newAddr)
+	h.Log.Debug("setting consul client to the following agent", "addr", newAddr)
 	return localClient, err
 }
 
