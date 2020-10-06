@@ -293,7 +293,7 @@ func TestServiceIntentions_ConsulNamespace(t *testing.T) {
 			Name:      "foo",
 			Namespace: "baz",
 		},
-	}).ConsulNamespace())
+	}).ConsulMirroringNS())
 }
 
 func TestServiceIntentions_ConsulGlobalResource(t *testing.T) {
@@ -310,7 +310,7 @@ func TestServiceIntentions_ConsulNamespaceWithWildcard(t *testing.T) {
 			Name:      "foo",
 			Namespace: "*",
 		},
-	}).ConsulNamespace())
+	}).ConsulMirroringNS())
 }
 
 func TestServiceIntentions_ObjectMeta(t *testing.T) {

@@ -279,7 +279,7 @@ type ServiceRouter struct {
 	Status `json:"status,omitempty"`
 }
 
-func (in *ServiceRouter) ConsulNamespace() string {
+func (in *ServiceRouter) ConsulMirroringNS() string {
 	return in.Namespace
 }
 

@@ -425,7 +425,7 @@ func TestServiceResolver_KubernetesName(t *testing.T) {
 }
 
 func TestServiceResolver_ConsulNamespace(t *testing.T) {
-	require.Equal(t, "bar", (&ServiceResolver{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulNamespace())
+	require.Equal(t, "bar", (&ServiceResolver{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
 }
 
 func TestServiceResolver_ConsulGlobalResource(t *testing.T) {

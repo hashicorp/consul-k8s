@@ -392,7 +392,7 @@ func TestServiceDefaults_KubernetesName(t *testing.T) {
 }
 
 func TestServiceDefaults_ConsulNamespace(t *testing.T) {
-	require.Equal(t, "bar", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulNamespace())
+	require.Equal(t, "bar", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
 }
 
 func TestServiceDefaults_ConsulGlobalResource(t *testing.T) {

@@ -340,7 +340,7 @@ func TestProxyDefaults_KubernetesName(t *testing.T) {
 }
 
 func TestProxyDefaults_ConsulNamespace(t *testing.T) {
-	require.Equal(t, common.DefaultConsulNamespace, (&ProxyDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulNamespace())
+	require.Equal(t, common.DefaultConsulNamespace, (&ProxyDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
 }
 
 func TestProxyDefaults_ConsulGlobalResource(t *testing.T) {

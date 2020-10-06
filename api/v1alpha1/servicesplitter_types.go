@@ -63,7 +63,7 @@ func (in *ServiceSplitter) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
 
-func (in *ServiceSplitter) ConsulNamespace() string {
+func (in *ServiceSplitter) ConsulMirroringNS() string {
 	return in.Namespace
 }
 

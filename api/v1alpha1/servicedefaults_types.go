@@ -46,7 +46,7 @@ func (in *ServiceDefaults) ConsulKind() string {
 	return capi.ServiceDefaults
 }
 
-func (in *ServiceDefaults) ConsulNamespace() string {
+func (in *ServiceDefaults) ConsulMirroringNS() string {
 	return in.Namespace
 }
 

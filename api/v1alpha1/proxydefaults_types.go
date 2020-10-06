@@ -73,7 +73,7 @@ func (in *ProxyDefaults) ConsulKind() string {
 	return capi.ProxyDefaults
 }
 
-func (in *ProxyDefaults) ConsulNamespace() string {
+func (in *ProxyDefaults) ConsulMirroringNS() string {
 	return common.DefaultConsulNamespace
 }
 

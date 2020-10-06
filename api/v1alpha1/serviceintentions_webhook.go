@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -49,35 +50,27 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 
 		for _, item := range svcIntentionsList.Items {
 			if singleConsulDestNS {
-				// Only verify if the name is the same here as the destination namespace in consul will be identical.
+				// If all config entries will be registered in the same Consul namespace, then spec.name
+				// must be unique for all entries so two custom resources don't configure the same Consul resource.
 				if item.Spec.Name == svcIntentions.Spec.Name {
 					return admission.Errored(http.StatusBadRequest,
-						fmt.Errorf("%s resource to manage intentions for service %q is already defined – all %s resources must manage unique services",
-							svcIntentions.KubeKind(),
-							svcIntentions.Spec.Name,
-							svcIntentions.KubeKind()))
+						fmt.Errorf("an existing ServiceIntentions resource has `spec.name: %s`", svcIntentions.Spec.Name))
 				}
-				// Verify both name and namespace are the same here as the destination namespace in consul will match the namespace mentioned.
+				// If namespace mirroring is enabled, each config entry will be registered in the Consul namespace
+				// set in spec.namespace. Thus we must check that there isn't already a config entry that sets the same spec.name and spec.namespace.
 			} else if item.Spec.Name == svcIntentions.Spec.Name && item.Spec.Namespace == svcIntentions.Spec.Namespace {
 				return admission.Errored(http.StatusBadRequest,
-					fmt.Errorf("%s resource to manage intentions for service %q in namespace %q is already defined – all %s resources must manage unique services across namespaces",
-						svcIntentions.KubeKind(),
-						svcIntentions.Spec.Name,
-						svcIntentions.Spec.Namespace,
-						svcIntentions.KubeKind()))
+					fmt.Errorf("an existing ServiceIntentions resource has `spec.name: %s` and `spec.namespace: %s`", svcIntentions.Spec.Name, svcIntentions.Spec.Namespace))
 			}
 		}
-	}
-	if req.Operation == v1beta1.Update {
+	} else if req.Operation == v1beta1.Update {
 		v.Logger.Info("validate update", "name", svcIntentions.KubernetesName())
 		prevIntention := req.OldObject.Object.(*ServiceIntentions)
 		newIntention := req.Object.Object.(*ServiceIntentions)
 
 		// validate that name and namespace of a resource cannot be updated so ensure no dangling intentions in Consul
 		if prevIntention.Spec.Name != newIntention.Spec.Name || prevIntention.Spec.Namespace != newIntention.Spec.Namespace {
-			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf("spec.name and spec.namespace are immutable field for %s",
-					svcIntentions.KubeKind()))
+			return admission.Errored(http.StatusBadRequest, errors.New("spec.name and spec.namespace are immutable fields for ServiceIntentions"))
 		}
 	}
 

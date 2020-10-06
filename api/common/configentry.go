@@ -23,16 +23,18 @@ type ConfigEntryResource interface {
 	// ConsulKind returns the Consul config entry kind, i.e. service-defaults, not
 	// servicedefaults.
 	ConsulKind() string
-	// ConsulGlobalResource returns if the the resource exists in the default
-	// consul namespace only.
+	// ConsulGlobalResource returns if the resource exists in the default
+	// Consul namespace only.
 	ConsulGlobalResource() bool
-	// ConsulNamespace returns the namespace that the config-entry would
+	// ConsulMirroringNS returns the namespace that the config-entry would
 	// exist in Consul Enterprise if namespaces and mirroring are enabled.
-	ConsulNamespace() string
+	ConsulMirroringNS() string
 	// KubeKind returns the Kube config entry kind, i.e. servicedefaults, not
 	// service-defaults.
 	KubeKind() string
 	// ConsulName returns the name of the config entry as saved in Consul.
+	// This may be different than KubernetesName() in the case of a ServiceIntentions
+	// config entry.
 	ConsulName() string
 	// KubernetesName returns the name of the KubernetesResource.
 	KubernetesName() string

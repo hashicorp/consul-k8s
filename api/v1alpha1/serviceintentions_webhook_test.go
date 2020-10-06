@@ -56,12 +56,11 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					},
 				},
 			},
-			expAllow: false,
-			mirror:   false,
-			// This error message is because the value "1" is valid JSON but is an invalid map
+			expAllow:      false,
+			mirror:        false,
 			expErrMessage: "serviceintentions.consul.hashicorp.com \"foo-intention\" is invalid: spec.sources[0].action: Invalid value: \"fail\": must be one of \"allow\", \"deny\"",
 		},
-		"itention managing service exists": {
+		"intention managing service exists": {
 			existingResources: []runtime.Object{&ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-intention",
@@ -82,7 +81,30 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        true,
-			expErrMessage: "serviceintentions resource to manage intentions for service \"foo\" in namespace \"bar\" is already defined – all serviceintentions resources must manage unique services across namespaces",
+			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo` and `spec.namespace: bar`",
+		},
+		"intention managing service with same name but different namespace with mirroring": {
+			existingResources: []runtime.Object{&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-intention",
+				},
+				Spec: ServiceIntentionsSpec{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+			}},
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar-intention",
+				},
+				Spec: ServiceIntentionsSpec{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+			},
+			expAllow:      true,
+			mirror:        true,
+			expErrMessage: "",
 		},
 		"intention managing service shares name but different namespace": {
 			existingResources: []runtime.Object{&ServiceIntentions{
@@ -105,7 +127,28 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "serviceintentions resource to manage intentions for service \"foo\" is already defined – all serviceintentions resources must manage unique services",
+			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo`",
+		},
+		"intention managing service shares name": {
+			existingResources: []runtime.Object{&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-intention",
+				},
+				Spec: ServiceIntentionsSpec{
+					Name: "foo",
+				},
+			}},
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar-intention",
+				},
+				Spec: ServiceIntentionsSpec{
+					Name: "foo",
+				},
+			},
+			expAllow:      false,
+			mirror:        false,
+			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo`",
 		},
 	}
 	for name, c := range cases {
@@ -156,7 +199,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 		expErrMessage     string
 		mirror            bool
 	}{
-		"no duplicates, valid": {
+		"valid update": {
 			existingResources: []runtime.Object{&ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-intention",
@@ -237,7 +280,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "spec.name and spec.namespace are immutable field for serviceintentions",
+			expErrMessage: "spec.name and spec.namespace are immutable fields for ServiceIntentions",
 		},
 		"namespace update": {
 			existingResources: []runtime.Object{&ServiceIntentions{
@@ -279,7 +322,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "spec.name and spec.namespace are immutable field for serviceintentions",
+			expErrMessage: "spec.name and spec.namespace are immutable fields for ServiceIntentions",
 		},
 	}
 	for name, c := range cases {

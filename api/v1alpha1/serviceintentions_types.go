@@ -45,7 +45,7 @@ type ServiceIntentions struct {
 	Status `json:"status,omitempty"`
 }
 
-func (in *ServiceIntentions) ConsulNamespace() string {
+func (in *ServiceIntentions) ConsulMirroringNS() string {
 	return in.Spec.Namespace
 }
 

@@ -139,7 +139,7 @@ func (in *mockConfigEntry) KubernetesName() string {
 	return in.MockName
 }
 
-func (in *mockConfigEntry) ConsulNamespace() string {
+func (in *mockConfigEntry) ConsulMirroringNS() string {
 	return in.MockNamespace
 }
 

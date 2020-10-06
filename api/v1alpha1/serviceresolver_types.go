@@ -33,7 +33,7 @@ func (in *ServiceResolver) ConsulKind() string {
 	return capi.ServiceResolver
 }
 
-func (in *ServiceResolver) ConsulNamespace() string {
+func (in *ServiceResolver) ConsulMirroringNS() string {
 	return in.Namespace
 }
 
