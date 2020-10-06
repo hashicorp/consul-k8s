@@ -15,9 +15,13 @@ import (
 
 // ServiceIntentionsSpec defines the desired state of ServiceIntentions
 type ServiceIntentionsSpec struct {
-	Name      string           `json:"name,omitempty"`
-	Namespace string           `json:"namespace,omitempty"`
-	Sources   SourceIntentions `json:"sources,omitempty"`
+	Destination Destination      `json:"destination,omitempty"`
+	Sources     SourceIntentions `json:"sources,omitempty"`
+}
+
+type Destination struct {
+	Name      string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 type SourceIntentions []*SourceIntention
@@ -46,7 +50,7 @@ type ServiceIntentions struct {
 }
 
 func (in *ServiceIntentions) ConsulMirroringNS() string {
-	return in.Spec.Namespace
+	return in.Spec.Destination.Namespace
 }
 
 func (in *ServiceIntentions) GetObjectMeta() metav1.ObjectMeta {
@@ -80,7 +84,7 @@ func (in *ServiceIntentions) KubeKind() string {
 }
 
 func (in *ServiceIntentions) ConsulName() string {
-	return in.Spec.Name
+	return in.Spec.Destination.Name
 }
 
 func (in *ServiceIntentions) KubernetesName() string {
@@ -118,7 +122,7 @@ func (in *ServiceIntentions) SyncedConditionStatus() corev1.ConditionStatus {
 func (in *ServiceIntentions) ToConsul(datacenter string) api.ConfigEntry {
 	return &capi.ServiceIntentionsConfigEntry{
 		Kind:    in.ConsulKind(),
-		Name:    in.Spec.Name,
+		Name:    in.Spec.Destination.Name,
 		Sources: in.Spec.Sources.toConsul(),
 		Meta:    meta(datacenter),
 	}
@@ -181,6 +185,17 @@ func (in *ServiceIntentions) Validate() error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in *ServiceIntentions) Default() {
+	if in.Spec.Destination.Namespace == "" {
+		in.Spec.Destination.Namespace = in.Namespace
+	}
+	for _, source := range in.Spec.Sources {
+		if source.Namespace == "" {
+			source.Namespace = in.Namespace
+		}
+	}
 }
 
 func (in IntentionAction) validate(path *field.Path) *field.Error {

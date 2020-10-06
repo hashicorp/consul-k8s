@@ -40,6 +40,9 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+
+	svcIntentions.Default()
+
 	singleConsulDestNS := !(v.EnableConsulNamespaces && v.EnableNSMirroring)
 	if req.Operation == v1beta1.Create {
 		v.Logger.Info("validate create", "name", svcIntentions.KubernetesName())
@@ -52,15 +55,15 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 			if singleConsulDestNS {
 				// If all config entries will be registered in the same Consul namespace, then spec.name
 				// must be unique for all entries so two custom resources don't configure the same Consul resource.
-				if item.Spec.Name == svcIntentions.Spec.Name {
+				if item.Spec.Destination.Name == svcIntentions.Spec.Destination.Name {
 					return admission.Errored(http.StatusBadRequest,
-						fmt.Errorf("an existing ServiceIntentions resource has `spec.name: %s`", svcIntentions.Spec.Name))
+						fmt.Errorf("an existing ServiceIntentions resource has `spec.destination.name: %s`", svcIntentions.Spec.Destination.Name))
 				}
 				// If namespace mirroring is enabled, each config entry will be registered in the Consul namespace
 				// set in spec.namespace. Thus we must check that there isn't already a config entry that sets the same spec.name and spec.namespace.
-			} else if item.Spec.Name == svcIntentions.Spec.Name && item.Spec.Namespace == svcIntentions.Spec.Namespace {
+			} else if item.Spec.Destination.Name == svcIntentions.Spec.Destination.Name && item.Spec.Destination.Namespace == svcIntentions.Spec.Destination.Namespace {
 				return admission.Errored(http.StatusBadRequest,
-					fmt.Errorf("an existing ServiceIntentions resource has `spec.name: %s` and `spec.namespace: %s`", svcIntentions.Spec.Name, svcIntentions.Spec.Namespace))
+					fmt.Errorf("an existing ServiceIntentions resource has `spec.destination.name: %s` and `spec.destination.namespace: %s`", svcIntentions.Spec.Destination.Name, svcIntentions.Spec.Destination.Namespace))
 			}
 		}
 	} else if req.Operation == v1beta1.Update {
@@ -69,8 +72,8 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		newIntention := req.Object.Object.(*ServiceIntentions)
 
 		// validate that name and namespace of a resource cannot be updated so ensure no dangling intentions in Consul
-		if prevIntention.Spec.Name != newIntention.Spec.Name || prevIntention.Spec.Namespace != newIntention.Spec.Namespace {
-			return admission.Errored(http.StatusBadRequest, errors.New("spec.name and spec.namespace are immutable fields for ServiceIntentions"))
+		if prevIntention.Spec.Destination.Name != newIntention.Spec.Destination.Name || prevIntention.Spec.Destination.Namespace != newIntention.Spec.Destination.Namespace {
+			return admission.Errored(http.StatusBadRequest, errors.New("spec.destination.name and spec.destination.namespace are immutable fields for ServiceIntentions"))
 		}
 	}
 

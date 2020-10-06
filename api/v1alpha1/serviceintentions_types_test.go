@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -41,8 +42,10 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "svc-name",
-					Namespace: "test",
+					Destination: Destination{
+						Name:      "svc-name",
+						Namespace: "test",
+					},
 					Sources: []*SourceIntention{
 						{
 							Name:        "svc1",
@@ -134,7 +137,9 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name: "svc-name",
+					Destination: Destination{
+						Name: "svc-name",
+					},
 					Sources: []*SourceIntention{
 						{
 							Name:        "svc1",
@@ -264,8 +269,10 @@ func TestServiceIntentions_ConsulName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Name:      "foo",
-			Namespace: "baz",
+			Destination: Destination{
+				Name:      "foo",
+				Namespace: "baz",
+			},
 		},
 	}).ConsulName())
 }
@@ -277,8 +284,10 @@ func TestServiceIntentions_KubernetesName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Name:      "foo",
-			Namespace: "baz",
+			Destination: Destination{
+				Name:      "foo",
+				Namespace: "baz",
+			},
 		},
 	}).KubernetesName())
 }
@@ -290,8 +299,10 @@ func TestServiceIntentions_ConsulNamespace(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Name:      "foo",
-			Namespace: "baz",
+			Destination: Destination{
+				Name:      "foo",
+				Namespace: "baz",
+			},
 		},
 	}).ConsulMirroringNS())
 }
@@ -307,8 +318,10 @@ func TestServiceIntentions_ConsulNamespaceWithWildcard(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Name:      "foo",
-			Namespace: "*",
+			Destination: Destination{
+				Name:      "foo",
+				Namespace: "*",
+			},
 		},
 	}).ConsulMirroringNS())
 }
@@ -324,6 +337,197 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 	require.Equal(t, meta, serviceResolver.GetObjectMeta())
 }
 
+func TestServiceIntentions_Default(t *testing.T) {
+	cases := map[string]struct {
+		input  *ServiceIntentions
+		output *ServiceIntentions
+	}{
+		"destination.namespace blank, meta.namespace default": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "bar",
+					},
+				},
+			},
+			output: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "default",
+					},
+				},
+			},
+		},
+		"destination.namespace blank, meta.namespace foobar": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "bar",
+					},
+				},
+			},
+			output: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foobar",
+					},
+				},
+			},
+		},
+		"sources.namespace blank, meta.namespace default": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "baz",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			output: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "baz",
+							Action:    "allow",
+							Namespace: "default",
+						},
+					},
+				},
+			},
+		},
+		"sources.namespace blank, meta.namespace foobar": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "baz",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			output: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "baz",
+							Action:    "allow",
+							Namespace: "foobar",
+						},
+					},
+				},
+			},
+		},
+		"only populated blank namespaces": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "baz",
+							Action: "allow",
+						},
+						{
+							Name:      "baz2",
+							Action:    "allow",
+							Namespace: "another-namespace",
+						},
+					},
+				},
+			},
+			output: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "foobar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "baz",
+							Action:    "allow",
+							Namespace: "foobar",
+						},
+						{
+							Name:      "baz2",
+							Action:    "allow",
+							Namespace: "another-namespace",
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			testCase.input.Default()
+			require.True(t, cmp.Equal(testCase.input, testCase.output))
+		})
+	}
+}
+
 func TestServiceIntentions_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input          *ServiceIntentions
@@ -335,8 +539,10 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "dest-service",
-					Namespace: "namespace",
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "web",
@@ -359,8 +565,10 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "dest-service",
-					Namespace: "namespace",
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "web",

@@ -31,8 +31,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 				},
 			},
 			expAllow: true,
@@ -45,8 +47,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -66,8 +70,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -75,13 +81,15 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 				},
 			},
 			expAllow:      false,
 			mirror:        true,
-			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo` and `spec.namespace: bar`",
+			expErrMessage: "an existing ServiceIntentions resource has `spec.destination.name: foo` and `spec.destination.namespace: bar`",
 		},
 		"intention managing service with same name but different namespace with mirroring": {
 			existingResources: []runtime.Object{&ServiceIntentions{
@@ -89,8 +97,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -98,8 +108,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "baz",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "baz",
+					},
 				},
 			},
 			expAllow:      true,
@@ -112,8 +124,10 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -121,13 +135,15 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "baz",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "baz",
+					},
 				},
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo`",
+			expErrMessage: "an existing ServiceIntentions resource has `spec.destination.name: foo`",
 		},
 		"intention managing service shares name": {
 			existingResources: []runtime.Object{&ServiceIntentions{
@@ -135,7 +151,9 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: Destination{
+						Name: "foo",
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -143,12 +161,14 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: Destination{
+						Name: "foo",
+					},
 				},
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "an existing ServiceIntentions resource has `spec.name: foo`",
+			expErrMessage: "an existing ServiceIntentions resource has `spec.destination.name: foo`",
 		},
 	}
 	for name, c := range cases {
@@ -205,8 +225,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -226,8 +248,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -246,8 +270,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -267,8 +293,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo-bar",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo-bar",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -280,7 +308,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "spec.name and spec.namespace are immutable fields for ServiceIntentions",
+			expErrMessage: "spec.destination.name and spec.destination.namespace are immutable fields for ServiceIntentions",
 		},
 		"namespace update": {
 			existingResources: []runtime.Object{&ServiceIntentions{
@@ -288,8 +316,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -309,8 +339,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Name:      "foo",
-					Namespace: "bar-foo",
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar-foo",
+					},
 					Sources: SourceIntentions{
 						{
 							Name:      "bar",
@@ -322,7 +354,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 			},
 			expAllow:      false,
 			mirror:        false,
-			expErrMessage: "spec.name and spec.namespace are immutable fields for ServiceIntentions",
+			expErrMessage: "spec.destination.name and spec.destination.namespace are immutable fields for ServiceIntentions",
 		},
 	}
 	for name, c := range cases {

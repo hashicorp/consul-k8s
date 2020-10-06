@@ -154,8 +154,10 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						Namespace: c.SourceKubeNS,
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
-						Name:      "test",
-						Namespace: c.SourceKubeNS,
+						Destination: v1alpha1.Destination{
+							Name:      "test",
+							Namespace: c.SourceKubeNS,
+						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
 								Name:      "baz",
@@ -400,8 +402,10 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 						Finalizers: []string{controller.FinalizerName},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
-						Name:      "foo",
-						Namespace: c.SourceKubeNS,
+						Destination: v1alpha1.Destination{
+							Name:      "foo",
+							Namespace: c.SourceKubeNS,
+						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
 								Name:      "bar",
@@ -663,8 +667,10 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ServiceIntentionsSpec{
-						Name:      "test",
-						Namespace: c.SourceKubeNS,
+						Destination: v1alpha1.Destination{
+							Name:      "test",
+							Namespace: c.SourceKubeNS,
+						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
 								Name:      "bar",

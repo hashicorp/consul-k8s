@@ -236,7 +236,9 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
@@ -561,7 +563,9 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
@@ -847,7 +851,9 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
@@ -1047,7 +1053,9 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 				},
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
@@ -1273,7 +1281,9 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
@@ -1501,7 +1511,9 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
@@ -1842,7 +1854,9 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Name: "foo",
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
 					Sources: v1alpha1.SourceIntentions{
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
