@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -34,10 +35,10 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 
 	healthResource := HealthCheckResource{
 		Log:          hclog.Default().Named("healthCheckResource"),
-		Clientset:    fake.NewSimpleClientset(pod),
-		ClientConfig: api.DefaultConfig(),
+		KubernetesClientset:    fake.NewSimpleClientset(pod),
+		ConsulClientConfig: api.DefaultConfig(),
 		ConsulPort:   strings.Split(s.HTTPAddr, ":")[1],
-		SyncPeriod:   0,
+		ReconcilePeriod:   0,
 	}
 
 	ctl := &controller.Controller{
@@ -51,7 +52,8 @@ func registerHealthCheck(t *testing.T, client *api.Client, ctl *controller.Contr
 	require := require.New(t)
 	ctl.Log.Error("Registering a new check from test: ", testHealthCheckID, testServiceNameReg)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
-		Name:      testHealthCheckID,
+		Name:      "K8s health check",
+		ID: testHealthCheckID,
 		ServiceID: testServiceNameReg,
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:    "100000h",
@@ -65,7 +67,7 @@ func registerHealthCheck(t *testing.T, client *api.Client, ctl *controller.Contr
 // We expect to already be pointed at the correct agent
 func testGetConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 	require := require.New(t)
-	filter := "Name == `" + testHealthCheckID + "`"
+	filter := fmt.Sprintf("CheckID == `%s`", testHealthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	require.NoError(err)
 	return checks[testHealthCheckID]
@@ -112,7 +114,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckPassing,
+				Status:  api.HealthPassing,
 			},
 			"",
 		},
@@ -148,14 +150,14 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckCritical,
+				Status:  api.HealthCritical,
 			},
 			"",
 		},
 		{
 			"Reconcile existing object from passing to failing",
 			true,
-			healthCheckPassing,
+			api.HealthPassing,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -184,14 +186,14 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckCritical,
+				Status:  api.HealthCritical,
 			},
 			"",
 		},
 		{
 			"Reconcile existing object from failing to passing",
 			true,
-			healthCheckCritical,
+			api.HealthCritical,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -220,14 +222,14 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckPassing,
+				Status:  api.HealthPassing,
 			},
 			"",
 		},
 		{
 			"Reconcile pod not running no update",
 			false,
-			healthCheckCritical,
+			api.HealthCritical,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -297,7 +299,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 		{
 			"PodRunning Object Create",
 			false,
-			healthCheckPassing,
+			api.HealthPassing,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -326,14 +328,14 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckPassing,
+				Status:  api.HealthPassing,
 			},
 			"",
 		},
 		{
 			"PodRunning Upsert to Failed",
 			true,
-			healthCheckPassing,
+			api.HealthPassing,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -362,14 +364,14 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckCritical,
+				Status:  api.HealthCritical,
 			},
 			"",
 		},
 		{
 			"PodRunning Upsert to Passing",
 			true,
-			healthCheckCritical,
+			api.HealthCritical,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -398,14 +400,14 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckPassing,
+				Status:  api.HealthPassing,
 			},
 			"",
 		},
 		{
 			"PodRunning Upsert no changes",
 			true,
-			healthCheckCritical,
+			api.HealthCritical,
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -434,7 +436,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  healthCheckPassing,
+				Status:  api.HealthPassing,
 			},
 			"",
 		},

@@ -360,7 +360,7 @@ func (c *Command) Run(args []string) int {
 			}
 		}()
 
-		syncPeriod, err := time.ParseDuration(c.flagConnectInjectHealthCheckReconcilePeriod)
+		reconcilePeriod, err := time.ParseDuration(c.flagConnectInjectHealthCheckReconcilePeriod)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error parsing health-checks-reconcile-period: %s", err))
 			return 1
@@ -368,10 +368,11 @@ func (c *Command) Run(args []string) int {
 
 		healthResource := connectinject.HealthCheckResource{
 			Log:          hclog.Default().Named("healthCheckResource"),
-			Clientset:    c.clientset,
-			ClientConfig: api.DefaultConfig(),
+			KubernetesClientset:    c.clientset,
+			ConsulClientConfig: api.DefaultConfig(),
 			ConsulPort:   consulPort,
-			SyncPeriod:   syncPeriod,
+			TLSEnabled: tlsEnabled != "",
+			ReconcilePeriod:   reconcilePeriod,
 		}
 
 		ctl := &controller.Controller{
