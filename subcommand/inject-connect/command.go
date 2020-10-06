@@ -367,12 +367,12 @@ func (c *Command) Run(args []string) int {
 		}
 
 		healthResource := connectinject.HealthCheckResource{
-			Log:          hclog.Default().Named("healthCheckResource"),
-			KubernetesClientset:    c.clientset,
-			ConsulClientConfig: api.DefaultConfig(),
-			ConsulPort:   consulPort,
-			TLSEnabled: tlsEnabled != "",
-			ReconcilePeriod:   reconcilePeriod,
+			Log:                 hclog.Default().Named("healthCheckResource"),
+			KubernetesClientset: c.clientset,
+			ConsulClientConfig:  api.DefaultConfig(),
+			ConsulPort:          consulPort,
+			TLSEnabled:          tlsEnabled != "",
+			ReconcilePeriod:     reconcilePeriod,
 		}
 
 		ctl := &controller.Controller{

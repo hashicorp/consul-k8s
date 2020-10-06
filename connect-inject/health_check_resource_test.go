@@ -34,11 +34,11 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	require.NoError(err)
 
 	healthResource := HealthCheckResource{
-		Log:          hclog.Default().Named("healthCheckResource"),
-		KubernetesClientset:    fake.NewSimpleClientset(pod),
-		ConsulClientConfig: api.DefaultConfig(),
-		ConsulPort:   strings.Split(s.HTTPAddr, ":")[1],
-		ReconcilePeriod:   0,
+		Log:                 hclog.Default().Named("healthCheckResource"),
+		KubernetesClientset: fake.NewSimpleClientset(pod),
+		ConsulClientConfig:  api.DefaultConfig(),
+		ConsulPort:          strings.Split(s.HTTPAddr, ":")[1],
+		ReconcilePeriod:     0,
 	}
 
 	ctl := &controller.Controller{
@@ -53,7 +53,7 @@ func registerHealthCheck(t *testing.T, client *api.Client, ctl *controller.Contr
 	ctl.Log.Error("Registering a new check from test: ", testHealthCheckID, testServiceNameReg)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "K8s health check",
-		ID: testHealthCheckID,
+		ID:        testHealthCheckID,
 		ServiceID: testServiceNameReg,
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:    "100000h",

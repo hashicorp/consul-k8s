@@ -27,9 +27,9 @@ const (
 )
 
 type HealthCheckResource struct {
-	Log          hclog.Logger
-	KubernetesClientset    kubernetes.Interface
-	ConsulClientConfig *api.Config
+	Log                 hclog.Logger
+	KubernetesClientset kubernetes.Interface
+	ConsulClientConfig  *api.Config
 
 	ConsulPort string
 	TLSEnabled bool
@@ -191,16 +191,16 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 	// The TTL time is 100000h which should ensure that the check never fails due to timeout
 	// of the TTL check.
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
-		ID: 	   consulHealthCheckID,
+		ID:        consulHealthCheckID,
 		Name:      "Kubernetes Health Check",
 		Notes:     "Kubernetes Health Check " + reason,
 		ServiceID: serviceID,
 		AgentServiceCheck: api.AgentServiceCheck{
-			TTL:                            "100000h",
-			Status:                         status,
-			Notes:                          reason,
-			SuccessBeforePassing:           1,
-			FailuresBeforeCritical:         1,
+			TTL:                    "100000h",
+			Status:                 status,
+			Notes:                  reason,
+			SuccessBeforePassing:   1,
+			FailuresBeforeCritical: 1,
 		},
 	})
 	if err != nil {
