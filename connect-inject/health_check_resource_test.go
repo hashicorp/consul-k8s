@@ -45,7 +45,7 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	return s, client, &healthResource
 }
 
-func registerHealthCheck(t *testing.T, client *api.Client, initialState string) error {
+func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "K8s health check",
@@ -57,11 +57,10 @@ func registerHealthCheck(t *testing.T, client *api.Client, initialState string) 
 		},
 	})
 	require.NoError(err)
-	return nil
 }
 
 // We expect to already be pointed at the correct agent
-func testGetConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
+func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 	require := require.New(t)
 	filter := fmt.Sprintf("CheckID == `%s`", testHealthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
@@ -69,7 +68,7 @@ func testGetConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck 
 	return checks[testHealthCheckID]
 }
 
-func TestHealthCheckHandlerReconcile(t *testing.T) {
+func TestHealthCheckResourceReconcile(t *testing.T) {
 	cases := []struct {
 		Name              string
 		CreateHealthCheck bool
@@ -225,7 +224,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 		{
 			"Reconcile pod not running no update",
 			false,
-			api.HealthCritical,
+			"",
 			&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
