@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -344,16 +345,19 @@ func (c *Command) Run(args []string) int {
 
 	// channel used for health checks
 	// also check to see if we should enable TLS
-	var healthCh chan struct{}
-	tlsEnabled := os.Getenv("CONSUL_CACERT")
-	consulPort := "8500"
-	if tlsEnabled != "" {
-		consulPort = "8501"
+	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+	if consulAddr == "" {
+		c.UI.Error("CONSUL_HTTP_ADDR is not specified")
+		return 0
+	}
+	consulUrl, err := url.Parse(consulAddr)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
+		return 0
 	}
 
 	if c.flagEnableHealthChecks {
 		go func() {
-			// TODO error handling to close this
 			c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 			if err := server.ListenAndServeTLS("", ""); err != nil {
 				c.UI.Error(fmt.Sprintf("Error listening: %s", err))
@@ -369,9 +373,8 @@ func (c *Command) Run(args []string) int {
 		healthResource := connectinject.HealthCheckResource{
 			Log:                 hclog.Default().Named("healthCheckResource"),
 			KubernetesClientset: c.clientset,
-			ConsulClientConfig:  api.DefaultConfig(),
-			ConsulPort:          consulPort,
-			TLSEnabled:          tlsEnabled != "",
+			ConsulUrl:           consulUrl,
+			Ctx:                 ctx,
 			ReconcilePeriod:     reconcilePeriod,
 		}
 
@@ -382,25 +385,18 @@ func (c *Command) Run(args []string) int {
 
 		// Start the health check controller, reconcile is started at the same time
 		// and new events will queue in the informer
-		healthCh = make(chan struct{})
 		go func() {
-			defer close(healthCh)
 			ctl.Run(ctx.Done())
 		}()
 
 		select {
-		// Unexpected exit
-		case <-healthCh:
-			cancelFunc()
-			return 1
-
 		// Interrupted, gracefully exit
 		case <-c.sigCh:
-			if healthCh != nil {
-				<-healthCh
-			}
+			cancelFunc()
+			server.Close()
 			return 0
 		}
+
 	} else {
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 		if err := server.ListenAndServeTLS("", ""); err != nil {

@@ -1,8 +1,8 @@
 package connectinject
 
 import (
-	ctx "context"
 	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
@@ -29,14 +29,13 @@ const (
 type HealthCheckResource struct {
 	Log                 hclog.Logger
 	KubernetesClientset kubernetes.Interface
-	ConsulClientConfig  *api.Config
 
-	ConsulPort string
-	TLSEnabled bool
-
+	// ConsulUrl holds the url information for client connections
+	ConsulUrl *url.URL
 	// ReconcilePeriod is the period by which reconcile gets called, default to 1 minute
 	ReconcilePeriod time.Duration
 
+	Ctx  context.Context
 	lock sync.Mutex
 }
 
@@ -45,7 +44,10 @@ type HealthCheckResource struct {
 // once every ReconcilePeriod time
 func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 	// Start the background watchers
-	h.Reconcile(stopCh)
+	err := h.Reconcile()
+	if err != nil {
+		h.Log.Error("reconcile returned an error", "err", err)
+	}
 
 	reconcileTimer := time.NewTimer(h.ReconcilePeriod)
 	defer reconcileTimer.Stop()
@@ -57,7 +59,10 @@ func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 			return
 
 		case <-reconcileTimer.C:
-			h.Reconcile(stopCh)
+			err = h.Reconcile()
+			if err != nil {
+				h.Log.Error("reconcile returned an error", "err", err)
+			}
 			reconcileTimer.Reset(h.ReconcilePeriod)
 		}
 	}
@@ -76,11 +81,11 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 		// ListWatch takes a List and Watch function which we filter based on label which was injected
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return h.KubernetesClientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx.Background(),
+				return h.KubernetesClientset.CoreV1().Pods(metav1.NamespaceAll).List(h.Ctx,
 					metav1.ListOptions{LabelSelector: labelInject})
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return h.KubernetesClientset.CoreV1().Pods(metav1.NamespaceAll).Watch(ctx.Background(),
+				return h.KubernetesClientset.CoreV1().Pods(metav1.NamespaceAll).Watch(h.Ctx,
 					metav1.ListOptions{LabelSelector: labelInject})
 			},
 		},
@@ -152,12 +157,12 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 // Reconcile iterates through all Pods with the appropriate label and compares the
 // current health check status against that which is stored in Consul and updates
 // the consul health check accordingly. If the health check doesn't yet exist it will create it.
-func (h *HealthCheckResource) Reconcile(stopCh <-chan struct{}) error {
+func (h *HealthCheckResource) Reconcile() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.Log.Debug("starting reconcile")
 	// First grab the list of Pods which have the label labelInject
-	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(context.Background(),
+	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(h.Ctx,
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
 		h.Log.Error("unable to get pods", "err", err)
@@ -244,15 +249,8 @@ func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, 
 
 // getConsulClient returns a new *api.Client pointed at the consul agent local to the pod
 func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, error) {
-	httpFmt := "http"
-	//consulPort := "8500"
-	if h.TLSEnabled == true {
-		httpFmt = "https"
-		// TODO: how can we plumb in consulPort so that is passes in tests also
-		//consulPort = "8501"
-	}
-	newAddr := fmt.Sprintf("%s://%s:%s", httpFmt, pod.Status.HostIP, h.ConsulPort)
-	localConfig := h.ConsulClientConfig
+	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
+	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {

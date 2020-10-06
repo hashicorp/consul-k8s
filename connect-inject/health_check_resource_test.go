@@ -2,7 +2,7 @@ package connectinject
 
 import (
 	"fmt"
-	"strings"
+	"net/url"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -33,11 +33,14 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	client, err := api.NewClient(clientConfig)
 	require.NoError(err)
 
+	schema := "http://"
+	consulUrl, err := url.Parse(schema + s.HTTPAddr)
+	require.NoError(err)
+
 	healthResource := HealthCheckResource{
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: fake.NewSimpleClientset(pod),
-		ConsulClientConfig:  api.DefaultConfig(),
-		ConsulPort:          strings.Split(s.HTTPAddr, ":")[1],
+		ConsulUrl:           consulUrl,
 		ReconcilePeriod:     0,
 	}
 
@@ -275,7 +278,7 @@ func TestHealthCheckHandlerReconcile(t *testing.T) {
 				require.NoError(err)
 			}
 
-			err := resource.Reconcile(nil)
+			err := resource.Reconcile()
 			require.NoError(err)
 			actual := testGetConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
