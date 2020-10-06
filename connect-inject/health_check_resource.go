@@ -95,7 +95,7 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 	)
 }
 
-// Upsert determines if an event should be processed and handled accordingly
+// Upsert processes a create or update event.
 // Two primary use cases are handled, new pods will get a new consul TTL health check
 // registered against their respective agent and service, and updates to pods will have
 // this TTL health check updated to reflect the pod status.
@@ -129,12 +129,12 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	// get a client connection to the correct agent
 	client, err := h.getConsulClient(pod)
 	if err != nil {
-		return fmt.Errorf("unable to set client connection for %s", pod.Name)
+		return fmt.Errorf("unable to get Consul client connection for %s", pod.Name)
 	}
 	// retrieve the health check that would exist if the service had one registered for this pod
 	serviceCheck, err := h.getServiceCheck(client, pod, serviceID, healthCheckID)
 	if err != nil {
-		return fmt.Errorf("unable to get agent health checks for %s, %s", healthCheckID, err)
+		return fmt.Errorf("unable to get agent health checks: serviceID=%s, checkID=%s, %s", serviceID, healthCheckID, err)
 	}
 	if serviceCheck == nil {
 		// create a new health check
@@ -156,7 +156,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 
 // Reconcile iterates through all Pods with the appropriate label and compares the
 // current health check status against that which is stored in Consul and updates
-// the consul health check accordingly. if the health check doesnt yet exist it will
+// the consul health check accordingly. If the health check doesn't yet exist it will create it.
 func (h *HealthCheckResource) Reconcile(stopCh <-chan struct{}) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -165,7 +165,7 @@ func (h *HealthCheckResource) Reconcile(stopCh <-chan struct{}) error {
 	podList, err := h.Clientset.CoreV1().Pods(corev1.NamespaceAll).List(context.Background(),
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
-		h.Log.Error("unable to get pods failing handler, err:%v", err)
+		h.Log.Error("unable to get pods", "err", err)
 		return err
 	}
 	// For each pod in the podlist, determine if a new health check needs to be registered
@@ -173,7 +173,7 @@ func (h *HealthCheckResource) Reconcile(stopCh <-chan struct{}) error {
 	for _, pod := range podList.Items {
 		err = h.reconcilePod(&pod)
 		if err != nil {
-			h.Log.Error("%s", fmt.Sprintf("unable to update pod: %s", err))
+			h.Log.Error("unable to update pod", "err", err)
 		}
 	}
 	h.Log.Debug("finished reconcile")
@@ -188,7 +188,7 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 
 // registerConsulHealthCheck registers a TTL health check for the service on this Agent.
 // The Agent is local to the Pod which has a kubernetes health check.
-// This has the effect of marking the endpoint health/unhealthy for Consul service mesh traffic.
+// This has the effect of marking the endpoint healthy/unhealthy for Consul service mesh traffic.
 func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status, reason string) error {
 	h.Log.Debug("registerConsulHealthCheck: ", consulHealthCheckID, serviceID)
 	// There is a chance of a race between when the Pod is transitioned to healthy by k8s and when we've initially
