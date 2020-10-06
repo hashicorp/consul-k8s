@@ -19,6 +19,7 @@ const (
 	testServiceNameAnnotation = "test-service"
 	testServiceNameReg        = "test-pod-test-service"
 	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
+	testFailureMessage        = "Kubernetes pod readiness probe failed"
 )
 
 func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
@@ -78,7 +79,7 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 		Err               string
 	}{
 		{
-			"Reconcile new Object Create Passing",
+			"Reconcile new Object Created Passing",
 			false,
 			"",
 			&corev1.Pod{
@@ -114,7 +115,7 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 			"",
 		},
 		{
-			"Reconcile new Object Create Critical",
+			"Reconcile new Object Created Critical",
 			false,
 			"",
 			&corev1.Pod{
@@ -174,14 +175,16 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
+						Type:    corev1.PodReady,
+						Status:  corev1.ConditionFalse,
+						Message: testFailureMessage,
 					}},
 				},
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
+				Notes:   testFailureMessage,
 			},
 			"",
 		},
@@ -219,6 +222,38 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 				CheckID: testHealthCheckID,
 				Status:  api.HealthPassing,
 			},
+			"",
+		},
+		{
+			"PodRunning Reconcile but with no label",
+			false,
+			"",
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Annotations: map[string]string{
+						annotationStatus:  "injected",
+						annotationService: testServiceNameAnnotation,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			nil,
 			"",
 		},
 		{
@@ -266,13 +301,12 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 			server.AddService(t, testServiceNameReg, "passing", nil)
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err := registerHealthCheck(t, client, tt.InitialState)
-				require.NoError(err)
+				registerHealthCheck(t, client, tt.InitialState)
 			}
 
 			err := resource.Reconcile()
 			require.NoError(err)
-			actual := testGetConsulAgentChecks(t, client)
+			actual := getConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
 				require.Equal(tt.Expected, actual)
 			} else {
@@ -282,7 +316,7 @@ func TestHealthCheckResourceReconcile(t *testing.T) {
 	}
 }
 
-func TestHealthCheckHandlerStandard(t *testing.T) {
+func TestHealthCheckHandlerUpsert(t *testing.T) {
 	cases := []struct {
 		Name              string
 		CreateHealthCheck bool
@@ -292,7 +326,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 		Err               string
 	}{
 		{
-			"PodRunning Object Create",
+			"PodRunning Upsert Object Created",
 			false,
 			api.HealthPassing,
 			&corev1.Pod{
@@ -328,7 +362,7 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning Upsert to Failed",
+			"PodRunning Upsert to Failed with failure message",
 			true,
 			api.HealthPassing,
 			&corev1.Pod{
@@ -352,14 +386,16 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
+						Type:    corev1.PodReady,
+						Status:  corev1.ConditionFalse,
+						Message: testFailureMessage,
 					}},
 				},
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
+				Notes:   testFailureMessage,
 			},
 			"",
 		},
@@ -534,12 +570,11 @@ func TestHealthCheckHandlerStandard(t *testing.T) {
 			// Create a passing service
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
-				err := registerHealthCheck(t, client, tt.InitialState)
-				require.NoError(err)
+				registerHealthCheck(t, client, tt.InitialState)
 			}
 			err := resource.Upsert("", tt.Pod)
 			require.NoError(err)
-			actual := testGetConsulAgentChecks(t, client)
+			actual := getConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
 				require.Equal(tt.Expected, actual)
 			} else {

@@ -343,20 +343,19 @@ func (c *Command) Run(args []string) int {
 		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
 	}
 
-	// channel used for health checks
-	// also check to see if we should enable TLS
-	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
-	if consulAddr == "" {
-		c.UI.Error("CONSUL_HTTP_ADDR is not specified")
-		return 1
-	}
-	consulUrl, err := url.Parse(consulAddr)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
-		return 1
-	}
-
 	if c.flagEnableHealthChecks {
+		// channel used for health checks
+		// also check to see if we should enable TLS
+		consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+		if consulAddr == "" {
+			c.UI.Error("CONSUL_HTTP_ADDR is not specified")
+			return 0
+		}
+		consulUrl, err := url.Parse(consulAddr)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
+			return 0
+		}
 		go func() {
 			c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 			if err := server.ListenAndServeTLS("", ""); err != nil {

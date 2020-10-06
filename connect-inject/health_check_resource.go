@@ -104,10 +104,6 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	if !ok {
 		return fmt.Errorf("failed to cast to a pod object")
 	}
-	if !h.shouldProcess(pod) {
-		// Skip pods that are not running or have not been properly injected
-		return nil
-	}
 	err := h.reconcilePod(pod)
 	if err != nil {
 		h.Log.Error("unable to update pod", "err", err)
@@ -118,8 +114,8 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 
 func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	h.Log.Debug("processing pod", "name", pod.Name)
-	if pod.Status.Phase != corev1.PodRunning {
-		h.Log.Info("pod is not running, skipping", "name", pod.Name, "phase", pod.Status.Phase)
+	if !h.shouldProcess(pod) {
+		// Skip pods that are not running or have not been properly injected
 		return nil
 	}
 	// fetch the identifiers we will use to interact with the Consul agent for this pod
