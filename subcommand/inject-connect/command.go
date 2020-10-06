@@ -348,12 +348,12 @@ func (c *Command) Run(args []string) int {
 	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
 	if consulAddr == "" {
 		c.UI.Error("CONSUL_HTTP_ADDR is not specified")
-		return 0
+		return 1
 	}
 	consulUrl, err := url.Parse(consulAddr)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
-		return 0
+		return 1
 	}
 
 	if c.flagEnableHealthChecks {
@@ -401,6 +401,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 		if err := server.ListenAndServeTLS("", ""); err != nil {
 			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+			return 1
 		}
 	}
 	return 0
