@@ -127,7 +127,6 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	healthCheckID := h.getConsulHealthCheckID(pod)
 	status, reason, err := h.getReadyStatusAndReason(pod)
 	if err != nil {
-		// health check does not exist, some other error
 		return fmt.Errorf("unable to get pod status: %s", err)
 	}
 	// get a client connection to the correct agent
