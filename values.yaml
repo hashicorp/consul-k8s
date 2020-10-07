@@ -30,7 +30,7 @@ global:
   #   image: "consul:1.5.0"
   #   # Consul Enterprise 1.5.0
   #   image: "hashicorp/consul-enterprise:1.5.0-ent"
-  image: "consul:1.8.2"
+  image: "consul:1.8.4"
 
   # array of objects containing image pull secret names that will be applied to
   # each service account.
@@ -231,7 +231,7 @@ global:
   # imageEnvoy is the name (and tag) of the Envoy Docker image used for the
   # connect-injected sidecar proxies and the mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
-  imageEnvoy: "envoyproxy/envoy-alpine:v1.14.2"
+  imageEnvoy: "envoyproxy/envoy-alpine:v1.14.4"
 
   # openshift contains configuration for running this Helm chart
   # on the Red Hat OpenShift platform.
