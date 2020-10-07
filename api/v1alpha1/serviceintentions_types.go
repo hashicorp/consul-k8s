@@ -1,13 +1,17 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -244,19 +248,55 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 }
 
 func (in *ServiceIntentions) Validate() error {
-	//var errs field.ErrorList
-	//path := field.NewPath("spec")
-	//for i, source := range in.Spec.Sources {
-	//	if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
-	//		errs = append(errs, err)
-	//	}
-	//}
-	//if len(errs) > 0 {
-	//	return apierrors.NewInvalid(
-	//		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
-	//		in.KubernetesName(), errs)
-	//}
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	for i, source := range in.Spec.Sources {
+		if len(source.Permissions) > 0 && source.Action != "" {
+			asJSON, _ := json.Marshal(source)
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), string(asJSON), `action and permissions are mutually exclusive and only one of them can be specified`))
+		}
+		if len(source.Permissions) == 0 {
+			if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			if err := source.Permissions.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err...)
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
+			in.KubernetesName(), errs)
+	}
 	return nil
+}
+
+func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	for i, permission := range in {
+		if err := permission.Action.validate(path.Child("permissions").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+		if permission.HTTP != nil {
+			if err := permission.HTTP.validate(path.Child("permissions").Index(i)); err != nil {
+				errs = append(errs, err...)
+			}
+		}
+	}
+	return errs
+}
+
+func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if invalidPathPrefix(in.PathPrefix) {
+		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, `must begin with a '/'`))
+	}
+	if invalidPathPrefix(in.PathExact) {
+		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, `must begin with a '/'`))
+	}
+	return errs
 }
 
 // Default sets zero value fields on this object to their defaults.

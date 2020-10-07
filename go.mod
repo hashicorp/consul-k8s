@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-querystring v1.0.0 // indirect
-	github.com/hashicorp/consul/api v1.4.1-0.20201006195812-c6001e9b68ad
+	github.com/hashicorp/consul/api v1.4.1-0.20201007080954-aa0f5ff839c5
 	github.com/hashicorp/consul/sdk v0.6.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v0.12.0
