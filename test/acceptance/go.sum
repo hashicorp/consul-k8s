@@ -222,8 +222,8 @@ github.com/gruntwork-io/gruntwork-cli v0.5.1 h1:mVmVsFubUSLSCO8bGigI63HXzvzkC0uW
 github.com/gruntwork-io/gruntwork-cli v0.5.1/go.mod h1:IBX21bESC1/LGoV7jhXKUnTQTZgQ6dYRsoj/VqxUSZQ=
 github.com/gruntwork-io/terratest v0.29.0 h1:EyPLLxglZIHJ0jU1cbx2NJT7A3MVEmPle8ENWDDwVAA=
 github.com/gruntwork-io/terratest v0.29.0/go.mod h1:aVz7181EP4okz7LMx6BLpiF7bL8wkq+h57V6uicvoc0=
-github.com/hashicorp/consul/api v1.4.1-0.20201006211533-eabba09b6633 h1:7Isk6LXOQLgzLc+77snDnR9jddDkTxbm4cAW1eCfc3c=
-github.com/hashicorp/consul/api v1.4.1-0.20201006211533-eabba09b6633/go.mod h1:1NSuaUUkFaJzMasbfq/11wKYWSR67Xn6r2DXKhuDNFg=
+github.com/hashicorp/consul/api v1.4.1-0.20201007080954-aa0f5ff839c5 h1:mHgaDaPdf0z3UG3G2UpCINFMRKhzi1DLNoOp6sIQWnU=
+github.com/hashicorp/consul/api v1.4.1-0.20201007080954-aa0f5ff839c5/go.mod h1:1NSuaUUkFaJzMasbfq/11wKYWSR67Xn6r2DXKhuDNFg=
 github.com/hashicorp/consul/sdk v0.6.0 h1:FfhMEkwvQl57CildXJyGHnwGGM4HMODGyfjGwNM1Vdw=
 github.com/hashicorp/consul/sdk v0.6.0/go.mod h1:fY08Y9z5SvJqevyZNy6WWPXiG3KwBPAvlcdx16zZ0fM=
 github.com/hashicorp/errwrap v1.0.0 h1:hLrqtEDnRye3+sgx6z4qVLNuviH3MR5aQ0ykNJa/UYA=
