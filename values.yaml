@@ -1002,8 +1002,10 @@ connectInject:
 # Controller handles config entry custom resources.
 controller:
   enabled: false
-
   replicas: 1
+
+  # Log verbosity level. One of "debug", "info", "warn", or "error".
+  logLevel: info
 
   # Resource settings for controller pods.
   resources:

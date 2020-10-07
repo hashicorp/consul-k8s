@@ -60,6 +60,7 @@ spec:
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
             -datacenter={{ .Values.global.datacenter }} \
             -enable-leader-election \
+            -log-level={{ .Values.controller.logLevel | quote }} \
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \
             {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
