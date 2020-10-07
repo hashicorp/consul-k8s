@@ -188,9 +188,6 @@ func (in IntentionAction) toConsul() capi.IntentionAction {
 }
 
 func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
-	if in == nil {
-		return nil
-	}
 	var consulIntentionPermissions []*capi.IntentionPermission
 	for _, permission := range in {
 		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
