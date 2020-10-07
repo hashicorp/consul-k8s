@@ -1,5 +1,16 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Connect: No longer set `--max-obj-name-len` flag when executing `envoy`. This flag
+  was [deprecated](https://www.envoyproxy.io/docs/envoy/latest/version_history/v1.11.0#deprecated)
+  in Envoy 1.11.0 and had no effect from then onwards. With Envoy >= 1.15.0 setting
+  this flag will result in an error, hence why we're removing it. [[GH-350](https://github.com/hashicorp/consul-k8s/pull/350)]
+
+  If you are running any Envoy version >= 1.11.0 this change will have no effect. If you
+  are running an Envoy version < 1.11.0 then you must upgrade Envoy to a newer
+  version. This can be done by setting the `global.imageEnvoy` key in the
+  Consul Helm chart.
+
 IMPROVEMENTS:
 
 * Add an ability to configure the synthetic Consul node name where catalog sync registers services. [[GH-312](https://github.com/hashicorp/consul-k8s/pull/312)]
