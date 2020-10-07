@@ -68,8 +68,13 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		}
 	} else if req.Operation == v1beta1.Update {
 		v.Logger.Info("validate update", "name", svcIntentions.KubernetesName())
-		prevIntention := req.OldObject.Object.(*ServiceIntentions)
-		newIntention := req.Object.Object.(*ServiceIntentions)
+		var prevIntention, newIntention ServiceIntentions
+		if err := v.decoder.DecodeRaw(*req.OldObject.DeepCopy(), &prevIntention); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		if err := v.decoder.DecodeRaw(*req.Object.DeepCopy(), &newIntention); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
 
 		// validate that name and namespace of a resource cannot be updated so ensure no dangling intentions in Consul
 		if prevIntention.Spec.Destination.Name != newIntention.Spec.Destination.Name || prevIntention.Spec.Destination.Namespace != newIntention.Spec.Destination.Namespace {

@@ -361,6 +361,7 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
 			marshalledRequestObject, err := json.Marshal(c.newResource)
+			marshalledOldRequestObject, err := json.Marshal(c.existingResources[0])
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
@@ -382,11 +383,10 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 					Namespace: otherNS,
 					Operation: v1beta1.Update,
 					Object: runtime.RawExtension{
-						Raw:    marshalledRequestObject,
-						Object: c.newResource,
+						Raw: marshalledRequestObject,
 					},
 					OldObject: runtime.RawExtension{
-						Object: c.existingResources[0],
+						Raw: marshalledOldRequestObject,
 					},
 				},
 			})
