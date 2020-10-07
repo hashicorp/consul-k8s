@@ -394,8 +394,10 @@ func (c *Command) Run(args []string) int {
 		select {
 		// Interrupted, gracefully exit
 		case <-c.sigCh:
-			cancelFunc()
-			server.Close()
+			if err := server.Close(); err != nil {
+				c.UI.Error(fmt.Sprintf("shutting down server: %v", err))
+				return 1
+			}
 			return 0
 
 		case <-serverErrors:
