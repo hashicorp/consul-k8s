@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func TestValidateConfigEntry(t *testing.T) {
+func TestValidateProxyDefault(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
@@ -97,7 +97,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: v1beta1.AdmissionRequest{
-					Name:      c.newResource.Name(),
+					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
 					Operation: v1beta1.Create,
 					Object: runtime.RawExtension{

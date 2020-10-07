@@ -42,9 +42,9 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 	}
 
 	if req.Operation == v1beta1.Create {
-		v.Logger.Info("validate create", "name", proxyDefaults.Name())
+		v.Logger.Info("validate create", "name", proxyDefaults.KubernetesName())
 
-		if proxyDefaults.Name() != common.Global {
+		if proxyDefaults.KubernetesName() != common.Global {
 			return admission.Errored(http.StatusBadRequest,
 				fmt.Errorf(`%s resource name must be "%s"`,
 					proxyDefaults.KubeKind(), common.Global))

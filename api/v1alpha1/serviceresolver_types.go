@@ -33,8 +33,8 @@ func (in *ServiceResolver) ConsulKind() string {
 	return capi.ServiceResolver
 }
 
-func (in *ServiceResolver) ConsulNamespaced() bool {
-	return true
+func (in *ServiceResolver) ConsulMirroringNS() string {
+	return in.Namespace
 }
 
 func (in *ServiceResolver) KubeKind() string {
@@ -43,6 +43,10 @@ func (in *ServiceResolver) KubeKind() string {
 
 func (in *ServiceResolver) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
+}
+
+func (in *ServiceResolver) KubernetesName() string {
+	return in.ObjectMeta.Name
 }
 
 func (in *ServiceResolver) AddFinalizer(f string) {
@@ -63,7 +67,7 @@ func (in *ServiceResolver) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *ServiceResolver) Name() string {
+func (in *ServiceResolver) ConsulName() string {
 	return in.ObjectMeta.Name
 }
 
@@ -99,7 +103,7 @@ func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
 func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceResolverConfigEntry{
 		Kind:           in.ConsulKind(),
-		Name:           in.Name(),
+		Name:           in.ConsulName(),
 		DefaultSubset:  in.Spec.DefaultSubset,
 		Subsets:        in.Spec.Subsets.toConsul(),
 		Redirect:       in.Spec.Redirect.toConsul(),
@@ -117,6 +121,10 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+}
+
+func (in *ServiceResolver) ConsulGlobalResource() bool {
+	return false
 }
 
 func (in *ServiceResolver) Validate() error {
@@ -142,7 +150,7 @@ func (in *ServiceResolver) Validate() error {
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceResolverKubeKind},
-			in.Name(), errs)
+			in.KubernetesName(), errs)
 	}
 	return nil
 }

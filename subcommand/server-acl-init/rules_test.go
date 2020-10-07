@@ -515,6 +515,7 @@ func TestControllerRules(t *testing.T) {
 			Expected: `operator = "write"
   service_prefix "" {
     policy = "write"
+    intentions = "write"
   }`,
 		},
 		{
@@ -525,6 +526,7 @@ func TestControllerRules(t *testing.T) {
 namespace "consul" {
   service_prefix "" {
     policy = "write"
+    intentions = "write"
   }
 }`,
 		},
@@ -536,6 +538,7 @@ namespace "consul" {
 namespace_prefix "" {
   service_prefix "" {
     policy = "write"
+    intentions = "write"
   }
 }`,
 		},
@@ -548,6 +551,7 @@ namespace_prefix "" {
 namespace_prefix "prefix-" {
   service_prefix "" {
     policy = "write"
+    intentions = "write"
   }
 }`,
 		},

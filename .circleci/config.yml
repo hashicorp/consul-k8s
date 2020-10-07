@@ -7,8 +7,8 @@ executors:
       - image: circleci/golang:1.14
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      - CONSUL_VERSION: dc728fc2f3e1c68411d90a7c7014c27145963526 # Consul's OSS version to use in tests
-      - CONSUL_ENT_VERSION: 03ac19c64222fff7a18f451049cac1bfe89549e5 # Consul's enterprise version to use in tests
+      - CONSUL_VERSION: aa0f5ff839c515aad3baa38c7936b4630263ca89 # Consul's OSS version to use in tests
+      - CONSUL_ENT_VERSION: 511f5942610bfa3ae53a40ca05db1858b25c2263 # Consul's enterprise version to use in tests
 
 commands:
   get-aws-cli:

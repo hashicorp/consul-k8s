@@ -224,10 +224,25 @@ func TestServiceSplitter_ConsulKind(t *testing.T) {
 	require.Equal(t, capi.ServiceSplitter, (&ServiceSplitter{}).ConsulKind())
 }
 
-func TestServiceSplitter(t *testing.T) {
+func TestServiceSplitter_KubeKind(t *testing.T) {
 	require.Equal(t, "servicesplitter", (&ServiceSplitter{}).KubeKind())
 }
 
+func TestServiceSplitter_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceSplitter{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestServiceSplitter_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceSplitter{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+}
+
+func TestServiceSplitter_ConsulNamespace(t *testing.T) {
+	require.Equal(t, "bar", (&ServiceSplitter{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
+}
+
+func TestServiceSplitter_ConsulGlobalResource(t *testing.T) {
+	require.False(t, (&ServiceSplitter{}).ConsulGlobalResource())
+}
 func TestServiceSplitter_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",

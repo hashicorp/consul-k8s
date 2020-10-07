@@ -383,6 +383,22 @@ func TestServiceDefaults_KubeKind(t *testing.T) {
 	require.Equal(t, "servicedefaults", (&ServiceDefaults{}).KubeKind())
 }
 
+func TestServiceDefaults_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestServiceDefaults_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestServiceDefaults_ConsulNamespace(t *testing.T) {
+	require.Equal(t, "bar", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
+}
+
+func TestServiceDefaults_ConsulGlobalResource(t *testing.T) {
+	require.False(t, (&ServiceDefaults{}).ConsulGlobalResource())
+}
+
 func TestServiceDefaults_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",

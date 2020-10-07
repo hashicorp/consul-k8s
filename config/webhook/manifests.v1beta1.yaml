@@ -49,6 +49,25 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-v1alpha1-serviceintentions
+  failurePolicy: Fail
+  name: mutate-serviceintentions.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceintentions
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-v1alpha1-serviceresolver
   failurePolicy: Fail
   name: mutate-serviceresolver.consul.hashicorp.com

@@ -255,6 +255,7 @@ namespace "{{ .InjectConsulDestNS }}" {
 {{- end }}
   service_prefix "" {
     policy = "write"
+    intentions = "write"
   }
 {{- if .EnableNamespaces }}
 }
