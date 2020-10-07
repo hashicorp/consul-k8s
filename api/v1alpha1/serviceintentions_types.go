@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
@@ -25,12 +27,40 @@ type Destination struct {
 }
 
 type SourceIntentions []*SourceIntention
+type IntentionPermissions []*IntentionPermission
+type IntentionHTTPHeaderPermissions []IntentionHTTPHeaderPermission
 
 type SourceIntention struct {
-	Name        string          `json:"name,omitempty"`
-	Namespace   string          `json:"namespace,omitempty"`
-	Action      IntentionAction `json:"action,omitempty"`
-	Description string          `json:"description,omitempty"`
+	Name        string               `json:"name,omitempty"`
+	Namespace   string               `json:"namespace,omitempty"`
+	Action      IntentionAction      `json:"action,omitempty"`
+	Permissions IntentionPermissions `json:"permissions,omitempty"`
+	Description string               `json:"description,omitempty"`
+}
+
+type IntentionPermission struct {
+	Action IntentionAction          `json:"action,omitempty"`
+	HTTP   *IntentionHTTPPermission `json:"http,omitempty"`
+}
+
+type IntentionHTTPPermission struct {
+	PathExact  string `json:"pathExact,omitempty"`
+	PathPrefix string `json:"pathPrefix,omitempty"`
+	PathRegex  string `json:"pathRegex,omitempty"`
+
+	Header IntentionHTTPHeaderPermissions `json:"header,omitempty"`
+
+	Methods []string `json:"methods,omitempty"`
+}
+
+type IntentionHTTPHeaderPermission struct {
+	Name    string `json:"name,omitempty"`
+	Present bool   `json:"present,omitempty"`
+	Exact   string `json:"exact,omitempty"`
+	Prefix  string `json:"prefix,omitempty"`
+	Suffix  string `json:"suffix,omitempty"`
+	Regex   string `json:"regex,omitempty"`
+	Invert  bool   `json:"invert,omitempty"`
 }
 
 // IntentionAction is the action that the intention represents. This
@@ -148,6 +178,7 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 		Name:        in.Name,
 		Namespace:   in.Namespace,
 		Action:      in.Action.toConsul(),
+		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,
 	}
 }
@@ -155,6 +186,48 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 func (in IntentionAction) toConsul() capi.IntentionAction {
 	return capi.IntentionAction(in)
 }
+
+func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
+	var consulIntentionPermissions []*capi.IntentionPermission
+	for _, permission := range in {
+		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
+			Action: permission.Action.toConsul(),
+			HTTP:   permission.HTTP.ToConsul(),
+		})
+	}
+	return consulIntentionPermissions
+}
+
+func (in *IntentionHTTPPermission) ToConsul() *capi.IntentionHTTPPermission {
+	if in == nil {
+		return nil
+	}
+	return &capi.IntentionHTTPPermission{
+		PathExact:  in.PathExact,
+		PathPrefix: in.PathPrefix,
+		PathRegex:  in.PathRegex,
+		Header:     in.Header.toConsul(),
+		Methods:    in.Methods,
+	}
+}
+
+func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPermission {
+	var headerPermissions []capi.IntentionHTTPHeaderPermission
+	for _, permission := range in {
+		headerPermissions = append(headerPermissions, capi.IntentionHTTPHeaderPermission{
+			Name:    permission.Name,
+			Present: permission.Present,
+			Exact:   permission.Exact,
+			Prefix:  permission.Prefix,
+			Suffix:  permission.Suffix,
+			Regex:   permission.Regex,
+			Invert:  permission.Invert,
+		})
+	}
+
+	return headerPermissions
+}
+
 func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
 	if !ok {
@@ -175,8 +248,17 @@ func (in *ServiceIntentions) Validate() error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	for i, source := range in.Spec.Sources {
-		if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
-			errs = append(errs, err)
+		if len(source.Permissions) > 0 && source.Action != "" {
+			asJSON, _ := json.Marshal(source)
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), string(asJSON), `action and permissions are mutually exclusive and only one of them can be specified`))
+		} else if len(source.Permissions) == 0 {
+			if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			if err := source.Permissions.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err...)
+			}
 		}
 	}
 	if len(errs) > 0 {
@@ -185,6 +267,32 @@ func (in *ServiceIntentions) Validate() error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	for i, permission := range in {
+		if err := permission.Action.validate(path.Child("permissions").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+		if permission.HTTP != nil {
+			if err := permission.HTTP.validate(path.Child("permissions").Index(i)); err != nil {
+				errs = append(errs, err...)
+			}
+		}
+	}
+	return errs
+}
+
+func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if invalidPathPrefix(in.PathPrefix) {
+		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, `must begin with a '/'`))
+	}
+	if invalidPathPrefix(in.PathExact) {
+		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, `must begin with a '/'`))
+	}
+	return errs
 }
 
 // Default sets zero value fields on this object to their defaults.

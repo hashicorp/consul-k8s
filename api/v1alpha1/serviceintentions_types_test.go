@@ -59,6 +59,36 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
 					},
 				},
 			},
@@ -80,6 +110,36 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 						Action:      "deny",
 						Precedence:  1,
 						Description: "disallow access from namespace not-test",
+					},
+					{
+						Name:      "svc-2",
+						Namespace: "bar",
+						Permissions: []*capi.IntentionPermission{
+							{
+								Action: "allow",
+								HTTP: &capi.IntentionHTTPPermission{
+									PathExact:  "/foo",
+									PathPrefix: "/bar",
+									PathRegex:  "/baz",
+									Header: []capi.IntentionHTTPHeaderPermission{
+										{
+											Name:    "header",
+											Present: true,
+											Exact:   "exact",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "regex",
+											Invert:  true,
+										},
+									},
+									Methods: []string{
+										"GET",
+										"PUT",
+									},
+								},
+							},
+						},
+						Description: "an L7 config",
 					},
 				},
 				Meta: nil,
@@ -153,6 +213,36 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
 					},
 				},
 			},
@@ -171,6 +261,36 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 						Namespace:   "not-test",
 						Action:      "deny",
 						Description: "disallow access from namespace not-test",
+					},
+					{
+						Name:      "svc-2",
+						Namespace: "bar",
+						Permissions: []*capi.IntentionPermission{
+							{
+								Action: "allow",
+								HTTP: &capi.IntentionHTTPPermission{
+									PathExact:  "/foo",
+									PathPrefix: "/bar",
+									PathRegex:  "/baz",
+									Header: []capi.IntentionHTTPHeaderPermission{
+										{
+											Name:    "header",
+											Present: true,
+											Exact:   "exact",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "regex",
+											Invert:  true,
+										},
+									},
+									Methods: []string{
+										"GET",
+										"PUT",
+									},
+								},
+							},
+						},
+						Description: "an L7 config",
 					},
 				},
 				Meta: map[string]string{
@@ -554,6 +674,36 @@ func TestServiceIntentions_Validate(t *testing.T) {
 							Namespace: "db",
 							Action:    "deny",
 						},
+						{
+							Name:      "bar",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
 					},
 				},
 			},
@@ -579,6 +729,119 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].action: Invalid value: "foo": must be one of "allow", "deny"`,
+		},
+		"invalid permissions.http.pathPrefix": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathPrefix: "bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathPrefix: Invalid value: "bar": must begin with a '/'`,
+		},
+		"invalid permissions.http.pathExact": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathExact: Invalid value: "bar": must begin with a '/'`,
+		},
+		"invalid permissions.action": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "foobar",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].action: Invalid value: "foobar": must be one of "allow", "deny"`,
+		},
+		"both action and permissions specified": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Action:    "deny",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
 		},
 	}
 	for name, testCase := range cases {
