@@ -49,13 +49,6 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-const (
-	LogLevelDebug = "debug"
-	LogLevelInfo  = "info"
-	LogLevelWarn  = "warn"
-	LogLevelError = "error"
-)
-
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
@@ -85,9 +78,9 @@ func (c *Command) init() {
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", LogLevelInfo,
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
-			"%q, %q, %q, and %q.", LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError))
+			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
