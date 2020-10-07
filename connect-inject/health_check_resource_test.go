@@ -20,6 +20,7 @@ const (
 	testServiceNameReg        = "test-pod-test-service"
 	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
 	testFailureMessage        = "Kubernetes pod readiness probe failed"
+	testDoNotRegister         = "do not register"
 )
 
 func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
@@ -534,6 +535,39 @@ func TestHealthCheckHandlerUpsert(t *testing.T) {
 			"",
 		},
 		{
+			"PodRunning service not registered, Upsert fails",
+			false,
+			testDoNotRegister,
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Labels:    map[string]string{labelInject: "true"},
+					Annotations: map[string]string{
+						annotationStatus:  "injected",
+						annotationService: testServiceNameAnnotation,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: testPodName,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			nil,
+			"ServiceID \"test-pod-test-service\" does not exist",
+		},
+		{
 			"PodRunning no Ready Status",
 			false,
 			"",
@@ -566,13 +600,19 @@ func TestHealthCheckHandlerUpsert(t *testing.T) {
 			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
 
-			server.AddService(t, testServiceNameReg, "passing", nil)
+			if tt.InitialState != testDoNotRegister {
+				server.AddService(t, testServiceNameReg, "passing", nil)
+			}
 			// Create a passing service
 			if tt.CreateHealthCheck {
 				// register the health check if ObjectCreate didnt run
 				registerHealthCheck(t, client, tt.InitialState)
 			}
 			err := resource.Upsert("", tt.Pod)
+			if tt.Err != "" {
+				require.Error(err, tt.Err)
+				return
+			}
 			require.NoError(err)
 			actual := getConsulAgentChecks(t, client)
 			if tt.Expected == nil || actual == nil {
