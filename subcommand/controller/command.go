@@ -113,9 +113,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	zapLevel, err := toLevel(c.flagLogLevel)
-	if err != nil {
-		c.UI.Error(err.Error())
+	var zapLevel zapcore.Level
+	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
 		return 1
 	}
 	// We set UseDevMode to true because we don't want our logs json
@@ -253,24 +253,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	return 0
-}
-
-// toLevel returns the zapcore level  and an error if lvl is not supported.
-func toLevel(lvl string) (zapcore.Level, error) {
-	switch lvl {
-	case LogLevelDebug:
-		return zapcore.DebugLevel, nil
-	case LogLevelInfo:
-		return zapcore.InfoLevel, nil
-	case LogLevelWarn:
-		return zapcore.WarnLevel, nil
-	case LogLevelError:
-		return zapcore.ErrorLevel, nil
-	default:
-		return zapcore.DebugLevel,
-			fmt.Errorf("invalid -log-level %q, must be one of %q, %q, %q, %q",
-				lvl, LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError)
-	}
 }
 
 func (c *Command) Help() string {

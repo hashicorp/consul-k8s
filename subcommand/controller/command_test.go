@@ -28,7 +28,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags:  []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo", "-log-level", "invalid"},
-			expErr: `invalid -log-level "invalid", must be one of "debug", "info", "warn", "error"`,
+			expErr: `Error parsing -log-level "invalid": unrecognized level: "invalid"`,
 		},
 	}
 
