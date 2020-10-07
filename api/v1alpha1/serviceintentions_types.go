@@ -254,8 +254,7 @@ func (in *ServiceIntentions) Validate() error {
 		if len(source.Permissions) > 0 && source.Action != "" {
 			asJSON, _ := json.Marshal(source)
 			errs = append(errs, field.Invalid(path.Child("sources").Index(i), string(asJSON), `action and permissions are mutually exclusive and only one of them can be specified`))
-		}
-		if len(source.Permissions) == 0 {
+		} else if len(source.Permissions) == 0 {
 			if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
 				errs = append(errs, err)
 			}
