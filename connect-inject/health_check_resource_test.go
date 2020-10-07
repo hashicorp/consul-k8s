@@ -618,6 +618,7 @@ func TestHealthCheckHandlerUpsert(t *testing.T) {
 			if tt.Expected == nil || actual == nil {
 				require.Equal(tt.Expected, actual)
 			} else {
+				require.Equal(tt.Expected.CheckID, actual.CheckID)
 				require.Equal(tt.Expected.Status, actual.Status)
 			}
 		})
