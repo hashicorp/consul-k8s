@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"os"
 	"testing"
 
 	"github.com/mitchellh/cli"
@@ -112,6 +113,11 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "request must be <= limit: -lifecycle-sidecar-cpu-request value of \"50m\" is greater than the -lifecycle-sidecar-cpu-limit value of \"25m\"",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "kschoche/consul-k8s-dev",
+				"-enable-health-checks-controller=true"},
+			expErr: "CONSUL_HTTP_ADDR is not specified",
+		},
 	}
 
 	for _, c := range cases {
@@ -144,4 +150,42 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagLifecycleSidecarCPULimit, "20m")
 	require.Equal(t, cmd.flagLifecycleSidecarMemoryRequest, "25Mi")
 	require.Equal(t, cmd.flagLifecycleSidecarMemoryLimit, "50Mi")
+}
+
+func TestRun_ValidationHealthCheckEnv(t *testing.T) {
+	cases := []struct {
+		name    string
+		envVars []string
+		flags   []string
+		expErr  string
+	}{
+		{
+			envVars: []string{"CONSUL_HTTP_ADDR", "0.0.0.0:999999"},
+			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s",
+				"-enable-health-checks-controller=true"},
+			expErr: "Error parsing CONSUL_HTTP_ADDR: parse \"0.0.0.0:999999\": first path segment in URL cannot contain colon",
+		},
+		{
+			envVars: []string{"CONSUL_HTTP_ADDR", "http://0.0.0.0:1234"},
+			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s",
+				"-enable-health-checks-controller=true",
+				"-health-checks-reconcile-period=abcdefg"},
+			expErr: "Error parsing health-checks-reconcile-period",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expErr, func(t *testing.T) {
+			k8sClient := fake.NewSimpleClientset()
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8sClient,
+			}
+			os.Setenv(c.envVars[0], c.envVars[1])
+			code := cmd.Run(c.flags)
+			os.Unsetenv(c.envVars[0])
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
+		})
+	}
 }

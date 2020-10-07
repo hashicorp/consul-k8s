@@ -59,8 +59,7 @@ func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 			return
 
 		case <-reconcileTimer.C:
-			err = h.Reconcile()
-			if err != nil {
+			if err := h.Reconcile(); err != nil {
 				h.Log.Error("reconcile returned an error", "err", err)
 			}
 			reconcileTimer.Reset(h.ReconcilePeriod)
@@ -196,7 +195,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		ID:        consulHealthCheckID,
 		Name:      "Kubernetes Health Check",
-		Notes:     "Kubernetes Health Check " + reason,
+		Notes:     reason,
 		ServiceID: serviceID,
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:                    "100000h",
