@@ -29,6 +29,7 @@ require (
 	github.com/radovskyb/watcher v1.0.2
 	github.com/stretchr/testify v1.5.1
 	go.opencensus.io v0.22.0 // indirect
+	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
@@ -40,6 +41,7 @@ require (
 	k8s.io/api v0.18.6
 	k8s.io/apimachinery v0.18.6
 	k8s.io/client-go v0.18.6
+	k8s.io/klog/v2 v2.0.0
 	sigs.k8s.io/controller-runtime v0.6.3
 )
 

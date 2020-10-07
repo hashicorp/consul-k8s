@@ -10,9 +10,11 @@ import (
 	"github.com/hashicorp/consul-k8s/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -29,6 +31,7 @@ type Command struct {
 	flagEnableLeaderElection bool
 	flagEnableWebhooks       bool
 	flagDatacenter           string
+	flagLogLevel             string
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -75,6 +78,9 @@ func (c *Command) init() {
 		"Directory that contains the TLS cert and key required for the webhook. The cert and key files must be named 'tls.crt' and 'tls.key' respectively.")
 	c.flagSet.BoolVar(&c.flagEnableWebhooks, "enable-webhooks", true,
 		"Enable webhooks. Disable when running locally since Kube API server won't be able to route to local server.")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
+		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
+			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -82,7 +88,6 @@ func (c *Command) init() {
 }
 
 func (c *Command) Run(args []string) int {
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("Parsing flagset: %s", err.Error()))
@@ -101,11 +106,23 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	var zapLevel zapcore.Level
+	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
+		return 1
+	}
+	// We set UseDevMode to true because we don't want our logs json
+	// formatted.
+	logger := zap.New(zap.UseDevMode(true), zap.Level(zapLevel))
+	ctrl.SetLogger(logger)
+	klog.SetLogger(logger)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		Port:             9443,
 		LeaderElection:   c.flagEnableLeaderElection,
 		LeaderElectionID: "consul.hashicorp.com",
+		Logger:           logger,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

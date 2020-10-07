@@ -26,6 +26,10 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-webhook-tls-cert-dir", "/foo"},
 			expErr: "-datacenter must be set",
 		},
+		{
+			flags:  []string{"-webhook-tls-cert-dir", "/foo", "-datacenter", "foo", "-log-level", "invalid"},
+			expErr: `Error parsing -log-level "invalid": unrecognized level: "invalid"`,
+		},
 	}
 
 	for _, c := range cases {
