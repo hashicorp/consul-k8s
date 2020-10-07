@@ -100,7 +100,7 @@ func TestValidateConfigEntry(t *testing.T) {
 			}
 			response := ValidateConfigEntry(ctx, admission.Request{
 				AdmissionRequest: v1beta1.AdmissionRequest{
-					Name:      c.newResource.Name(),
+					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
 					Operation: v1beta1.Create,
 					Object: runtime.RawExtension{
@@ -135,8 +135,12 @@ type mockConfigEntry struct {
 	Valid         bool
 }
 
-func (in *mockConfigEntry) ConsulNamespaced() bool {
-	return true
+func (in *mockConfigEntry) KubernetesName() string {
+	return in.MockName
+}
+
+func (in *mockConfigEntry) ConsulMirroringNS() string {
+	return in.MockNamespace
 }
 
 func (in *mockConfigEntry) GetObjectMeta() metav1.ObjectMeta {
@@ -149,6 +153,10 @@ func (in *mockConfigEntry) GetObjectKind() schema.ObjectKind {
 
 func (in *mockConfigEntry) DeepCopyObject() runtime.Object {
 	return in
+}
+
+func (in *mockConfigEntry) ConsulGlobalResource() bool {
+	return false
 }
 
 func (in *mockConfigEntry) AddFinalizer(_ string) {}
@@ -167,7 +175,7 @@ func (in *mockConfigEntry) KubeKind() string {
 	return "mockkind"
 }
 
-func (in *mockConfigEntry) Name() string {
+func (in *mockConfigEntry) ConsulName() string {
 	return in.MockName
 }
 

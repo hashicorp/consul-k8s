@@ -331,6 +331,22 @@ func TestProxyDefaults_KubeKind(t *testing.T) {
 	require.Equal(t, "proxydefaults", (&ProxyDefaults{}).KubeKind())
 }
 
+func TestProxyDefaults_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&ProxyDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+}
+
+func TestProxyDefaults_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&ProxyDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+}
+
+func TestProxyDefaults_ConsulNamespace(t *testing.T) {
+	require.Equal(t, common.DefaultConsulNamespace, (&ProxyDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
+}
+
+func TestProxyDefaults_ConsulGlobalResource(t *testing.T) {
+	require.True(t, (&ProxyDefaults{}).ConsulGlobalResource())
+}
+
 func TestProxyDefaults_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",

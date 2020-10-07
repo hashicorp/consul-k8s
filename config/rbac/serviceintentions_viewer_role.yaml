@@ -1,0 +1,20 @@
+# permissions for end users to view serviceintentions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceintentions-viewer-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceintentions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceintentions/status
+  verbs:
+  - get

@@ -1,0 +1,24 @@
+# permissions for end users to edit serviceintentions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceintentions-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceintentions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceintentions/status
+  verbs:
+  - get

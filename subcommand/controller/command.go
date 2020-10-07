@@ -172,6 +172,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ServiceSplitter)
 		return 1
 	}
+	if err = (&controller.ServiceIntentionsController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.ServiceIntentions),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ServiceIntentions)
+		return 1
+	}
 
 	if c.flagEnableWebhooks {
 		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
@@ -217,6 +226,14 @@ func (c *Command) Run(args []string) int {
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceSplitter),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
+			&webhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
 				EnableConsulNamespaces: c.flagEnableNamespaces,
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})

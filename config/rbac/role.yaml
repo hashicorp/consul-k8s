@@ -49,6 +49,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - serviceintentions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceintentions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - serviceresolvers
   verbs:
   - create

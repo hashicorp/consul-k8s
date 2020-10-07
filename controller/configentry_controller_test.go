@@ -210,6 +210,67 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, float32(100), svcDefault.Splits[0].Weight)
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereqs: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "baz",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-name",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "allow",
+						},
+						&v1alpha1.SourceIntention{
+							Name:   "baz",
+							Action: "deny",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				svcIntentions, ok := consulEntry.(*capi.ServiceIntentionsConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, "foo", svcIntentions.Name)
+				require.Equal(t, "bar", svcIntentions.Sources[0].Name)
+				require.Equal(t, capi.IntentionActionAllow, svcIntentions.Sources[0].Action)
+				require.Equal(t, "baz", svcIntentions.Sources[1].Name)
+				require.Equal(t, capi.IntentionActionDeny, svcIntentions.Sources[1].Action)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -224,6 +285,8 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -237,7 +300,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
-				Name:      c.configEntryResource.Name(),
+				Name:      c.configEntryResource.KubernetesName(),
 			}
 			resp, err := r.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
@@ -245,9 +308,9 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			req.NoError(err)
 			req.False(resp.Requeue)
 
-			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.Name(), nil)
+			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
 			req.NoError(err)
-			req.Equal(c.configEntryResource.Name(), cfg.GetName())
+			req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
 			c.compare(t, cfg)
 
 			// Check that the status is "synced".
@@ -425,11 +488,11 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				}
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				svcDefault, ok := consulEntry.(*capi.ServiceSplitterConfigEntry)
+				svcSplitter, ok := consulEntry.(*capi.ServiceSplitterConfigEntry)
 				require.True(t, ok, "cast error")
-				require.Equal(t, float32(80), svcDefault.Splits[0].Weight)
-				require.Equal(t, float32(20), svcDefault.Splits[1].Weight)
-				require.Equal(t, "bar", svcDefault.Splits[1].Service)
+				require.Equal(t, float32(80), svcSplitter.Splits[0].Weight)
+				require.Equal(t, float32(20), svcSplitter.Splits[1].Weight)
+				require.Equal(t, "bar", svcSplitter.Splits[1].Service)
 			},
 		},
 		{
@@ -479,6 +542,58 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "/different_path", configEntry.Routes[0].Match.HTTP.PathPrefix)
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereqs: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-name",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				svcIntentions := resource.(*v1alpha1.ServiceIntentions)
+				svcIntentions.Spec.Sources[0].Action = "deny"
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				configEntry, ok := consulEntry.(*capi.ServiceIntentionsConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[0].Action)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -493,6 +608,8 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -517,7 +634,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryResource.Name(),
+					Name:      c.configEntryResource.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
 				err = client.Get(ctx, namespacedName, c.configEntryResource)
@@ -535,9 +652,9 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.Name(), nil)
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
 				req.NoError(err)
-				req.Equal(c.configEntryResource.Name(), cfg.GetName())
+				req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
 				c.compare(t, cfg)
 			}
 		})
@@ -711,6 +828,51 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-name",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -724,6 +886,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -748,7 +912,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryResourceWithDeletion.Name(),
+					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(ctrl.Request{
@@ -757,10 +921,10 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.Name(), nil)
+				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.ConsulName(), nil)
 				req.EqualError(err,
 					fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)",
-						c.consulKind, c.configEntryResourceWithDeletion.Name()))
+						c.consulKind, c.configEntryResourceWithDeletion.ConsulName()))
 			}
 		})
 	}
@@ -880,6 +1044,31 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			configEntryResource: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -902,14 +1091,14 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
-				Name:      c.configEntryResource.Name(),
+				Name:      c.configEntryResource.KubernetesName(),
 			}
 			resp, err := r.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.Error(err)
 
-			expErr := fmt.Sprintf("Get \"http://incorrect-address/v1/config/%s/%s\": dial tcp: lookup incorrect-address", c.consulKind, c.configEntryResource.Name())
+			expErr := fmt.Sprintf("Get \"http://incorrect-address/v1/config/%s/%s\": dial tcp: lookup incorrect-address", c.consulKind, c.configEntryResource.ConsulName())
 			req.Contains(err.Error(), expErr)
 			req.False(resp.Requeue)
 
@@ -1078,6 +1267,50 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereq: &capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "http",
+			},
+			configEntryResource: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "deny",
+						},
+					},
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1094,6 +1327,8 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -1114,7 +1349,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
-				Name:      c.configEntryResource.Name(),
+				Name:      c.configEntryResource.KubernetesName(),
 			}
 			resp, err := r.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
@@ -1256,6 +1491,49 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			},
 		},
 		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereqs: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "deny",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
 			consulPrereqs: []capi.ConfigEntry{
@@ -1307,6 +1585,8 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -1331,7 +1611,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryResource.Name(),
+					Name:      c.configEntryResource.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
 				err = client.Get(ctx, namespacedName, c.configEntryResource)
@@ -1346,7 +1626,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.Name(), nil)
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
 				req.NoError(err)
 				req.Equal(cfg.GetMeta()[common.DatacenterKey], "different-datacenter")
 
@@ -1556,6 +1836,51 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				require.Empty(t, svcSplitter.Finalizers())
 			},
 		},
+		{
+			kubeKind:   "ServiceIntentions",
+			consulKind: capi.ServiceIntentions,
+			consulPrereq: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "foo",
+					Protocol: "http",
+				},
+			},
+			configEntryResourceWithDeletion: &v1alpha1.ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ServiceIntentionsSpec{
+					Destination: v1alpha1.Destination{
+						Name: "foo",
+					},
+					Sources: v1alpha1.SourceIntentions{
+						&v1alpha1.SourceIntention{
+							Name:   "bar",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			confirmDelete: func(t *testing.T, cli client.Client, ctx context.Context, name types.NamespacedName) {
+				svcSplitter := &v1alpha1.ServiceIntentions{}
+				_ = cli.Get(ctx, name, svcSplitter)
+				require.Empty(t, svcSplitter.Finalizers())
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1570,6 +1895,8 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
 			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -1596,7 +1923,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: kubeNS,
-					Name:      c.configEntryResourceWithDeletion.Name(),
+					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
 				resp, err := r.Reconcile(ctrl.Request{
@@ -1605,7 +1932,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				entry, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.Name(), nil)
+				entry, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.ConsulName(), nil)
 				req.NoError(err)
 				req.Equal(entry.GetMeta()[common.DatacenterKey], "different-datacenter")
 

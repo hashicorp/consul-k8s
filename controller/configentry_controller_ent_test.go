@@ -146,6 +146,44 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
 			},
+			"intentions": {
+				ConsulKind: capi.ServiceIntentions,
+				KubeResource: &v1alpha1.ServiceIntentions{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: c.SourceKubeNS,
+					},
+					Spec: v1alpha1.ServiceIntentionsSpec{
+						Destination: v1alpha1.Destination{
+							Name:      "test",
+							Namespace: c.SourceKubeNS,
+						},
+						Sources: v1alpha1.SourceIntentions{
+							&v1alpha1.SourceIntention{
+								Name:      "baz",
+								Namespace: "bar",
+								Action:    "allow",
+							},
+						},
+					},
+				},
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
+					return &controller.ServiceIntentionsController{
+						Client:                client,
+						Log:                   logger,
+						Scheme:                scheme,
+						ConfigEntryController: cont,
+					}
+				},
+				AssertValidConfig: func(cfg capi.ConfigEntry) bool {
+					configEntry, ok := cfg.(*capi.ServiceIntentionsConfigEntry)
+					if !ok {
+						return false
+					}
+					return configEntry.Sources[0].Action == capi.IntentionActionAllow
+				},
+				ConsulNamespace: c.ExpConsulNS,
+			},
 		}
 
 		for kind, in := range configEntryKinds {
@@ -158,6 +196,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				consul, err := testutil.NewTestServerConfigT(t, nil)
 				req.NoError(err)
 				defer consul.Stop()
+				consul.WaitForServiceIntentions(t)
 				consulClient, err := capi.NewClient(&capi.Config{
 					Address: consul.HTTPAddr,
 				})
@@ -181,13 +220,13 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				resp, err := r.Reconcile(ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: c.SourceKubeNS,
-						Name:      in.KubeResource.Name(),
+						Name:      in.KubeResource.KubernetesName(),
 					},
 				})
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				cfg, _, err := consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.Name(), &capi.QueryOptions{
+				cfg, _, err := consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.ConsulName(), &capi.QueryOptions{
 					Namespace: in.ConsulNamespace,
 				})
 				req.NoError(err)
@@ -198,7 +237,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				// Check that the status is "synced".
 				err = fakeClient.Get(ctx, types.NamespacedName{
 					Namespace: c.SourceKubeNS,
-					Name:      in.KubeResource.Name(),
+					Name:      in.KubeResource.KubernetesName(),
 				}, in.KubeResource)
 				req.NoError(err)
 				conditionSynced := in.KubeResource.SyncedConditionStatus()
@@ -354,6 +393,64 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					return configEntry.MeshGateway.Mode == capi.MeshGatewayModeLocal
 				},
 			},
+			"intentions": {
+				ConsulKind: capi.ServiceIntentions,
+				KubeResource: &v1alpha1.ServiceIntentions{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "test",
+						Namespace:  c.SourceKubeNS,
+						Finalizers: []string{controller.FinalizerName},
+					},
+					Spec: v1alpha1.ServiceIntentionsSpec{
+						Destination: v1alpha1.Destination{
+							Name:      "foo",
+							Namespace: c.SourceKubeNS,
+						},
+						Sources: v1alpha1.SourceIntentions{
+							&v1alpha1.SourceIntention{
+								Name:      "bar",
+								Namespace: "baz",
+								Action:    "deny",
+							},
+						},
+					},
+				},
+				ConsulNamespace: c.ExpConsulNS,
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
+					return &controller.ServiceIntentionsController{
+						Client:                client,
+						Log:                   logger,
+						Scheme:                scheme,
+						ConfigEntryController: cont,
+					}
+				},
+				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
+					_, _, err := consulClient.ConfigEntries().Set(&capi.ServiceIntentionsConfigEntry{
+						Kind: capi.ServiceIntentions,
+						Name: "foo",
+						Sources: []*capi.SourceIntention{
+							{
+								Name:      "bar",
+								Namespace: "baz",
+								Action:    capi.IntentionActionDeny,
+							},
+						},
+					}, &capi.WriteOptions{Namespace: namespace})
+					return err
+				},
+				UpdateResourceFunc: func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error {
+					svcIntention := in.(*v1alpha1.ServiceIntentions)
+					svcIntention.Spec.Sources[0].Action = "allow"
+					return client.Update(ctx, svcIntention)
+				},
+				AssertValidConfigFunc: func(cfg capi.ConfigEntry) bool {
+					configEntry, ok := cfg.(*capi.ServiceIntentionsConfigEntry)
+					if !ok {
+						return false
+					}
+					return configEntry.Sources[0].Action == capi.IntentionActionAllow
+				},
+			},
 		}
 		for kind, in := range configEntryKinds {
 			tt.Run(fmt.Sprintf("%s : %s", name, kind), func(t *testing.T) {
@@ -365,6 +462,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				consul, err := testutil.NewTestServerConfigT(t, nil)
 				req.NoError(err)
 				defer consul.Stop()
+				consul.WaitForServiceIntentions(t)
 				consulClient, err := capi.NewClient(&capi.Config{
 					Address: consul.HTTPAddr,
 				})
@@ -403,7 +501,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					// First get it so we have the latest revision number.
 					err = fakeClient.Get(ctx, types.NamespacedName{
 						Namespace: c.SourceKubeNS,
-						Name:      in.KubeResource.Name(),
+						Name:      in.KubeResource.KubernetesName(),
 					}, in.KubeResource)
 					req.NoError(err)
 
@@ -414,13 +512,13 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					resp, err := r.Reconcile(ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
-							Name:      in.KubeResource.Name(),
+							Name:      in.KubeResource.KubernetesName(),
 						},
 					})
 					req.NoError(err)
 					req.False(resp.Requeue)
 
-					cfg, _, err := consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.Name(), &capi.QueryOptions{
+					cfg, _, err := consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.ConsulName(), &capi.QueryOptions{
 						Namespace: in.ConsulNamespace,
 					})
 					req.NoError(err)
@@ -547,11 +645,60 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
-					_, _, err := consulClient.ConfigEntries().Set(&capi.ServiceConfigEntry{
-						Kind: capi.ServiceDefaults,
+					_, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+						Kind: capi.ProxyDefaults,
 						Name: common.Global,
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: capi.MeshGatewayModeRemote,
+						},
+					}, &capi.WriteOptions{Namespace: namespace})
+					return err
+				},
+			},
+			"intentions": {
+				ConsulKind: capi.ServiceIntentions,
+				// Create it with the deletion timestamp set to mimic that it's already
+				// been marked for deletion.
+				KubeResource: &v1alpha1.ServiceIntentions{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "foo",
+						Namespace:         c.SourceKubeNS,
+						Finalizers:        []string{controller.FinalizerName},
+						DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					},
+					Spec: v1alpha1.ServiceIntentionsSpec{
+						Destination: v1alpha1.Destination{
+							Name:      "test",
+							Namespace: c.SourceKubeNS,
+						},
+						Sources: v1alpha1.SourceIntentions{
+							&v1alpha1.SourceIntention{
+								Name:      "bar",
+								Namespace: "baz",
+								Action:    "deny",
+							},
+						},
+					},
+				},
+				ConsulNamespace: c.ExpConsulNS,
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *controller.ConfigEntryController) reconcile.Reconciler {
+					return &controller.ServiceIntentionsController{
+						Client:                client,
+						Log:                   logger,
+						Scheme:                scheme,
+						ConfigEntryController: cont,
+					}
+				},
+				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
+					_, _, err := consulClient.ConfigEntries().Set(&capi.ServiceIntentionsConfigEntry{
+						Kind: capi.ServiceIntentions,
+						Name: "test",
+						Sources: []*capi.SourceIntention{
+							{
+								Name:      "bar",
+								Namespace: "baz",
+								Action:    capi.IntentionActionDeny,
+							},
 						},
 					}, &capi.WriteOptions{Namespace: namespace})
 					return err
@@ -568,6 +715,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				consul, err := testutil.NewTestServerConfigT(t, nil)
 				req.NoError(err)
 				defer consul.Stop()
+				consul.WaitForServiceIntentions(t)
 				consulClient, err := capi.NewClient(&capi.Config{
 					Address: consul.HTTPAddr,
 				})
@@ -606,16 +754,16 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					resp, err := r.Reconcile(ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
-							Name:      in.KubeResource.Name(),
+							Name:      in.KubeResource.KubernetesName(),
 						},
 					})
 					req.NoError(err)
 					req.False(resp.Requeue)
 
-					_, _, err = consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.Name(), &capi.QueryOptions{
+					_, _, err = consulClient.ConfigEntries().Get(in.ConsulKind, in.KubeResource.ConsulName(), &capi.QueryOptions{
 						Namespace: in.ConsulNamespace,
 					})
-					req.EqualError(err, fmt.Sprintf(`Unexpected response code: 404 (Config entry not found for "%s" / "%s")`, in.ConsulKind, in.KubeResource.Name()))
+					req.EqualError(err, fmt.Sprintf(`Unexpected response code: 404 (Config entry not found for "%s" / "%s")`, in.ConsulKind, in.KubeResource.ConsulName()))
 				}
 			})
 		}
