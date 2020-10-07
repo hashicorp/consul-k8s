@@ -32,7 +32,6 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
-		"--max-obj-name-len", "256",
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 	})
 
