@@ -248,6 +248,27 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 							Name:   "baz",
 							Action: "deny",
 						},
+						&v1alpha1.SourceIntention{
+							Name: "bax",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -269,6 +290,9 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, capi.IntentionActionAllow, svcIntentions.Sources[0].Action)
 				require.Equal(t, "baz", svcIntentions.Sources[1].Name)
 				require.Equal(t, capi.IntentionActionDeny, svcIntentions.Sources[1].Action)
+				require.Equal(t, "bax", svcIntentions.Sources[2].Name)
+				require.Equal(t, capi.IntentionActionAllow, svcIntentions.Sources[2].Permissions[0].Action)
+				require.Equal(t, "/path", svcIntentions.Sources[2].Permissions[0].HTTP.PathExact)
 			},
 		},
 	}
@@ -571,6 +595,27 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 							Name:   "bar",
 							Action: "allow",
 						},
+						&v1alpha1.SourceIntention{
+							Name: "baz",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -587,11 +632,13 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			updateF: func(resource common.ConfigEntryResource) {
 				svcIntentions := resource.(*v1alpha1.ServiceIntentions)
 				svcIntentions.Spec.Sources[0].Action = "deny"
+				svcIntentions.Spec.Sources[1].Permissions[0].Action = "deny"
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
 				configEntry, ok := consulEntry.(*capi.ServiceIntentionsConfigEntry)
 				require.True(t, ok, "cast error")
 				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[0].Action)
+				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[1].Permissions[0].Action)
 			},
 		},
 	}
@@ -858,6 +905,27 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
 							Action: "allow",
+						},
+						&v1alpha1.SourceIntention{
+							Name: "baz",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -1289,6 +1357,27 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 							Name:   "bar",
 							Action: "deny",
 						},
+						&v1alpha1.SourceIntention{
+							Name: "baz",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 				Status: v1alpha1.Status{
@@ -1518,6 +1607,27 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 						&v1alpha1.SourceIntention{
 							Name:   "bar",
 							Action: "deny",
+						},
+						&v1alpha1.SourceIntention{
+							Name: "baz",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -1862,6 +1972,27 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 							Name:   "bar",
 							Action: "allow",
 						},
+						&v1alpha1.SourceIntention{
+							Name: "baz",
+							Permissions: v1alpha1.IntentionPermissions{
+								&v1alpha1.IntentionPermission{
+									Action: "allow",
+									HTTP: &v1alpha1.IntentionHTTPPermission{
+										PathExact: "/path",
+										Header: v1alpha1.IntentionHTTPHeaderPermissions{
+											v1alpha1.IntentionHTTPHeaderPermission{
+												Name:    "auth",
+												Present: true,
+											},
+										},
+										Methods: []string{
+											"PUT",
+											"GET",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1876,9 +2007,9 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				}
 			},
 			confirmDelete: func(t *testing.T, cli client.Client, ctx context.Context, name types.NamespacedName) {
-				svcSplitter := &v1alpha1.ServiceIntentions{}
-				_ = cli.Get(ctx, name, svcSplitter)
-				require.Empty(t, svcSplitter.Finalizers())
+				svcIntentions := &v1alpha1.ServiceIntentions{}
+				_ = cli.Get(ctx, name, svcIntentions)
+				require.Empty(t, svcIntentions.Finalizers())
 			},
 		},
 	}
