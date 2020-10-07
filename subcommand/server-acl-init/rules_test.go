@@ -314,6 +314,7 @@ func TestSyncRules(t *testing.T) {
 		ConsulSyncDestinationNamespace string
 		EnableSyncK8SNSMirroring       bool
 		SyncK8SNSMirroringPrefix       string
+		SyncConsulNodeName             string
 		Expected                       string
 	}{
 		{
@@ -322,7 +323,25 @@ func TestSyncRules(t *testing.T) {
 			"sync-namespace",
 			true,
 			"prefix-",
+			"k8s-sync",
 			`node "k8s-sync" {
+    policy = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "write"
+  }`,
+		},
+		{
+			"Namespaces are disabled, non-default node name",
+			false,
+			"sync-namespace",
+			true,
+			"prefix-",
+			"new-node-name",
+			`node "new-node-name" {
     policy = "write"
   }
   node_prefix "" {
@@ -338,7 +357,28 @@ func TestSyncRules(t *testing.T) {
 			"sync-namespace",
 			false,
 			"prefix-",
+			"k8s-sync",
 			`node "k8s-sync" {
+    policy = "write"
+  }
+operator = "write"
+namespace "sync-namespace" {
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			"Namespaces are enabled, mirroring disabled, non-default node name",
+			true,
+			"sync-namespace",
+			false,
+			"prefix-",
+			"new-node-name",
+			`node "new-node-name" {
     policy = "write"
   }
 operator = "write"
@@ -357,7 +397,28 @@ namespace "sync-namespace" {
 			"sync-namespace",
 			true,
 			"",
+			"k8s-sync",
 			`node "k8s-sync" {
+    policy = "write"
+  }
+operator = "write"
+namespace_prefix "" {
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			"Namespaces are enabled, mirroring enabled, prefix empty, non-default node name",
+			true,
+			"sync-namespace",
+			true,
+			"",
+			"new-node-name",
+			`node "new-node-name" {
     policy = "write"
   }
 operator = "write"
@@ -376,7 +437,28 @@ namespace_prefix "" {
 			"sync-namespace",
 			true,
 			"prefix-",
+			"k8s-sync",
 			`node "k8s-sync" {
+    policy = "write"
+  }
+operator = "write"
+namespace_prefix "prefix-" {
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			"Namespaces are enabled, mirroring enabled, prefix defined, non-default node name",
+			true,
+			"sync-namespace",
+			true,
+			"prefix-",
+			"new-node-name",
+			`node "new-node-name" {
     policy = "write"
   }
 operator = "write"
@@ -400,6 +482,7 @@ namespace_prefix "prefix-" {
 				flagConsulSyncDestinationNamespace: tt.ConsulSyncDestinationNamespace,
 				flagEnableSyncK8SNSMirroring:       tt.EnableSyncK8SNSMirroring,
 				flagSyncK8SNSMirroringPrefix:       tt.SyncK8SNSMirroringPrefix,
+				flagSyncConsulNodeName:             tt.SyncConsulNodeName,
 			}
 
 			syncRules, err := cmd.syncRules()
