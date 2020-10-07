@@ -187,6 +187,7 @@ func (in *ServiceIntentions) Validate() error {
 	return nil
 }
 
+// Default sets zero value fields on this object to their defaults.
 func (in *ServiceIntentions) Default() {
 	if in.Spec.Destination.Namespace == "" {
 		in.Spec.Destination.Namespace = in.Namespace
