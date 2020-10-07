@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,8 @@ type Command struct {
 
 	flagCreateClientToken bool
 
-	flagCreateSyncToken bool
+	flagCreateSyncToken    bool
+	flagSyncConsulNodeName string
 
 	flagCreateInjectToken      bool
 	flagCreateInjectAuthMethod bool
@@ -107,8 +109,12 @@ func (c *Command) init() {
 		"Toggle for updating the anonymous token to allow DNS queries to work")
 	c.flags.BoolVar(&c.flagCreateClientToken, "create-client-token", true,
 		"Toggle for creating a client agent token. Default is true.")
+
 	c.flags.BoolVar(&c.flagCreateSyncToken, "create-sync-token", false,
 		"Toggle for creating a catalog sync token.")
+	c.flags.StringVar(&c.flagSyncConsulNodeName, "sync-consul-node-name", "k8s-sync",
+		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
+			"via DNS, the name should only contain alpha-numerics and dashes.")
 
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
 		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
@@ -215,12 +221,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
-	if len(c.flagServerAddresses) == 0 {
-		c.UI.Error("-server-address must be set at least once")
-		return 1
-	}
-	if c.flagResourcePrefix == "" {
-		c.UI.Error("-resource-prefix must be set")
+
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -767,6 +771,39 @@ func (c *Command) createAnonymousPolicy() bool {
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
 			(c.flagCreateInjectAuthMethod && c.flagCreateACLReplicationToken))
+}
+
+func (c *Command) validateFlags() error {
+	if len(c.flagServerAddresses) == 0 {
+		return errors.New("-server-address must be set at least once")
+	}
+
+	if c.flagResourcePrefix == "" {
+		return errors.New("-resource-prefix must be set")
+	}
+
+	// For the Consul node name to be discoverable via DNS, it must contain only
+	// dashes and alphanumeric characters. Length is also constrained.
+	// These restrictions match those defined in Consul's agent definition.
+	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	const maxDNSLabelLength = 63
+
+	if invalidDnsRe.MatchString(c.flagSyncConsulNodeName) {
+		return fmt.Errorf("-sync-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to invalid characters. Valid characters include "+
+			"all alpha-numerics and dashes",
+			c.flagSyncConsulNodeName,
+		)
+	}
+	if len(c.flagSyncConsulNodeName) > maxDNSLabelLength {
+		return fmt.Errorf("-sync-consul-node-name=%s is invalid: node name will not be discoverable "+
+			"via DNS due to it being too long. Valid lengths are between "+
+			"1 and 63 bytes",
+			c.flagSyncConsulNodeName,
+		)
+	}
+
+	return nil
 }
 
 const consulDefaultNamespace = "default"

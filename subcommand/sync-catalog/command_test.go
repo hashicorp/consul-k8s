@@ -16,6 +16,39 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// Test flag validation
+func TestRun_FlagValidation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		Flags  []string
+		ExpErr string
+	}{
+		{
+			Flags: []string{"-consul-node-name=Speci@l_Chars"},
+			ExpErr: "-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
+				"via DNS due to invalid characters. Valid characters include all alpha-numerics and dashes",
+		},
+		{
+			Flags: []string{"-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long"},
+			ExpErr: "-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long is invalid: node name will not be discoverable " +
+				"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.ExpErr, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			responseCode := cmd.Run(c.Flags)
+			require.Equal(t, 1, responseCode, ui.ErrorWriter.String())
+			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
+		})
+	}
+}
+
 // Test that the default consul service is synced to k8s
 func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	t.Parallel()

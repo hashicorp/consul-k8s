@@ -14,6 +14,7 @@ type rulesData struct {
 	InjectConsulDestNS      string
 	InjectEnableNSMirroring bool
 	InjectNSMirroringPrefix string
+	SyncConsulNodeName      string
 }
 
 type gatewayRulesData struct {
@@ -177,7 +178,7 @@ namespace "{{ .GatewayNamespace }}" {
 
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
-  node "k8s-sync" {
+  node "{{ .SyncConsulNodeName }}" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
@@ -273,6 +274,7 @@ func (c *Command) rulesData() rulesData {
 		InjectConsulDestNS:      c.flagConsulInjectDestinationNamespace,
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
+		SyncConsulNodeName:      c.flagSyncConsulNodeName,
 	}
 }
 
