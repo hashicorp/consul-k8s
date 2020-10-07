@@ -2,11 +2,20 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceDefaults
 metadata:
   name: svc1
+spec:
+  protocol: http
 ---
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceDefaults
 metadata:
   name: svc2
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: svc3
+spec:
+  protocol: http
 ---
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceIntentions
@@ -18,3 +27,11 @@ spec:
   sources:
   - name: svc2
     action: allow
+  - name: svc3
+    permissions:
+    - action: allow
+      http:
+        methods:
+        - GET
+        - PUT
+        pathExact: "/foo"

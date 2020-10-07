@@ -114,6 +114,7 @@ func TestController(t *testing.T) {
 					svcIntentionsEntry, ok := entry.(*api.ServiceIntentionsConfigEntry)
 					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
 					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[0].Action)
+					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[1].Permissions[0].Action)
 				})
 			}
 
@@ -139,7 +140,7 @@ func TestController(t *testing.T) {
 				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicesplitter", "splitter", "-p", `{"spec": {"splits": [{"weight": 50}, {"weight": 50, "service": "other-splitter"}]}}`, "--type=merge")
 
 				t.Log("patching service-intentions custom resource")
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}]}}`, "--type=merge")
+				helpers.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}, {"name": "svc3", "permissions": [{"action": "deny", "http": {"pathExact": "/foo", "methods": ["GET", "PUT"]}}]}]}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -186,6 +187,7 @@ func TestController(t *testing.T) {
 					svcIntentions, ok := entry.(*api.ServiceIntentionsConfigEntry)
 					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
 					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[0].Action)
+					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[1].Permissions[0].Action)
 				})
 			}
 
