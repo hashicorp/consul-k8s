@@ -6,6 +6,8 @@ IMPROVEMENTS:
 * Catalog Sync: Can now be run when Consul clients are disabled. It will make API calls to the Consul servers instead. [[GH-570](https://github.com/hashicorp/consul-helm/pull/570)]
 * Catalog Sync: Add support for changing the Consul node name where services are sync'd. [[GH-580](https://github.com/hashicorp/consul-helm/pull/580)]
 * Support for setting `priorityClassName` for sync-catalog and connect-inject deployments. [[GH-609](https://github.com/hashicorp/consul-helm/pull/609)]
+* Updated the default Consul image to `consul:1.8.4`.
+* Updated the default Envoy image to `envoyproxy/envoy-alpine:v1.14.4`.
 
 BREAKING CHANGES:
 * `connectInject.imageEnvoy` and `meshGateway.imageEnvoy` have been removed and now inherit from `global.imageEnvoy`
