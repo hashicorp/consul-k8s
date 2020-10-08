@@ -1,0 +1,7 @@
+# this is a generated file used for operator sdk during code generation of CRDs, Controllers and webhooks
+domain: hashicorp.com
+layout: go.kubebuilder.io/v2
+repo: github.com/hashicorp/consul-k8s
+version: 3-alpha
+plugins:
+  go.operator-sdk.io/v2-alpha: {}

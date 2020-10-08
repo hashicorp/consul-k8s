@@ -47,6 +47,8 @@ type Command struct {
 	flagInjectAuthMethodHost   string
 	flagBindingRuleSelector    string
 
+	flagCreateControllerToken bool
+
 	flagCreateEntLicenseToken bool
 
 	flagCreateSnapshotAgentToken bool
@@ -125,6 +127,9 @@ func (c *Command) init() {
 			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
+
+	c.flags.BoolVar(&c.flagCreateControllerToken, "create-controller-token", false,
+		"Toggle for creating a token for the controller.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
@@ -634,6 +639,19 @@ func (c *Command) Run(args []string) int {
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
 		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateControllerToken {
+		rules, err := c.controllerRules()
+		if err != nil {
+			c.log.Error("Error templating controller token rules", "err", err)
+			return 1
+		}
+		err = c.createLocalACL("controller", rules, consulDC, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1

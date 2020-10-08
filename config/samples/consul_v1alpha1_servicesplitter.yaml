@@ -1,0 +1,7 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceSplitter
+metadata:
+  name: servicesplitter-sample
+spec:
+  # Add fields here
+  foo: bar
