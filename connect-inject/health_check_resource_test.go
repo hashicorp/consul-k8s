@@ -1,12 +1,17 @@
 package connectinject
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -417,7 +422,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 
 				if tt.InitialState != testDoNotRegister {
 					// Create a passing service
-					server.AddService(t, testServiceNameReg, "passing", nil)
+					server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 				}
 				if tt.PreCreateHealthCheck {
 					// register the health check if this is not an object create path
@@ -458,4 +463,115 @@ func TestHealthCheckHandlers(t *testing.T) {
 			})
 		}
 	}
+}
+
+// Test that if the agent is unavailable reconcile will fail on the pod
+// and once the agent becomes available reconcile will correctly
+// update the checks after its loop timer passes
+func TestReconcileRun(t *testing.T) {
+	var err error
+	require := require.New(t)
+
+	// Start the clientset with a Pod that is failed
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: "default",
+			Labels:    map[string]string{labelInject: "true"},
+			Annotations: map[string]string{
+				annotationStatus:  "injected",
+				annotationService: testServiceNameAnnotation,
+			},
+		},
+		Spec: testPodSpec,
+		Status: corev1.PodStatus{
+			HostIP: "127.0.0.1",
+			Phase:  corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionFalse,
+			}},
+		},
+	}
+	k8sclientset := fake.NewSimpleClientset(pod)
+	randomPorts := freeport.MustTake(6)
+
+	schema := "http://"
+	serverAddress := fmt.Sprintf("%s%s:%d", schema, "127.0.0.1", randomPorts[1])
+
+	// setup consul client connection
+	clientConfig := &api.Config{Address: serverAddress}
+	require.NoError(err)
+	client, err := api.NewClient(clientConfig)
+	require.NoError(err)
+	consulUrl, err := url.Parse(serverAddress)
+	require.NoError(err)
+
+	healthResource := HealthCheckResource{
+		Log:                 hclog.Default().Named("healthCheckResource"),
+		KubernetesClientset: k8sclientset,
+		ConsulUrl:           consulUrl,
+		ReconcilePeriod:     5 * time.Second,
+	}
+	ctl := &controller.Controller{
+		Log:      hclog.Default().Named("healthCheckController"),
+		Resource: &healthResource,
+	}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
+	// start the controller
+	go func() {
+		ctl.Run(ctx.Done())
+	}()
+	time.Sleep(time.Second * 1)
+
+	testServerReady := make(chan bool)
+	var srv *testutil.TestServer
+	go func() {
+		srv, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			c.Ports = &testutil.TestPortConfig{
+				DNS:     randomPorts[0],
+				HTTP:    randomPorts[1],
+				HTTPS:   randomPorts[2],
+				SerfLan: randomPorts[3],
+				SerfWan: randomPorts[4],
+				Server:  randomPorts[5],
+			}
+		})
+		require.NoError(err)
+		close(testServerReady)
+	}()
+	// Wait for server to come up
+	select {
+	case <-testServerReady:
+		defer srv.Stop()
+	}
+	// validate that there is no health check created by reconciler
+	check := getConsulAgentChecks(t, client)
+	require.Nil(check)
+	// Add the service
+	// TODO: can this be done inside the cfg func when creating the server instance?
+	srv.AddService(t, testServiceNameReg, api.HealthPassing, nil)
+
+	timer := &retry.Timer{Timeout: 15 * time.Second, Wait: 5 * time.Second}
+	var actual *api.AgentCheck
+	retry.RunWith(timer, t, func(r *retry.R) {
+		actual = getConsulAgentChecks(t, client)
+		if actual == nil {
+			r.Error("check = nil")
+		}
+	})
+
+	expectedCheck := &api.AgentCheck{
+		CheckID: testHealthCheckID,
+		Status:  api.HealthCritical,
+		Notes:   testFailureMessage,
+		Output:  testFailureMessage,
+	}
+
+	require.Equal("Kubernetes Health Check", actual.Name)
+	require.Equal(expectedCheck.CheckID, actual.CheckID)
+	require.Equal(expectedCheck.Status, actual.Status)
+	require.Equal("ttl", actual.Type)
 }
