@@ -136,7 +136,6 @@ jobs:
             gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 20m -failfast \
               -enable-enterprise \
               -enable-multi-cluster \
-              -run TestController \
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
