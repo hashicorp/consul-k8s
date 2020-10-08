@@ -34,7 +34,7 @@ func TestRun_ArgValidation(t *testing.T) {
 		},
 		{
 			[]string{"-k8s-namespace=default", "-timeout=10jd", "job-name"},
-			"\"10jd\" is not a valid timeout: time: unknown unit jd in duration 10jd",
+			"\"10jd\" is not a valid timeout",
 		},
 	}
 	for _, c := range cases {
