@@ -1,5 +1,17 @@
 ## Unreleased
 
+FEATURES:
+
+* Support deploying this Helm chart to OpenShift. [[GH-600](https://github.com/hashicorp/consul-helm/pull/600)]
+
+  To install on OpenShift, set `global.openshift.enabled` to `true`:
+
+  ```sh
+  helm install consul hashicorp/consul \
+    --set global.name=consul \
+    --set global.openshift.enabled=true
+  ```
+
 IMPROVEMENTS:
 
 * Add `dns.type` and `dns.additionalSpec` settings for changing the DNS service type and adding additional spec. [[GH-555](https://github.com/hashicorp/consul-helm/pull/555)]
