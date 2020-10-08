@@ -1,5 +1,24 @@
 ## UNRELEASED
 
+FEATURES:
+* Add beta support for new commands `consul-k8s controller` and `consul-k8s webhook-cert-manager`. [[GH-353](https://github.com/hashicorp/consul-k8s/pull/353)]
+
+  `controller` will start a Kubernetes controller that acts on Consul
+  Custom Resource Definitions. The currently supported CRDs are:
+    * `ProxyDefaults` - https://www.consul.io/docs/agent/config-entries/proxy-defaults
+    * `ServiceDefaults` - https://www.consul.io/docs/agent/config-entries/service-defaults
+    * `ServiceSplitter` - https://www.consul.io/docs/agent/config-entries/service-splitter
+    * `ServiceRouter` - https://www.consul.io/docs/agent/config-entries/service-router
+    * `ServiceResolver` - https://www.consul.io/docs/agent/config-entries/service-resolver
+    * `ServiceIntentions` (requires Consul >= 1.9.0) - https://www.consul.io/docs/agent/config-entries/service-intentions
+   
+   See [https://www.consul.io/docs/k8s/connect/crds](https://www.consul.io/docs/k8s/connect/crds)
+   for more information on the CRD schemas. **Requires Consul >= 1.8.4**.
+   
+   `webhook-cert-manager` manages certificates for Kubernetes webhooks. It will
+   refresh expiring certificates and update corresponding secrets and mutating
+   webhook configurations.
+
 BREAKING CHANGES:
 * Connect: No longer set `--max-obj-name-len` flag when executing `envoy`. This flag
   was [deprecated](https://www.envoyproxy.io/docs/envoy/latest/version_history/v1.11.0#deprecated)
