@@ -165,13 +165,6 @@ func TestRun_ValidationHealthCheckEnv(t *testing.T) {
 				"-enable-health-checks-controller=true"},
 			expErr: "Error parsing CONSUL_HTTP_ADDR: parse \"0.0.0.0:999999\": first path segment in URL cannot contain colon",
 		},
-		{
-			envVars: []string{"CONSUL_HTTP_ADDR", "http://0.0.0.0:1234"},
-			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s",
-				"-enable-health-checks-controller=true",
-				"-health-checks-reconcile-period=abcdefg"},
-			expErr: "Error parsing health-checks-reconcile-period",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {

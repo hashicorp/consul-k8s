@@ -126,9 +126,6 @@ func TestHandlerHandle(t *testing.T) {
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"testLabel": "123",
-						},
 						Annotations: map[string]string{
 							annotationUpstreams: "echo:1234,db:1234",
 						},
@@ -181,7 +178,7 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
+					Path:      "/metadata/labels",
 				},
 			},
 		},
@@ -402,6 +399,56 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+			},
+		},
+		{
+			"pod with existing label",
+			Handler{
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+			},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"testLabel": "123",
+						},
+					},
+
+					Spec: basicSpec,
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
 				},
 			},
 		},
