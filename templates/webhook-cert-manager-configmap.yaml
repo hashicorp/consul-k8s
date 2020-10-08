@@ -1,0 +1,28 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: webhook-cert-manager
+data:
+  webhook-config.json: |-
+    [
+      {
+        "name": "{{ template "consul.fullname" . }}-controller-mutating-webhook-configuration",
+        "tlsAutoHosts": [
+          "{{ template "consul.fullname" . }}-controller-webhook",
+          "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc",
+          "{{ template "consul.fullname" . }}-controller-webhook.{{ .Release.Namespace }}.svc.cluster.local"
+        ],
+        "secretName": "{{ template "consul.fullname" . }}-controller-webhook-cert",
+        "secretNamespace": "{{ .Release.Namespace }}"
+      }
+    ]
+
+{{- end }}

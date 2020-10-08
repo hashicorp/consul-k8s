@@ -1,0 +1,127 @@
+{{- if .Values.controller.enabled }}
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ template "consul.fullname" . }}-controller-mutating-webhook-configuration
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: controller
+webhooks:
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-proxydefaults
+  failurePolicy: Fail
+  name: mutate-proxydefaults.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - proxydefaults
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicedefaults
+  failurePolicy: Fail
+  name: mutate-servicedefaults.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - servicedefaults
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-serviceresolver
+  failurePolicy: Fail
+  name: mutate-serviceresolver.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - serviceresolvers
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicerouter
+  failurePolicy: Fail
+  name: mutate-servicerouter.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - servicerouters
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicesplitter
+  failurePolicy: Fail
+  name: mutate-servicesplitter.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - servicesplitters
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-serviceintentions
+  failurePolicy: Fail
+  name: mutate-serviceintentions.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - serviceintentions
+  sideEffects: None
+{{- end }}

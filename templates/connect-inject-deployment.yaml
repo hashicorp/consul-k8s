@@ -205,7 +205,7 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
-          {{- end }}
+            {{- end }}
           {{- with .Values.connectInject.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
