@@ -346,14 +346,14 @@ func (c *Command) Run(args []string) int {
 	if c.flagEnableHealthChecks {
 		// channel used for health checks
 		// also check to see if we should enable TLS
-		consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+		consulAddr := os.Getenv(api.HTTPAddrEnvName)
 		if consulAddr == "" {
-			c.UI.Error("CONSUL_HTTP_ADDR is not specified")
+			c.UI.Error(fmt.Sprintf("%s is not specified", api.HTTPAddrEnvName))
 			return 1
 		}
 		consulUrl, err := url.Parse(consulAddr)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
+			c.UI.Error(fmt.Sprintf("Error parsing %s: %s", api.HTTPAddrEnvName, err))
 			return 1
 		}
 
