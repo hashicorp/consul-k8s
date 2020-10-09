@@ -235,7 +235,7 @@ func TestRun_CommandExitsCleanlyAfterSigInt(t *testing.T) {
 	// Assert that it exits cleanly or timeout.
 	select {
 	case exitCode := <-exitChan:
-		require.Equal(t, 0, exitCode)
+		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 	case <-time.After(time.Second * 1):
 		// Fail if the stopCh was not caught.
 		require.Fail(t, "timeout waiting for command to exit")
