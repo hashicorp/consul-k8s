@@ -8,6 +8,11 @@ metadata:
   creationTimestamp: null
   name: servicesplitters.consul.hashicorp.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=="Synced")].status
+    description: The sync status of the resource with Consul
+    name: Synced
+    type: string
   group: consul.hashicorp.com
   names:
     kind: ServiceSplitter
