@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -465,6 +464,41 @@ func TestHealthCheckHandlers(t *testing.T) {
 	}
 }
 
+// Test that stopch works for Reconciler
+func TestReconcilerShutdown(t *testing.T) {
+	require := require.New(t)
+	k8sclientset := fake.NewSimpleClientset()
+	serverAddress := "http://127.0.0.1:999999"
+	consulUrl, err := url.Parse(serverAddress)
+	require.NoError(err)
+	healthResource := HealthCheckResource{
+		Log:                 hclog.Default().Named("healthCheckResource"),
+		KubernetesClientset: k8sclientset,
+		ConsulUrl:           consulUrl,
+		ReconcilePeriod:     5 * time.Second,
+	}
+
+	reconcilerRunningCtx := make(chan struct{})
+	reconcilerShutdownSuccess := make(chan bool)
+	go func() {
+		// starting the reconciler
+		healthResource.Run(reconcilerRunningCtx)
+		close(reconcilerShutdownSuccess)
+	}()
+	// trigger shutdown of the reconciler
+	close(reconcilerRunningCtx)
+
+	select {
+	case <-reconcilerShutdownSuccess:
+		// we're expecting the function to exit gracefully so no assertion needed
+		return
+	case <-time.After(time.Second * 1):
+		// fail if the stopCh was not caught
+		require.Fail("timeout waiting for reconciler to shutdown")
+	}
+
+}
+
 // Test that if the agent is unavailable reconcile will fail on the pod
 // and once the agent becomes available reconcile will correctly
 // update the checks after its loop timer passes
@@ -495,7 +529,6 @@ func TestReconcileRun(t *testing.T) {
 	}
 	k8sclientset := fake.NewSimpleClientset(pod)
 	randomPorts := freeport.MustTake(6)
-
 	schema := "http://"
 	serverAddress := fmt.Sprintf("%s%s:%d", schema, "127.0.0.1", randomPorts[1])
 
@@ -511,20 +544,17 @@ func TestReconcileRun(t *testing.T) {
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: k8sclientset,
 		ConsulUrl:           consulUrl,
-		ReconcilePeriod:     5 * time.Second,
-	}
-	ctl := &controller.Controller{
-		Log:      hclog.Default().Named("healthCheckController"),
-		Resource: &healthResource,
+		ReconcilePeriod:     100 * time.Millisecond,
 	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	// start the controller
+	// start the reconciler
 	go func() {
-		ctl.Run(ctx.Done())
+		healthResource.Run(ctx.Done())
 	}()
-	time.Sleep(time.Second * 1)
+	// let reconcile run at least once
+	time.Sleep(time.Millisecond * 300)
 
 	testServerReady := make(chan bool)
 	var srv *testutil.TestServer
@@ -550,14 +580,17 @@ func TestReconcileRun(t *testing.T) {
 	// validate that there is no health check created by reconciler
 	check := getConsulAgentChecks(t, client)
 	require.Nil(check)
-	// Add the service
-	// TODO: can this be done inside the cfg func when creating the server instance?
+	// Add the service - only now will a health check have a service to register against
 	srv.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 
-	timer := &retry.Timer{Timeout: 15 * time.Second, Wait: 5 * time.Second}
+	// retry so we can cover time period when reconciler is already running vs
+	// when it will run next based on the loop
+	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}
 	var actual *api.AgentCheck
 	retry.RunWith(timer, t, func(r *retry.R) {
 		actual = getConsulAgentChecks(t, client)
+		// the assertion is not on actual != nil, but below
+		// against an expected check.
 		if actual == nil {
 			r.Error("check = nil")
 		}
@@ -569,7 +602,7 @@ func TestReconcileRun(t *testing.T) {
 		Notes:   testFailureMessage,
 		Output:  testFailureMessage,
 	}
-
+	// Validate the checks are set
 	require.Equal("Kubernetes Health Check", actual.Name)
 	require.Equal(expectedCheck.CheckID, actual.CheckID)
 	require.Equal(expectedCheck.Status, actual.Status)
