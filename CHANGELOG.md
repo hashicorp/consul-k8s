@@ -12,6 +12,44 @@ FEATURES:
     --set global.openshift.enabled=true
   ```
 
+* Beta support for custom resource definitions. [[GH-636](https://github.com/hashicorp/consul-helm/pull/636)]
+
+  **Requires Consul >= 1.8.4.**
+  
+  The currently supported CRDs can be used to manage Consul's [Configuration Entries](https://www.consul.io/docs/agent/config-entries),
+  specifically:
+    * `ProxyDefaults` - https://www.consul.io/docs/agent/config-entries/proxy-defaults
+    * `ServiceDefaults` - https://www.consul.io/docs/agent/config-entries/service-defaults
+    * `ServiceSplitter` - https://www.consul.io/docs/agent/config-entries/service-splitter
+    * `ServiceRouter` - https://www.consul.io/docs/agent/config-entries/service-router
+    * `ServiceResolver` - https://www.consul.io/docs/agent/config-entries/service-resolver
+    * `ServiceIntentions` (requires Consul >= 1.9.0) - https://www.consul.io/docs/agent/config-entries/service-intentions
+
+  An example use looks like:
+
+  ```yaml
+  apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceDefaults
+  metadata:
+    name: defaults
+  spec:
+    protocol: "http"
+  ```
+
+  See [https://www.consul.io/docs/k8s/connect/crds](https://www.consul.io/docs/k8s/connect/crds)
+  for more information on the CRD schemas.
+
+  To enable, set `controller.enabled: true` in your Helm configuration:
+
+  ```yaml
+  controller:
+    enabled: true
+  ```
+
+  This will install the CRDs, the controller that watches for CR creation, and
+  a webhook certificate manager that manages the certificates for the controller's
+  webhooks.
+
 IMPROVEMENTS:
 
 * Add `dns.type` and `dns.additionalSpec` settings for changing the DNS service type and adding additional spec. [[GH-555](https://github.com/hashicorp/consul-helm/pull/555)]
