@@ -32,16 +32,16 @@ type HealthCheckResource struct {
 
 	// ConsulUrl holds the url information for client connections
 	ConsulUrl *url.URL
-	// ReconcilePeriod is the period by which reconcile gets called, default to 1 minute
+	// ReconcilePeriod is the period by which reconcile gets called, default to 1 minute.
 	ReconcilePeriod time.Duration
 
 	Ctx  context.Context
 	lock sync.Mutex
 }
 
-// Run is the long-running runloop for periodically running Reconcile
-// it initially starts a Reconcile phase at startup and then calls Reconcile
-// once every ReconcilePeriod time
+// Run is the long-running runloop for periodically running Reconcile.
+// It initially reconciles at startup and is then invoked after every
+// ReconcilePeriod expires.
 func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 	// Start the background watchers
 	err := h.Reconcile()
@@ -68,16 +68,16 @@ func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 }
 
 // Delete is not implemented because it is handled by the preStop phase whereby all services
-// related to the pod are deregistered which also deregisters health checks
+// related to the pod are deregistered which also deregisters health checks.
 func (h *HealthCheckResource) Delete(string) error {
 	return nil
 }
 
 // Informer starts a sharedindex informer which watches and lists corev1.Pod objects
-// which meet the filter of labelInject
+// which meet the filter of labelInject.
 func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		// ListWatch takes a List and Watch function which we filter based on label which was injected
+		// ListWatch takes a List and Watch function which we filter based on label which was injected.
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return h.KubernetesClientset.CoreV1().Pods(metav1.NamespaceAll).List(h.Ctx,
@@ -97,7 +97,7 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 // Upsert processes a create or update event.
 // Two primary use cases are handled, new pods will get a new consul TTL health check
 // registered against their respective agent and service, and updates to pods will have
-// this TTL health check updated to reflect the pod status.
+// this TTL health check updated to reflect the pod's readiness status.
 func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	pod, ok := raw.(*corev1.Pod)
 	if !ok {
@@ -114,7 +114,7 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	h.Log.Debug("processing pod", "name", pod.Name)
 	if !h.shouldProcess(pod) {
-		// Skip pods that are not running or have not been properly injected
+		// skip pods that are not running or have not been properly injected
 		return nil
 	}
 	// fetch the identifiers we will use to interact with the Consul agent for this pod
@@ -158,7 +158,7 @@ func (h *HealthCheckResource) Reconcile() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.Log.Debug("starting reconcile")
-	// First grab the list of Pods which have the label labelInject
+	// get the list of Pods which have the label labelInject
 	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(h.Ctx,
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
@@ -214,7 +214,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 	return nil
 }
 
-// getServiceCheck will return the health check for this pod+service or nil if it doesnt exist yet
+// getServiceCheck will return the health check for this pod and service if it exists.
 func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID string) (*api.AgentCheck, error) {
 	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
@@ -246,7 +246,7 @@ func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, 
 	return "", "", fmt.Errorf("no ready status for pod: %s", pod.Name)
 }
 
-// getConsulClient returns a new *api.Client pointed at the consul agent local to the pod
+// getConsulClient returns an *api.Client that points at the consul agent local to the pod.
 func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, error) {
 	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
 	localConfig := api.DefaultConfig()
