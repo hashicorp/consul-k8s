@@ -1,7 +1,5 @@
 ## UNRELEASED
 
-## 0.19.0 (Oct 12, 2020)
-
 FEATURES:
 * Add beta support for new commands `consul-k8s controller` and `consul-k8s webhook-cert-manager`. [[GH-353](https://github.com/hashicorp/consul-k8s/pull/353)]
 
