@@ -316,7 +316,7 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: spec.splits: Invalid value: "[{\"weight\":90},{\"weight\":5}]": the sum of weights across all splits must add up to a 100 percent, but adds up to 95.000000`,
+			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: spec.splits: Invalid value: "[{\"weight\":90},{\"weight\":5}]": the sum of weights across all splits must add up to 100 percent, but adds up to 95.000000`,
 		},
 		"weight must be between 0.01 and 100": {
 			input: &ServiceSplitter{
@@ -334,7 +334,7 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: [spec.splits[0].weight: Invalid value: 101: weight must be a percentage between 0.01 and 100, spec.splits[1].weight: Invalid value: 0.001: weight must be a percentage between 0.01 and 100, spec.splits: Invalid value: "[{\"weight\":101},{\"weight\":0.001}]": the sum of weights across all splits must add up to a 100 percent, but adds up to 101.000999]`,
+			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: [spec.splits[0].weight: Invalid value: 101: weight must be a percentage between 0.01 and 100, spec.splits[1].weight: Invalid value: 0.001: weight must be a percentage between 0.01 and 100, spec.splits: Invalid value: "[{\"weight\":101},{\"weight\":0.001}]": the sum of weights across all splits must add up to 100 percent, but adds up to 101.000999]`,
 		},
 	}
 	for name, testCase := range cases {

@@ -181,7 +181,7 @@ func (in ServiceSplits) validate(path *field.Path) field.ErrorList {
 	if sumOfWeights != 100 {
 		asJSON, _ := json.Marshal(in)
 		errs = append(errs, field.Invalid(path, string(asJSON),
-			fmt.Sprintf("the sum of weights across all splits must add up to a 100 percent, but adds up to %f", sumOfWeights)))
+			fmt.Sprintf("the sum of weights across all splits must add up to 100 percent, but adds up to %f", sumOfWeights)))
 	}
 
 	return errs
