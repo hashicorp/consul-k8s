@@ -5,6 +5,7 @@ require (
 	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/deckarep/golang-set v1.7.1
 	github.com/digitalocean/godo v1.10.0 // indirect
+	github.com/google/go-cmp v0.3.0
 	github.com/hashicorp/consul/api v1.6.0
 	github.com/hashicorp/consul/sdk v0.6.0
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f

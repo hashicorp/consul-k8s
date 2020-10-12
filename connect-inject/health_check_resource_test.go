@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -32,7 +34,12 @@ const (
 	testTypesReconcileOnly = "reconcile"
 	testUpsert             = "upsert"
 	testReconcile          = "reconcile"
+	ttl                    = "ttl"
+	name                   = "Kubernetes Health Check"
 )
+
+// used by gocmp
+var ignoredFields = []string{"Node", "Namespace", "Definition", "Type", "ServiceID", "ServiceName"}
 
 func getSupportedTestTypes(testTypes string) map[string]bool {
 	switch testTypes {
@@ -142,6 +149,8 @@ func TestHealthCheckHandlers(t *testing.T) {
 				CheckID: testHealthCheckID,
 				Status:  api.HealthPassing,
 				Notes:   testCheckNotesPassing,
+				Type:    ttl,
+				Name:    name,
 			},
 			"",
 		},
@@ -174,6 +183,8 @@ func TestHealthCheckHandlers(t *testing.T) {
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
 				Notes:   testCheckNotesPassing,
+				Type:    ttl,
+				Name:    name,
 			},
 			"",
 		},
@@ -207,6 +218,8 @@ func TestHealthCheckHandlers(t *testing.T) {
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
 				Output:  testFailureMessage,
+				Type:    ttl,
+				Name:    name,
 			},
 			"",
 		},
@@ -239,6 +252,8 @@ func TestHealthCheckHandlers(t *testing.T) {
 				CheckID: testHealthCheckID,
 				Status:  api.HealthPassing,
 				Output:  testCheckNotesPassing,
+				Type:    ttl,
+				Name:    name,
 			},
 			"",
 		},
@@ -272,6 +287,8 @@ func TestHealthCheckHandlers(t *testing.T) {
 				Status:  api.HealthCritical,
 				Notes:   testFailureMessage,
 				Output:  testFailureMessage,
+				Type:    ttl,
+				Name:    name,
 			},
 			"",
 		},
@@ -436,7 +453,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 				if tt.Err != "" {
 					// used in the cases where we're expecting an error from
 					// the controller/handler, in which case do not check agent
-					// checks as they're relevant/created.
+					// checks as they're not relevant/created.
 					require.Error(err, tt.Err)
 					return
 				}
@@ -446,15 +463,11 @@ func TestHealthCheckHandlers(t *testing.T) {
 					require.Equal(tt.Expected, actual)
 				} else {
 					if actual.Status != tt.InitialState {
-						require.Equal(tt.Expected.Output, actual.Output)
+						require.True(true, cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Notes")...)))
 					} else {
 						// no update called
-						require.Equal(tt.Expected.Notes, actual.Notes)
+						require.True(true, cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Output")...)))
 					}
-					require.Equal("Kubernetes Health Check", actual.Name)
-					require.Equal(tt.Expected.CheckID, actual.CheckID)
-					require.Equal(tt.Expected.Status, actual.Status)
-					require.Equal("ttl", actual.Type)
 				}
 			})
 		}
@@ -597,10 +610,9 @@ func TestReconcileRun(t *testing.T) {
 		Status:  api.HealthCritical,
 		Notes:   testFailureMessage,
 		Output:  testFailureMessage,
+		Type:    ttl,
+		Name:    name,
 	}
 	// Validate the checks are set
-	require.Equal("Kubernetes Health Check", actual.Name)
-	require.Equal(expectedCheck.CheckID, actual.CheckID)
-	require.Equal(expectedCheck.Status, actual.Status)
-	require.Equal("ttl", actual.Type)
+	require.True(true, cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Notes")...)))
 }
