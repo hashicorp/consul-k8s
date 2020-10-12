@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 0.19.0 (Oct 12, 2020)
+
 FEATURES:
 * Add beta support for new commands `consul-k8s controller` and `consul-k8s webhook-cert-manager`. [[GH-353](https://github.com/hashicorp/consul-k8s/pull/353)]
 
@@ -35,6 +37,10 @@ IMPROVEMENTS:
 * Add an ability to configure the synthetic Consul node name where catalog sync registers services. [[GH-312](https://github.com/hashicorp/consul-k8s/pull/312)]
   * Sync: Add `-consul-node-name` flag to the `sync-catalog` command to configure the Consul node name for syncing services to Consul.
   * ACLs: Add `-sync-consul-node-name` flag to the server-acl-init command so that it can create correct policy for the sync catalog.
+
+BUG FIXES:
+* Connect: use the first secret of type `kubernetes.io/service-account-token` when creating/updating auth method. [[GH-350](https://github.com/hashicorp/consul-k8s/pull/321)]
+  
 
 ## 0.18.1 (August 10, 2020)
 
