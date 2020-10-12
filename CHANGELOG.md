@@ -36,6 +36,9 @@ IMPROVEMENTS:
   * Sync: Add `-consul-node-name` flag to the `sync-catalog` command to configure the Consul node name for syncing services to Consul.
   * ACLs: Add `-sync-consul-node-name` flag to the server-acl-init command so that it can create correct policy for the sync catalog.
 
+BUG FIXES:
+* Connect: use the first secret of type `kubernetes.io/service-account-token` when creating/updating auth method. [[GH-350](https://github.com/hashicorp/consul-k8s/pull/321)]
+  
 ## 0.18.1 (August 10, 2020)
 
 BUG FIXES:
