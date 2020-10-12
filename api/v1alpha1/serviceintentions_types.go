@@ -71,6 +71,7 @@ type IntentionAction string
 // +kubebuilder:subresource:status
 
 // ServiceIntentions is the Schema for the serviceintentions API
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 type ServiceIntentions struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
