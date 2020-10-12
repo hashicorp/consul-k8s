@@ -166,13 +166,13 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
+						Status: corev1.ConditionFalse,
 					}},
 				},
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
-				Status:  api.HealthPassing,
+				Status:  api.HealthCritical,
 				Notes:   testCheckNotesPassing,
 			},
 			"",
