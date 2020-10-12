@@ -408,9 +408,6 @@ func TestHealthCheckHandlers(t *testing.T) {
 			if _, ok := tt.ValidTests[work]; !ok {
 				continue
 			}
-			//if tt.Name != "PodRunning change to Failed with failure message - change to failed" {
-			//	continue
-			//}
 			t.Run(work+" "+tt.Name, func(t *testing.T) {
 				var err error
 
@@ -496,7 +493,6 @@ func TestReconcilerShutdown(t *testing.T) {
 		// fail if the stopCh was not caught
 		require.Fail("timeout waiting for reconciler to shutdown")
 	}
-
 }
 
 // Test that if the agent is unavailable reconcile will fail on the pod

@@ -346,14 +346,14 @@ func (c *Command) Run(args []string) int {
 	if c.flagEnableHealthChecks {
 		// channel used for health checks
 		// also check to see if we should enable TLS
-		consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+		consulAddr := os.Getenv(api.HTTPAddrEnvName)
 		if consulAddr == "" {
-			c.UI.Error("CONSUL_HTTP_ADDR is not specified")
+			c.UI.Error(fmt.Sprintf("%s is not specified", api.HTTPAddrEnvName))
 			return 1
 		}
 		consulUrl, err := url.Parse(consulAddr)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error parsing CONSUL_HTTP_ADDR: %s", err))
+			c.UI.Error(fmt.Sprintf("Error parsing %s: %s", api.HTTPAddrEnvName, err))
 			return 1
 		}
 
@@ -381,8 +381,15 @@ func (c *Command) Run(args []string) int {
 
 		// Start the health check controller, reconcile is started at the same time
 		// and new events will queue in the informer
+		ctrlExitCh := make(chan error)
 		go func() {
 			ctl.Run(ctx.Done())
+			// If ctl.Run() exits before ctx is cancelled, then our health checks
+			// controller isn't running. In that case we need to shutdown since
+			// this is unrecoverable.
+			if ctx.Err() == nil {
+				ctrlExitCh <- fmt.Errorf("health checks controller exited unexpectedly")
+			}
 		}()
 
 		select {
@@ -395,6 +402,10 @@ func (c *Command) Run(args []string) int {
 			return 0
 
 		case <-serverErrors:
+			return 1
+
+		case err := <-ctrlExitCh:
+			c.UI.Error(fmt.Sprintf("controller error: %v", err))
 			return 1
 		}
 
