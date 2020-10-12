@@ -1,8 +1,10 @@
 ## Unreleased
 
+## 0.25.0 (Oct 12, 2020)
+
 FEATURES:
 
-* Support deploying this Helm chart to OpenShift. [[GH-600](https://github.com/hashicorp/consul-helm/pull/600)]
+* Support deploying this Helm chart to OpenShift 4.x. [[GH-600](https://github.com/hashicorp/consul-helm/pull/600)]
 
   To install on OpenShift, set `global.openshift.enabled` to `true`:
 
@@ -49,6 +51,10 @@ FEATURES:
   This will install the CRDs, the controller that watches for CR creation, and
   a webhook certificate manager that manages the certificates for the controller's
   webhooks.
+
+* Add acceptance test framework and automated acceptance tests to the Helm chart.
+  Please see Contributing docs for more info on how to [run](https://github.com/hashicorp/consul-helm/blob/master/CONTRIBUTING.md#acceptance-tests)
+  and [add](https://github.com/hashicorp/consul-helm/blob/master/CONTRIBUTING.md#writing-acceptance-tests) acceptance tests. [[GH-551](https://github.com/hashicorp/consul-helm/pull/551)]
 
 IMPROVEMENTS:
 

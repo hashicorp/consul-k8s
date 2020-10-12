@@ -53,7 +53,7 @@ global:
   # If using acls.manageSystemACLs then must be >= 0.10.1.
   # If using connect inject then must be >= 0.10.1.
   # If using Consul Enterprise namespaces, must be >= 0.12.
-  imageK8S: "hashicorp/consul-k8s:0.18.1"
+  imageK8S: "hashicorp/consul-k8s:0.19.0"
 
   # datacenter is the name of the datacenter that the agents should register
   # as. This can't be changed once the Consul cluster is up and running
@@ -1008,8 +1008,10 @@ connectInject:
         memory: "150Mi"
         cpu: "50m"
 
-# [Consul 1.9 Beta Support Only]
+# [Beta feature]
 # Controller handles config entry custom resources.
+# Requires consul >= 1.8.4.
+# ServiceIntentions require consul 1.9 Beta or greater.
 controller:
   enabled: false
   replicas: 1
