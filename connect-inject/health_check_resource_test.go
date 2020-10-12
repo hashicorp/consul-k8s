@@ -124,7 +124,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -156,7 +156,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -188,7 +188,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -221,7 +221,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -253,7 +253,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -286,7 +286,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -338,7 +338,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Namespace: "default",
 					Labels:    map[string]string{labelInject: "true"},
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -365,7 +365,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 					Name:      testPodName,
 					Namespace: "default",
 					Annotations: map[string]string{
-						annotationStatus:  "injected",
+						annotationStatus:  injected,
 						annotationService: testServiceNameAnnotation,
 					},
 				},
@@ -513,7 +513,7 @@ func TestReconcileRun(t *testing.T) {
 			Namespace: "default",
 			Labels:    map[string]string{labelInject: "true"},
 			Annotations: map[string]string{
-				annotationStatus:  "injected",
+				annotationStatus:  injected,
 				annotationService: testServiceNameAnnotation,
 			},
 		},

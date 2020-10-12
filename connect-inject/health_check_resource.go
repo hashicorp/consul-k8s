@@ -30,9 +30,10 @@ type HealthCheckResource struct {
 	Log                 hclog.Logger
 	KubernetesClientset kubernetes.Interface
 
-	// ConsulUrl holds the url information for client connections
+	// ConsulUrl holds the url information for client connections.
 	ConsulUrl *url.URL
-	// ReconcilePeriod is the period by which reconcile gets called, default to 1 minute
+	// ReconcilePeriod is the period by which reconcile gets called
+	// default to 1 minute.
 	ReconcilePeriod time.Duration
 
 	Ctx  context.Context
@@ -41,9 +42,8 @@ type HealthCheckResource struct {
 
 // Run is the long-running runloop for periodically running Reconcile
 // it initially starts a Reconcile phase at startup and then calls Reconcile
-// once every ReconcilePeriod time
+// once every ReconcilePeriod time.
 func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
-	// Start the background watchers
 	err := h.Reconcile()
 	if err != nil {
 		h.Log.Error("reconcile returned an error", "err", err)
@@ -68,13 +68,13 @@ func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 }
 
 // Delete is not implemented because it is handled by the preStop phase whereby all services
-// related to the pod are deregistered which also deregisters health checks
+// related to the pod are deregistered which also deregisters health checks.
 func (h *HealthCheckResource) Delete(string) error {
 	return nil
 }
 
 // Informer starts a sharedindex informer which watches and lists corev1.Pod objects
-// which meet the filter of labelInject
+// which meet the filter of labelInject.
 func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		// ListWatch takes a List and Watch function which we filter based on label which was injected
@@ -111,6 +111,33 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	return nil
 }
 
+// Reconcile iterates through all Pods with the appropriate label and compares the
+// current health check status against that which is stored in Consul and updates
+// the consul health check accordingly. If the health check doesn't yet exist it will create it.
+func (h *HealthCheckResource) Reconcile() error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.Log.Debug("starting reconcile")
+	// First grab the list of Pods which have the label labelInject
+	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(h.Ctx,
+		metav1.ListOptions{LabelSelector: labelInject})
+	if err != nil {
+		h.Log.Error("unable to get pods", "err", err)
+		return err
+	}
+	// For each pod in the podlist, determine if a new health check needs to be registered
+	// or: if a health check exists, determine if it needs to be updated
+	for _, pod := range podList.Items {
+		err = h.reconcilePod(&pod)
+		if err != nil {
+			h.Log.Error("unable to update pod", "err", err)
+		}
+	}
+	h.Log.Debug("finished reconcile")
+	return nil
+}
+
+// reconcilePod will reconcile a pod. This is the common work for both Upsert and Reconcile.
 func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	h.Log.Debug("processing pod", "name", pod.Name)
 	if !h.shouldProcess(pod) {
@@ -151,33 +178,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	return nil
 }
 
-// Reconcile iterates through all Pods with the appropriate label and compares the
-// current health check status against that which is stored in Consul and updates
-// the consul health check accordingly. If the health check doesn't yet exist it will create it.
-func (h *HealthCheckResource) Reconcile() error {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	h.Log.Debug("starting reconcile")
-	// First grab the list of Pods which have the label labelInject
-	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(h.Ctx,
-		metav1.ListOptions{LabelSelector: labelInject})
-	if err != nil {
-		h.Log.Error("unable to get pods", "err", err)
-		return err
-	}
-	// For each pod in the podlist, determine if a new health check needs to be registered
-	// or: if a health check exists, determine if it needs to be updated
-	for _, pod := range podList.Items {
-		err = h.reconcilePod(&pod)
-		if err != nil {
-			h.Log.Error("unable to update pod", "err", err)
-		}
-	}
-	h.Log.Debug("finished reconcile")
-	return nil
-}
-
-// updateConsulHealthCheckStatus updates the consul health check status
+// updateConsulHealthCheckStatus updates the consul health check status.
 func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, consulHealthCheckID, status, reason string) error {
 	h.Log.Debug("updating health check: ", "id", consulHealthCheckID)
 	return client.Agent().UpdateTTL(consulHealthCheckID, reason, status)
@@ -212,7 +213,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 	return nil
 }
 
-// getServiceCheck will return the health check for this pod+service or nil if it doesnt exist yet
+// getServiceCheck will return the health check for this pod+service or nil if it doesnt exist yet.
 func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID string) (*api.AgentCheck, error) {
 	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
@@ -220,7 +221,7 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID 
 		h.Log.Error("unable to get agent health check", "checkID", healthCheckID, "filter", filter, "err", err)
 		return nil, err
 	}
-	// This will be nil (does not exist) or an actual check!
+	// This will be nil (does not exist) or an actual check
 	return checks[healthCheckID], nil
 }
 
@@ -244,7 +245,7 @@ func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, 
 	return "", "", fmt.Errorf("no ready status for pod: %s", pod.Name)
 }
 
-// getConsulClient returns a new *api.Client pointed at the consul agent local to the pod
+// getConsulClient returns a new *api.Client pointed at the consul agent local to the pod.
 func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, error) {
 	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
 	localConfig := api.DefaultConfig()
@@ -258,11 +259,11 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	return localClient, err
 }
 
-// shouldProcess is a simple filter which determines if Upsert should attempt to process the pod
-// this is done without making any client api calls so it is fast. We only are interested in running
-// pods as the have valid readiness probe status.
+// shouldProcess is a simple filter which determines if Upsert or Reconcile should attempt to process the pod.
+// this is done without making any client api calls so it is fast.
+// We only are interested in corev1.PodRunning pods as they have valid readiness probe status.
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
-	return pod.Annotations[annotationStatus] == "injected" && pod.Status.Phase == corev1.PodRunning
+	return pod.Annotations[annotationStatus] == injected && pod.Status.Phase == corev1.PodRunning
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
@@ -271,7 +272,7 @@ func (h *HealthCheckResource) getConsulHealthCheckID(pod *corev1.Pod) string {
 	return fmt.Sprintf("%s_%s_kubernetes-health-check-ttl", pod.Namespace, h.getConsulServiceID(pod))
 }
 
-// getConsulServiceID returns the serviceID of the connect service
+// getConsulServiceID returns the serviceID of the connect service.
 func (h *HealthCheckResource) getConsulServiceID(pod *corev1.Pod) string {
 	return fmt.Sprintf("%s-%s", pod.Name, pod.Annotations[annotationService])
 }
