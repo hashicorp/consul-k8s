@@ -38,8 +38,8 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 	t.Log("Waiting for pods to be ready.")
 
-	// Wait up to 5m.
-	counter := &retry.Counter{Count: 60, Wait: 5 * time.Second}
+	// Wait up to 7m.
+	counter := &retry.Counter{Count: 84, Wait: 5 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)

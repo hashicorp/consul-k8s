@@ -99,9 +99,9 @@ This template is for an init container.
       mountPath: /consul/tls/client/ca
   resources:
     requests:
-      memory: "25Mi"
+      memory: "50Mi"
       cpu: "50m"
     limits:
-      memory: "25Mi"
+      memory: "50Mi"
       cpu: "50m"
 {{- end -}}
