@@ -42,10 +42,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 50Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 50Mi
         volumeMounts:
         - name: config
           mountPath: /bootstrap/config
