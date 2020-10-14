@@ -14,7 +14,7 @@ FEATURES:
     * `ServiceResolver` - https://www.consul.io/docs/agent/config-entries/service-resolver
     * `ServiceIntentions` (requires Consul >= 1.9.0) - https://www.consul.io/docs/agent/config-entries/service-intentions
    
-   See [https://www.consul.io/docs/k8s/connect/crds](https://www.consul.io/docs/k8s/connect/crds)
+   See [https://www.consul.io/docs/k8s/crds](https://www.consul.io/docs/k8s/crds)
    for more information on the CRD schemas. **Requires Consul >= 1.8.4**.
    
    `webhook-cert-manager` manages certificates for Kubernetes webhooks. It will
