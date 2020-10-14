@@ -26,32 +26,13 @@ const (
 	testServiceNameReg        = "test-pod-test-service"
 	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
 	testFailureMessage        = "Kubernetes pod readiness probe failed"
-	testDoNotRegister         = "do not register"
-
-	testCheckNotesPassing  = "Kubernetes Health Checks Passing"
-	testTypesBoth          = "both"
-	testTypesUpsertOnly    = "upsert"
-	testTypesReconcileOnly = "reconcile"
-	testUpsert             = "upsert"
-	testReconcile          = "reconcile"
-	ttl                    = "ttl"
-	name                   = "Kubernetes Health Check"
+	testCheckNotesPassing     = "Kubernetes Health Checks Passing"
+	ttl                       = "ttl"
+	name                      = "Kubernetes Health Check"
 )
 
 // used by gocmp
-var ignoredFields = []string{"Node", "Namespace", "Definition", "Type", "ServiceID", "ServiceName"}
-
-func getSupportedTestTypes(testTypes string) map[string]bool {
-	switch testTypes {
-	case testTypesBoth:
-		return map[string]bool{testUpsert: true, testReconcile: true}
-	case testTypesReconcileOnly:
-		return map[string]bool{testReconcile: true}
-	case testTypesUpsertOnly:
-		return map[string]bool{testUpsert: true}
-	}
-	return nil
-}
+var ignoredFields = []string{"Node", "Namespace", "Definition", "ServiceID", "ServiceName"}
 
 var testPodSpec = corev1.PodSpec{
 	Containers: []corev1.Container{
@@ -85,17 +66,17 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	return s, client, &healthResource
 }
 
-func registerHealthCheck(t *testing.T, client *api.Client, initialState, reason string) {
+func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "Kubernetes Health Check",
 		ID:        testHealthCheckID,
 		ServiceID: testServiceNameReg,
-		Notes:     reason,
+		Notes:     "",
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:    "100000h",
 			Status: initialState,
-			Notes:  reason,
+			Notes:  "",
 		},
 	})
 	require.NoError(err)
@@ -111,9 +92,9 @@ func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 }
 
 func TestHealthCheckHandlers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		Name                 string
-		ValidTests           map[string]bool
 		PreCreateHealthCheck bool
 		InitialState         string
 		Pod                  *corev1.Pod
@@ -121,8 +102,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 		Err                  string
 	}{
 		{
-			"PodRunning Object Created passing - create check and set passing",
-			getSupportedTestTypes(testTypesBoth),
+			"reconcilePod will create check and set passed",
 			false,
 			api.HealthPassing,
 			&corev1.Pod{
@@ -148,15 +128,15 @@ func TestHealthCheckHandlers(t *testing.T) {
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
 				Status:  api.HealthPassing,
-				Notes:   testCheckNotesPassing,
+				Notes:   "",
+				Output:  kubernetesSuccessReasonMsg,
 				Type:    ttl,
 				Name:    name,
 			},
 			"",
 		},
 		{
-			"PodRunning Object Created failed - create check and set failed",
-			getSupportedTestTypes(testTypesBoth),
+			"reconcilePod will create check and set failed",
 			false,
 			api.HealthPassing,
 			&corev1.Pod{
@@ -174,23 +154,24 @@ func TestHealthCheckHandlers(t *testing.T) {
 					HostIP: "127.0.0.1",
 					Phase:  corev1.PodRunning,
 					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
+						Type:    corev1.PodReady,
+						Status:  corev1.ConditionFalse,
+						Message: testFailureMessage,
 					}},
 				},
 			},
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
-				Notes:   testCheckNotesPassing,
+				Notes:   "",
+				Output:  testFailureMessage,
 				Type:    ttl,
 				Name:    name,
 			},
 			"",
 		},
 		{
-			"PodRunning change to Failed with failure message - change to failed",
-			getSupportedTestTypes(testTypesBoth),
+			"precreate a passing pod and change to failed",
 			true,
 			api.HealthPassing,
 			&corev1.Pod{
@@ -224,8 +205,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning failed to passing - change to passing",
-			getSupportedTestTypes(testTypesBoth),
+			"precreate failed pod and change to passing",
 			true,
 			api.HealthCritical,
 			&corev1.Pod{
@@ -258,8 +238,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning but with no changes - no change",
-			getSupportedTestTypes(testTypesBoth),
+			"precreacte failed check, no pod changes results in no healthcheck changes",
 			true,
 			api.HealthCritical,
 			&corev1.Pod{
@@ -285,16 +264,14 @@ func TestHealthCheckHandlers(t *testing.T) {
 			&api.AgentCheck{
 				CheckID: testHealthCheckID,
 				Status:  api.HealthCritical,
-				Notes:   testFailureMessage,
-				Output:  testFailureMessage,
+				Output:  "", // when there is no change in status, Consul doesnt set the Output field
 				Type:    ttl,
 				Name:    name,
 			},
 			"",
 		},
 		{
-			"PodNotRunning - no changes",
-			getSupportedTestTypes(testTypesBoth),
+			"PodNotRunning will be ignored for processing",
 			false,
 			"",
 			&corev1.Pod{
@@ -321,8 +298,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning no annotations - no change",
-			getSupportedTestTypes(testTypesBoth),
+			"PodRunning no annotations will be ignored for processing",
 			false,
 			"",
 			&corev1.Pod{
@@ -345,63 +321,7 @@ func TestHealthCheckHandlers(t *testing.T) {
 			"",
 		},
 		{
-			"PodRunning service not registered causes error",
-			getSupportedTestTypes(testTypesUpsertOnly),
-			false,
-			testDoNotRegister,
-			&corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testPodName,
-					Namespace: "default",
-					Labels:    map[string]string{labelInject: "true"},
-					Annotations: map[string]string{
-						annotationStatus:  injected,
-						annotationService: testServiceNameAnnotation,
-					},
-				},
-				Spec: testPodSpec,
-				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
-					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					}},
-				},
-			},
-			nil,
-			"ServiceID \"test-pod-test-service\" does not exist",
-		},
-		{
-			"PodRunning no label - no change",
-			getSupportedTestTypes(testTypesReconcileOnly),
-			false,
-			"",
-			&corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testPodName,
-					Namespace: "default",
-					Annotations: map[string]string{
-						annotationStatus:  injected,
-						annotationService: testServiceNameAnnotation,
-					},
-				},
-				Spec: testPodSpec,
-				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
-					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					}},
-				},
-			},
-			nil,
-			"",
-		},
-		{
-			"PodRunning no Ready Status - no change",
-			getSupportedTestTypes(testTypesBoth),
+			"PodRunning no Ready Status will be ignored for processing",
 			false,
 			"",
 			&corev1.Pod{
@@ -420,71 +340,107 @@ func TestHealthCheckHandlers(t *testing.T) {
 			"",
 		},
 	}
-	for _, work := range []string{testReconcile, testUpsert} {
-		for _, tt := range cases {
-			if _, ok := tt.ValidTests[work]; !ok {
-				continue
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			var err error
+			require := require.New(t)
+			// Get a server, client, and handler
+			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
+			defer server.Stop()
+			// register the service with Consul
+			server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
+			if tt.PreCreateHealthCheck {
+				// register the health check if this is not an object create path
+				registerHealthCheck(t, client, tt.InitialState)
 			}
-			t.Run(work+" "+tt.Name, func(t *testing.T) {
-				var err error
-
-				require := require.New(t)
-				// Get a server, client, and handler
-				server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
-				defer server.Stop()
-
-				if tt.InitialState != testDoNotRegister {
-					// Create a passing service
-					server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
-				}
-				if tt.PreCreateHealthCheck {
-					// register the health check if this is not an object create path
-					if tt.InitialState == api.HealthPassing {
-						registerHealthCheck(t, client, tt.InitialState, testCheckNotesPassing)
-					} else {
-						registerHealthCheck(t, client, tt.InitialState, testFailureMessage)
-					}
-				}
-				if work == testUpsert {
-					err = resource.Upsert("", tt.Pod)
-				} else if work == testReconcile {
-					err = resource.Reconcile()
-				}
-				if tt.Err != "" {
-					// used in the cases where we're expecting an error from
-					// the controller/handler, in which case do not check agent
-					// checks as they're not relevant/created.
-					require.Error(err, tt.Err)
-					return
-				}
-				require.NoError(err)
-				actual := getConsulAgentChecks(t, client)
-				if tt.Expected == nil || actual == nil {
-					require.Equal(tt.Expected, actual)
-				} else {
-					if actual.Status != tt.InitialState {
-						require.True(true, cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Notes")...)))
-					} else {
-						// no update called
-						require.True(true, cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Output")...)))
-					}
-				}
-			})
-		}
+			// Upsert and Reconcile both use this common function to reconcile the pod
+			err = resource.reconcilePod(tt.Pod)
+			// if we're expecting any error from reconcilePod
+			if tt.Err != "" {
+				// used in the cases where we're expecting an error from
+				// the controller/handler, in which case do not check agent
+				// checks as they're not relevant/created.
+				require.Error(err, tt.Err)
+				return
+			}
+			require.NoError(err)
+			// get the agent checks if they were registered
+			actual := getConsulAgentChecks(t, client)
+			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+		})
 	}
+}
+
+func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: "default",
+			Labels:    map[string]string{labelInject: "true"},
+			Annotations: map[string]string{
+				annotationStatus:  injected,
+				annotationService: testServiceNameAnnotation,
+			},
+		},
+		Spec: testPodSpec,
+		Status: corev1.PodStatus{
+			HostIP: "127.0.0.1",
+			Phase:  corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	server, _, resource := testServerAgentResourceAndController(t, pod)
+	defer server.Stop()
+	// start Upsert, it will attempt to reconcile the Pod but the service doesnt exist in Consul so will fail
+	err := resource.Upsert("", pod)
+	require.EqualError(err, "unable to register health check: Unexpected response code: 500 (ServiceID \"test-pod-test-service\" does not exist)")
+}
+
+func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: "default",
+			Annotations: map[string]string{
+				annotationStatus:  injected,
+				annotationService: testServiceNameAnnotation,
+			},
+		},
+		Spec: testPodSpec,
+		Status: corev1.PodStatus{
+			HostIP: "127.0.0.1",
+			Phase:  corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	server, client, resource := testServerAgentResourceAndController(t, pod)
+	defer server.Stop()
+	// start the reconciler, it should not create a health check
+	err := resource.Reconcile()
+	require.NoError(err)
+	actual := getConsulAgentChecks(t, client)
+	require.Nil(actual)
 }
 
 // Test that stopch works for Reconciler
 func TestReconcilerShutdown(t *testing.T) {
+	t.Parallel()
 	require := require.New(t)
 	k8sclientset := fake.NewSimpleClientset()
-	serverAddress := "http://127.0.0.1:999999"
-	consulUrl, err := url.Parse(serverAddress)
-	require.NoError(err)
 	healthResource := HealthCheckResource{
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: k8sclientset,
-		ConsulUrl:           consulUrl,
+		ConsulUrl:           nil,
 		ReconcilePeriod:     5 * time.Second,
 	}
 
@@ -512,6 +468,7 @@ func TestReconcilerShutdown(t *testing.T) {
 // and once the agent becomes available reconcile will correctly
 // update the checks after its loop timer passes
 func TestReconcileRun(t *testing.T) {
+	t.Parallel()
 	var err error
 	require := require.New(t)
 
@@ -531,8 +488,9 @@ func TestReconcileRun(t *testing.T) {
 			HostIP: "127.0.0.1",
 			Phase:  corev1.PodRunning,
 			Conditions: []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionFalse,
+				Type:    corev1.PodReady,
+				Status:  corev1.ConditionFalse,
+				Message: testFailureMessage,
 			}},
 		},
 	}
@@ -565,27 +523,18 @@ func TestReconcileRun(t *testing.T) {
 	// let reconcile run at least once
 	time.Sleep(time.Millisecond * 300)
 
-	testServerReady := make(chan bool)
 	var srv *testutil.TestServer
-	go func() {
-		srv, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-			c.Ports = &testutil.TestPortConfig{
-				DNS:     randomPorts[0],
-				HTTP:    randomPorts[1],
-				HTTPS:   randomPorts[2],
-				SerfLan: randomPorts[3],
-				SerfWan: randomPorts[4],
-				Server:  randomPorts[5],
-			}
-		})
-		require.NoError(err)
-		close(testServerReady)
-	}()
-	// Wait for server to come up
-	select {
-	case <-testServerReady:
-		defer srv.Stop()
-	}
+	srv, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.Ports = &testutil.TestPortConfig{
+			DNS:     randomPorts[0],
+			HTTP:    randomPorts[1],
+			HTTPS:   randomPorts[2],
+			SerfLan: randomPorts[3],
+			SerfWan: randomPorts[4],
+			Server:  randomPorts[5],
+		}
+	})
+	require.NoError(err)
 	// validate that there is no health check created by reconciler
 	check := getConsulAgentChecks(t, client)
 	require.Nil(check)
@@ -608,11 +557,10 @@ func TestReconcileRun(t *testing.T) {
 	expectedCheck := &api.AgentCheck{
 		CheckID: testHealthCheckID,
 		Status:  api.HealthCritical,
-		Notes:   testFailureMessage,
 		Output:  testFailureMessage,
 		Type:    ttl,
 		Name:    name,
 	}
 	// Validate the checks are set
-	require.True(true, cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, append(ignoredFields, "Notes")...)))
+	require.True(cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 }

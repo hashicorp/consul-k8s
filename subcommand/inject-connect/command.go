@@ -122,7 +122,7 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
-	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", true,
+	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", false,
 		"Enables health checks controller.")
 	c.flagSet.DurationVar(&c.flagConnectInjectHealthCheckReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
