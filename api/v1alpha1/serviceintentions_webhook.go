@@ -2,12 +2,14 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
 	capi "github.com/hashicorp/consul/api"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,7 +43,10 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	svcIntentions.Default()
+	defaultingPatches, err := v.defaultingPatches(err, &svcIntentions)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
 
 	singleConsulDestNS := !(v.EnableConsulNamespaces && v.EnableNSMirroring)
 	if req.Operation == v1beta1.Create {
@@ -85,10 +90,33 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	if err := svcIntentions.Validate(); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	return admission.Allowed(fmt.Sprintf("valid %s request", svcIntentions.KubeKind()))
+	// We always return an admission.Patched() response, even if there are no patches, since
+	// admission.Patched() with no patches is equal to admission.Allowed() under
+	// the hood.
+	return admission.Patched(fmt.Sprintf("valid %s request", svcIntentions.KubeKind()), defaultingPatches...)
 }
 
 func (v *ServiceIntentionsWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
+}
+
+// defaultingPatches returns the patches needed to set fields to their
+// defaults.
+func (v *ServiceIntentionsWebhook) defaultingPatches(err error, svcIntentions *ServiceIntentions) ([]jsonpatch.Operation, error) {
+	beforeDefaulting, err := json.Marshal(svcIntentions)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling input: %s", err)
+	}
+	svcIntentions.Default(v.EnableConsulNamespaces)
+	afterDefaulting, err := json.Marshal(svcIntentions)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
+	}
+
+	defaultingPatches, err := jsonpatch.CreatePatch(beforeDefaulting, afterDefaulting)
+	if err != nil {
+		return nil, fmt.Errorf("creating patches: %s", err)
+	}
+	return defaultingPatches, nil
 }
