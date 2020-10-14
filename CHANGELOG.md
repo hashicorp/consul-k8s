@@ -38,7 +38,7 @@ FEATURES:
     protocol: "http"
   ```
 
-  See [https://www.consul.io/docs/k8s/connect/crds](https://www.consul.io/docs/k8s/connect/crds)
+  See [https://www.consul.io/docs/k8s/crds](https://www.consul.io/docs/k8s/crds)
   for more information on the CRD schemas.
 
   To enable, set `controller.enabled: true` in your Helm configuration:
