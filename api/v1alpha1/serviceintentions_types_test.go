@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -457,6 +458,7 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 	require.Equal(t, meta, serviceResolver.GetObjectMeta())
 }
 
+// Test defaulting behavior for both OSS and enterprise.
 func TestServiceIntentions_Default(t *testing.T) {
 	cases := map[string]struct {
 		input  *ServiceIntentions
@@ -641,10 +643,20 @@ func TestServiceIntentions_Default(t *testing.T) {
 		},
 	}
 	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			testCase.input.Default()
-			require.True(t, cmp.Equal(testCase.input, testCase.output))
-		})
+		// We also test with consul namespaces enabled/disabled. When disabled,
+		// the input shouldn't change since we don't set any namespace defaults
+		// in OSS.
+		for _, namespacesEnabled := range []bool{false, true} {
+			testName := fmt.Sprintf("%s namespaces=%t", name, namespacesEnabled)
+			t.Run(testName, func(t *testing.T) {
+				testCase.input.Default(namespacesEnabled)
+				if namespacesEnabled {
+					require.True(t, cmp.Equal(testCase.input, testCase.output))
+				} else {
+					require.True(t, cmp.Equal(testCase.input, testCase.input))
+				}
+			})
+		}
 	}
 }
 

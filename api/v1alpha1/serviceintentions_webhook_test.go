@@ -3,10 +3,12 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func TestValidateServiceIntentions_Create(t *testing.T) {
+func TestHandle_ServiceIntentions_Create(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
@@ -209,7 +211,7 @@ func TestValidateServiceIntentions_Create(t *testing.T) {
 	}
 }
 
-func TestValidateServiceIntentions_Update(t *testing.T) {
+func TestHandle_ServiceIntentions_Update(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
@@ -396,5 +398,169 @@ func TestValidateServiceIntentions_Update(t *testing.T) {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
 			}
 		})
+	}
+}
+
+// Test that we return patches to set Consul namespace fields to their defaults.
+// This test also tests OSS where we expect no patches since OSS has no
+// Consul namespaces.
+func TestHandle_ServiceIntentions_Patches(t *testing.T) {
+	otherNS := "other"
+
+	cases := map[string]struct {
+		newResource *ServiceIntentions
+		expPatches  []jsonpatch.Operation
+	}{
+		"all namespace fields set": {
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-intention",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "baz",
+							Namespace: "baz",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			expPatches: []jsonpatch.Operation{},
+		},
+		"destination.namespace empty": {
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-intention",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "foo",
+					},
+				},
+			},
+			expPatches: []jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/destination/namespace",
+					Value:     "bar",
+				},
+			},
+		},
+		"destination.namespace empty and sources.namespace empty": {
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-intention",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "baz",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			expPatches: []jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/destination/namespace",
+					Value:     "bar",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/sources/0/namespace",
+					Value:     "bar",
+				},
+			},
+		},
+		"multiple sources.namespace empty": {
+			newResource: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-intention",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "baz",
+							Action: "allow",
+						},
+						{
+							Name:   "svc",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			expPatches: []jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/sources/0/namespace",
+					Value:     "bar",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/sources/1/namespace",
+					Value:     "bar",
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		for _, namespacesEnabled := range []bool{false, true} {
+			testName := fmt.Sprintf("%s namespaces-enabled=%t", name, namespacesEnabled)
+			t.Run(testName, func(t *testing.T) {
+				ctx := context.Background()
+				marshalledRequestObject, err := json.Marshal(c.newResource)
+				require.NoError(t, err)
+				s := runtime.NewScheme()
+				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
+				client := fake.NewFakeClientWithScheme(s)
+				decoder, err := admission.NewDecoder(s)
+				require.NoError(t, err)
+
+				validator := &ServiceIntentionsWebhook{
+					Client:                 client,
+					ConsulClient:           nil,
+					Logger:                 logrtest.TestLogger{T: t},
+					decoder:                decoder,
+					EnableConsulNamespaces: namespacesEnabled,
+				}
+				response := validator.Handle(ctx, admission.Request{
+					AdmissionRequest: v1beta1.AdmissionRequest{
+						Name:      c.newResource.KubernetesName(),
+						Namespace: otherNS,
+						Operation: v1beta1.Create,
+						Object: runtime.RawExtension{
+							Raw: marshalledRequestObject,
+						},
+					},
+				})
+
+				require.Equal(t, true, response.Allowed, response.AdmissionResponse.Result.Message)
+				if namespacesEnabled {
+					require.ElementsMatch(t, c.expPatches, response.Patches)
+				} else {
+					// If namespaces are disabled there should be no patches
+					// because we don't default any namespace fields.
+					require.Len(t, response.Patches, 0)
+				}
+			})
+		}
 	}
 }

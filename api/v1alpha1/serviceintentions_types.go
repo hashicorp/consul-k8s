@@ -298,13 +298,19 @@ func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 }
 
 // Default sets zero value fields on this object to their defaults.
-func (in *ServiceIntentions) Default() {
-	if in.Spec.Destination.Namespace == "" {
-		in.Spec.Destination.Namespace = in.Namespace
-	}
-	for _, source := range in.Spec.Sources {
-		if source.Namespace == "" {
-			source.Namespace = in.Namespace
+func (in *ServiceIntentions) Default(consulNamespacesEnabled bool) {
+	// If namespaces are enabled we want to set all the namespace fields to their
+	// defaults. If namespaces are not enabled (i.e. OSS) we don't set any
+	// namespace fields because this would cause errors
+	// making API calls (because namespace fields can't be set in OSS).
+	if consulNamespacesEnabled {
+		if in.Spec.Destination.Namespace == "" {
+			in.Spec.Destination.Namespace = in.Namespace
+		}
+		for _, source := range in.Spec.Sources {
+			if source.Namespace == "" {
+				source.Namespace = in.Namespace
+			}
 		}
 	}
 }
