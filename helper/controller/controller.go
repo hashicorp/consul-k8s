@@ -116,7 +116,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 		utilruntime.HandleError(fmt.Errorf("error syncing cache"))
 		return
 	}
-	c.Log.Info("initial cache sync complete")
+	c.Log.Debug("initial cache sync complete")
 
 	// run the runWorker method every second with a stop channel
 	wait.Until(func() {
