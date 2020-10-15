@@ -102,7 +102,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	helpers.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-	helm.Delete(t, h.helmOptions, h.releaseName, false)
+	// Ignore the error returned by the helm delete here so that we can
+	// always idempotently clean up resources in the cluster.
+	helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 
 	// Delete PVCs.
 	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
