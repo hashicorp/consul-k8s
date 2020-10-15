@@ -549,7 +549,7 @@ func TestReconcileRun(t *testing.T) {
 		actual = getConsulAgentChecks(t, client)
 		// The assertion is not on actual != nil, but below
 		// against an expected check.
-		if actual == nil {
+		if actual == nil || actual.Output == "" {
 			r.Error("check = nil")
 		}
 	})
