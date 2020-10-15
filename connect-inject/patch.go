@@ -101,7 +101,7 @@ func updateAnnotation(target, add map[string]string) []jsonpatch.JsonPatchOperat
 	return result
 }
 
-// updateLabels adds pod label
+// updateLabels adds pod label.
 func updateLabels(target, add map[string]string) []jsonpatch.JsonPatchOperation {
 	var result []jsonpatch.JsonPatchOperation
 	if len(target) == 0 {

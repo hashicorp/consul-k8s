@@ -31,7 +31,7 @@ const (
 	name                      = "Kubernetes Health Check"
 )
 
-// used by gocmp
+// Used by gocmp.
 var ignoredFields = []string{"Node", "Namespace", "Definition", "ServiceID", "ServiceName"}
 
 var testPodSpec = corev1.PodSpec{
@@ -44,7 +44,7 @@ var testPodSpec = corev1.PodSpec{
 
 func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
 	require := require.New(t)
-	// Set up server, client
+	// Setup server & client.
 	s, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 
@@ -82,7 +82,7 @@ func registerHealthCheck(t *testing.T, client *api.Client, initialState string) 
 	require.NoError(err)
 }
 
-// We expect to already be pointed at the correct agent
+// We expect to already be pointed at the correct agent.
 func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 	require := require.New(t)
 	filter := fmt.Sprintf("CheckID == `%s`", testHealthCheckID)
@@ -91,7 +91,7 @@ func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
 	return checks[testHealthCheckID]
 }
 
-func TestHealthCheckHandlers(t *testing.T) {
+func TestReconcilePod(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		Name                 string
@@ -398,7 +398,7 @@ func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
 	defer server.Stop()
 	// start Upsert, it will attempt to reconcile the Pod but the service doesnt exist in Consul so will fail
 	err := resource.Upsert("", pod)
-	require.EqualError(err, "unable to register health check: Unexpected response code: 500 (ServiceID \"test-pod-test-service\" does not exist)")
+	require.Contains(err.Error(), "test-pod-test-service\" does not exist)")
 }
 
 func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
@@ -432,7 +432,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	require.Nil(actual)
 }
 
-// Test that stopch works for Reconciler
+// Test that stopch works for Reconciler.
 func TestReconcilerShutdown(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -447,7 +447,7 @@ func TestReconcilerShutdown(t *testing.T) {
 	reconcilerRunningCtx := make(chan struct{})
 	reconcilerShutdownSuccess := make(chan bool)
 	go func() {
-		// starting the reconciler
+		// Starting the reconciler.
 		healthResource.Run(reconcilerRunningCtx)
 		close(reconcilerShutdownSuccess)
 	}()
@@ -456,23 +456,23 @@ func TestReconcilerShutdown(t *testing.T) {
 
 	select {
 	case <-reconcilerShutdownSuccess:
-		// we're expecting the function to exit gracefully so no assertion needed
+		// The function is expected to exit gracefully so no assertion needed.
 		return
 	case <-time.After(time.Second * 1):
-		// fail if the stopCh was not caught
+		// Fail if the stopCh was not caught.
 		require.Fail("timeout waiting for reconciler to shutdown")
 	}
 }
 
 // Test that if the agent is unavailable reconcile will fail on the pod
 // and once the agent becomes available reconcile will correctly
-// update the checks after its loop timer passes
+// update the checks after its loop timer passes.
 func TestReconcileRun(t *testing.T) {
 	t.Parallel()
 	var err error
 	require := require.New(t)
 
-	// Start the clientset with a Pod that is failed
+	// Start the clientset with a Pod that is failed.
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
@@ -499,7 +499,7 @@ func TestReconcileRun(t *testing.T) {
 	schema := "http://"
 	serverAddress := fmt.Sprintf("%s%s:%d", schema, "127.0.0.1", randomPorts[1])
 
-	// setup consul client connection
+	// Setup consul client connection.
 	clientConfig := &api.Config{Address: serverAddress}
 	require.NoError(err)
 	client, err := api.NewClient(clientConfig)
@@ -516,11 +516,11 @@ func TestReconcileRun(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	// start the reconciler
+	// Start the reconciler.
 	go func() {
 		healthResource.Run(ctx.Done())
 	}()
-	// let reconcile run at least once
+	// Let reconcile run at least once.
 	time.Sleep(time.Millisecond * 300)
 
 	var srv *testutil.TestServer
@@ -535,19 +535,19 @@ func TestReconcileRun(t *testing.T) {
 		}
 	})
 	require.NoError(err)
-	// validate that there is no health check created by reconciler
+	// Validate that there is no health check created by reconciler.
 	check := getConsulAgentChecks(t, client)
 	require.Nil(check)
-	// Add the service - only now will a health check have a service to register against
+	// Add the service - only now will a health check have a service to register against.
 	srv.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 
-	// retry so we can cover time period when reconciler is already running vs
-	// when it will run next based on the loop
+	// Retry so we can cover time period when reconciler is already running vs
+	// when it will run next based on the loop.
 	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}
 	var actual *api.AgentCheck
 	retry.RunWith(timer, t, func(r *retry.R) {
 		actual = getConsulAgentChecks(t, client)
-		// the assertion is not on actual != nil, but below
+		// The assertion is not on actual != nil, but below
 		// against an expected check.
 		if actual == nil {
 			r.Error("check = nil")
@@ -561,6 +561,6 @@ func TestReconcileRun(t *testing.T) {
 		Type:    ttl,
 		Name:    name,
 	}
-	// Validate the checks are set
+	// Validate the checks are set.
 	require.True(cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 }

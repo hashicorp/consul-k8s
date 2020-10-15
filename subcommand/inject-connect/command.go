@@ -58,9 +58,9 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
-	// Flags to enable connect-inject health checks
-	flagEnableHealthChecks                      bool          // Start the health check controller
-	flagConnectInjectHealthCheckReconcilePeriod time.Duration // period for health check reconcile
+	// Flags to enable connect-inject health checks.
+	flagEnableHealthChecks                      bool          // Start the health check controller.
+	flagConnectInjectHealthCheckReconcilePeriod time.Duration // Period for health check reconcile.
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -161,8 +161,8 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 
-	// wait on an interrupt for exit, be sure to init it before running
-	// the controller so that we dont receive an interrupt before its ready
+	// Wait on an interrupt for exit, be sure to init it before running
+	// the controller so that we don't receive an interrupt before it's ready.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
 		signal.Notify(c.sigCh, os.Interrupt)
@@ -344,8 +344,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagEnableHealthChecks {
-		// channel used for health checks
-		// also check to see if we should enable TLS
+		// Channel used for health checks
+		// also check to see if we should enable TLS.
 		consulAddr := os.Getenv(api.HTTPAddrEnvName)
 		if consulAddr == "" {
 			c.UI.Error(fmt.Sprintf("%s is not specified", api.HTTPAddrEnvName))
@@ -380,7 +380,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		// Start the health check controller, reconcile is started at the same time
-		// and new events will queue in the informer
+		// and new events will queue in the informer.
 		ctrlExitCh := make(chan error)
 		go func() {
 			ctl.Run(ctx.Done())
@@ -393,7 +393,7 @@ func (c *Command) Run(args []string) int {
 		}()
 
 		select {
-		// Interrupted, gracefully exit
+		// Interrupted, gracefully exit.
 		case <-c.sigCh:
 			if err := server.Close(); err != nil {
 				c.UI.Error(fmt.Sprintf("shutting down server: %v", err))

@@ -22,7 +22,7 @@ const (
 	// This is the key the controller will use on the label filter for its lister, watcher and reconciler.
 	labelInject = "consul.hashicorp.com/connect-inject-status"
 
-	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul
+	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul.
 	kubernetesSuccessReasonMsg = "Kubernetes Health Checks Passing"
 )
 
@@ -141,28 +141,28 @@ func (h *HealthCheckResource) Reconcile() error {
 func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	h.Log.Debug("processing pod", "name", pod.Name)
 	if !h.shouldProcess(pod) {
-		// skip pods that are not running or have not been properly injected
+		// Skip pods that are not running or have not been properly injected.
 		return nil
 	}
-	// fetch the identifiers we will use to interact with the Consul agent for this pod
+	// Fetch the identifiers we will use to interact with the Consul agent for this pod.
 	serviceID := h.getConsulServiceID(pod)
 	healthCheckID := h.getConsulHealthCheckID(pod)
 	status, reason, err := h.getReadyStatusAndReason(pod)
 	if err != nil {
 		return fmt.Errorf("unable to get pod status: %s", err)
 	}
-	// get a client connection to the correct agent
+	// Get a client connection to the correct agent.
 	client, err := h.getConsulClient(pod)
 	if err != nil {
 		return fmt.Errorf("unable to get Consul client connection for %s: %s", pod.Name, err)
 	}
-	// retrieve the health check that would exist if the service had one registered for this pod
+	// Retrieve the health check that would exist if the service had one registered for this pod.
 	serviceCheck, err := h.getServiceCheck(client, healthCheckID)
 	if err != nil {
 		return fmt.Errorf("unable to get agent health checks: serviceID=%s, checkID=%s, %s", serviceID, healthCheckID, err)
 	}
 	if serviceCheck == nil {
-		// create a new health check
+		// Create a new health check.
 		h.Log.Debug("registering new health check", "name", pod.Name, "id", healthCheckID)
 		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status, "")
 		if err != nil {
@@ -175,7 +175,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 			return fmt.Errorf("error updating health check: %s", err)
 		}
 	} else if serviceCheck.Status != status {
-		// update the healthCheck
+		// Update the healthCheck.
 		err = h.updateConsulHealthCheckStatus(client, healthCheckID, status, reason)
 		if err != nil {
 			return fmt.Errorf("error updating health check: %s", err)
@@ -266,7 +266,7 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 }
 
 // shouldProcess is a simple filter which determines if Upsert or Reconcile should attempt to process the pod.
-// this is done without making any client api calls so it is fast.
+// This is done without making any client api calls so it is fast.
 // We only are interested in corev1.PodRunning pods as they have valid readiness probe status.
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
 	return pod.Annotations[annotationStatus] == injected && pod.Status.Phase == corev1.PodRunning
