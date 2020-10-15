@@ -344,18 +344,18 @@ func TestReconcilePod(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			var err error
 			require := require.New(t)
-			// Get a server, client, and handler
+			// Get a server, client, and handler.
 			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
-			// register the service with Consul
+			// Register the service with Consul.
 			server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 			if tt.PreCreateHealthCheck {
-				// register the health check if this is not an object create path
+				// Register the health check if this is not an object create path.
 				registerHealthCheck(t, client, tt.InitialState)
 			}
-			// Upsert and Reconcile both use this common function to reconcile the pod
+			// Upsert and Reconcile both use reconcilePod to reconcile a pod.
 			err = resource.reconcilePod(tt.Pod)
-			// if we're expecting any error from reconcilePod
+			// If we're expecting any error from reconcilePod.
 			if tt.Err != "" {
 				// used in the cases where we're expecting an error from
 				// the controller/handler, in which case do not check agent
@@ -364,7 +364,7 @@ func TestReconcilePod(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			// get the agent checks if they were registered
+			// Get the agent checks if they were registered.
 			actual := getConsulAgentChecks(t, client)
 			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 		})
@@ -396,7 +396,7 @@ func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
 	}
 	server, _, resource := testServerAgentResourceAndController(t, pod)
 	defer server.Stop()
-	// start Upsert, it will attempt to reconcile the Pod but the service doesnt exist in Consul so will fail
+	// Start Upsert, it will attempt to reconcile the Pod but the service doesnt exist in Consul so will fail.
 	err := resource.Upsert("", pod)
 	require.Contains(err.Error(), "test-pod-test-service\" does not exist)")
 }
@@ -425,7 +425,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	}
 	server, client, resource := testServerAgentResourceAndController(t, pod)
 	defer server.Stop()
-	// start the reconciler, it should not create a health check
+	// Start the reconciler, it should not create a health check.
 	err := resource.Reconcile()
 	require.NoError(err)
 	actual := getConsulAgentChecks(t, client)
@@ -451,7 +451,7 @@ func TestReconcilerShutdown(t *testing.T) {
 		healthResource.Run(reconcilerRunningCtx)
 		close(reconcilerShutdownSuccess)
 	}()
-	// trigger shutdown of the reconciler
+	// Trigger shutdown of the reconciler.
 	close(reconcilerRunningCtx)
 
 	select {

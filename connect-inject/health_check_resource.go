@@ -32,7 +32,7 @@ type HealthCheckResource struct {
 
 	// ConsulUrl holds the url information for client connections.
 	ConsulUrl *url.URL
-	// ReconcilePeriod is the period by which reconcile gets called
+	// ReconcilePeriod is the period by which reconcile gets called.
 	// default to 1 minute.
 	ReconcilePeriod time.Duration
 
@@ -118,15 +118,14 @@ func (h *HealthCheckResource) Reconcile() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.Log.Debug("starting reconcile")
-	// First grab the list of Pods which have the label labelInject
+	// First grab the list of Pods which have the label labelInject.
 	podList, err := h.KubernetesClientset.CoreV1().Pods(corev1.NamespaceAll).List(h.Ctx,
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
 		h.Log.Error("unable to get pods", "err", err)
 		return err
 	}
-	// For each pod in the podlist, determine if a new health check needs to be registered
-	// or: if a health check exists, determine if it needs to be updated
+	// Reconcile the state of each pod in the podList.
 	for _, pod := range podList.Items {
 		err = h.reconcilePod(&pod)
 		if err != nil {
@@ -164,12 +163,12 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	if serviceCheck == nil {
 		// Create a new health check.
 		h.Log.Debug("registering new health check", "name", pod.Name, "id", healthCheckID)
-		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status, "")
+		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status)
 		if err != nil {
 			return fmt.Errorf("unable to register health check: %s", err)
 		}
-		// then update it, the reason this is separate is there is no way to set the Output field of the health check
-		// at creation time, and this is what is displayed on the UI as opposed to the Notes field
+		// Also update it, the reason this is separate is there is no way to set the Output field of the health check
+		// at creation time, and this is what is displayed on the UI as opposed to the Notes field.
 		err = h.updateConsulHealthCheckStatus(client, healthCheckID, status, reason)
 		if err != nil {
 			return fmt.Errorf("error updating health check: %s", err)
@@ -192,8 +191,8 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 
 // registerConsulHealthCheck registers a TTL health check for the service on this Agent.
 // The Agent is local to the Pod which has a kubernetes health check.
-// This has the effect of marking the endpoint healthy/unhealthy for Consul service mesh traffic.
-func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status, reason string) error {
+// This has the effect of marking the service instance healthy/unhealthy for Consul service mesh traffic.
+func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status string) error {
 	h.Log.Debug("registering Consul health check", "id", consulHealthCheckID, "serviceID", serviceID)
 
 	// Create a TTL health check in Consul associated with this service and pod.
@@ -202,12 +201,10 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		ID:        consulHealthCheckID,
 		Name:      "Kubernetes Health Check",
-		Notes:     reason,
 		ServiceID: serviceID,
 		AgentServiceCheck: api.AgentServiceCheck{
 			TTL:                    "100000h",
 			Status:                 status,
-			Notes:                  reason,
 			SuccessBeforePassing:   1,
 			FailuresBeforeCritical: 1,
 		},
@@ -227,7 +224,7 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID 
 		h.Log.Error("unable to get agent health check", "checkID", healthCheckID, "filter", filter, "err", err)
 		return nil, err
 	}
-	// This will be nil (does not exist) or an actual check
+	// This will be nil (does not exist) or an actual check.
 	return checks[healthCheckID], nil
 }
 
