@@ -84,6 +84,9 @@ const (
 	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
+
+	// injected is used as the annotation value for annotationInjected
+	injected = "injected"
 )
 
 var (
@@ -346,7 +349,16 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// Add annotations so that we know we're injected
 	patches = append(patches, updateAnnotation(
 		pod.Annotations,
-		map[string]string{annotationStatus: "injected"})...)
+		map[string]string{
+			annotationStatus: injected,
+		})...)
+
+	// Add Pod label for health checks
+	patches = append(patches, updateLabels(
+		pod.Labels,
+		map[string]string{
+			labelInject: injected,
+		})...)
 
 	// Generate the patch
 	var patch []byte

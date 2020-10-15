@@ -252,6 +252,8 @@ github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t
 github.com/grpc-ecosystem/grpc-gateway v1.9.5/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/hashicorp/consul/api v1.4.1-0.20201007080954-aa0f5ff839c5 h1:mHgaDaPdf0z3UG3G2UpCINFMRKhzi1DLNoOp6sIQWnU=
 github.com/hashicorp/consul/api v1.4.1-0.20201007080954-aa0f5ff839c5/go.mod h1:1NSuaUUkFaJzMasbfq/11wKYWSR67Xn6r2DXKhuDNFg=
+github.com/hashicorp/consul/api v1.6.0 h1:SZB2hQW8AcTOpfDmiVblQbijxzsRuiyy0JpHfabvHio=
+github.com/hashicorp/consul/api v1.6.0/go.mod h1:1NSuaUUkFaJzMasbfq/11wKYWSR67Xn6r2DXKhuDNFg=
 github.com/hashicorp/consul/sdk v0.4.1-0.20201006182405-a2a8e9c7839a h1:yclqizoDCodLeiAUg1Siaodz3hvIBxzH8A2GnjY74EU=
 github.com/hashicorp/consul/sdk v0.4.1-0.20201006182405-a2a8e9c7839a/go.mod h1:fY08Y9z5SvJqevyZNy6WWPXiG3KwBPAvlcdx16zZ0fM=
 github.com/hashicorp/errwrap v1.0.0 h1:hLrqtEDnRye3+sgx6z4qVLNuviH3MR5aQ0ykNJa/UYA=

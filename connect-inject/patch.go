@@ -101,6 +101,28 @@ func updateAnnotation(target, add map[string]string) []jsonpatch.JsonPatchOperat
 	return result
 }
 
+// updateLabels adds pod label.
+func updateLabels(target, add map[string]string) []jsonpatch.JsonPatchOperation {
+	var result []jsonpatch.JsonPatchOperation
+	if len(target) == 0 {
+		result = append(result, jsonpatch.JsonPatchOperation{
+			Operation: "add",
+			Path:      "/metadata/labels",
+			Value:     add,
+		})
+		return result
+	}
+
+	for key, value := range add {
+		result = append(result, jsonpatch.JsonPatchOperation{
+			Operation: "add",
+			Path:      "/metadata/labels/" + escapeJSONPointer(key),
+			Value:     value,
+		})
+	}
+	return result
+}
+
 // https://tools.ietf.org/html/rfc6901
 func escapeJSONPointer(s string) string {
 	s = strings.Replace(s, "~", "~0", -1)
