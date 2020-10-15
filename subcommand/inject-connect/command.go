@@ -59,8 +59,8 @@ type Command struct {
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	// Flags to enable connect-inject health checks.
-	flagEnableHealthChecks                      bool          // Start the health check controller.
-	flagConnectInjectHealthCheckReconcilePeriod time.Duration // Period for health check reconcile.
+	flagEnableHealthChecks          bool          // Start the health check controller.
+	flagHealthChecksReconcilePeriod time.Duration // Period for health check reconcile.
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -124,7 +124,7 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", false,
 		"Enables health checks controller.")
-	c.flagSet.DurationVar(&c.flagConnectInjectHealthCheckReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
+	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -371,7 +371,7 @@ func (c *Command) Run(args []string) int {
 			KubernetesClientset: c.clientset,
 			ConsulUrl:           consulUrl,
 			Ctx:                 ctx,
-			ReconcilePeriod:     c.flagConnectInjectHealthCheckReconcilePeriod,
+			ReconcilePeriod:     c.flagHealthChecksReconcilePeriod,
 		}
 
 		ctl := &controller.Controller{
