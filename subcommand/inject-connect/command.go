@@ -16,7 +16,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deckarep/golang-set"
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -126,12 +125,12 @@ func (c *Command) init() {
 		"Enables health checks controller.")
 	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
-		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored")
+		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
-		"[Enterprise Only] Defines which Consul namespace to register all injected services into. If '-enable-namespace-mirroring' "+
+		"[Enterprise Only] Defines which Consul namespace to register all injected services into. If '-enable-k8s-namespace-mirroring' "+
 			"is true, this is not used.")
 	c.flagSet.BoolVar(&c.flagEnableK8SNSMirroring, "enable-k8s-namespace-mirroring", false, "[Enterprise Only] Enables "+
-		"k8s namespace mirroring")
+		"k8s namespace mirroring.")
 	c.flagSet.StringVar(&c.flagK8SNSMirroringPrefix, "k8s-namespace-mirroring-prefix", "",
 		"[Enterprise Only] Prefix that will be added to all k8s namespaces mirrored into Consul if mirroring is enabled.")
 	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
@@ -289,7 +288,7 @@ func (c *Command) Run(args []string) int {
 
 	// Create the certificate notifier so we can update for certificates,
 	// then start all the background routines for updating certificates.
-	certCh := make(chan cert.Bundle)
+	certCh := make(chan cert.MetaBundle)
 	certNotify := &cert.Notify{Ch: certCh, Source: certSource}
 	defer certNotify.Stop()
 	go certNotify.Start(context.Background())
@@ -298,14 +297,8 @@ func (c *Command) Run(args []string) int {
 	go c.certWatcher(ctx, certCh, c.clientset)
 
 	// Convert allow/deny lists to sets
-	allowSet := mapset.NewSet()
-	denySet := mapset.NewSet()
-	for _, allow := range c.flagAllowK8sNamespacesList {
-		allowSet.Add(allow)
-	}
-	for _, deny := range c.flagDenyK8sNamespacesList {
-		denySet.Add(deny)
-	}
+	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
+	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
@@ -325,8 +318,8 @@ func (c *Command) Run(args []string) int {
 		InitContainerResources:     initResources,
 		LifecycleSidecarResources:  lifecycleResources,
 		EnableNamespaces:           c.flagEnableNamespaces,
-		AllowK8sNamespacesSet:      allowSet,
-		DenyK8sNamespacesSet:       denySet,
+		AllowK8sNamespacesSet:      allowK8sNamespaces,
+		DenyK8sNamespacesSet:       denyK8sNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
@@ -439,8 +432,8 @@ func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	return certRaw.(*tls.Certificate), nil
 }
 
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.Bundle, clientset kubernetes.Interface) {
-	var bundle cert.Bundle
+func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface) {
+	var bundle cert.MetaBundle
 	for {
 		select {
 		case bundle = <-ch:

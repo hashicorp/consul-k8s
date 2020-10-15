@@ -1,0 +1,24 @@
+# permissions for end users to edit servicesplitters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: servicesplitter-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicesplitters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicesplitters/status
+  verbs:
+  - get

@@ -9,6 +9,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	apiv1 "k8s.io/api/core/v1"
@@ -357,19 +358,14 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	}
 
 	// Update the Consul namespace based on namespace settings
-	if t.EnableNamespaces {
-		var ns string
-
-		// Mirroring takes precedence
-		if t.EnableK8SNSMirroring {
-			ns = fmt.Sprintf("%s%s", t.K8SNSMirroringPrefix, svc.Namespace)
-		} else {
-			ns = t.ConsulDestinationNamespace
-		}
-		t.Log.Debug("[generateRegistrations] namespace being used", "key", key, "namespace", ns)
-
-		// Update baseService to have a Consul namespace
-		baseService.Namespace = ns
+	consulNS := namespaces.ConsulNamespace(svc.Namespace,
+		t.EnableNamespaces,
+		t.ConsulDestinationNamespace,
+		t.EnableK8SNSMirroring,
+		t.K8SNSMirroringPrefix)
+	if consulNS != "" {
+		t.Log.Debug("[generateRegistrations] namespace being used", "key", key, "namespace", consulNS)
+		baseService.Namespace = consulNS
 	}
 
 	// Determine the default port and set port annotations

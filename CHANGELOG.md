@@ -1,11 +1,46 @@
 ## UNRELEASED
 
+## 0.19.0 (October 12, 2020)
+
+FEATURES:
+* Add beta support for new commands `consul-k8s controller` and `consul-k8s webhook-cert-manager`. [[GH-353](https://github.com/hashicorp/consul-k8s/pull/353)]
+
+  `controller` will start a Kubernetes controller that acts on Consul
+  Custom Resource Definitions. The currently supported CRDs are:
+    * `ProxyDefaults` - https://www.consul.io/docs/agent/config-entries/proxy-defaults
+    * `ServiceDefaults` - https://www.consul.io/docs/agent/config-entries/service-defaults
+    * `ServiceSplitter` - https://www.consul.io/docs/agent/config-entries/service-splitter
+    * `ServiceRouter` - https://www.consul.io/docs/agent/config-entries/service-router
+    * `ServiceResolver` - https://www.consul.io/docs/agent/config-entries/service-resolver
+    * `ServiceIntentions` (requires Consul >= 1.9.0) - https://www.consul.io/docs/agent/config-entries/service-intentions
+   
+   See [https://www.consul.io/docs/k8s/crds](https://www.consul.io/docs/k8s/crds)
+   for more information on the CRD schemas. **Requires Consul >= 1.8.4**.
+   
+   `webhook-cert-manager` manages certificates for Kubernetes webhooks. It will
+   refresh expiring certificates and update corresponding secrets and mutating
+   webhook configurations.
+
+BREAKING CHANGES:
+* Connect: No longer set `--max-obj-name-len` flag when executing `envoy`. This flag
+  was [deprecated](https://www.envoyproxy.io/docs/envoy/latest/version_history/v1.11.0#deprecated)
+  in Envoy 1.11.0 and had no effect from then onwards. With Envoy >= 1.15.0 setting
+  this flag will result in an error, hence why we're removing it. [[GH-350](https://github.com/hashicorp/consul-k8s/pull/350)]
+
+  If you are running any Envoy version >= 1.11.0 this change will have no effect. If you
+  are running an Envoy version < 1.11.0 then you must upgrade Envoy to a newer
+  version. This can be done by setting the `global.imageEnvoy` key in the
+  Consul Helm chart.
+
 IMPROVEMENTS:
 
 * Add an ability to configure the synthetic Consul node name where catalog sync registers services. [[GH-312](https://github.com/hashicorp/consul-k8s/pull/312)]
   * Sync: Add `-consul-node-name` flag to the `sync-catalog` command to configure the Consul node name for syncing services to Consul.
   * ACLs: Add `-sync-consul-node-name` flag to the server-acl-init command so that it can create correct policy for the sync catalog.
 
+BUG FIXES:
+* Connect: use the first secret of type `kubernetes.io/service-account-token` when creating/updating auth method. [[GH-350](https://github.com/hashicorp/consul-k8s/pull/321)]
+  
 ## 0.18.1 (August 10, 2020)
 
 BUG FIXES:

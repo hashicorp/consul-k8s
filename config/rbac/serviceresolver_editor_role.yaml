@@ -1,0 +1,24 @@
+# permissions for end users to edit serviceresolvers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceresolver-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceresolvers/status
+  verbs:
+  - get
