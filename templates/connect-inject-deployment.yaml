@@ -46,8 +46,9 @@ spec:
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
             {{- end }}
-            {{- /* A Consul client and ACL token is only necessary for the connect injector if namespaces are enabled */}}
-            {{- if .Values.global.enableConsulNamespaces }}
+            {{- /* A Consul client and ACL token is necessary for the connect injector if namespaces are enabled
+              or if healthChecks enabled */}}
+            {{- if (or .Values.global.enableConsulNamespaces .Values.connectInject.healthChecks.enabled) }}
             - name: HOST_IP
               valueFrom:
                 fieldRef:
@@ -84,6 +85,8 @@ spec:
                 -envoy-image="{{ .Values.global.imageEnvoy }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -listen=:8080 \
+                -enable-health-checks-controller={{ .Values.connectInject.healthChecks.enabled }} \
+                -health-checks-reconcile-period={{ .Values.connectInject.healthChecks.reconcilePeriod }} \
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}

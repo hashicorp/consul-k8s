@@ -58,8 +58,8 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=false' \
       . | tee /dev/stderr |
-      yq -r '.rules | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+      yq -r '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 }
 
 @test "connectInject/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
@@ -69,8 +69,8 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[1].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "podsecuritypolicies" ]
+      yq -r '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
 }
 
 #--------------------------------------------------------------------
@@ -83,8 +83,8 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.rules | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 }
 
 @test "connectInject/ClusterRole: allow secret access with global.bootsrapACLs=true and global.enableConsulNamespaces=true" {
@@ -95,8 +95,8 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[1].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
 }
 
 @test "connectInject/ClusterRole: allows secret access with bootsrapACLs, enablePodSecurityPolicies and enableConsulNamespaces all true" {
@@ -108,6 +108,29 @@ load _helpers
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
 }
+
+@test "connectInject/ClusterRole: pod resource permission set when health checks are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "pods")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "connectInject/ClusterRole: no pod resource permission set when health checks are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "pods")) | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+

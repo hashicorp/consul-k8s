@@ -809,6 +809,18 @@ connectInject:
   image: null # image for consul-k8s that contains the injector
   default: false # true will inject by default, otherwise requires annotation
 
+  # healthChecks enables propagation of k8s pod health status to Consul service instances.
+  # NOTE: It is highly recommended to enable TLS with this feature because it requires
+  # making calls to Consul clients across the cluster. Without TLS enabled, these calls
+  # could leak ACL tokens.
+  healthChecks:
+    # Enables the Consul Health Check controller that syncs the readiness checks on
+    # connect-injected services with the agent.
+    enabled: false
+    # reconcilePeriod defines how often a full state reconcile is done after the initial reconcile
+    # at startup is completed.
+    reconcilePeriod: "1m"
+
   # Optional priorityClassName.
   priorityClassName: ""
 
