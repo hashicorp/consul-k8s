@@ -91,8 +91,8 @@ spec:
                 EOF
                 chmod +x ./apply-license.sh
 
-                # Time out after 20 minutes.
-                timeout -t 1200 ./apply-license.sh
+                # Time out after 20 minutes. Use || to support new timeout versions that don't accept -t
+                timeout -t 1200 ./apply-license.sh 2> /dev/null || timeout 1200 ./apply-license.sh 2> /dev/null
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
             - name: consul-ca-cert
