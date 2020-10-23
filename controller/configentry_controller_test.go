@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	capi "github.com/hashicorp/consul/api"
@@ -2072,4 +2074,113 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
+	ctx := context.Background()
+	kubeNS := "default"
+
+	s := runtime.NewScheme()
+	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{}, &v1alpha1.ServiceSplitter{})
+
+	defaults := &v1alpha1.ServiceDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.ServiceDefaultsSpec{
+			Protocol: "http",
+		},
+	}
+
+	splitter := &v1alpha1.ServiceSplitter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.ServiceSplitterSpec{
+			Splits: v1alpha1.ServiceSplits{
+				{
+					Weight:  100,
+					Service: "service",
+				},
+			},
+		},
+	}
+
+	client := fake.NewFakeClientWithScheme(s, defaults, splitter)
+
+	consul, err := testutil.NewTestServerConfigT(t, nil)
+	require.NoError(t, err)
+	defer consul.Stop()
+
+	consul.WaitForServiceIntentions(t)
+	consulClient, err := capi.NewClient(&capi.Config{
+		Address: consul.HTTPAddr,
+	})
+	require.NoError(t, err)
+
+	logger := logrtest.TestLogger{T: t}
+
+	svcDefaultsReconciler := ServiceDefaultsController{
+		Client: client,
+		Log:    logger,
+		ConfigEntryController: &ConfigEntryController{
+			ConsulClient:   consulClient,
+			DatacenterName: datacenterName,
+		},
+	}
+	svcSplitterReconciler := ServiceSplitterController{
+		Client: client,
+		Log:    logger,
+		ConfigEntryController: &ConfigEntryController{
+			ConsulClient:   consulClient,
+			DatacenterName: datacenterName,
+		},
+	}
+
+	defaultsNamespacedName := types.NamespacedName{
+		Namespace: kubeNS,
+		Name:      defaults.Name,
+	}
+
+	splitterNamespacedName := types.NamespacedName{
+		Namespace: kubeNS,
+		Name:      splitter.Name,
+	}
+
+	// Create config entries for service-defaults and service-splitter.
+	resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	resp, err = svcSplitterReconciler.Reconcile(ctrl.Request{NamespacedName: splitterNamespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
+
+	err = client.Get(ctx, defaultsNamespacedName, defaults)
+	require.NoError(t, err)
+
+	// Update service-default with deletion timestamp so that it attempts deletion on reconcile.
+	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	err = client.Update(ctx, defaults)
+	require.NoError(t, err)
+
+	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
+	resp, err = svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	require.EqualError(t, err, "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)")
+	require.False(t, resp.Requeue)
+
+	err = client.Get(ctx, defaultsNamespacedName, defaults)
+	require.NoError(t, err)
+
+	// Ensure the status of the resource is updated to display failure reason.
+	syncCondition := defaults.GetCondition(v1alpha1.ConditionSynced)
+	expectedCondition := &v1alpha1.Condition{
+		Type:    v1alpha1.ConditionSynced,
+		Status:  corev1.ConditionFalse,
+		Reason:  ConsulAgentError,
+		Message: "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)",
+	}
+	require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
 }
