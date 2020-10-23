@@ -1,5 +1,9 @@
 {{- if .Values.controller.enabled }}
+{{- if .Capabilities.APIVersions.Has "admissionregistration.k8s.io/v1" }}
+apiVersion: admissionregistration.k8s.io/v1
+{{- else }}
 apiVersion: admissionregistration.k8s.io/v1beta1
+{{- end }}
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ template "consul.fullname" . }}-controller-mutating-webhook-configuration
@@ -17,6 +21,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-proxydefaults
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-proxydefaults.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -36,6 +43,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-servicedefaults.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -55,6 +65,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-serviceresolver
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-serviceresolver.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -74,6 +87,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-servicerouter
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-servicerouter.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -93,6 +109,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-servicesplitter
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-servicesplitter.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -112,6 +131,9 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-serviceintentions
   failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
   name: mutate-serviceintentions.consul.hashicorp.com
   rules:
     - apiGroups:
