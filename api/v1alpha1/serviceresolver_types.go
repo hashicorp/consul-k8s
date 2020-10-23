@@ -248,7 +248,7 @@ type ServiceResolverFailover struct {
 	ServiceSubset string `json:"serviceSubset,omitempty"`
 	// Namespace is the namespace to resolve the requested service from to form
 	// the failover group of instances. If empty the current namespace is used.
-	Namespace string `json:"namespaces,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 	// Datacenters is a fixed list of datacenters to try during failover.
 	Datacenters []string `json:"datacenters,omitempty"`
 }

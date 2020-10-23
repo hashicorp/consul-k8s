@@ -56,7 +56,7 @@ spec:
                     items:
                       type: string
                     type: array
-                  namespaces:
+                  namespace:
                     description: Namespace is the namespace to resolve the requested service from to form the failover group of instances. If empty the current namespace is used.
                     type: string
                   service:
