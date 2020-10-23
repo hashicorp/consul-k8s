@@ -17,6 +17,10 @@ metadata:
 webhooks:
   - name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
     failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - "v1beta1"
+      - "v1"
     clientConfig:
       service:
         name: {{ template "consul.fullname" . }}-connect-injector-svc
