@@ -22,6 +22,7 @@ const ServiceResolverKubeKind string = "serviceresolver"
 
 // ServiceResolver is the Schema for the serviceresolvers API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type ServiceResolver struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -247,7 +248,7 @@ type ServiceResolverFailover struct {
 	ServiceSubset string `json:"serviceSubset,omitempty"`
 	// Namespace is the namespace to resolve the requested service from to form
 	// the failover group of instances. If empty the current namespace is used.
-	Namespace string `json:"namespaces,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 	// Datacenters is a fixed list of datacenters to try during failover.
 	Datacenters []string `json:"datacenters,omitempty"`
 }

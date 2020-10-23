@@ -126,7 +126,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 						Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 					})
 					if err != nil {
-						return ctrl.Result{}, fmt.Errorf("deleting config entry from consul: %w", err)
+						return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
+							fmt.Errorf("deleting config entry from consul: %w", err))
 					}
 					logger.Info("deletion from Consul successful")
 				} else {
