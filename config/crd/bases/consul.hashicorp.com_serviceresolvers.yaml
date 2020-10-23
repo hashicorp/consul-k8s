@@ -13,6 +13,10 @@ spec:
     description: The sync status of the resource with Consul
     name: Synced
     type: string
+  - JSONPath: .metadata.creationTimestamp
+    description: The age of the resource
+    name: Age
+    type: date
   group: consul.hashicorp.com
   names:
     kind: ServiceResolver
@@ -52,7 +56,7 @@ spec:
                     items:
                       type: string
                     type: array
-                  namespaces:
+                  namespace:
                     description: Namespace is the namespace to resolve the requested service from to form the failover group of instances. If empty the current namespace is used.
                     type: string
                   service:

@@ -271,6 +271,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 
 // ServiceRouter is the Schema for the servicerouters API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type ServiceRouter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
