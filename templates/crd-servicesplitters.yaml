@@ -7,12 +7,22 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.4.0
   creationTimestamp: null
   name: servicesplitters.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.conditions[?(@.type=="Synced")].status
     description: The sync status of the resource with Consul
     name: Synced
     type: string
+  - JSONPath: .metadata.creationTimestamp
+    description: The age of the resource
+    name: Age
+    type: date
   group: consul.hashicorp.com
   names:
     kind: ServiceSplitter
