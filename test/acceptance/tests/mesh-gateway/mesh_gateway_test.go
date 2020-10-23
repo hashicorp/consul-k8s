@@ -97,7 +97,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	helpers.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
+	helpers.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -214,7 +214,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnection(t, primaryContext.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
 		})
 	}
 }

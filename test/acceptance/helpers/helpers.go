@@ -114,7 +114,14 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 // to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, deploymentName string, curlArgs ...string) {
+func CheckStaticServerConnection(
+	t *testing.T,
+	options *k8s.KubectlOptions,
+	expectSuccess bool,
+	deploymentName string,
+	failureMessage string,
+	curlArgs ...string,
+) {
 	t.Helper()
 
 	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
@@ -129,9 +136,21 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expe
 			require.Contains(r, output, "hello world")
 		} else {
 			require.Error(r, err)
-			require.Contains(r, output, "curl: (52) Empty reply from server")
+			require.Contains(r, output, failureMessage)
 		}
 	})
+}
+
+// CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
+// but it always expects a successful connection.
+func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+	CheckStaticServerConnection(t, options, true, deploymentName, "", curlArgs...)
+}
+
+// CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
+// but it always expects a failing connection with error "Empty reply from server."
+func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+	CheckStaticServerConnection(t, options, false, deploymentName, "curl: (52) Empty reply from server", curlArgs...)
 }
 
 // Sets up a goroutine that will wait for interrupt signals
