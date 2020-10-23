@@ -13,6 +13,10 @@ spec:
     description: The sync status of the resource with Consul
     name: Synced
     type: string
+  - JSONPath: .metadata.creationTimestamp
+    description: The age of the resource
+    name: Age
+    type: date
   group: consul.hashicorp.com
   names:
     kind: ServiceSplitter
