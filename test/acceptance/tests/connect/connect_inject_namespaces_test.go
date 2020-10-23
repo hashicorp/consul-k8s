@@ -127,7 +127,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			if c.secure {
 				t.Log("checking that the connection is not successful because there's no intention")
-				helpers.CheckStaticServerConnection(t, staticClientOpts, false, staticClientName, "http://localhost:1234")
+				helpers.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 
 				intention := &api.Intention{
 					SourceName:      staticClientName,
@@ -150,7 +150,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			}
 
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnection(t, staticClientOpts, true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 		})
 	}
 }

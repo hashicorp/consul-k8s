@@ -91,7 +91,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			t.Log("trying calls to terminating gateway")
-			helpers.CheckStaticServerConnection(t, ctx.KubectlOptions(t), true, staticClientName, "http://localhost:1234")
+			helpers.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 		})
 	}
 }
@@ -181,7 +181,7 @@ func createTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client,
 
 func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k8sOptions *k8s.KubectlOptions, sourceNS, destinationNS string) {
 	t.Log("testing intentions prevent connections through the terminating gateway")
-	helpers.CheckStaticServerConnection(t, k8sOptions, false, staticClientName, "http://localhost:1234")
+	helpers.CheckStaticServerConnectionFailing(t, k8sOptions, staticClientName, "http://localhost:1234")
 
 	t.Log("creating static-client => static-server intention")
 	_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{

@@ -126,7 +126,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				t.Log("testing intentions prevent ingress")
-				helpers.CheckStaticServerConnection(t, nsK8SOptions, false, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+				helpers.CheckStaticServerConnectionFailing(t, nsK8SOptions, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
 
 				// Now we create the allow intention.
 				t.Log("creating ingress-gateway => static-server intention")
@@ -143,7 +143,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the static-client pod. It should route to the static-server pod.
 			t.Log("trying calls to ingress gateway")
-			helpers.CheckStaticServerConnection(t, nsK8SOptions, true, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+			helpers.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
 		})
 	}
 }
@@ -246,7 +246,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 				// via the bounce pod. It should fail to connect with the
 				// static-server pod because of intentions.
 				t.Log("testing intentions prevent ingress")
-				helpers.CheckStaticServerConnection(t, nsK8SOptions, false, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+				helpers.CheckStaticServerConnectionFailing(t, nsK8SOptions, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
 
 				// Now we create the allow intention.
 				t.Log("creating ingress-gateway => static-server intention")
@@ -263,7 +263,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			// Test that we can make a call to the ingress gateway
 			// via the static-client pod. It should route to the static-server pod.
 			t.Log("trying calls to ingress gateway")
-			helpers.CheckStaticServerConnection(t, nsK8SOptions, true, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+			helpers.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, "static-client", "-H", "Host: static-server.ingress.consul", ingressGatewayService)
 		})
 	}
 }
