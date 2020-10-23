@@ -2161,7 +2161,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	err = client.Get(ctx, defaultsNamespacedName, defaults)
 	require.NoError(t, err)
 
-	// Update service-default with deletion timestamp so that it attempts deletion on reconcile.
+	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
 	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	err = client.Update(ctx, defaults)
 	require.NoError(t, err)
