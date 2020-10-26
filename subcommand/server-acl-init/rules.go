@@ -7,14 +7,15 @@ import (
 )
 
 type rulesData struct {
-	EnableNamespaces        bool
-	SyncConsulDestNS        string
-	SyncEnableNSMirroring   bool
-	SyncNSMirroringPrefix   string
-	InjectConsulDestNS      string
-	InjectEnableNSMirroring bool
-	InjectNSMirroringPrefix string
-	SyncConsulNodeName      string
+	EnableNamespaces             bool
+	SyncConsulDestNS             string
+	SyncEnableNSMirroring        bool
+	SyncNSMirroringPrefix        string
+	InjectConsulDestNS           string
+	InjectEnableNSMirroring      bool
+	InjectNSMirroringPrefix      string
+	SyncConsulNodeName           string
+	EnableHealthChecksController bool
 }
 
 type gatewayRulesData struct {
@@ -204,10 +205,24 @@ namespace "{{ .SyncConsulDestNS }}" {
 }
 
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector only needs permissions to create namespaces.
+	// The Connect injector needs permissions to create namespaces and create/update service checks.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
+{{- end }}
+{{- if .EnableHealthChecksController }}
+{{- if .EnableNamespaces }}
+namespace_prefix "" {
+{{- end }}
+  node_prefix "" {
+     policy = "write"
+  }
+  service_prefix "" {
+     policy = "write"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
 {{- end }}
 `
 	return c.renderRules(injectRulesTpl)
@@ -267,14 +282,15 @@ namespace "{{ .InjectConsulDestNS }}" {
 
 func (c *Command) rulesData() rulesData {
 	return rulesData{
-		EnableNamespaces:        c.flagEnableNamespaces,
-		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
-		SyncEnableNSMirroring:   c.flagEnableSyncK8SNSMirroring,
-		SyncNSMirroringPrefix:   c.flagSyncK8SNSMirroringPrefix,
-		InjectConsulDestNS:      c.flagConsulInjectDestinationNamespace,
-		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
-		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
-		SyncConsulNodeName:      c.flagSyncConsulNodeName,
+		EnableNamespaces:             c.flagEnableNamespaces,
+		SyncConsulDestNS:             c.flagConsulSyncDestinationNamespace,
+		SyncEnableNSMirroring:        c.flagEnableSyncK8SNSMirroring,
+		SyncNSMirroringPrefix:        c.flagSyncK8SNSMirroringPrefix,
+		InjectConsulDestNS:           c.flagConsulInjectDestinationNamespace,
+		InjectEnableNSMirroring:      c.flagEnableInjectK8SNSMirroring,
+		InjectNSMirroringPrefix:      c.flagInjectK8SNSMirroringPrefix,
+		SyncConsulNodeName:           c.flagSyncConsulNodeName,
+		EnableHealthChecksController: c.flagEnableHealthChecksController,
 	}
 }
 

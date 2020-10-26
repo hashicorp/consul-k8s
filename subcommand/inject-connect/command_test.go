@@ -117,7 +117,7 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "request must be <= limit: -lifecycle-sidecar-cpu-request value of \"50m\" is greater than the -lifecycle-sidecar-cpu-limit value of \"25m\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "kschoche/consul-k8s-dev",
+			flags: []string{"-consul-k8s-image", "hashicorpdev/consul-k8s:latest",
 				"-enable-health-checks-controller=true"},
 			expErr: "CONSUL_HTTP_ADDR is not specified",
 		},

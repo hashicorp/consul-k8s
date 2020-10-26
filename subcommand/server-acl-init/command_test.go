@@ -245,6 +245,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Health Checks ACL token",
+			TokenFlags:  []string{"-enable-health-checks-controller"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {

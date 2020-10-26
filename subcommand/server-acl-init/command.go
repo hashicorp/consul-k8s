@@ -80,6 +80,9 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
+	// Flag for health check connect-inject rules
+	flagEnableHealthChecksController bool
+
 	flagLogLevel string
 	flagTimeout  time.Duration
 
@@ -184,6 +187,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
+
+	c.flags.BoolVar(&c.flagEnableHealthChecksController, "enable-health-checks-controller", false,
+		"Creates health check controller ACL rules.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
@@ -457,7 +463,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateInjectToken {
+	if c.flagCreateInjectToken || c.flagEnableHealthChecksController {
 		injectRules, err := c.injectRules()
 		if err != nil {
 			c.log.Error("Error templating inject rules", "err", err)
