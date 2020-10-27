@@ -537,14 +537,14 @@ func TestReplicationTokenRules(t *testing.T) {
 		{
 			"Namespaces are disabled",
 			false,
-			`acl = "write"
-operator = "write"
+			`operator = "write"
 agent_prefix "" {
   policy = "read"
 }
 node_prefix "" {
   policy = "write"
 }
+  acl = "write"
   service_prefix "" {
     policy = "read"
     intentions = "read"
@@ -553,8 +553,7 @@ node_prefix "" {
 		{
 			"Namespaces are enabled",
 			true,
-			`acl = "write"
-operator = "write"
+			`operator = "write"
 agent_prefix "" {
   policy = "read"
 }
@@ -562,6 +561,7 @@ node_prefix "" {
   policy = "write"
 }
 namespace_prefix "" {
+  acl = "write"
   service_prefix "" {
     policy = "read"
     intentions = "read"

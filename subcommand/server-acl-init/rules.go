@@ -222,7 +222,6 @@ func (c *Command) aclReplicationRules() (string, error) {
 	// datacenters during federation since in order to start ACL replication,
 	// we need a token with both replication and agent permissions.
 	aclReplicationRulesTpl := `
-acl = "write"
 operator = "write"
 agent_prefix "" {
   policy = "read"
@@ -233,6 +232,7 @@ node_prefix "" {
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
+  acl = "write"
   service_prefix "" {
     policy = "read"
     intentions = "read"
