@@ -233,9 +233,9 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TestName:    "Controller token",
 			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
-			PolicyDCs:   []string{"dc1"},
+			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
-			LocalToken:  true,
+			LocalToken:  false,
 		},
 		{
 			TestName:    "Health Checks ACL token",
@@ -400,6 +400,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Controller token",
+			TokenFlags:  []string{"-create-controller-token"},
+			PolicyNames: []string{"controller-token-dc2"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			LocalToken:  false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -529,6 +537,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+		},
+		{
+			TestName:    "Controller token",
+			TokenFlags:  []string{"-create-controller-token"},
+			PolicyNames: []string{"controller-token"},
+			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 		},
 	}
 	for _, c := range cases {

@@ -232,6 +232,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-ingress-gateway-name=anothergw",
 				"-terminating-gateway-name=gw",
 				"-terminating-gateway-name=anothergw",
+				"-create-controller-token",
 			}
 			// Our second run, we're going to update from namespaces disabled to
 			// namespaces enabled with a single destination ns.
@@ -267,6 +268,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anothergw-ingress-gateway-token",
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
+				"controller-token",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -318,6 +320,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anothergw-ingress-gateway-token",
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
+				"controller-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -680,6 +683,13 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
+		"controller token": {
+			TokenFlags:  []string{"-create-controller-token"},
+			PolicyNames: []string{"controller-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 			LocalToken:  false,
 		},
 	}
