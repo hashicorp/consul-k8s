@@ -218,17 +218,47 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			}
 			require.NoError(t, ioutil.WriteFile(logFilename, []byte(logs), 0600))
 
-			// Describe pod
-			desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "describe", "pod", pod.Name)
+			// Describe pod and write it to a file
+			writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
+		}
 
-			// Write pod info or error to file name <pod.Name>.txt
-			if err != nil {
-				desc = fmt.Sprintf("Error describing pod: %s: %s", err, desc)
-			}
-			descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.txt", pod.Name))
-			require.NoError(t, ioutil.WriteFile(descFilename, []byte(desc), 0600))
+		// Describe any stateful sets
+		statefulSets, err := client.AppsV1().StatefulSets(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		for _, statefulSet := range statefulSets.Items {
+			// Describe stateful set and write it to a file
+			writeResourceInfoToFile(t, statefulSet.Name, "statefulset", testDebugDirectory, kubectlOptions)
+		}
+
+		// Describe any daemonsets
+		daemonsets, err := client.AppsV1().DaemonSets(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		for _, daemonSet := range daemonsets.Items {
+			// Describe daemon set and write it to a file
+			writeResourceInfoToFile(t, daemonSet.Name, "daemonset", testDebugDirectory, kubectlOptions)
+		}
+
+		// Describe any deployments
+		deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		for _, deployment := range deployments.Items {
+			// Describe deployment and write it to a file
+			writeResourceInfoToFile(t, deployment.Name, "deployment", testDebugDirectory, kubectlOptions)
 		}
 	}
+}
+
+// writeResourceInfoToFile takes a Kubernetes resource name, resource type (e.g. pod, deployment, statefulset etc),
+// runs 'kubectl describe' with that resource name and type and writes the output of it to a file or errors.
+// Note that the resource type has to be compatible with the one you could use with a kubectl describe command,
+// e.g. 'daemonset' so that this function can run 'kubectl describe daemonset foo'.
+func writeResourceInfoToFile(t *testing.T, resourceName, resourceType, testDebugDirectory string, kubectlOptions *k8s.KubectlOptions) {
+	// Describe resource
+	desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "describe", resourceType, resourceName)
+
+	// Write resource info or error to file name <resource.Name>-resourceType.txt
+	if err != nil {
+		desc = fmt.Sprintf("Error describing %s/%s: %s: %s", resourceType, resourceType, err, desc)
+	}
+	descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s.txt", resourceName, resourceType))
+	require.NoError(t, ioutil.WriteFile(descFilename, []byte(desc), 0600))
 }
 
 // KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
