@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Federation: ensure replication ACL token can replicate policies and tokens in Consul namespaces other than `default` (Consul-enterprise only). [[GH-364](https://github.com/hashicorp/consul-k8s/issues/364)]
+
 ## 0.19.0 (October 12, 2020)
 
 FEATURES:
