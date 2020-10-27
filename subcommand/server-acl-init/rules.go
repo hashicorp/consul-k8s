@@ -205,24 +205,19 @@ namespace "{{ .SyncConsulDestNS }}" {
 }
 
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector needs permissions to create namespaces and create/update service checks.
+	// The Connect injector needs permissions to create namespaces when namespaces are enabled
+	// and also create/update service checks when health checks are enabled.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
 {{- if .EnableHealthChecksController }}
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
-{{- end }}
   node_prefix "" {
      policy = "write"
   }
   service_prefix "" {
      policy = "write"
   }
-{{- if .EnableNamespaces }}
-}
-{{- end }}
 {{- end }}
 `
 	return c.renderRules(injectRulesTpl)
@@ -290,7 +285,7 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring:      c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix:      c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:           c.flagSyncConsulNodeName,
-		EnableHealthChecksController: c.flagEnableHealthChecksController,
+		EnableHealthChecksController: c.flagAddInjectHealthChecksRules,
 	}
 }
 

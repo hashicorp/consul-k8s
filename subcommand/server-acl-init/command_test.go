@@ -247,7 +247,15 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-enable-health-checks-controller"},
+			TokenFlags:  []string{"-add-inject-health-checks-rules"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "Health Checks ACL token with namespaces enabled",
+			TokenFlags:  []string{"-add-inject-health-checks-rules", "-create-inject-namespace-token"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},

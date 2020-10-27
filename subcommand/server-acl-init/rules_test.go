@@ -531,14 +531,12 @@ operator = "write"`,
 			true,
 			`
 operator = "write"
-namespace_prefix "" {
   node_prefix "" {
      policy = "write"
   }
   service_prefix "" {
      policy = "write"
-  }
-}`,
+  }`,
 		},
 	}
 
@@ -547,8 +545,8 @@ namespace_prefix "" {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:             tt.EnableNamespaces,
-				flagEnableHealthChecksController: tt.EnableHealthChecks,
+				flagEnableNamespaces:           tt.EnableNamespaces,
+				flagAddInjectHealthChecksRules: tt.EnableHealthChecks,
 			}
 
 			injectorRules, err := cmd.injectRules()

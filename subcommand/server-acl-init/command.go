@@ -42,10 +42,10 @@ type Command struct {
 	flagCreateSyncToken    bool
 	flagSyncConsulNodeName string
 
-	flagCreateInjectToken      bool
-	flagCreateInjectAuthMethod bool
-	flagInjectAuthMethodHost   string
-	flagBindingRuleSelector    string
+	flagAddInjectNamespaceRules bool
+	flagCreateInjectAuthMethod  bool
+	flagInjectAuthMethodHost    string
+	flagBindingRuleSelector     string
 
 	flagCreateControllerToken bool
 
@@ -81,7 +81,7 @@ type Command struct {
 	flagBootstrapTokenFile string
 
 	// Flag for health check connect-inject rules
-	flagEnableHealthChecksController bool
+	flagAddInjectHealthChecksRules bool
 
 	flagLogLevel string
 	flagTimeout  time.Duration
@@ -119,7 +119,7 @@ func (c *Command) init() {
 		"The Consul node name to register for catalog sync. Defaults to k8s-sync. To be discoverable "+
 			"via DNS, the name should only contain alpha-numerics and dashes.")
 
-	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-namespace-token", false,
+	c.flags.BoolVar(&c.flagAddInjectNamespaceRules, "create-inject-namespace-token", false,
 		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
 	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method.")
@@ -188,7 +188,7 @@ func (c *Command) init() {
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
 
-	c.flags.BoolVar(&c.flagEnableHealthChecksController, "enable-health-checks-controller", false,
+	c.flags.BoolVar(&c.flagAddInjectHealthChecksRules, "add-inject-health-checks-rules", false,
 		"Creates health check controller ACL rules.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
@@ -463,7 +463,8 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateInjectToken || c.flagEnableHealthChecksController {
+	// Add rules for connect inject based on whether namespaces are enabled or health checks, or both.
+	if c.flagAddInjectNamespaceRules || c.flagAddInjectHealthChecksRules {
 		injectRules, err := c.injectRules()
 		if err != nil {
 			c.log.Error("Error templating inject rules", "err", err)
