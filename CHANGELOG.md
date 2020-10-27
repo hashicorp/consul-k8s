@@ -3,6 +3,8 @@
 BUG FIXES:
 * Federation: ensure replication ACL token can replicate policies and tokens in Consul namespaces other than `default` (Consul-enterprise only). [[GH-364](https://github.com/hashicorp/consul-k8s/issues/364)]
 * CRDs: validate custom resources can only set namespace fields if Consul namespaces are enabled [[GH-375](https://github.com/hashicorp/consul-k8s/pull/375)]
+* CRDs: Ensure ACL token is global so that secondary DCs can manage custom resources.
+  Without this fix, controllers running in secondary datacenters would get ACL errors. [[GH-369](https://github.com/hashicorp/consul-k8s/pull/369)]
 
 ## 0.19.0 (October 12, 2020)
 

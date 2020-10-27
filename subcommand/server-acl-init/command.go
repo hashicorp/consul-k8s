@@ -666,7 +666,10 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("Error templating controller token rules", "err", err)
 			return 1
 		}
-		err = c.createLocalACL("controller", rules, consulDC, consulClient)
+		// Controller token must be global because config entry writes all
+		// go to the primary datacenter. This means secondary datacenters need
+		// a token that is known by the primary datacenters.
+		err = c.createGlobalACL("controller", rules, consulDC, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
