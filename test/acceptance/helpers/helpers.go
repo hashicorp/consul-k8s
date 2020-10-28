@@ -218,28 +218,28 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			}
 			require.NoError(t, ioutil.WriteFile(logFilename, []byte(logs), 0600))
 
-			// Describe pod and write it to a file
+			// Describe pod and write it to a file.
 			writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
 		}
 
-		// Describe any stateful sets
+		// Describe any stateful sets.
 		statefulSets, err := client.AppsV1().StatefulSets(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		for _, statefulSet := range statefulSets.Items {
-			// Describe stateful set and write it to a file
+			// Describe stateful set and write it to a file.
 			writeResourceInfoToFile(t, statefulSet.Name, "statefulset", testDebugDirectory, kubectlOptions)
 		}
 
-		// Describe any daemonsets
+		// Describe any daemonsets.
 		daemonsets, err := client.AppsV1().DaemonSets(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		for _, daemonSet := range daemonsets.Items {
-			// Describe daemon set and write it to a file
+			// Describe daemon set and write it to a file.
 			writeResourceInfoToFile(t, daemonSet.Name, "daemonset", testDebugDirectory, kubectlOptions)
 		}
 
-		// Describe any deployments
+		// Describe any deployments.
 		deployments, err := client.AppsV1().Deployments(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		for _, deployment := range deployments.Items {
-			// Describe deployment and write it to a file
+			// Describe deployment and write it to a file.
 			writeResourceInfoToFile(t, deployment.Name, "deployment", testDebugDirectory, kubectlOptions)
 		}
 	}
