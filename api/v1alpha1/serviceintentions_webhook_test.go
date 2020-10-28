@@ -410,6 +410,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 	cases := map[string]struct {
 		newResource *ServiceIntentions
 		expPatches  []jsonpatch.Operation
+		errMsg      string
 	}{
 		"all namespace fields set": {
 			newResource: &ServiceIntentions{
@@ -432,6 +433,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				},
 			},
 			expPatches: []jsonpatch.Operation{},
+			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: [spec.destination.namespace: Invalid value: "bar": consul namespaces must be enabled to set destination.namespace, spec.sources[0].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
 		},
 		"destination.namespace empty": {
 			newResource: &ServiceIntentions{
@@ -452,6 +454,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Value:     "bar",
 				},
 			},
+			errMsg: "",
 		},
 		"destination.namespace empty and sources.namespace empty": {
 			newResource: &ServiceIntentions{
@@ -477,12 +480,8 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Path:      "/spec/destination/namespace",
 					Value:     "bar",
 				},
-				{
-					Operation: "add",
-					Path:      "/spec/sources/0/namespace",
-					Value:     "bar",
-				},
 			},
+			errMsg: "",
 		},
 		"multiple sources.namespace empty": {
 			newResource: &ServiceIntentions{
@@ -507,18 +506,8 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					},
 				},
 			},
-			expPatches: []jsonpatch.Operation{
-				{
-					Operation: "add",
-					Path:      "/spec/sources/0/namespace",
-					Value:     "bar",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/sources/1/namespace",
-					Value:     "bar",
-				},
-			},
+			expPatches: []jsonpatch.Operation{},
+			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: spec.destination.namespace: Invalid value: "bar": consul namespaces must be enabled to set destination.namespace`,
 		},
 	}
 	for name, c := range cases {
@@ -540,6 +529,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Logger:                 logrtest.TestLogger{T: t},
 					decoder:                decoder,
 					EnableConsulNamespaces: namespacesEnabled,
+					EnableNSMirroring:      true,
 				}
 				response := validator.Handle(ctx, admission.Request{
 					AdmissionRequest: v1beta1.AdmissionRequest{
@@ -552,10 +542,14 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					},
 				})
 
-				require.Equal(t, true, response.Allowed, response.AdmissionResponse.Result.Message)
 				if namespacesEnabled {
+					require.Equal(t, true, response.Allowed, response.AdmissionResponse.Result.Message)
 					require.ElementsMatch(t, c.expPatches, response.Patches)
 				} else {
+					if c.errMsg != "" {
+						require.Equal(t, false, response.Allowed)
+						require.Equal(t, c.errMsg, response.AdmissionResponse.Result.Message)
+					}
 					// If namespaces are disabled there should be no patches
 					// because we don't default any namespace fields.
 					require.Len(t, response.Patches, 0)

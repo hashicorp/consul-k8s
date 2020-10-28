@@ -156,7 +156,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					Spec: v1alpha1.ServiceIntentionsSpec{
 						Destination: v1alpha1.Destination{
 							Name:      "test",
-							Namespace: c.SourceKubeNS,
+							Namespace: c.ExpConsulNS,
 						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
@@ -404,7 +404,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					Spec: v1alpha1.ServiceIntentionsSpec{
 						Destination: v1alpha1.Destination{
 							Name:      "foo",
-							Namespace: c.SourceKubeNS,
+							Namespace: c.ExpConsulNS,
 						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
@@ -669,7 +669,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					Spec: v1alpha1.ServiceIntentionsSpec{
 						Destination: v1alpha1.Destination{
 							Name:      "test",
-							Namespace: c.SourceKubeNS,
+							Namespace: c.ExpConsulNS,
 						},
 						Sources: v1alpha1.SourceIntentions{
 							&v1alpha1.SourceIntention{
