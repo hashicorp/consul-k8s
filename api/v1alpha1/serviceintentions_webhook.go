@@ -19,11 +19,13 @@ import (
 
 type ServiceIntentionsWebhook struct {
 	client.Client
-	ConsulClient           *capi.Client
-	Logger                 logr.Logger
-	decoder                *admission.Decoder
-	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
+	ConsulClient               *capi.Client
+	Logger                     logr.Logger
+	decoder                    *admission.Decoder
+	EnableConsulNamespaces     bool
+	EnableNSMirroring          bool
+	ConsulDestinationNamespace string
+	NSMirroringPrefix          string
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -90,6 +92,12 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	if err := svcIntentions.Validate(); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+
+	// ServiceIntentions are invalid if destination namespaces or source namespaces are set when Consul Namespaces are not enabled.
+	if err := svcIntentions.ValidateNamespaces(v.EnableConsulNamespaces); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
 	// We always return an admission.Patched() response, even if there are no patches, since
 	// admission.Patched() with no patches is equal to admission.Allowed() under
 	// the hood.
@@ -108,7 +116,7 @@ func (v *ServiceIntentionsWebhook) defaultingPatches(err error, svcIntentions *S
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)
 	}
-	svcIntentions.Default(v.EnableConsulNamespaces)
+	svcIntentions.Default(v.EnableConsulNamespaces, v.ConsulDestinationNamespace, v.EnableNSMirroring, v.NSMirroringPrefix)
 	afterDefaulting, err := json.Marshal(svcIntentions)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
