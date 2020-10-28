@@ -596,6 +596,21 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			"",
 		},
+		"no sources": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources: Required value: at least one source must be specified`,
+		},
 		"invalid action": {
 			&ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
