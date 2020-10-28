@@ -37,6 +37,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
+					},
 				},
 			},
 			expAllow: true,
@@ -76,6 +83,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -86,6 +100,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Destination: Destination{
 						Name:      "foo",
 						Namespace: "bar",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
 					},
 				},
 			},
@@ -103,6 +124,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -113,6 +141,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Destination: Destination{
 						Name:      "foo",
 						Namespace: "baz",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
 					},
 				},
 			},
@@ -130,6 +165,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -140,6 +182,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Destination: Destination{
 						Name:      "foo",
 						Namespace: "baz",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
 					},
 				},
 			},
@@ -156,6 +205,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Destination: Destination{
 						Name: "foo",
 					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
+					},
 				},
 			}},
 			newResource: &ServiceIntentions{
@@ -165,6 +221,13 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 				Spec: ServiceIntentionsSpec{
 					Destination: Destination{
 						Name: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
 					},
 				},
 			},
@@ -444,6 +507,13 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				Spec: ServiceIntentionsSpec{
 					Destination: Destination{
 						Name: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "bar",
+							Namespace: "foo",
+							Action:    "allow",
+						},
 					},
 				},
 			},

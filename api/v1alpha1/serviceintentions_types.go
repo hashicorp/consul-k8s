@@ -251,6 +251,9 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 func (in *ServiceIntentions) Validate() error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
+	if len(in.Spec.Sources) == 0 {
+		errs = append(errs, field.Required(path.Child("sources"), `at least one source must be specified`))
+	}
 	for i, source := range in.Spec.Sources {
 		if len(source.Permissions) > 0 && source.Action != "" {
 			asJSON, _ := json.Marshal(source)

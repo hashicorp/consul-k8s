@@ -223,6 +223,17 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					MeshGateway: MeshGatewayConfig{
 						Mode: "remote",
 					},
+					Expose: ExposeConfig{
+						Checks: false,
+						Paths: []ExposePath{
+							{
+								ListenerPort:  100,
+								Path:          "/bar",
+								LocalPathPort: 1000,
+								Protocol:      "",
+							},
+						},
+					},
 				},
 			},
 			expectedErrMsg: "",
