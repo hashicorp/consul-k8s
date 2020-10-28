@@ -508,3 +508,96 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_PatchesForNamespaces(t *testing.T) {
+	basicSpec := corev1.PodSpec{
+		Containers: []corev1.Container{
+			corev1.Container{
+				Name: "web",
+			},
+		},
+	}
+	cases := []struct {
+		Name    string
+		Handler Handler
+		Req     v1beta1.AdmissionRequest
+		Err     string // expected error string, not exact
+		Patches []jsonpatch.JsonPatchOperation
+	}{
+		{
+			"consul destination namespace annotation is set via patch",
+			Handler{
+				Log:                        hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:       mapset.NewSet(),
+				ConsulDestinationNamespace: "abcd",
+				EnableK8SNSMirroring:       true,
+				EnableNamespaces:           true,
+			},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{},
+					Spec:       basicSpec,
+				}),
+			},
+			"",
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels/",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			resp := tt.Handler.Mutate(&tt.Req)
+			if (tt.Err == "") != resp.Allowed {
+				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
+			}
+			if tt.Err != "" {
+				require.Contains(resp.Result.Message, tt.Err)
+				return
+			}
+
+			var actual []jsonpatch.JsonPatchOperation
+			if len(resp.Patch) > 0 {
+				require.NoError(json.Unmarshal(resp.Patch, &actual))
+				for i, _ := range actual {
+					actual[i].Value = nil
+				}
+			}
+			require.Equal(tt.Patches, actual)
+		})
+	}
+}

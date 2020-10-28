@@ -163,7 +163,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 	if serviceCheck == nil {
 		// Create a new health check.
 		h.Log.Debug("registering new health check", "name", pod.Name, "id", healthCheckID)
-		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status)
+		err = h.registerConsulHealthCheck(client, pod, healthCheckID, serviceID, status)
 		if err != nil {
 			return fmt.Errorf("unable to register health check: %s", err)
 		}
@@ -192,7 +192,7 @@ func (h *HealthCheckResource) updateConsulHealthCheckStatus(client *api.Client, 
 // registerConsulHealthCheck registers a TTL health check for the service on this Agent.
 // The Agent is local to the Pod which has a kubernetes health check.
 // This has the effect of marking the service instance healthy/unhealthy for Consul service mesh traffic.
-func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status string) error {
+func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod *corev1.Pod, consulHealthCheckID, serviceID, status string) error {
 	h.Log.Debug("registering Consul health check", "id", consulHealthCheckID, "serviceID", serviceID)
 
 	// Create a TTL health check in Consul associated with this service and pod.
@@ -208,6 +208,8 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 			SuccessBeforePassing:   1,
 			FailuresBeforeCritical: 1,
 		},
+		// For Consul-ENT only, this will be omitted for OSS, aka ""
+		Namespace: pod.Annotations[annotationConsulDestinationNamespace],
 	})
 	if err != nil {
 		h.Log.Error("unable to register health check with Consul from k8s", "err", err)
@@ -253,6 +255,9 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
 	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
+	if pod.Annotations[annotationConsulDestinationNamespace] != "" {
+		localConfig.Namespace = pod.Annotations[annotationConsulDestinationNamespace]
+	}
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {
 		h.Log.Error("unable to get Consul API Client", "addr", newAddr, "err", err)

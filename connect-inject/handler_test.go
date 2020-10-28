@@ -403,21 +403,19 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 		{
-			"pod with existing label",
+			"consul destination namespace annotation is set",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
+				Log:                        hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:       mapset.NewSet(),
+				ConsulDestinationNamespace: "abcd",
+				EnableK8SNSMirroring:       true,
+				EnableNamespaces:           true,
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"testLabel": "123",
-						},
-					},
-
-					Spec: basicSpec,
+					ObjectMeta: metav1.ObjectMeta{},
+					Spec:       basicSpec,
 				}),
 			},
 			"",
@@ -448,7 +446,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
+					Path:      "/metadata/labels/",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
 				},
 			},
 		},
