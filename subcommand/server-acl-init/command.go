@@ -190,7 +190,7 @@ func (c *Command) init() {
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
 
-	c.flags.BoolVar(&c.flagAddInjectHealthChecksRules, "add-inject-health-checks-rules", false,
+	c.flags.BoolVar(&c.flagAddInjectHealthChecksRules, "enable-health-checks", false,
 		"Creates health check controller ACL rules.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,

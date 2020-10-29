@@ -255,7 +255,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -263,7 +263,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -434,7 +434,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -442,7 +442,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token-dc2"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -586,13 +586,13 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		},
 		{
 			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},
 		{
 			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-add-inject-health-checks-rules"},
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},
