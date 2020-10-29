@@ -1,3 +1,5 @@
+// +build enterprise
+
 package serveraclinit
 
 import (
