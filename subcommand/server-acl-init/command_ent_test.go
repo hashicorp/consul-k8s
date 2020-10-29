@@ -1,9 +1,8 @@
-// +build enterprise
-
 package serveraclinit
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -17,100 +16,105 @@ import (
 
 // Test the auth method and acl binding rule created when namespaces are enabled
 // and there's a single consul destination namespace.
-func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
-	t.Parallel()
+func TestRun_ConnectInject_SingleDestinationNamespace(tt *testing.T) {
+	tt.Parallel()
 
-	consulDestNamespaces := []string{"default", "destination"}
-	for _, consulDestNamespace := range consulDestNamespaces {
-		t.Run(consulDestNamespace, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(tt)
-			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
-			require := require.New(tt)
+	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
+	for _, flag := range cases {
+		tt.Run(flag, func(t *testing.T) {
+			consulDestNamespaces := []string{"default", "destination"}
+			for _, consulDestNamespace := range consulDestNamespaces {
+				t.Run(consulDestNamespace, func(tt *testing.T) {
+					k8s, testAgent := completeEnterpriseSetup(tt)
+					defer testAgent.Stop()
+					setUpK8sServiceAccount(tt, k8s, ns)
+					require := require.New(tt)
 
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			cmd.init()
-			args := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
-				"-enable-namespaces",
-				"-consul-inject-destination-namespace", consulDestNamespace,
-				"-acl-binding-rule-selector=serviceaccount.name!=default",
-			}
+					ui := cli.NewMockUi()
+					cmd := Command{
+						UI:        ui,
+						clientset: k8s,
+					}
+					cmd.init()
+					args := []string{
+						"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+						"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+						"-resource-prefix=" + resourcePrefix,
+						"-k8s-namespace=" + ns,
+						flag,
+						"-enable-namespaces",
+						"-consul-inject-destination-namespace", consulDestNamespace,
+						"-acl-binding-rule-selector=serviceaccount.name!=default",
+					}
 
-			responseCode := cmd.Run(args)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+					responseCode := cmd.Run(args)
+					require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
-				Token:   bootToken,
-			})
-			require.NoError(err)
+					bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+					consul, err := api.NewClient(&api.Config{
+						Address: testAgent.HTTPAddr,
+						Token:   bootToken,
+					})
+					require.NoError(err)
 
-			// Ensure there's only one auth method.
-			namespaceQuery := &api.QueryOptions{
-				Namespace: consulDestNamespace,
-			}
-			methods, _, err := consul.ACL().AuthMethodList(namespaceQuery)
-			require.NoError(err)
-			require.Len(methods, 1)
+					// Ensure there's only one auth method.
+					namespaceQuery := &api.QueryOptions{
+						Namespace: consulDestNamespace,
+					}
+					methods, _, err := consul.ACL().AuthMethodList(namespaceQuery)
+					require.NoError(err)
+					require.Len(methods, 1)
 
-			// Check the ACL auth method is created in the expected namespace.
-			authMethodName := resourcePrefix + "-k8s-auth-method"
-			actMethod, _, err := consul.ACL().AuthMethodRead(authMethodName, namespaceQuery)
-			require.NoError(err)
-			require.NotNil(actMethod)
-			require.Equal("kubernetes", actMethod.Type)
-			require.Equal("Kubernetes Auth Method", actMethod.Description)
-			require.NotContains(actMethod.Config, "MapNamespaces")
-			require.NotContains(actMethod.Config, "ConsulNamespacePrefix")
+					// Check the ACL auth method is created in the expected namespace.
+					authMethodName := resourcePrefix + "-k8s-auth-method"
+					actMethod, _, err := consul.ACL().AuthMethodRead(authMethodName, namespaceQuery)
+					require.NoError(err)
+					require.NotNil(actMethod)
+					require.Equal("kubernetes", actMethod.Type)
+					require.Equal("Kubernetes Auth Method", actMethod.Description)
+					require.NotContains(actMethod.Config, "MapNamespaces")
+					require.NotContains(actMethod.Config, "ConsulNamespacePrefix")
 
-			// Check the binding rule is as expected.
-			rules, _, err := consul.ACL().BindingRuleList(authMethodName, namespaceQuery)
-			require.NoError(err)
-			require.Len(rules, 1)
-			actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, namespaceQuery)
-			require.NoError(err)
-			require.NotNil(actRule)
-			require.Equal("Kubernetes binding rule", actRule.Description)
-			require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-			require.Equal("${serviceaccount.name}", actRule.BindName)
-			require.Equal("serviceaccount.name!=default", actRule.Selector)
+					// Check the binding rule is as expected.
+					rules, _, err := consul.ACL().BindingRuleList(authMethodName, namespaceQuery)
+					require.NoError(err)
+					require.Len(rules, 1)
+					actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, namespaceQuery)
+					require.NoError(err)
+					require.NotNil(actRule)
+					require.Equal("Kubernetes binding rule", actRule.Description)
+					require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+					require.Equal("${serviceaccount.name}", actRule.BindName)
+					require.Equal("serviceaccount.name!=default", actRule.Selector)
 
-			// Check that the default namespace got an attached ACL policy
-			defNamespace, _, err := consul.Namespaces().Read("default", &api.QueryOptions{})
-			require.NoError(err)
-			require.NotNil(defNamespace)
-			require.NotNil(defNamespace.ACLs)
-			require.Len(defNamespace.ACLs.PolicyDefaults, 1)
-			require.Equal("cross-namespace-policy", defNamespace.ACLs.PolicyDefaults[0].Name)
+					// Check that the default namespace got an attached ACL policy
+					defNamespace, _, err := consul.Namespaces().Read("default", &api.QueryOptions{})
+					require.NoError(err)
+					require.NotNil(defNamespace)
+					require.NotNil(defNamespace.ACLs)
+					require.Len(defNamespace.ACLs.PolicyDefaults, 1)
+					require.Equal("cross-namespace-policy", defNamespace.ACLs.PolicyDefaults[0].Name)
 
-			if consulDestNamespace != "default" {
-				// Check that only one namespace was created besides the
-				// already existing `default` namespace
-				namespaces, _, err := consul.Namespaces().List(&api.QueryOptions{})
-				require.NoError(err)
-				require.Len(namespaces, 2)
+					if consulDestNamespace != "default" {
+						// Check that only one namespace was created besides the
+						// already existing `default` namespace
+						namespaces, _, err := consul.Namespaces().List(&api.QueryOptions{})
+						require.NoError(err)
+						require.Len(namespaces, 2)
 
-				// Check the created namespace properties
-				actNamespace, _, err := consul.Namespaces().Read(consulDestNamespace, &api.QueryOptions{})
-				require.NoError(err)
-				require.NotNil(actNamespace)
-				require.Equal(consulDestNamespace, actNamespace.Name)
-				require.Equal("Auto-generated by consul-k8s", actNamespace.Description)
-				require.NotNil(actNamespace.ACLs)
-				require.Len(actNamespace.ACLs.PolicyDefaults, 1)
-				require.Equal("cross-namespace-policy", actNamespace.ACLs.PolicyDefaults[0].Name)
-				require.Contains(actNamespace.Meta, "external-source")
-				require.Equal("kubernetes", actNamespace.Meta["external-source"])
+						// Check the created namespace properties
+						actNamespace, _, err := consul.Namespaces().Read(consulDestNamespace, &api.QueryOptions{})
+						require.NoError(err)
+						require.NotNil(actNamespace)
+						require.Equal(consulDestNamespace, actNamespace.Name)
+						require.Equal("Auto-generated by consul-k8s", actNamespace.Description)
+						require.NotNil(actNamespace.ACLs)
+						require.Len(actNamespace.ACLs.PolicyDefaults, 1)
+						require.Equal("cross-namespace-policy", actNamespace.ACLs.PolicyDefaults[0].Name)
+						require.Contains(actNamespace.Meta, "external-source")
+						require.Equal("kubernetes", actNamespace.Meta["external-source"])
+					}
+				})
 			}
 		})
 	}
@@ -118,9 +122,10 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 
 // Test the auth method and acl binding rule created when namespaces are enabled
 // and we're mirroring namespaces.
-func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
-	t.Parallel()
+func TestRun_ConnectInject_NamespaceMirroring(tt *testing.T) {
+	tt.Parallel()
 
+	flagcases := []string{"-create-inject-auth-method", "-create-inject-token"}
 	cases := map[string]struct {
 		MirroringPrefix string
 		ExtraFlags      []string
@@ -141,64 +146,68 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases {
-		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t)
-			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
-			require := require.New(tt)
+	for _, flag := range flagcases {
+		tt.Run(flag, func(t *testing.T) {
+			for name, c := range cases {
+				t.Run(name, func(tt *testing.T) {
+					k8s, testAgent := completeEnterpriseSetup(t)
+					defer testAgent.Stop()
+					setUpK8sServiceAccount(tt, k8s, ns)
+					require := require.New(tt)
 
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
+					ui := cli.NewMockUi()
+					cmd := Command{
+						UI:        ui,
+						clientset: k8s,
+					}
+					cmd.init()
+					args := []string{
+						"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+						"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+						"-resource-prefix=" + resourcePrefix,
+						"-k8s-namespace=" + ns,
+						flag,
+						"-enable-namespaces",
+						"-enable-inject-k8s-namespace-mirroring",
+						"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
+						"-acl-binding-rule-selector=serviceaccount.name!=default",
+					}
+					args = append(args, c.ExtraFlags...)
+					responseCode := cmd.Run(args)
+					require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+					bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+					consul, err := api.NewClient(&api.Config{
+						Address: testAgent.HTTPAddr,
+						Token:   bootToken,
+					})
+					require.NoError(err)
+
+					// Check the ACL auth method is as expected.
+					authMethodName := resourcePrefix + "-k8s-auth-method"
+					method, _, err := consul.ACL().AuthMethodRead(authMethodName, nil)
+					require.NoError(err)
+					require.NotNil(method, authMethodName+" not found")
+					require.Equal("kubernetes", method.Type)
+					require.Equal("Kubernetes Auth Method", method.Description)
+					require.Contains(method.Config, "MapNamespaces")
+					require.Contains(method.Config, "ConsulNamespacePrefix")
+					require.Equal(true, method.Config["MapNamespaces"])
+					require.Equal(c.MirroringPrefix, method.Config["ConsulNamespacePrefix"])
+
+					// Check the binding rule is as expected.
+					rules, _, err := consul.ACL().BindingRuleList(authMethodName, nil)
+					require.NoError(err)
+					require.Len(rules, 1)
+					actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, nil)
+					require.NoError(err)
+					require.NotNil(actRule)
+					require.Equal("Kubernetes binding rule", actRule.Description)
+					require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+					require.Equal("${serviceaccount.name}", actRule.BindName)
+					require.Equal("serviceaccount.name!=default", actRule.Selector)
+				})
 			}
-			cmd.init()
-			args := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
-				"-enable-namespaces",
-				"-enable-inject-k8s-namespace-mirroring",
-				"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
-				"-acl-binding-rule-selector=serviceaccount.name!=default",
-			}
-			args = append(args, c.ExtraFlags...)
-			responseCode := cmd.Run(args)
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
-				Token:   bootToken,
-			})
-			require.NoError(err)
-
-			// Check the ACL auth method is as expected.
-			authMethodName := resourcePrefix + "-k8s-auth-method"
-			method, _, err := consul.ACL().AuthMethodRead(authMethodName, nil)
-			require.NoError(err)
-			require.NotNil(method, authMethodName+" not found")
-			require.Equal("kubernetes", method.Type)
-			require.Equal("Kubernetes Auth Method", method.Description)
-			require.Contains(method.Config, "MapNamespaces")
-			require.Contains(method.Config, "ConsulNamespacePrefix")
-			require.Equal(true, method.Config["MapNamespaces"])
-			require.Equal(c.MirroringPrefix, method.Config["ConsulNamespacePrefix"])
-
-			// Check the binding rule is as expected.
-			rules, _, err := consul.ACL().BindingRuleList(authMethodName, nil)
-			require.NoError(err)
-			require.Len(rules, 1)
-			actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, nil)
-			require.NoError(err)
-			require.NotNil(actRule)
-			require.Equal("Kubernetes binding rule", actRule.Description)
-			require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-			require.Equal("${serviceaccount.name}", actRule.BindName)
-			require.Equal("serviceaccount.name!=default", actRule.Selector)
 		})
 	}
 }
@@ -211,6 +220,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
 			k8s, testAgent := completeEnterpriseSetup(t)
+			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 			defer testAgent.Stop()
 			require := require.New(t)
 
@@ -224,7 +234,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-allow-dns",
 				"-create-mesh-gateway-token",
 				"-create-sync-token",
-				"-create-inject-namespace-token",
+				"-create-inject-token",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
 				"-ingress-gateway-name=gw",
@@ -255,11 +265,12 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			require.NoError(err)
 
 			// Check that the expected policies were created.
+			// TODO: I think this was an invalid test
 			firstRunExpectedPolicies := []string{
 				"anonymous-token-policy",
 				"client-token",
 				"catalog-sync-token",
-				"connect-inject-token",
+				//				"connect-inject-token",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
@@ -404,7 +415,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			AuthMethodExpectedNamespacePrefixConfig: "prefix-",
 			BindingRuleExpectedNS:                   "default",
 		},
-		"no ns => single dest ns": {
+		"no ns => single dest ns (deprecated)": {
 			FirstRunArgs: nil,
 			SecondRunArgs: []string{
 				"-create-inject-auth-method",
@@ -416,14 +427,28 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			AuthMethodExpectedNamespacePrefixConfig: "",
 			BindingRuleExpectedNS:                   "dest",
 		},
+		"no ns => single dest ns": {
+			FirstRunArgs: nil,
+			SecondRunArgs: []string{
+				"-create-inject-token",
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace=dest",
+			},
+			AuthMethodExpectedNS:                    "dest",
+			AuthMethodExpectMapNamespacesConfig:     false,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "dest",
+		},
 		"mirroring ns => single dest ns": {
 			FirstRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
 			},
 			SecondRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-consul-inject-destination-namespace=dest",
 			},
 			AuthMethodExpectedNS:                    "dest",
@@ -433,11 +458,13 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		},
 		"single dest ns => mirroring ns": {
 			FirstRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace=dest",
 			},
 			SecondRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
 			},
@@ -448,12 +475,14 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		},
 		"mirroring ns (no prefix) => mirroring ns (no prefix)": {
 			FirstRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=",
 			},
 			SecondRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=",
 			},
@@ -464,11 +493,13 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		},
 		"mirroring ns => mirroring ns (same prefix)": {
 			FirstRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
 			},
 			SecondRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
@@ -480,11 +511,13 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		},
 		"mirroring ns (no prefix) => mirroring ns (prefix)": {
 			FirstRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=",
 			},
 			SecondRunArgs: []string{
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
@@ -497,11 +530,13 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		"mirroring ns (prefix) => mirroring ns (no prefix)": {
 			FirstRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=prefix-",
 			},
 			SecondRunArgs: []string{
 				"-enable-namespaces",
+				"-create-inject-token",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix=",
 			},
@@ -512,74 +547,77 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases {
-		t.Run(name, func(tt *testing.T) {
-			require := require.New(tt)
-			k8s, testAgent := completeEnterpriseSetup(tt)
-			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
+	tokenflags := []string{"-create-inject-auth-method", "-create-inject-token"}
+	for _, flag := range tokenflags {
+		for name, c := range cases {
+			t.Run(fmt.Sprintf("%v-%v", name, flag), func(tt *testing.T) {
+				require := require.New(tt)
+				k8s, testAgent := completeEnterpriseSetup(tt)
+				defer testAgent.Stop()
+				setUpK8sServiceAccount(tt, k8s, ns)
 
-			ui := cli.NewMockUi()
-			defaultArgs := []string{
-				"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
-				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
-				"-resource-prefix=" + resourcePrefix,
-				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
-			}
+				ui := cli.NewMockUi()
+				defaultArgs := []string{
+					"-server-address=" + strings.Split(testAgent.HTTPAddr, ":")[0],
+					"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
+					"-resource-prefix=" + resourcePrefix,
+					"-k8s-namespace=" + ns,
+					flag,
+				}
 
-			// First run. NOTE: we don't assert anything here since we've
-			// tested these results in other tests. What we care about here
-			// is the result after the second run.
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			responseCode := cmd.Run(append(defaultArgs, c.FirstRunArgs...))
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+				// First run. NOTE: we don't assert anything here since we've
+				// tested these results in other tests. What we care about here
+				// is the result after the second run.
+				cmd := Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				responseCode := cmd.Run(append(defaultArgs, c.FirstRunArgs...))
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-			// Second run.
-			// NOTE: We're redefining the command so that the old flag values are
-			// reset.
-			cmd = Command{
-				UI:        ui,
-				clientset: k8s,
-			}
-			responseCode = cmd.Run(append(defaultArgs, c.SecondRunArgs...))
-			require.Equal(0, responseCode, ui.ErrorWriter.String())
+				// Second run.
+				// NOTE: We're redefining the command so that the old flag values are
+				// reset.
+				cmd = Command{
+					UI:        ui,
+					clientset: k8s,
+				}
+				responseCode = cmd.Run(append(defaultArgs, c.SecondRunArgs...))
+				require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-			// Now check that everything is as expected.
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-			consul, err := api.NewClient(&api.Config{
-				Address: testAgent.HTTPAddr,
-				Token:   bootToken,
+				// Now check that everything is as expected.
+				bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+				consul, err := api.NewClient(&api.Config{
+					Address: testAgent.HTTPAddr,
+					Token:   bootToken,
+				})
+				require.NoError(err)
+
+				// Check the ACL auth method is as expected.
+				authMethodName := resourcePrefix + "-k8s-auth-method"
+				method, _, err := consul.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{
+					Namespace: c.AuthMethodExpectedNS,
+				})
+				require.NoError(err)
+				require.NotNil(method, authMethodName+" not found")
+				if c.AuthMethodExpectMapNamespacesConfig {
+					require.Contains(method.Config, "MapNamespaces")
+					require.Contains(method.Config, "ConsulNamespacePrefix")
+					require.Equal(true, method.Config["MapNamespaces"])
+					require.Equal(c.AuthMethodExpectedNamespacePrefixConfig, method.Config["ConsulNamespacePrefix"])
+				} else {
+					require.NotContains(method.Config, "MapNamespaces")
+					require.NotContains(method.Config, "ConsulNamespacePrefix")
+				}
+
+				// Check the binding rule is as expected.
+				rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{
+					Namespace: c.BindingRuleExpectedNS,
+				})
+				require.NoError(err)
+				require.Len(rules, 1)
 			})
-			require.NoError(err)
-
-			// Check the ACL auth method is as expected.
-			authMethodName := resourcePrefix + "-k8s-auth-method"
-			method, _, err := consul.ACL().AuthMethodRead(authMethodName, &api.QueryOptions{
-				Namespace: c.AuthMethodExpectedNS,
-			})
-			require.NoError(err)
-			require.NotNil(method, authMethodName+" not found")
-			if c.AuthMethodExpectMapNamespacesConfig {
-				require.Contains(method.Config, "MapNamespaces")
-				require.Contains(method.Config, "ConsulNamespacePrefix")
-				require.Equal(true, method.Config["MapNamespaces"])
-				require.Equal(c.AuthMethodExpectedNamespacePrefixConfig, method.Config["ConsulNamespacePrefix"])
-			} else {
-				require.NotContains(method.Config, "MapNamespaces")
-				require.NotContains(method.Config, "ConsulNamespacePrefix")
-			}
-
-			// Check the binding rule is as expected.
-			rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{
-				Namespace: c.BindingRuleExpectedNS,
-			})
-			require.NoError(err)
-			require.Len(rules, 1)
-		})
+		}
 	}
 }
 
@@ -608,8 +646,15 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 			LocalToken:  false,
 		},
-		"connect-inject-namespace token": {
-			TokenFlags:  []string{"-create-inject-namespace-token"},
+		"connect-inject-namespace token (deprecated)": {
+			TokenFlags:  []string{"-create-inject-namespace-token", "-enable-namespaces"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
+		"connect-inject-token": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -673,6 +718,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
 			k8s, testSvr := completeEnterpriseSetup(t)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
 

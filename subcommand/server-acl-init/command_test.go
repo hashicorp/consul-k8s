@@ -273,7 +273,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
 
@@ -456,7 +456,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			defer fileCleanup()
 
 			k8s, consul, secondaryAddr, cleanup := mockReplicatedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
 			// Run the command.
@@ -604,7 +604,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			defer fileCleanup()
 
 			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testAgent.Stop()
 
 			// Run the command.
@@ -728,7 +728,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				defer testSvr.Stop()
 				consulHTTPAddr = testSvr.HTTPAddr
 			}
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -828,7 +828,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 
 			k8s, testSvr := completeSetup(tt)
 			defer testSvr.Stop()
-			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
+			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
 
 			// Run the command.
@@ -903,7 +903,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(tt *testing.T) {
 
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
-			caCert, jwtToken := setUpK8sServiceAccount(t, k8s)
+			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(t)
 
 			ui := cli.NewMockUi()
@@ -955,7 +955,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(tt *testing.T) {
 			serviceAccountCACert = base64.StdEncoding.EncodeToString([]byte(caCertPem))
 
 			// Create a new service account
-			updatedCACert, updatedJWTToken := setUpK8sServiceAccount(t, k8s)
+			updatedCACert, updatedJWTToken := setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run command again
 			responseCode = cmd.Run([]string{
@@ -993,7 +993,7 @@ func TestRun_BindingRuleUpdates(tt *testing.T) {
 	for _, flag := range cases {
 		tt.Run(flag, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
 
@@ -1737,7 +1737,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
 			k8s, consul, serverAddr, cleanup := mockReplicatedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
 			// Run the command.
@@ -2090,16 +2090,16 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 // This Service Account would normally automatically be created by Kubernetes
 // when the injector deployment is created. It returns the Service Account
 // CA Cert and JWT token.
-func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) {
+func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
-	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
 		// The second secret is mimicking the behavior on Openshift,
 		// where two secrets are injected: one with SA token and one with docker config.
-		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
+		_, err := k8s.CoreV1().ServiceAccounts(namespace).Create(
 			context.Background(),
 			&v1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2136,7 +2136,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 		},
 		Type: v1.SecretTypeServiceAccountToken,
 	}
-	createOrUpdateSecret(t, k8s, secret)
+	createOrUpdateSecret(t, k8s, secret, namespace)
 
 	// Create the second secret of a different type
 	otherSecret := &v1.Secret{
@@ -2146,19 +2146,19 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeDockercfg,
 	}
-	createOrUpdateSecret(t, k8s, otherSecret)
+	createOrUpdateSecret(t, k8s, otherSecret, namespace)
 
 	return string(caCertBytes), string(tokenBytes)
 }
 
-func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret) {
-	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(context.Background(), secret.Name, metav1.GetOptions{})
+func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret, namespace string) {
+	existingSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
 	var err error
 	if existingSecret == nil {
-		_, err = k8s.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
+		_, err = k8s.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		require.NoError(t, err)
 	} else {
-		_, err = k8s.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
+		_, err = k8s.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 		require.NoError(t, err)
 	}
 }
