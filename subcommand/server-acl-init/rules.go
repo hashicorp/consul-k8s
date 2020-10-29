@@ -7,15 +7,15 @@ import (
 )
 
 type rulesData struct {
-	EnableNamespaces             bool
-	SyncConsulDestNS             string
-	SyncEnableNSMirroring        bool
-	SyncNSMirroringPrefix        string
-	InjectConsulDestNS           string
-	InjectEnableNSMirroring      bool
-	InjectNSMirroringPrefix      string
-	SyncConsulNodeName           string
-	EnableHealthChecksController bool
+	EnableNamespaces        bool
+	SyncConsulDestNS        string
+	SyncEnableNSMirroring   bool
+	SyncNSMirroringPrefix   string
+	InjectConsulDestNS      string
+	InjectEnableNSMirroring bool
+	InjectNSMirroringPrefix string
+	SyncConsulNodeName      string
+	EnableHealthChecks      bool
 }
 
 type gatewayRulesData struct {
@@ -211,7 +211,7 @@ func (c *Command) injectRules() (string, error) {
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
-{{- if .EnableHealthChecksController }}
+{{- if .EnableHealthChecks }}
   node_prefix "" {
      policy = "write"
   }
@@ -277,15 +277,15 @@ namespace "{{ .InjectConsulDestNS }}" {
 
 func (c *Command) rulesData() rulesData {
 	return rulesData{
-		EnableNamespaces:             c.flagEnableNamespaces,
-		SyncConsulDestNS:             c.flagConsulSyncDestinationNamespace,
-		SyncEnableNSMirroring:        c.flagEnableSyncK8SNSMirroring,
-		SyncNSMirroringPrefix:        c.flagSyncK8SNSMirroringPrefix,
-		InjectConsulDestNS:           c.flagConsulInjectDestinationNamespace,
-		InjectEnableNSMirroring:      c.flagEnableInjectK8SNSMirroring,
-		InjectNSMirroringPrefix:      c.flagInjectK8SNSMirroringPrefix,
-		SyncConsulNodeName:           c.flagSyncConsulNodeName,
-		EnableHealthChecksController: c.flagAddInjectHealthChecksRules,
+		EnableNamespaces:        c.flagEnableNamespaces,
+		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
+		SyncEnableNSMirroring:   c.flagEnableSyncK8SNSMirroring,
+		SyncNSMirroringPrefix:   c.flagSyncK8SNSMirroringPrefix,
+		InjectConsulDestNS:      c.flagConsulInjectDestinationNamespace,
+		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
+		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
+		SyncConsulNodeName:      c.flagSyncConsulNodeName,
+		EnableHealthChecks:      c.flagAddInjectHealthChecksRules,
 	}
 }
 
