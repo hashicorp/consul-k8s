@@ -170,22 +170,6 @@ func TestRun_TokensPrimaryDC(tt *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Inject token (deprecated)",
-			TokenFlags:  []string{"-create-inject-namespace-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		{
-			TestName:    "Inject token with namespaces",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -260,14 +244,6 @@ func TestRun_TokensPrimaryDC(tt *testing.T) {
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  true,
-		},
-		{
-			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
 		},
 	}
 	for _, c := range cases {
@@ -365,22 +341,6 @@ func TestRun_TokensReplicatedDC(tt *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Inject namespace token (deprecated)",
-			TokenFlags:  []string{"-create-inject-namespace-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token-dc2"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		{
-			TestName:    "Inject namespace token with namespaces",
-			TokenFlags:  []string{"-enable-namespaces", "-create-inject-token"},
-			PolicyNames: []string{"connect-inject-token-dc2"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token-dc2"},
@@ -439,14 +399,6 @@ func TestRun_TokensReplicatedDC(tt *testing.T) {
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  true,
-		},
-		{
-			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
-			PolicyNames: []string{"connect-inject-token-dc2"},
-			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  false,
 		},
 	}
 	for _, c := range cases {
@@ -525,18 +477,6 @@ func TestRun_TokensWithProvidedBootstrapToken(tt *testing.T) {
 			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 		},
 		{
-			TestName:    "Inject token (deprecated)",
-			TokenFlags:  []string{"-create-inject-namespace-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-		},
-		{
-			TestName:    "Inject token with namespaces",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
-			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -587,12 +527,6 @@ func TestRun_TokensWithProvidedBootstrapToken(tt *testing.T) {
 		{
 			TestName:    "Health Checks ACL token",
 			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
-			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-		},
-		{
-			TestName:    "Health Checks ACL token with namespaces enabled",
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
 			PolicyNames: []string{"connect-inject-token"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},

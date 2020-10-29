@@ -714,6 +714,27 @@ func TestRun_TokensWithNamespacesEnabled(tt *testing.T) {
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
 		},
+		"inject token (deprecated)": {
+			TokenFlags:  []string{"-create-inject-namespace-token", "-enable-namespaces"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
+		"inject token with namespaces": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
+		"Health Checks ACL token with namespaces enabled": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
 	}
 	for testName, c := range cases {
 		tt.Run(testName, func(t *testing.T) {
