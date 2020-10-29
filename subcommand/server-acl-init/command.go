@@ -42,6 +42,7 @@ type Command struct {
 	flagCreateSyncToken    bool
 	flagSyncConsulNodeName string
 
+	flagCreateInjectToken       bool
 	flagAddInjectNamespaceRules bool
 	flagCreateInjectAuthMethod  bool
 	flagInjectAuthMethodHost    string
@@ -120,11 +121,12 @@ func (c *Command) init() {
 			"via DNS, the name should only contain alpha-numerics and dashes.")
 
 	c.flags.BoolVar(&c.flagAddInjectNamespaceRules, "create-inject-namespace-token", false,
-		"Toggle for creating a connect injector token. Only required when namespaces are enabled.")
-	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-auth-method", false,
+		"Toggle for creating a connect injector token. Only required when namespaces are enabled. "+
+			"Deprecated: use -create-inject-token instead.")
+	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-auth-method", false,
+		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
+	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method.")
-	c.flags.BoolVar(&c.flagCreateInjectAuthMethod, "create-inject-token", false,
-		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-auth-method instead.")
 	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
@@ -463,8 +465,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagCreateInjectToken {
+		err := c.configureConnectInject(consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
 	// Add rules for connect inject based on whether namespaces are enabled or health checks, or both.
-	if c.flagAddInjectNamespaceRules || c.flagAddInjectHealthChecksRules {
+	if (c.flagAddInjectNamespaceRules || c.flagCreateInjectToken) && (c.flagEnableNamespaces || c.flagAddInjectHealthChecksRules) {
 		injectRules, err := c.injectRules()
 		if err != nil {
 			c.log.Error("Error templating inject rules", "err", err)
@@ -629,14 +638,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagCreateInjectAuthMethod {
-		err := c.configureConnectInject(consulClient)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
-	}
-
 	if c.flagCreateACLReplicationToken {
 		rules, err := c.aclReplicationRules()
 		if err != nil {
@@ -777,7 +778,7 @@ func (c *Command) createAnonymousPolicy() bool {
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectAuthMethod && c.flagCreateACLReplicationToken))
+			(c.flagCreateInjectToken && c.flagCreateACLReplicationToken))
 }
 
 func (c *Command) validateFlags() error {
