@@ -248,11 +248,13 @@ func (c *Command) Run(args []string) int {
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
 			&webhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
-				Client:                 mgr.GetClient(),
-				ConsulClient:           consulClient,
-				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
-				EnableConsulNamespaces: c.flagEnableNamespaces,
-				EnableNSMirroring:      c.flagEnableNSMirroring,
+				Client:                     mgr.GetClient(),
+				ConsulClient:               consulClient,
+				Logger:                     ctrl.Log.WithName("webhooks").WithName(common.ServiceIntentions),
+				EnableConsulNamespaces:     c.flagEnableNamespaces,
+				EnableNSMirroring:          c.flagEnableNSMirroring,
+				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+				NSMirroringPrefix:          c.flagNSMirroringPrefix,
 			}})
 	}
 	// +kubebuilder:scaffold:builder

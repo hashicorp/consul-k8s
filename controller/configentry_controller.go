@@ -96,6 +96,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 		return ctrl.Result{}, err
 	}
 
+	consulEntry := configEntry.ToConsul(r.DatacenterName)
+
 	if configEntry.GetObjectMeta().DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then let's add the finalizer and update the object. This is equivalent
@@ -112,7 +114,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
 			entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
-				Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+				Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 			})
 
 			// Ignore the error where the config entry isn't found in Consul.
@@ -123,7 +125,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 				// Only delete the resource from Consul if it is owned by our datacenter.
 				if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
 					_, err := r.ConsulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.WriteOptions{
-						Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+						Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 					})
 					if err != nil {
 						return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -148,7 +150,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	// Check to see if consul has config entry with the same name
 	entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
-		Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+		Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 	})
 	// If a config entry with this name does not exist
 	if isNotFoundErr(err) {
@@ -157,7 +159,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 		// If Consul namespaces are enabled we may need to create the
 		// destination consul namespace first.
 		if r.EnableConsulNamespaces {
-			consulNS := r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())
+			consulNS := r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())
 			created, err := namespaces.EnsureExists(r.ConsulClient, consulNS, r.CrossNSACLPolicy)
 			if err != nil {
 				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -169,8 +171,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 		}
 
 		// Create the config entry
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(r.DatacenterName), &capi.WriteOptions{
-			Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -195,8 +197,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	if !configEntry.MatchesConsul(entry) {
 		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
-		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(configEntry.ToConsul(r.DatacenterName), &capi.WriteOptions{
-			Namespace: r.consulNamespace(configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -211,7 +213,15 @@ func (r *ConfigEntryController) ReconcileEntry(
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigEntryController) consulNamespace(namespace string, globalResource bool) string {
+func (r *ConfigEntryController) consulNamespace(configEntry capi.ConfigEntry, namespace string, globalResource bool) string {
+	// ServiceIntentions have the appropriate Consul Namespace set on them as the value
+	// is defaulted by the webhook. These are then set on the ServiceIntentions config entry
+	// but not on the others. In case the ConfigEntry has the Consul Namespace set, we just
+	// use the namespace assigned instead of attempting to determine it.
+	if configEntry.GetNamespace() != "" {
+		return configEntry.GetNamespace()
+	}
+
 	// Does not attempt to parse the namespace for global resources like ProxyDefaults or
 	// wildcard namespace destinations are they will not be prefixed and will remain "default"/"*".
 	if !globalResource && namespace != common.WildcardNamespace {

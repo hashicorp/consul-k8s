@@ -198,7 +198,8 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 				},
 				Spec: ServiceIntentionsSpec{
 					Destination: Destination{
-						Name: "svc-name",
+						Name:      "svc-name",
+						Namespace: "dest-ns",
 					},
 					Sources: []*SourceIntention{
 						{
@@ -247,8 +248,9 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 				},
 			},
 			Exp: &capi.ServiceIntentionsConfigEntry{
-				Kind: capi.ServiceIntentions,
-				Name: "svc-name",
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "dest-ns",
 				Sources: []*capi.SourceIntention{
 					{
 						Name:        "svc1",
@@ -457,193 +459,73 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 	require.Equal(t, meta, serviceResolver.GetObjectMeta())
 }
 
+// Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestServiceIntentions_Default(t *testing.T) {
-	cases := map[string]struct {
-		input  *ServiceIntentions
-		output *ServiceIntentions
+	namespaceConfig := map[string]struct {
+		enabled              bool
+		destinationNamespace string
+		mirroring            bool
+		prefix               string
+		expectedDestination  string
 	}{
-		"destination.namespace blank, meta.namespace default": {
-			input: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "default",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name: "bar",
-					},
-				},
-			},
-			output: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "default",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "default",
-					},
-				},
-			},
+		"disabled": {
+			enabled:              false,
+			destinationNamespace: "",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "",
 		},
-		"destination.namespace blank, meta.namespace foobar": {
-			input: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name: "bar",
-					},
-				},
-			},
-			output: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foobar",
-					},
-				},
-			},
+		"destinationNS": {
+			enabled:              true,
+			destinationNamespace: "foo",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "foo",
 		},
-		"sources.namespace blank, meta.namespace default": {
-			input: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "default",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "baz",
-							Action: "allow",
-						},
-					},
-				},
-			},
-			output: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "default",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "baz",
-							Action:    "allow",
-							Namespace: "default",
-						},
-					},
-				},
-			},
+		"mirroringEnabledWithoutPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "",
+			expectedDestination:  "bar",
 		},
-		"sources.namespace blank, meta.namespace foobar": {
-			input: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "baz",
-							Action: "allow",
-						},
-					},
-				},
-			},
-			output: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "baz",
-							Action:    "allow",
-							Namespace: "foobar",
-						},
-					},
-				},
-			},
-		},
-		"only populated blank namespaces": {
-			input: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "baz",
-							Action: "allow",
-						},
-						{
-							Name:      "baz2",
-							Action:    "allow",
-							Namespace: "another-namespace",
-						},
-					},
-				},
-			},
-			output: &ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "foobar",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: "foo",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "baz",
-							Action:    "allow",
-							Namespace: "foobar",
-						},
-						{
-							Name:      "baz2",
-							Action:    "allow",
-							Namespace: "another-namespace",
-						},
-					},
-				},
-			},
+		"mirroringWithPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "ns-",
+			expectedDestination:  "ns-bar",
 		},
 	}
-	for name, testCase := range cases {
+
+	for name, s := range namespaceConfig {
+		input := &ServiceIntentions{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+			},
+			Spec: ServiceIntentionsSpec{
+				Destination: Destination{
+					Name: "bar",
+				},
+			},
+		}
+		output := &ServiceIntentions{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+			},
+			Spec: ServiceIntentionsSpec{
+				Destination: Destination{
+					Name:      "bar",
+					Namespace: s.expectedDestination,
+				},
+			},
+		}
+
 		t.Run(name, func(t *testing.T) {
-			testCase.input.Default()
-			require.True(t, cmp.Equal(testCase.input, testCase.output))
+			input.Default(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			require.True(t, cmp.Equal(input, output))
 		})
 	}
 }
@@ -708,6 +590,21 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			"",
+		},
+		"no sources": {
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources: Required value: at least one source must be specified`,
 		},
 		"invalid action": {
 			&ServiceIntentions{
@@ -847,6 +744,303 @@ func TestServiceIntentions_Validate(t *testing.T) {
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := testCase.input.Validate()
+			if testCase.expectedErrMsg != "" {
+				require.EqualError(t, err, testCase.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestServiceIntentions_ValidateNamespaces(t *testing.T) {
+	cases := map[string]struct {
+		namespacesEnabled bool
+		input             *ServiceIntentions
+		expectedErrMsg    string
+	}{
+		"enabled: valid": {
+			true,
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Namespace: "web",
+							Action:    "allow",
+						},
+						{
+							Name:      "db",
+							Namespace: "db",
+							Action:    "deny",
+						},
+						{
+							Name:      "bar",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			"",
+		},
+		"disabled: destination namespace specified": {
+			false,
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "web",
+							Action: "allow",
+						},
+						{
+							Name:   "db",
+							Action: "deny",
+						},
+						{
+							Name: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.destination.namespace: Invalid value: "foo": consul namespaces must be enabled to set destination.namespace`,
+		},
+		"disabled: single source namespace specified": {
+			false,
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "bar",
+						},
+						{
+							Name:   "db",
+							Action: "deny",
+						},
+						{
+							Name: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace`,
+		},
+		"disabled: multiple source namespace specified": {
+			false,
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "bar",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "baz",
+						},
+						{
+							Name:      "bar",
+							Namespace: "baz",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace, spec.sources[1].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace, spec.sources[2].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
+		},
+		"disabled: multiple source and destination namespace specified": {
+			false,
+			&ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "foo",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "bar",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "baz",
+						},
+						{
+							Name:      "bar",
+							Namespace: "baz",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact:  "/foo",
+										PathPrefix: "/bar",
+										PathRegex:  "/baz",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Exact:   "exact",
+												Prefix:  "prefix",
+												Suffix:  "suffix",
+												Regex:   "regex",
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.destination.namespace: Invalid value: "foo": consul namespaces must be enabled to set destination.namespace, spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace, spec.sources[1].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace, spec.sources[2].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.ValidateNamespaces(testCase.namespacesEnabled)
 			if testCase.expectedErrMsg != "" {
 				require.EqualError(t, err, testCase.expectedErrMsg)
 			} else {
