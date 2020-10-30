@@ -668,6 +668,13 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
 		},
+		"inject token with namespaces (deprecated)": {
+			TokenFlags:  []string{"-create-inject-auth-method", "-enable-namespaces"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
 		"inject token with namespaces": {
 			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
 			PolicyNames: []string{"connect-inject-token"},
