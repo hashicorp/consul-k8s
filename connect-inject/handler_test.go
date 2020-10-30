@@ -402,58 +402,6 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
-		{
-			"consul destination namespace annotation is set",
-			Handler{
-				Log:                        hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:       mapset.NewSet(),
-				ConsulDestinationNamespace: "abcd",
-				EnableK8SNSMirroring:       true,
-				EnableNamespaces:           true,
-			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       basicSpec,
-				}),
-			},
-			"",
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels/",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
-				},
-			},
-		},
 	}
 
 	for _, tt := range cases {
