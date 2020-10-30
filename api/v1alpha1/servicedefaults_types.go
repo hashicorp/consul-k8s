@@ -227,7 +227,7 @@ func (e ExposeConfig) validate(path *field.Path) []*field.Error {
 				pathCfg.Path,
 				`must begin with a '/'`))
 		}
-		if !sliceContains(protocols, pathCfg.Protocol) {
+		if pathCfg.Protocol != "" && !sliceContains(protocols, pathCfg.Protocol) {
 			errs = append(errs, field.Invalid(
 				indexPath.Child("protocol"),
 				pathCfg.Protocol,

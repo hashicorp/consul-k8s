@@ -6,6 +6,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -153,10 +154,11 @@ func (in *ServiceIntentions) SyncedConditionStatus() corev1.ConditionStatus {
 
 func (in *ServiceIntentions) ToConsul(datacenter string) api.ConfigEntry {
 	return &capi.ServiceIntentionsConfigEntry{
-		Kind:    in.ConsulKind(),
-		Name:    in.Spec.Destination.Name,
-		Sources: in.Spec.Sources.toConsul(),
-		Meta:    meta(datacenter),
+		Kind:      in.ConsulKind(),
+		Name:      in.Spec.Destination.Name,
+		Namespace: in.Spec.Destination.Namespace,
+		Sources:   in.Spec.Sources.toConsul(),
+		Meta:      meta(datacenter),
 	}
 }
 
@@ -249,6 +251,9 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 func (in *ServiceIntentions) Validate() error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
+	if len(in.Spec.Sources) == 0 {
+		errs = append(errs, field.Required(path.Child("sources"), `at least one source must be specified`))
+	}
 	for i, source := range in.Spec.Sources {
 		if len(source.Permissions) > 0 && source.Action != "" {
 			asJSON, _ := json.Marshal(source)
@@ -297,16 +302,41 @@ func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 	return errs
 }
 
-// Default sets zero value fields on this object to their defaults.
-func (in *ServiceIntentions) Default() {
-	if in.Spec.Destination.Namespace == "" {
-		in.Spec.Destination.Namespace = in.Namespace
-	}
-	for _, source := range in.Spec.Sources {
-		if source.Namespace == "" {
-			source.Namespace = in.Namespace
+// Default sets the namespace field on spec.destination to their default values if namespaces are enabled.
+func (in *ServiceIntentions) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	// If namespaces are enabled we want to set the destination namespace field to it's
+	// default. If namespaces are not enabled (i.e. OSS) we don't set the
+	// namespace fields because this would cause errors
+	// making API calls (because namespace fields can't be set in OSS).
+	if consulNamespacesEnabled {
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		if in.Spec.Destination.Namespace == "" {
+			in.Spec.Destination.Namespace = namespace
 		}
 	}
+}
+
+// ValidateNamespaces returns an error if spec.destination.namespace or spec.sources[i].namespace
+// is set but namespaces are disabled.
+func (in *ServiceIntentions) ValidateNamespaces(namespacesEnabled bool) error {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !namespacesEnabled {
+		if in.Spec.Destination.Namespace != "" {
+			errs = append(errs, field.Invalid(path.Child("destination").Child("namespace"), in.Spec.Destination.Namespace, `consul namespaces must be enabled to set destination.namespace`))
+		}
+		for i, source := range in.Spec.Sources {
+			if source.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `consul namespaces must be enabled to set source.namespace`))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
+			in.KubernetesName(), errs)
+	}
+	return nil
 }
 
 func (in IntentionAction) validate(path *field.Path) *field.Error {
