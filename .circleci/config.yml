@@ -4,7 +4,7 @@ orbs:
 executors:
   go:
     docker:
-      - image: circleci/golang:1.14
+      - image: docker.mirror.hashicorp.services/circleci/golang:1.14
     environment:
       - TEST_RESULTS: /tmp/test-results
 
@@ -13,7 +13,7 @@ jobs:
     docker:
       # This image is built from test/docker/Test.dockerfile
       # helm2 must use 0.3.0 version of the image
-      - image: hashicorpdev/consul-helm-test:0.3.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.3.0
 
     steps:
       - checkout
@@ -22,7 +22,7 @@ jobs:
           command: bats ./test/unit
   unit-helm3:
     docker:
-      - image: hashicorpdev/consul-helm-test:0.6.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.6.0
 
     steps:
       - checkout
@@ -96,7 +96,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: hashicorpdev/consul-helm-test:0.5.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.5.0
 
     steps:
       - run:
@@ -161,7 +161,7 @@ jobs:
       - OC_SECONDARY_NAME: consul-helm-test-3737660519
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: hashicorpdev/consul-helm-test:0.6.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.6.0
 
     steps:
       - checkout
@@ -211,7 +211,7 @@ jobs:
 
   update-helm-charts-index:
     docker:
-      - image: circleci/golang:latest
+      - image: docker.mirror.hashicorp.services/circleci/golang:latest
     steps:
       - checkout
       - run:
