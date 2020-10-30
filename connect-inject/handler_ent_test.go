@@ -3,6 +3,7 @@
 package connectinject
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
+	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // This tests the checkAndCreate namespace function that is called
@@ -36,7 +39,61 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		Handler            Handler
 		Req                v1beta1.AdmissionRequest
 		ExpectedNamespaces []string
+		ExpectedPatches    []jsonpatch.JsonPatchOperation
 	}{
+		{
+			"consul destination namespace annotation is set via patch",
+			Handler{
+				Log:                        hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:       mapset.NewSet(),
+				ConsulDestinationNamespace: "abcd",
+				EnableK8SNSMirroring:       true,
+				EnableNamespaces:           true,
+			},
+			v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{},
+					Spec:       basicSpec,
+				}),
+				Namespace: "abcd",
+			},
+			[]string{"default", "abcd"},
+			[]jsonpatch.JsonPatchOperation{
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/-",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
+				},
+			},
+		},
 		{
 			"single destination namespace 'default' from k8s 'default'",
 			Handler{
@@ -53,6 +110,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default"},
+			nil,
 		},
 
 		{
@@ -71,6 +129,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "non-default",
 			},
 			[]string{"default"},
+			nil,
 		},
 
 		{
@@ -89,6 +148,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default", "dest"},
+			nil,
 		},
 
 		{
@@ -107,6 +167,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "non-default",
 			},
 			[]string{"default", "dest"},
+			nil,
 		},
 
 		{
@@ -126,6 +187,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default"},
+			nil,
 		},
 
 		{
@@ -145,6 +207,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "dest",
 			},
 			[]string{"default", "dest"},
+			nil,
 		},
 
 		{
@@ -165,6 +228,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default", "k8s-default"},
+			nil,
 		},
 
 		{
@@ -185,6 +249,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "dest",
 			},
 			[]string{"default", "k8s-dest"},
+			nil,
 		},
 	}
 
@@ -233,6 +298,17 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 						"namespace %s has wrong value for external-source metadata key", ns)
 				}
 
+			}
+			// Check the patches, if provided.
+			if tt.ExpectedPatches != nil {
+				var actual []jsonpatch.JsonPatchOperation
+				if len(resp.Patch) > 0 {
+					require.NoError(json.Unmarshal(resp.Patch, &actual))
+					for i, _ := range actual {
+						actual[i].Value = nil
+					}
+				}
+				require.Equal(tt.ExpectedPatches, actual)
 			}
 		})
 	}
@@ -505,99 +581,6 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				}
 
 			}
-		})
-	}
-}
-
-func TestHandler_PatchesForNamespaces(t *testing.T) {
-	basicSpec := corev1.PodSpec{
-		Containers: []corev1.Container{
-			corev1.Container{
-				Name: "web",
-			},
-		},
-	}
-	cases := []struct {
-		Name    string
-		Handler Handler
-		Req     v1beta1.AdmissionRequest
-		Err     string // expected error string, not exact
-		Patches []jsonpatch.JsonPatchOperation
-	}{
-		{
-			"consul destination namespace annotation is set via patch",
-			Handler{
-				Log:                        hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:       mapset.NewSet(),
-				ConsulDestinationNamespace: "abcd",
-				EnableK8SNSMirroring:       true,
-				EnableNamespaces:           true,
-			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       basicSpec,
-				}),
-			},
-			"",
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels/",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
-				},
-			},
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			resp := tt.Handler.Mutate(&tt.Req)
-			if (tt.Err == "") != resp.Allowed {
-				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
-			}
-			if tt.Err != "" {
-				require.Contains(resp.Result.Message, tt.Err)
-				return
-			}
-
-			var actual []jsonpatch.JsonPatchOperation
-			if len(resp.Patch) > 0 {
-				require.NoError(json.Unmarshal(resp.Patch, &actual))
-				for i, _ := range actual {
-					actual[i].Value = nil
-				}
-			}
-			require.Equal(tt.Patches, actual)
 		})
 	}
 }
