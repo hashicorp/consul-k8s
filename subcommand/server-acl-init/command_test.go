@@ -830,8 +830,8 @@ func TestRun_ConnectInjectAuthMethod(tt *testing.T) {
 func TestRun_ConnectInjectAuthMethodUpdates(tt *testing.T) {
 	tt.Parallel()
 
+	// Test with deprecated -create-inject-auth-method flag.
 	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
-
 	for _, flag := range cases {
 		tt.Run(flag, func(t *testing.T) {
 
@@ -922,8 +922,9 @@ func TestRun_ConnectInjectAuthMethodUpdates(tt *testing.T) {
 // Test that ACL binding rules are updated if the rule selector changes.
 func TestRun_BindingRuleUpdates(tt *testing.T) {
 	tt.Parallel()
-	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
 
+	// Test with deprecated -create-inject-auth-method flag.
+	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
 	for _, flag := range cases {
 		tt.Run(flag, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
