@@ -4,7 +4,7 @@ version: 2.1
 executors:
   go:
     docker:
-      - image: circleci/golang:1.14
+      - image: docker.mirror.hashicorp.services/circleci/golang:1.14
     environment:
       - TEST_RESULTS: /tmp/test-results # path to where test results are saved
       - CONSUL_VERSION: 71ba8300a3d25b335aff0de9f9dd2a82fc2e58f1 # Consul's OSS version to use in tests
