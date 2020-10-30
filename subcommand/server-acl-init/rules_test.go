@@ -545,8 +545,8 @@ operator = "write"
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:           tt.EnableNamespaces,
-				flagAddInjectHealthChecksRules: tt.EnableHealthChecks,
+				flagEnableNamespaces:   tt.EnableNamespaces,
+				flagEnableHealthChecks: tt.EnableHealthChecks,
 			}
 
 			injectorRules, err := cmd.injectRules()

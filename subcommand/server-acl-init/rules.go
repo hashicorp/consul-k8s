@@ -285,7 +285,7 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:      c.flagSyncConsulNodeName,
-		EnableHealthChecks:      c.flagAddInjectHealthChecksRules,
+		EnableHealthChecks:      c.flagEnableHealthChecks,
 	}
 }
 
