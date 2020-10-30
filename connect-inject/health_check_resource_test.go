@@ -48,7 +48,12 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	s, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(err)
 
-	clientConfig := &api.Config{Address: s.HTTPAddr}
+	clientConfig := &api.Config{}
+	if pod.ObjectMeta.Namespace != "default" && pod.ObjectMeta.Namespace != "" {
+		clientConfig = &api.Config{Address: s.HTTPAddr, Namespace: pod.ObjectMeta.Namespace}
+	} else {
+		clientConfig = &api.Config{Address: s.HTTPAddr}
+	}
 	require.NoError(err)
 	client, err := api.NewClient(clientConfig)
 	require.NoError(err)
@@ -66,7 +71,7 @@ func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testu
 	return s, client, &healthResource
 }
 
-func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
+func registerHealthCheck(t *testing.T, client *api.Client, pod *corev1.Pod, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "Kubernetes Health Check",
@@ -78,6 +83,7 @@ func registerHealthCheck(t *testing.T, client *api.Client, initialState string) 
 			Status: initialState,
 			Notes:  "",
 		},
+		Namespace: pod.Annotations[annotationConsulDestinationNamespace],
 	})
 	require.NoError(err)
 }
@@ -351,7 +357,7 @@ func TestReconcilePod(t *testing.T) {
 			server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 			if tt.PreCreateHealthCheck {
 				// Register the health check if this is not an object create path.
-				registerHealthCheck(t, client, tt.InitialState)
+				registerHealthCheck(t, client, tt.Pod, tt.InitialState)
 			}
 			// Upsert and Reconcile both use reconcilePod to reconcile a pod.
 			err = resource.reconcilePod(tt.Pod)
