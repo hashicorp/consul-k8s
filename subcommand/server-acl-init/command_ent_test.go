@@ -118,8 +118,8 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 
 // Test the auth method and acl binding rule created when namespaces are enabled
 // and we're mirroring namespaces.
-func TestRun_ConnectInject_NamespaceMirroring(tt *testing.T) {
-	tt.Parallel()
+func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
+	t.Parallel()
 
 	cases := map[string]struct {
 		MirroringPrefix string
@@ -142,11 +142,11 @@ func TestRun_ConnectInject_NamespaceMirroring(tt *testing.T) {
 	}
 
 	for name, c := range cases {
-		tt.Run(name, func(t *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t)
+		t.Run(name, func(tt *testing.T) {
+			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
-			setUpK8sServiceAccount(t, k8s, ns)
-			require := require.New(t)
+			setUpK8sServiceAccount(tt, k8s, ns)
+			require := require.New(tt)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
@@ -169,7 +169,7 @@ func TestRun_ConnectInject_NamespaceMirroring(tt *testing.T) {
 			responseCode := cmd.Run(args)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			bootToken := getBootToken(tt, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
 				Address: testAgent.HTTPAddr,
 				Token:   bootToken,
@@ -204,12 +204,12 @@ func TestRun_ConnectInject_NamespaceMirroring(tt *testing.T) {
 }
 
 // Test that ACL policies get updated if namespaces config changes.
-func TestRun_ACLPolicyUpdates(tt *testing.T) {
-	tt.Parallel()
+func TestRun_ACLPolicyUpdates(t *testing.T) {
+	t.Parallel()
 
 	k8sNamespaceFlags := []string{"default", "other"}
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
-		tt.Run(k8sNamespaceFlag, func(t *testing.T) {
+		t.Run(k8sNamespaceFlag, func(t *testing.T) {
 			k8s, testAgent := completeEnterpriseSetup(t)
 			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 			defer testAgent.Stop()
@@ -583,8 +583,8 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 }
 
 // Test the tokens and policies that are created when namespaces is enabled.
-func TestRun_TokensWithNamespacesEnabled(tt *testing.T) {
-	tt.Parallel()
+func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
+	t.Parallel()
 
 	cases := map[string]struct {
 		TokenFlags  []string
@@ -684,7 +684,7 @@ func TestRun_TokensWithNamespacesEnabled(tt *testing.T) {
 		},
 	}
 	for testName, c := range cases {
-		tt.Run(testName, func(t *testing.T) {
+		t.Run(testName, func(t *testing.T) {
 			k8s, testSvr := completeEnterpriseSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
@@ -750,8 +750,8 @@ func TestRun_TokensWithNamespacesEnabled(tt *testing.T) {
 }
 
 // Test the parsing the namespace from gateway names
-func TestRun_GatewayNamespaceParsing(tt *testing.T) {
-	tt.Parallel()
+func TestRun_GatewayNamespaceParsing(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		TestName         string
@@ -915,7 +915,7 @@ namespace "namespace2" {
 		},
 	}
 	for _, c := range cases {
-		tt.Run(c.TestName, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeEnterpriseSetup(t)
 			defer testSvr.Stop()
 			require := require.New(t)

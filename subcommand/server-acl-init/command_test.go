@@ -33,8 +33,8 @@ import (
 var ns = "default"
 var resourcePrefix = "release-name-consul"
 
-func TestRun_FlagValidation(tt *testing.T) {
-	tt.Parallel()
+func TestRun_FlagValidation(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		Flags  []string
@@ -77,7 +77,7 @@ func TestRun_FlagValidation(tt *testing.T) {
 	}
 
 	for _, c := range cases {
-		tt.Run(c.ExpErr, func(t *testing.T) {
+		t.Run(c.ExpErr, func(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI: ui,
@@ -142,8 +142,8 @@ func TestRun_Defaults(t *testing.T) {
 
 // Test the different flags that should create tokens and save them as
 // Kubernetes secrets.
-func TestRun_TokensPrimaryDC(tt *testing.T) {
-	tt.Parallel()
+func TestRun_TokensPrimaryDC(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		TestName    string
@@ -247,7 +247,7 @@ func TestRun_TokensPrimaryDC(tt *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		tt.Run(c.TestName, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
@@ -313,8 +313,8 @@ func TestRun_TokensPrimaryDC(tt *testing.T) {
 }
 
 // Test creating each token type when replication is enabled.
-func TestRun_TokensReplicatedDC(tt *testing.T) {
-	tt.Parallel()
+func TestRun_TokensReplicatedDC(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		TestName    string
@@ -402,7 +402,7 @@ func TestRun_TokensReplicatedDC(tt *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		tt.Run(c.TestName, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
@@ -455,8 +455,8 @@ func TestRun_TokensReplicatedDC(tt *testing.T) {
 }
 
 // Test creating each token type when the bootstrap token is provided.
-func TestRun_TokensWithProvidedBootstrapToken(tt *testing.T) {
-	tt.Parallel()
+func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		TestName    string
@@ -532,7 +532,7 @@ func TestRun_TokensWithProvidedBootstrapToken(tt *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		tt.Run(c.TestName, func(t *testing.T) {
+		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
@@ -589,8 +589,8 @@ func TestRun_TokensWithProvidedBootstrapToken(tt *testing.T) {
 
 // Test the conditions under which we should create the anonymous token
 // policy.
-func TestRun_AnonymousTokenPolicy(tt *testing.T) {
-	tt.Parallel()
+func TestRun_AnonymousTokenPolicy(t *testing.T) {
+	t.Parallel()
 
 	cases := map[string]struct {
 		Flags              []string
@@ -639,7 +639,7 @@ func TestRun_AnonymousTokenPolicy(tt *testing.T) {
 		},
 	}
 	for name, c := range cases {
-		tt.Run(name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			flags := c.Flags
 			var k8s *fake.Clientset
 			var consulHTTPAddr string
@@ -727,8 +727,8 @@ func TestRun_AnonymousTokenPolicy(tt *testing.T) {
 	}
 }
 
-func TestRun_ConnectInjectAuthMethod(tt *testing.T) {
-	tt.Parallel()
+func TestRun_ConnectInjectAuthMethod(t *testing.T) {
+	t.Parallel()
 
 	cases := map[string]struct {
 		flags        []string
@@ -758,7 +758,7 @@ func TestRun_ConnectInjectAuthMethod(tt *testing.T) {
 		},
 	}
 	for testName, c := range cases {
-		tt.Run(testName, func(t *testing.T) {
+		t.Run(testName, func(t *testing.T) {
 
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
@@ -1663,11 +1663,11 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 }
 
 // Test that if acl replication is enabled, we don't create an anonymous token policy.
-func TestRun_AnonPolicy_IgnoredWithReplication(tt *testing.T) {
+func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 	// The anonymous policy is configured when one of these flags is set.
 	cases := []string{"-allow-dns", "-create-inject-auth-method"}
 	for _, flag := range cases {
-		tt.Run(flag, func(t *testing.T) {
+		t.Run(flag, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
@@ -1761,8 +1761,8 @@ func TestRun_CloudAutoJoin(t *testing.T) {
 	require.Len(agentPolicy.Datacenters, 0)
 }
 
-func TestRun_GatewayErrors(tt *testing.T) {
-	tt.Parallel()
+func TestRun_GatewayErrors(t *testing.T) {
+	t.Parallel()
 
 	cases := map[string]struct {
 		flags []string
@@ -1787,11 +1787,11 @@ func TestRun_GatewayErrors(tt *testing.T) {
 		},
 	}
 	for testName, c := range cases {
-		tt.Run(testName, func(t *testing.T) {
+		t.Run(testName, func(tt *testing.T) {
 
-			k8s, testSvr := completeSetup(t)
+			k8s, testSvr := completeSetup(tt)
 			defer testSvr.Stop()
-			require := require.New(t)
+			require := require.New(tt)
 
 			// Run the command.
 			ui := cli.NewMockUi()
