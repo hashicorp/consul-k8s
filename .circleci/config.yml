@@ -133,13 +133,27 @@ jobs:
             eval "$(echo export primary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[0]))"
             eval "$(echo export secondary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[1]))"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 20m -failfast \
-              -enable-enterprise \
-              -enable-multi-cluster \
-              -kubeconfig="$primary_kubeconfig" \
-              -secondary-kubeconfig="$secondary_kubeconfig" \
-              -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=hashicorpdev/consul-k8s:latest
+            # We have to run the tests for each package separately so that we can
+            # exit early if any test fails (-failfast only works within a single
+            # package).
+            exit_code=0
+            for pkg in $(go list ./...)
+            do
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 20m -failfast \
+                    -enable-enterprise \
+                    -enable-multi-cluster \
+                    -kubeconfig="$primary_kubeconfig" \
+                    -secondary-kubeconfig="$secondary_kubeconfig" \
+                    -debug-directory="$TEST_RESULTS/debug" \
+                    -consul-k8s-image=hashicorpdev/consul-k8s:latest
+              then
+                echo "Tests in ${pkg} failed, aborting early"
+                exit_code=1
+                break
+              fi
+            done
+            gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
+            exit $exit_code
 
       - store_test_results:
           path: /tmp/test-results
