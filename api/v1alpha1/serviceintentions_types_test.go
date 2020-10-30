@@ -466,7 +466,6 @@ func TestServiceIntentions_Default(t *testing.T) {
 		destinationNamespace string
 		mirroring            bool
 		prefix               string
-		sourceNamespace      string
 		expectedDestination  string
 	}{
 		"disabled": {
@@ -474,7 +473,6 @@ func TestServiceIntentions_Default(t *testing.T) {
 			destinationNamespace: "",
 			mirroring:            false,
 			prefix:               "",
-			sourceNamespace:      "bar",
 			expectedDestination:  "",
 		},
 		"destinationNS": {
@@ -482,7 +480,6 @@ func TestServiceIntentions_Default(t *testing.T) {
 			destinationNamespace: "foo",
 			mirroring:            false,
 			prefix:               "",
-			sourceNamespace:      "bar",
 			expectedDestination:  "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
@@ -490,7 +487,6 @@ func TestServiceIntentions_Default(t *testing.T) {
 			destinationNamespace: "",
 			mirroring:            true,
 			prefix:               "",
-			sourceNamespace:      "bar",
 			expectedDestination:  "bar",
 		},
 		"mirroringWithPrefix": {
@@ -498,7 +494,6 @@ func TestServiceIntentions_Default(t *testing.T) {
 			destinationNamespace: "",
 			mirroring:            true,
 			prefix:               "ns-",
-			sourceNamespace:      "bar",
 			expectedDestination:  "ns-bar",
 		},
 	}
@@ -507,7 +502,7 @@ func TestServiceIntentions_Default(t *testing.T) {
 		input := &ServiceIntentions{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
-				Namespace: s.sourceNamespace,
+				Namespace: "bar",
 			},
 			Spec: ServiceIntentionsSpec{
 				Destination: Destination{
@@ -518,7 +513,7 @@ func TestServiceIntentions_Default(t *testing.T) {
 		output := &ServiceIntentions{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
-				Namespace: s.sourceNamespace,
+				Namespace: "bar",
 			},
 			Spec: ServiceIntentionsSpec{
 				Destination: Destination{
