@@ -471,7 +471,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateInjectToken {
-		err := c.configureConnectInject(consulClient)
+		err := c.configureConnectInjectAuthMethod(consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
