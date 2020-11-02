@@ -80,7 +80,7 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
-	// Health checks controller is enabled.
+	// Flag to indicate that the health checks controller is enabled.
 	flagEnableHealthChecks bool
 
 	flagLogLevel string
@@ -131,7 +131,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
-		"Toggle for creating a connect inject auth method.")
+		"Toggle for creating a connect inject auth method and an ACL token. The ACL token will only be created if either of the -enable-namespaces or -enable-health-checks flags is set.")
 	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
@@ -196,7 +196,7 @@ func (c *Command) init() {
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
 
 	c.flags.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", false,
-		"Toggle for creating health check controller token.")
+		"Toggle for adding ACL rules for the health check controller to the connect ACL token. Requires -create-inject-token to be also be set.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
