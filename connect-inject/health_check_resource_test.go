@@ -89,12 +89,12 @@ func registerHealthCheck(t *testing.T, client *api.Client, pod *corev1.Pod, init
 }
 
 // We expect to already be pointed at the correct agent.
-func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
+func getConsulAgentChecks(t *testing.T, client *api.Client, healthCheckID string) *api.AgentCheck {
 	require := require.New(t)
-	filter := fmt.Sprintf("CheckID == `%s`", testHealthCheckID)
+	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	require.NoError(err)
-	return checks[testHealthCheckID]
+	return checks[healthCheckID]
 }
 
 func TestReconcilePod(t *testing.T) {
@@ -371,7 +371,7 @@ func TestReconcilePod(t *testing.T) {
 			}
 			require.NoError(err)
 			// Get the agent checks if they were registered.
-			actual := getConsulAgentChecks(t, client)
+			actual := getConsulAgentChecks(t, client, testHealthCheckID)
 			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 		})
 	}
@@ -434,7 +434,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	// Start the reconciler, it should not create a health check.
 	err := resource.Reconcile()
 	require.NoError(err)
-	actual := getConsulAgentChecks(t, client)
+	actual := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(actual)
 }
 
@@ -542,7 +542,7 @@ func TestReconcileRun(t *testing.T) {
 	})
 	require.NoError(err)
 	// Validate that there is no health check created by reconciler.
-	check := getConsulAgentChecks(t, client)
+	check := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(check)
 	// Add the service - only now will a health check have a service to register against.
 	srv.AddService(t, testServiceNameReg, api.HealthPassing, nil)
@@ -552,7 +552,7 @@ func TestReconcileRun(t *testing.T) {
 	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}
 	var actual *api.AgentCheck
 	retry.RunWith(timer, t, func(r *retry.R) {
-		actual = getConsulAgentChecks(t, client)
+		actual = getConsulAgentChecks(t, client, testHealthCheckID)
 		// The assertion is not on actual != nil, but below
 		// against an expected check.
 		if actual == nil || actual.Output == "" {

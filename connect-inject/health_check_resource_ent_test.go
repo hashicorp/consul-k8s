@@ -14,14 +14,16 @@ import (
 )
 
 const (
-	testNamespace = "testNamesapce"
-	testName      = "testName"
+	testNamespace               = "testnamespace"
+	testNamespacedHealthCheckID = "testnamespace_test-pod-test-service_kubernetes-health-check-ttl"
 )
+
+var ignoredFieldsEnterprise = []string{"Node", "Definition", "ServiceID", "ServiceName"}
 
 var testPodWithNamespace = corev1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: testNamespace,
-		Name:      testName,
+		Name:      testPodName,
 	},
 	Spec: corev1.PodSpec{},
 }
@@ -62,12 +64,13 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 			},
 			&api.AgentCheck{
-				CheckID: testHealthCheckID,
-				Status:  api.HealthPassing,
-				Notes:   "",
-				Output:  kubernetesSuccessReasonMsg,
-				Type:    ttl,
-				Name:    name,
+				CheckID:   testNamespacedHealthCheckID,
+				Status:    api.HealthPassing,
+				Notes:     "",
+				Output:    kubernetesSuccessReasonMsg,
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
 			},
 			"",
 		},
@@ -98,12 +101,13 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 			},
 			&api.AgentCheck{
-				CheckID: testHealthCheckID,
-				Status:  api.HealthCritical,
-				Notes:   "",
-				Output:  testFailureMessage,
-				Type:    ttl,
-				Name:    name,
+				CheckID:   testNamespacedHealthCheckID,
+				Status:    api.HealthCritical,
+				Notes:     "",
+				Output:    testFailureMessage,
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
 			},
 			"",
 		},
@@ -134,11 +138,12 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 			},
 			&api.AgentCheck{
-				CheckID: testHealthCheckID,
-				Status:  api.HealthCritical,
-				Output:  testFailureMessage,
-				Type:    ttl,
-				Name:    name,
+				CheckID:   testNamespacedHealthCheckID,
+				Status:    api.HealthCritical,
+				Output:    testFailureMessage,
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
 			},
 			"",
 		},
@@ -168,11 +173,12 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 			},
 			&api.AgentCheck{
-				CheckID: testHealthCheckID,
-				Status:  api.HealthPassing,
-				Output:  testCheckNotesPassing,
-				Type:    ttl,
-				Name:    name,
+				CheckID:   testNamespacedHealthCheckID,
+				Status:    api.HealthPassing,
+				Output:    testCheckNotesPassing,
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
 			},
 			"",
 		},
@@ -202,11 +208,12 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 			},
 			&api.AgentCheck{
-				CheckID: testHealthCheckID,
-				Status:  api.HealthCritical,
-				Output:  "", // when there is no change in status, Consul doesnt set the Output field
-				Type:    ttl,
-				Name:    name,
+				CheckID:   testNamespacedHealthCheckID,
+				Status:    api.HealthCritical,
+				Output:    "", // when there is no change in status, Consul doesnt set the Output field
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
 			},
 			"",
 		},
@@ -284,17 +291,6 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			var err error
-			registration := api.CatalogRegistration{
-				//			ID:      testServiceNameReg,
-				Node:    "test-k8s",
-				Address: "127.0.0.1",
-				Service: &api.AgentService{
-					ID:        testServiceNameAnnotation,
-					Service:   testServiceNameAnnotation,
-					Namespace: testNamespace,
-					Tags:      nil,
-				},
-			}
 			require := require.New(t)
 			// Get a server, client, and handler.
 			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
@@ -302,18 +298,11 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 			// Register the service with Consul.
 			_, _, err = client.Namespaces().Create(&api.Namespace{Name: testNamespace}, nil)
 			require.NoError(err)
-			_, err = client.Catalog().Register(&registration, nil)
-			require.NoError(err)
-
-			services, _, err := client.Catalog().Services(&api.QueryOptions{})
-			for x, _ := range services {
-				t.Logf("========= %v ", x)
-			}
-			require.NoError(err)
-			cats, _, err := client.Catalog().Service(testServiceNameReg, "", &api.QueryOptions{})
-			for _, x := range cats {
-				t.Logf("======== id: %v, sid: %v, ns: %v, sname: %v", x.ID, x.ServiceID, x.Namespace, x.ServiceName)
-			}
+			err = client.Agent().ServiceRegister(&api.AgentServiceRegistration{
+				ID:        testServiceNameReg,
+				Name:      testServiceNameAnnotation,
+				Namespace: testNamespace,
+			})
 			require.NoError(err)
 			if tt.PreCreateHealthCheck {
 				// Register the health check if this is not an object create path.
@@ -331,8 +320,8 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 			}
 			require.NoError(err)
 			// Get the agent checks if they were registered.
-			actual := getConsulAgentChecks(t, client)
-			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+			actual := getConsulAgentChecks(t, client, testNamespacedHealthCheckID)
+			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFieldsEnterprise...)))
 		})
 	}
 }
