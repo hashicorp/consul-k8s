@@ -210,8 +210,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 		},
 	})
 	if err != nil {
-		h.Log.Error("unable to register health check with Consul from k8s", "err", err)
-		return err
+		return fmt.Errorf("registering health check for service %q: %s", serviceID, err)
 	}
 	return nil
 }
@@ -221,8 +220,7 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID 
 	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	if err != nil {
-		h.Log.Error("unable to get agent health check", "checkID", healthCheckID, "filter", filter, "err", err)
-		return nil, err
+		return nil, fmt.Errorf("getting check %q: %s", healthCheckID, err)
 	}
 	// This will be nil (does not exist) or an actual check.
 	return checks[healthCheckID], nil
