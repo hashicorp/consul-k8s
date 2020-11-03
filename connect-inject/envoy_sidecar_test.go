@@ -60,6 +60,57 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	})
 }
 
+// Test that we can pass extra flags to envoy.
+func TestHandlerEnvoySidecar_ExtraEnvoyFlags(t *testing.T) {
+	cases := []struct {
+		name                     string
+		extraEnvoyOpts           string
+		expectedContainerCommand []string
+	}{
+		{
+			name:           "no extra options provided",
+			extraEnvoyOpts: "",
+			expectedContainerCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+			},
+		},
+		{
+			name:           "extra log-level option",
+			extraEnvoyOpts: "--log-level debug",
+			expectedContainerCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--log-level", "debug",
+			},
+		},
+		{
+			name:           "extraEnvoyOpts with quotes inside",
+			extraEnvoyOpts: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			expectedContainerCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--log-level", "debug",
+				"--admin-address-path", "\"/tmp/consul/foo bar\"",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := Handler{
+				ImageConsul:    "hashicorp/consul:latest",
+				ImageEnvoy:     "hashicorp/consul-k8s:latest",
+				ExtraEnvoyOpts: tc.extraEnvoyOpts,
+			}
+
+			c, err := h.envoySidecar(&corev1.Pod{}, "")
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedContainerCommand, c.Command)
+		})
+	}
+}
+
 // Test that if AuthMethod is set
 // the preStop command includes a token
 func TestHandlerEnvoySidecar_AuthMethod(t *testing.T) {
