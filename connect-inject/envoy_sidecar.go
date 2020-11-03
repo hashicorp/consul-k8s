@@ -3,9 +3,11 @@ package connectinject
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -31,6 +33,11 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 
 	resources, err := h.envoySidecarResources(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	cmd, err := h.getContainerSidecarCommand()
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -64,10 +71,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 				},
 			},
 		},
-		Command: []string{
-			"envoy",
-			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-		},
+		Command: cmd,
 	}
 	if h.ConsulCACert != "" {
 		caCertEnvVar := corev1.EnvVar{
@@ -86,6 +90,27 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 		})
 	}
 	return container, nil
+}
+
+func (h *Handler) getContainerSidecarCommand() ([]string, error) {
+	cmd := []string{
+		"envoy",
+		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+	}
+
+	if h.ExtraEnvoyOpts != "" {
+		tokens, err := shlex.Split(h.ExtraEnvoyOpts)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, t := range tokens {
+			if strings.Contains(t, " ") {
+				t = strconv.Quote(t)
+			}
+			cmd = append(cmd, t)
+		}
+	}
+	return cmd, nil
 }
 
 func (h *Handler) envoySidecarResources(pod *corev1.Pod) (corev1.ResourceRequirements, error) {
