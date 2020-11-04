@@ -208,7 +208,7 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, pod 
 			SuccessBeforePassing:   1,
 			FailuresBeforeCritical: 1,
 		},
-		// For Consul-ENT only, this will be omitted for OSS, aka ""
+		// For Consul-ENT only. In OSS this will be set to "" which has no effect.
 		Namespace: pod.Annotations[annotationConsulDestinationNamespace],
 	})
 	if err != nil {
