@@ -496,7 +496,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				},
 			},
 			expPatches: []jsonpatch.Operation{},
-			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: [spec.destination.namespace: Invalid value: "bar": consul namespaces must be enabled to set destination.namespace, spec.sources[0].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
+			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: [spec.destination.namespace: Invalid value: "bar": Consul Enterprise namespaces must be enabled to set destination.namespace, spec.sources[0].namespace: Invalid value: "baz": Consul Enterprise namespaces must be enabled to set source.namespace]`,
 		},
 		"destination.namespace empty": {
 			newResource: &ServiceIntentions{
@@ -577,7 +577,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				},
 			},
 			expPatches: []jsonpatch.Operation{},
-			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: spec.destination.namespace: Invalid value: "bar": consul namespaces must be enabled to set destination.namespace`,
+			errMsg:     `serviceintentions.consul.hashicorp.com "foo-intention" is invalid: spec.destination.namespace: Invalid value: "bar": Consul Enterprise namespaces must be enabled to set destination.namespace`,
 		},
 	}
 	for name, c := range cases {

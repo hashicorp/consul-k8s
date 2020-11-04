@@ -402,7 +402,7 @@ func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorL
 		for i, r := range in.Spec.Routes {
 			if r.Destination != nil {
 				if r.Destination.Namespace != "" {
-					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("namespace"), r.Destination.Namespace, `consul namespaces must be enabled to set destination.namespace`))
+					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("namespace"), r.Destination.Namespace, `Consul Enterprise namespaces must be enabled to set destination.namespace`))
 				}
 			}
 		}
