@@ -15,6 +15,7 @@ type rulesData struct {
 	InjectEnableNSMirroring bool
 	InjectNSMirroringPrefix string
 	SyncConsulNodeName      string
+	EnableHealthChecks      bool
 }
 
 type gatewayRulesData struct {
@@ -204,10 +205,19 @@ namespace "{{ .SyncConsulDestNS }}" {
 }
 
 func (c *Command) injectRules() (string, error) {
-	// The Connect injector only needs permissions to create namespaces.
+	// The Connect injector needs permissions to create namespaces when namespaces are enabled
+	// and also create/update service checks when health checks are enabled.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
+{{- end }}
+{{- if .EnableHealthChecks }}
+  node_prefix "" {
+     policy = "write"
+  }
+  service_prefix "" {
+     policy = "write"
+  }
 {{- end }}
 `
 	return c.renderRules(injectRulesTpl)
@@ -275,6 +285,7 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:      c.flagSyncConsulNodeName,
+		EnableHealthChecks:      c.flagEnableHealthChecks,
 	}
 }
 

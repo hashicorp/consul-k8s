@@ -170,14 +170,6 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Inject namespace token",
-			TokenFlags:  []string{"-create-inject-namespace-token"},
-			PolicyNames: []string{"connect-inject-token"},
-			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -245,10 +237,19 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Health Checks ACL token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			k8s, testSvr := completeSetup(t)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
 
@@ -340,14 +341,6 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
-			TestName:    "Inject namespace token",
-			TokenFlags:  []string{"-create-inject-namespace-token"},
-			PolicyNames: []string{"connect-inject-token-dc2"},
-			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-			LocalToken:  true,
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token-dc2"},
@@ -399,6 +392,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
 			LocalToken: true,
 		},
+		{
+			TestName:    "Health Checks ACL token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -407,6 +408,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			defer fileCleanup()
 
 			k8s, consul, secondaryAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
 			// Run the command.
@@ -475,12 +477,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 		},
 		{
-			TestName:    "Inject token",
-			TokenFlags:  []string{"-create-inject-namespace-token"},
-			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
-		},
-		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
@@ -528,6 +524,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			PolicyNames: []string{"acl-replication-token"},
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 		},
+		{
+			TestName:    "Health Checks ACL token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -536,6 +538,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			defer fileCleanup()
 
 			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testAgent.Stop()
 
 			// Run the command.
@@ -604,18 +607,33 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			SecondaryDC:        true,
 			ExpAnonymousPolicy: false,
 		},
-		"auth method, primary dc, no replication": {
+		"auth method, primary dc, no replication (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method"},
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: false,
 		},
-		"auth method, primary dc, with replication": {
+		"auth method, primary dc, with replication (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method", "-create-acl-replication-token"},
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: true,
 		},
-		"auth method, secondary dc": {
+		"auth method, secondary dc (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method"},
+			SecondaryDC:        true,
+			ExpAnonymousPolicy: false,
+		},
+		"auth method, primary dc, no replication": {
+			Flags:              []string{"-create-inject-token"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: false,
+		},
+		"auth method, primary dc, with replication": {
+			Flags:              []string{"-create-inject-token", "-create-acl-replication-token"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: true,
+		},
+		"auth method, secondary dc": {
+			Flags:              []string{"-create-inject-token"},
 			SecondaryDC:        true,
 			ExpAnonymousPolicy: false,
 		},
@@ -644,7 +662,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				defer testSvr.Stop()
 				consulHTTPAddr = testSvr.HTTPAddr
 			}
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -724,21 +742,28 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			flags:        []string{"-create-inject-auth-method"},
 			expectedHost: "https://kubernetes.default.svc",
 		},
-		"-inject-auth-method-host flag": {
+		"-inject-auth-method-host flag (deprecated)": {
 			flags: []string{
 				"-create-inject-auth-method",
 				"-inject-auth-method-host=https://my-kube.com",
 			},
 			expectedHost: "https://my-kube.com",
 		},
+		"-inject-auth-method-host flag": {
+			flags: []string{
+				"-create-inject-token",
+				"-inject-auth-method-host=https://my-kube.com",
+			},
+			expectedHost: "https://my-kube.com",
+		},
 	}
 	for testName, c := range cases {
-		t.Run(testName, func(tt *testing.T) {
+		t.Run(testName, func(t *testing.T) {
 
-			k8s, testSvr := completeSetup(tt)
+			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
-			caCert, jwtToken := setUpK8sServiceAccount(tt, k8s)
-			require := require.New(tt)
+			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
+			require := require.New(t)
 
 			// Run the command.
 			ui := cli.NewMockUi()
@@ -805,165 +830,179 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 	t.Parallel()
 
-	k8s, testSvr := completeSetup(t)
-	defer testSvr.Stop()
-	caCert, jwtToken := setUpK8sServiceAccount(t, k8s)
-	require := require.New(t)
+	// Test with deprecated -create-inject-auth-method flag.
+	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
+	for _, flag := range cases {
+		t.Run(flag, func(t *testing.T) {
 
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
+			k8s, testSvr := completeSetup(t)
+			defer testSvr.Stop()
+			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
+			require := require.New(t)
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+
+			bindingRuleSelector := "serviceaccount.name!=default"
+
+			// First, create an auth method using the defaults
+			responseCode := cmd.Run([]string{
+				"-timeout=1m",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				flag,
+				"-acl-binding-rule-selector=" + bindingRuleSelector,
+			})
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the auth method was created.
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(err)
+			authMethodName := resourcePrefix + "-k8s-auth-method"
+			authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
+				&api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			require.NotNil(authMethod)
+			require.Contains(authMethod.Config, "Host")
+			require.Equal(authMethod.Config["Host"], defaultKubernetesHost)
+			require.Contains(authMethod.Config, "CACert")
+			require.Equal(authMethod.Config["CACert"], caCert)
+			require.Contains(authMethod.Config, "ServiceAccountJWT")
+			require.Equal(authMethod.Config["ServiceAccountJWT"], jwtToken)
+
+			// Generate a new CA certificate
+			_, _, caCertPem, _, err := cert.GenerateCA("kubernetes")
+			require.NoError(err)
+
+			// Overwrite the default kubernetes api, service account token and CA cert
+			kubernetesHost := "https://kubernetes.example.com"
+			// This token is the base64 encoded example token from jwt.io
+			serviceAccountToken = "ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM="
+			serviceAccountCACert = base64.StdEncoding.EncodeToString([]byte(caCertPem))
+
+			// Create a new service account
+			updatedCACert, updatedJWTToken := setUpK8sServiceAccount(t, k8s, ns)
+
+			// Run command again
+			responseCode = cmd.Run([]string{
+				"-timeout=1m",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				"-acl-binding-rule-selector=" + bindingRuleSelector,
+				flag,
+				"-inject-auth-method-host=" + kubernetesHost,
+			})
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check that the auth method has been updated
+			authMethod, _, err = consul.ACL().AuthMethodRead(authMethodName,
+				&api.QueryOptions{Token: bootToken})
+			require.NoError(err)
+			require.NotNil(authMethod)
+			require.Contains(authMethod.Config, "Host")
+			require.Equal(authMethod.Config["Host"], kubernetesHost)
+			require.Contains(authMethod.Config, "CACert")
+			require.Equal(authMethod.Config["CACert"], updatedCACert)
+			require.Contains(authMethod.Config, "ServiceAccountJWT")
+			require.Equal(authMethod.Config["ServiceAccountJWT"], updatedJWTToken)
+		})
 	}
-
-	bindingRuleSelector := "serviceaccount.name!=default"
-
-	// First, create an auth method using the defaults
-	responseCode := cmd.Run([]string{
-		"-timeout=1m",
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-create-inject-auth-method",
-		"-acl-binding-rule-selector=" + bindingRuleSelector,
-	})
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Check that the auth method was created.
-	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
-	consul, err := api.NewClient(&api.Config{
-		Address: testSvr.HTTPAddr,
-	})
-	require.NoError(err)
-	authMethodName := resourcePrefix + "-k8s-auth-method"
-	authMethod, _, err := consul.ACL().AuthMethodRead(authMethodName,
-		&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	require.NotNil(authMethod)
-	require.Contains(authMethod.Config, "Host")
-	require.Equal(authMethod.Config["Host"], defaultKubernetesHost)
-	require.Contains(authMethod.Config, "CACert")
-	require.Equal(authMethod.Config["CACert"], caCert)
-	require.Contains(authMethod.Config, "ServiceAccountJWT")
-	require.Equal(authMethod.Config["ServiceAccountJWT"], jwtToken)
-
-	// Generate a new CA certificate
-	_, _, caCertPem, _, err := cert.GenerateCA("kubernetes")
-	require.NoError(err)
-
-	// Overwrite the default kubernetes api, service account token and CA cert
-	kubernetesHost := "https://kubernetes.example.com"
-	// This token is the base64 encoded example token from jwt.io
-	serviceAccountToken = "ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM="
-	serviceAccountCACert = base64.StdEncoding.EncodeToString([]byte(caCertPem))
-
-	// Create a new service account
-	updatedCACert, updatedJWTToken := setUpK8sServiceAccount(t, k8s)
-
-	// Run command again
-	responseCode = cmd.Run([]string{
-		"-timeout=1m",
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-acl-binding-rule-selector=" + bindingRuleSelector,
-		"-create-inject-auth-method",
-		"-inject-auth-method-host=" + kubernetesHost,
-	})
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
-
-	// Check that the auth method has been updated
-	authMethod, _, err = consul.ACL().AuthMethodRead(authMethodName,
-		&api.QueryOptions{Token: bootToken})
-	require.NoError(err)
-	require.NotNil(authMethod)
-	require.Contains(authMethod.Config, "Host")
-	require.Equal(authMethod.Config["Host"], kubernetesHost)
-	require.Contains(authMethod.Config, "CACert")
-	require.Equal(authMethod.Config["CACert"], updatedCACert)
-	require.Contains(authMethod.Config, "ServiceAccountJWT")
-	require.Equal(authMethod.Config["ServiceAccountJWT"], updatedJWTToken)
 }
 
 // Test that ACL binding rules are updated if the rule selector changes.
-func TestRun_BindingRuleUpdates(t *testing.T) {
-	t.Parallel()
-	k8s, testSvr := completeSetup(t)
-	setUpK8sServiceAccount(t, k8s)
-	defer testSvr.Stop()
-	require := require.New(t)
+func TestRun_BindingRuleUpdates(tt *testing.T) {
+	tt.Parallel()
 
-	consul, err := api.NewClient(&api.Config{
-		Address: testSvr.HTTPAddr,
-	})
-	require.NoError(err)
+	// Test with deprecated -create-inject-auth-method flag.
+	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
+	for _, flag := range cases {
+		tt.Run(flag, func(t *testing.T) {
+			k8s, testSvr := completeSetup(t)
+			setUpK8sServiceAccount(t, k8s, ns)
+			defer testSvr.Stop()
+			require := require.New(t)
 
-	ui := cli.NewMockUi()
-	commonArgs := []string{
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
-		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
-		"-create-inject-auth-method",
-	}
-	firstRunArgs := append(commonArgs,
-		"-acl-binding-rule-selector=serviceaccount.name!=default",
-	)
-	// On the second run, we change the binding rule selector.
-	secondRunArgs := append(commonArgs,
-		"-acl-binding-rule-selector=serviceaccount.name!=changed",
-	)
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+			})
+			require.NoError(err)
 
-	// Run the command first to populate the binding rule.
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	responseCode := cmd.Run(firstRunArgs)
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
+			ui := cli.NewMockUi()
+			commonArgs := []string{
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+				flag,
+			}
+			firstRunArgs := append(commonArgs,
+				"-acl-binding-rule-selector=serviceaccount.name!=default",
+			)
+			// On the second run, we change the binding rule selector.
+			secondRunArgs := append(commonArgs,
+				"-acl-binding-rule-selector=serviceaccount.name!=changed",
+			)
 
-	// Validate the binding rule.
-	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := resourcePrefix + "-k8s-auth-method"
-		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
-		require.NoError(err)
-		require.Len(rules, 1)
-		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
-		require.NoError(err)
-		require.NotNil(actRule)
-		require.Equal("Kubernetes binding rule", actRule.Description)
-		require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-		require.Equal("${serviceaccount.name}", actRule.BindName)
-		require.Equal("serviceaccount.name!=default", actRule.Selector)
-	}
+			// Run the command first to populate the binding rule.
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			responseCode := cmd.Run(firstRunArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-	// Re-run the command with namespace flags. The policies should be updated.
-	// NOTE: We're redefining the command so that the old flag values are
-	// reset.
-	cmd = Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	responseCode = cmd.Run(secondRunArgs)
-	require.Equal(0, responseCode, ui.ErrorWriter.String())
+			// Validate the binding rule.
+			{
+				queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+				authMethodName := resourcePrefix + "-k8s-auth-method"
+				rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
+				require.NoError(err)
+				require.Len(rules, 1)
+				actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+				require.NoError(err)
+				require.NotNil(actRule)
+				require.Equal("Kubernetes binding rule", actRule.Description)
+				require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+				require.Equal("${serviceaccount.name}", actRule.BindName)
+				require.Equal("serviceaccount.name!=default", actRule.Selector)
+			}
 
-	// Check the binding rule is changed expected.
-	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := resourcePrefix + "-k8s-auth-method"
-		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
-		require.NoError(err)
-		require.Len(rules, 1)
-		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
-		require.NoError(err)
-		require.NotNil(actRule)
-		require.Equal("Kubernetes binding rule", actRule.Description)
-		require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
-		require.Equal("${serviceaccount.name}", actRule.BindName)
-		require.Equal("serviceaccount.name!=changed", actRule.Selector)
+			// Re-run the command with namespace flags. The policies should be updated.
+			// NOTE: We're redefining the command so that the old flag values are
+			// reset.
+			cmd = Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			responseCode = cmd.Run(secondRunArgs)
+			require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+			// Check the binding rule is changed expected.
+			{
+				queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+				authMethodName := resourcePrefix + "-k8s-auth-method"
+				rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
+				require.NoError(err)
+				require.Len(rules, 1)
+				actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+				require.NoError(err)
+				require.NotNil(actRule)
+				require.Equal("Kubernetes binding rule", actRule.Description)
+				require.Equal(api.BindingRuleBindTypeService, actRule.BindType)
+				require.Equal("${serviceaccount.name}", actRule.BindName)
+				require.Equal("serviceaccount.name!=changed", actRule.Selector)
+			}
+		})
 	}
 }
 
@@ -1633,7 +1672,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 			tokenFile, fileCleanup := writeTempFile(t, bootToken)
 			defer fileCleanup()
 			k8s, consul, serverAddr, cleanup := mockReplicatedSetup(t, bootToken)
-			setUpK8sServiceAccount(t, k8s)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
 			// Run the command.
@@ -1986,16 +2025,16 @@ func generateServerCerts(t *testing.T) (string, string, string, func()) {
 // This Service Account would normally automatically be created by Kubernetes
 // when the injector deployment is created. It returns the Service Account
 // CA Cert and JWT token.
-func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) {
+func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
-	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
 		// The second secret is mimicking the behavior on Openshift,
 		// where two secrets are injected: one with SA token and one with docker config.
-		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
+		_, err := k8s.CoreV1().ServiceAccounts(namespace).Create(
 			context.Background(),
 			&v1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2032,7 +2071,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 		},
 		Type: v1.SecretTypeServiceAccountToken,
 	}
-	createOrUpdateSecret(t, k8s, secret)
+	createOrUpdateSecret(t, k8s, secret, namespace)
 
 	// Create the second secret of a different type
 	otherSecret := &v1.Secret{
@@ -2042,19 +2081,19 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset) (string, string) 
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeDockercfg,
 	}
-	createOrUpdateSecret(t, k8s, otherSecret)
+	createOrUpdateSecret(t, k8s, otherSecret, namespace)
 
 	return string(caCertBytes), string(tokenBytes)
 }
 
-func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret) {
-	existingSecret, _ := k8s.CoreV1().Secrets(ns).Get(context.Background(), secret.Name, metav1.GetOptions{})
+func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret, namespace string) {
+	existingSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
 	var err error
 	if existingSecret == nil {
-		_, err = k8s.CoreV1().Secrets(ns).Create(context.Background(), secret, metav1.CreateOptions{})
+		_, err = k8s.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		require.NoError(t, err)
 	} else {
-		_, err = k8s.CoreV1().Secrets(ns).Update(context.Background(), secret, metav1.UpdateOptions{})
+		_, err = k8s.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 		require.NoError(t, err)
 	}
 }
