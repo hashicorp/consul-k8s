@@ -42,36 +42,7 @@ var testPodSpec = corev1.PodSpec{
 	},
 }
 
-func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
-	require := require.New(t)
-	// Setup server & client.
-	s, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-
-	clientConfig := &api.Config{}
-	if pod.ObjectMeta.Namespace != "default" && pod.ObjectMeta.Namespace != "" {
-		clientConfig = &api.Config{Address: s.HTTPAddr, Namespace: pod.ObjectMeta.Namespace}
-	} else {
-		clientConfig = &api.Config{Address: s.HTTPAddr}
-	}
-	require.NoError(err)
-	client, err := api.NewClient(clientConfig)
-	require.NoError(err)
-
-	schema := "http://"
-	consulUrl, err := url.Parse(schema + s.HTTPAddr)
-	require.NoError(err)
-
-	healthResource := HealthCheckResource{
-		Log:                 hclog.Default().Named("healthCheckResource"),
-		KubernetesClientset: fake.NewSimpleClientset(pod),
-		ConsulUrl:           consulUrl,
-		ReconcilePeriod:     0,
-	}
-	return s, client, &healthResource
-}
-
-func registerHealthCheck(t *testing.T, client *api.Client, pod *corev1.Pod, initialState string) {
+func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
 		Name:      "Kubernetes Health Check",
@@ -83,7 +54,6 @@ func registerHealthCheck(t *testing.T, client *api.Client, pod *corev1.Pod, init
 			Status: initialState,
 			Notes:  "",
 		},
-		Namespace: pod.Annotations[annotationConsulDestinationNamespace],
 	})
 	require.NoError(err)
 }
@@ -357,7 +327,7 @@ func TestReconcilePod(t *testing.T) {
 			server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 			if tt.PreCreateHealthCheck {
 				// Register the health check if this is not an object create path.
-				registerHealthCheck(t, client, tt.Pod, tt.InitialState)
+				registerHealthCheck(t, client, tt.InitialState)
 			}
 			// Upsert and Reconcile both use reconcilePod to reconcile a pod.
 			err = resource.reconcilePod(tt.Pod)
@@ -569,4 +539,31 @@ func TestReconcileRun(t *testing.T) {
 	}
 	// Validate the checks are set.
 	require.True(cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+}
+
+func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
+	return testServerAgentResourceAndControllerWithConsulNS(t, pod, "")
+}
+
+func testServerAgentResourceAndControllerWithConsulNS(t *testing.T, pod *corev1.Pod, consulNS string) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
+	require := require.New(t)
+	// Setup server & client.
+	s, err := testutil.NewTestServerConfigT(t, nil)
+	require.NoError(err)
+
+	clientConfig := &api.Config{Address: s.HTTPAddr, Namespace: consulNS}
+	client, err := api.NewClient(clientConfig)
+	require.NoError(err)
+
+	schema := "http://"
+	consulUrl, err := url.Parse(schema + s.HTTPAddr)
+	require.NoError(err)
+
+	healthResource := HealthCheckResource{
+		Log:                 hclog.Default().Named("healthCheckResource"),
+		KubernetesClientset: fake.NewSimpleClientset(pod),
+		ConsulUrl:           consulUrl,
+		ReconcilePeriod:     0,
+	}
+	return s, client, &healthResource
 }

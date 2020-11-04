@@ -364,12 +364,12 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			labelInject: injected,
 		})...)
 
-	// Consul-ENT only : Add the Consul destination namespace as an annotation to the pod.
+	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if h.EnableNamespaces {
 		patches = append(patches, updateAnnotation(
 			pod.Annotations,
 			map[string]string{
-				annotationConsulDestinationNamespace: h.consulNamespace(req.Namespace),
+				annotationConsulNamespace: h.consulNamespace(req.Namespace),
 			})...)
 	}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // This tests the checkAndCreate namespace function that is called
@@ -39,61 +38,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		Handler            Handler
 		Req                v1beta1.AdmissionRequest
 		ExpectedNamespaces []string
-		ExpectedPatches    []jsonpatch.JsonPatchOperation
 	}{
-		{
-			"consul destination namespace annotation is set via patch",
-			Handler{
-				Log:                        hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:       mapset.NewSet(),
-				ConsulDestinationNamespace: "abcd",
-				EnableK8SNSMirroring:       true,
-				EnableNamespaces:           true,
-			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       basicSpec,
-				}),
-				Namespace: "abcd",
-			},
-			[]string{"default", "abcd"},
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationConsulDestinationNamespace),
-				},
-			},
-		},
 		{
 			"single destination namespace 'default' from k8s 'default'",
 			Handler{
@@ -110,7 +55,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default"},
-			nil,
 		},
 
 		{
@@ -129,7 +73,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "non-default",
 			},
 			[]string{"default"},
-			nil,
 		},
 
 		{
@@ -148,7 +91,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default", "dest"},
-			nil,
 		},
 
 		{
@@ -167,7 +109,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "non-default",
 			},
 			[]string{"default", "dest"},
-			nil,
 		},
 
 		{
@@ -187,7 +128,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default"},
-			nil,
 		},
 
 		{
@@ -207,7 +147,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "dest",
 			},
 			[]string{"default", "dest"},
-			nil,
 		},
 
 		{
@@ -228,7 +167,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "default",
 			},
 			[]string{"default", "k8s-default"},
-			nil,
 		},
 
 		{
@@ -249,7 +187,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				Namespace: "dest",
 			},
 			[]string{"default", "k8s-dest"},
-			nil,
 		},
 	}
 
@@ -298,17 +235,6 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 						"namespace %s has wrong value for external-source metadata key", ns)
 				}
 
-			}
-			// Check the patches, if provided.
-			if tt.ExpectedPatches != nil {
-				var actual []jsonpatch.JsonPatchOperation
-				if len(resp.Patch) > 0 {
-					require.NoError(json.Unmarshal(resp.Patch, &actual))
-					for i, _ := range actual {
-						actual[i].Value = nil
-					}
-				}
-				require.Equal(tt.ExpectedPatches, actual)
 			}
 		})
 	}
@@ -581,6 +507,91 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				}
 
 			}
+		})
+	}
+}
+
+// Test that the annotation for the Consul namespace is added.
+func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
+	t.Parallel()
+	sourceKubeNS := "kube-ns"
+
+	cases := map[string]struct {
+		ConsulDestinationNamespace string
+		Mirroring                  bool
+		MirroringPrefix            string
+		ExpNamespaceAnnotation     string
+	}{
+		"dest: default": {
+			ConsulDestinationNamespace: "default",
+			ExpNamespaceAnnotation:     "default",
+		},
+		"dest: foo": {
+			ConsulDestinationNamespace: "foo",
+			ExpNamespaceAnnotation:     "foo",
+		},
+		"mirroring": {
+			Mirroring:              true,
+			ExpNamespaceAnnotation: sourceKubeNS,
+		},
+		"mirroring with prefix": {
+			Mirroring:              true,
+			MirroringPrefix:        "prefix-",
+			ExpNamespaceAnnotation: "prefix-" + sourceKubeNS,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Set up consul server
+			a, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer a.Stop()
+
+			// Set up consul client
+			client, err := api.NewClient(&api.Config{
+				Address: a.HTTPAddr,
+			})
+			require.NoError(err)
+
+			handler := Handler{
+				Log:                        hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet:      mapset.NewSet("*"),
+				DenyK8sNamespacesSet:       mapset.NewSet(),
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: c.ConsulDestinationNamespace,
+				EnableK8SNSMirroring:       c.Mirroring,
+				K8SNSMirroringPrefix:       c.MirroringPrefix,
+				ConsulClient:               client,
+			}
+
+			resp := handler.Mutate(&v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "web",
+							},
+						},
+					},
+				}),
+				Namespace: sourceKubeNS,
+			})
+			require.Equal(resp.Allowed, true)
+
+			// Check that the annotation was added as a patch.
+			var consulNamespaceAnnotationValue string
+			var patches []jsonpatch.JsonPatchOperation
+			require.NoError(json.Unmarshal(resp.Patch, &patches))
+			for _, patch := range patches {
+				if patch.Path == "/metadata/annotations/"+escapeJSONPointer(annotationConsulNamespace) {
+					consulNamespaceAnnotationValue = patch.Value.(string)
+				}
+			}
+			require.NotEmpty(consulNamespaceAnnotationValue, "no namespace annotation set")
+			require.Equal(c.ExpNamespaceAnnotation, consulNamespaceAnnotationValue)
 		})
 	}
 }
