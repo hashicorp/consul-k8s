@@ -40,7 +40,7 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 		{
 			Name:                 "reconcilePod will create check and set passed",
 			PreCreateHealthCheck: false,
-			InitialState:         api.HealthPassing,
+			InitialState:         "", // only used when precreating a health check
 			Pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -75,7 +75,7 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 		{
 			Name:                 "reconcilePod will create check and set failed",
 			PreCreateHealthCheck: false,
-			InitialState:         api.HealthPassing,
+			InitialState:         "", // only used when precreating a health check
 			Pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,

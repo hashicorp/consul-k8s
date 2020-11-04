@@ -214,7 +214,7 @@ func TestReconcilePod(t *testing.T) {
 			"",
 		},
 		{
-			"precreacte failed check, no pod changes results in no healthcheck changes",
+			"precreate failed check, no pod changes results in no healthcheck changes",
 			true,
 			api.HealthCritical,
 			&corev1.Pod{

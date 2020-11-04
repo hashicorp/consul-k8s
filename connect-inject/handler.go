@@ -88,8 +88,7 @@ const (
 	// injected is used as the annotation value for annotationInjected
 	injected = "injected"
 
-	// annotationConsulDestinationNamespace is the Consul namespace the service is registered into.
-
+	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 )
 
