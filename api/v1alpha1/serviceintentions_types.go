@@ -324,11 +324,11 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 	path := field.NewPath("spec")
 	if !namespacesEnabled {
 		if in.Spec.Destination.Namespace != "" {
-			errs = append(errs, field.Invalid(path.Child("destination").Child("namespace"), in.Spec.Destination.Namespace, `consul namespaces must be enabled to set destination.namespace`))
+			errs = append(errs, field.Invalid(path.Child("destination").Child("namespace"), in.Spec.Destination.Namespace, `Consul Enterprise namespaces must be enabled to set destination.namespace`))
 		}
 		for i, source := range in.Spec.Sources {
 			if source.Namespace != "" {
-				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `consul namespaces must be enabled to set source.namespace`))
+				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `Consul Enterprise namespaces must be enabled to set source.namespace`))
 			}
 		}
 	}

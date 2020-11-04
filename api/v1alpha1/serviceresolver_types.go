@@ -155,12 +155,12 @@ func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.Erro
 	if !namespacesEnabled {
 		if in.Spec.Redirect != nil {
 			if in.Spec.Redirect.Namespace != "" {
-				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `consul namespaces must be enabled to set redirect.namespace`))
+				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `Consul Enterprise namespaces must be enabled to set redirect.namespace`))
 			}
 		}
 		for k, v := range in.Spec.Failover {
 			if v.Namespace != "" {
-				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `consul namespaces must be enabled to set failover.namespace`))
+				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `Consul Enterprise namespaces must be enabled to set failover.namespace`))
 			}
 		}
 
