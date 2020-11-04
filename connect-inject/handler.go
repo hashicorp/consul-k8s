@@ -365,7 +365,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		})...)
 
 	// Consul-ENT only : Add the Consul destination namespace as an annotation to the pod.
-	if h.EnableNamespaces && h.EnableK8SNSMirroring {
+	if h.EnableNamespaces {
 		patches = append(patches, updateAnnotation(
 			pod.Annotations,
 			map[string]string{
