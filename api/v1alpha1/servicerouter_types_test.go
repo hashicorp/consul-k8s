@@ -390,10 +390,11 @@ func TestServiceRouter_ObjectMeta(t *testing.T) {
 
 func TestServiceRouter_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input          *ServiceRouter
-		expectedErrMsg string
+		input             *ServiceRouter
+		namespacesEnabled bool
+		expectedErrMsgs   []string
 	}{
-		"valid": {
+		"namespaces enabled: valid": {
 			input: &ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -406,10 +407,39 @@ func TestServiceRouter_Validate(t *testing.T) {
 									PathPrefix: "/admin",
 								},
 							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destA",
+								Namespace: "namespace-a",
+							},
 						},
 					},
 				},
 			},
+			namespacesEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"namespaces disabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service: "destA",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
 		"http match queryParam": {
 			input: &ServiceRouter{
@@ -438,7 +468,10 @@ func TestServiceRouter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicerouter.consul.hashicorp.com "foo" is invalid: [spec.routes[0].match.http: Invalid value: "{\"pathExact\":\"exact\",\"pathPrefix\":\"prefix\",\"pathRegex\":\"regex\",\"queryParam\":[{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"regex\":\"regex\"}]}": at most only one of pathExact, pathPrefix, or pathRegex may be configured, spec.routes[0].match.http.pathExact: Invalid value: "exact": must begin with a '/', spec.routes[0].match.http.pathPrefix: Invalid value: "prefix": must begin with a '/', spec.routes[0].match.http.queryParam[0]: Invalid value: "{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"regex\":\"regex\"}": at most only one of exact, regex, or present may be configured]`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`servicerouter.consul.hashicorp.com "foo" is invalid: [spec.routes[0].match.http: Invalid value: "{\"pathExact\":\"exact\",\"pathPrefix\":\"prefix\",\"pathRegex\":\"regex\",\"queryParam\":[{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"regex\":\"regex\"}]}": at most only one of pathExact, pathPrefix, or pathRegex may be configured, spec.routes[0].match.http.pathExact: Invalid value: "exact": must begin with a '/', spec.routes[0].match.http.pathPrefix: Invalid value: "prefix": must begin with a '/', spec.routes[0].match.http.queryParam[0]: Invalid value: "{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"regex\":\"regex\"}": at most only one of exact, regex, or present may be configured]`,
+			},
 		},
 		"http match header": {
 			input: &ServiceRouter{
@@ -469,7 +502,10 @@ func TestServiceRouter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicerouter.consul.hashicorp.com "foo" is invalid: [spec.routes[0].match.http: Invalid value: "{\"pathExact\":\"exact\",\"pathPrefix\":\"prefix\",\"pathRegex\":\"regex\",\"header\":[{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"prefix\":\"prefix\",\"suffix\":\"suffix\",\"regex\":\"regex\"}]}": at most only one of pathExact, pathPrefix, or pathRegex may be configured, spec.routes[0].match.http.pathExact: Invalid value: "exact": must begin with a '/', spec.routes[0].match.http.pathPrefix: Invalid value: "prefix": must begin with a '/', spec.routes[0].match.http.header[0]: Invalid value: "{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"prefix\":\"prefix\",\"suffix\":\"suffix\",\"regex\":\"regex\"}": at most only one of exact, prefix, suffix, regex, or present may be configured]`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`servicerouter.consul.hashicorp.com "foo" is invalid: [spec.routes[0].match.http: Invalid value: "{\"pathExact\":\"exact\",\"pathPrefix\":\"prefix\",\"pathRegex\":\"regex\",\"header\":[{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"prefix\":\"prefix\",\"suffix\":\"suffix\",\"regex\":\"regex\"}]}": at most only one of pathExact, pathPrefix, or pathRegex may be configured, spec.routes[0].match.http.pathExact: Invalid value: "exact": must begin with a '/', spec.routes[0].match.http.pathPrefix: Invalid value: "prefix": must begin with a '/', spec.routes[0].match.http.header[0]: Invalid value: "{\"name\":\"name\",\"present\":true,\"exact\":\"exact\",\"prefix\":\"prefix\",\"suffix\":\"suffix\",\"regex\":\"regex\"}": at most only one of exact, prefix, suffix, regex, or present may be configured]`,
+			},
 		},
 		"destination and prefixRewrite": {
 			input: &ServiceRouter{
@@ -496,14 +532,66 @@ func TestServiceRouter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
+			},
+		},
+		"namespaces disabled: single destination namespace specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"servicerouter.consul.hashicorp.com \"foo\" is invalid: spec.routes[0].destination.namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set destination.namespace",
+			},
+		},
+		"namespaces disabled: multiple destination namespaces specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+							},
+						},
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-b",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.routes[0].destination.namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set destination.namespace",
+				"spec.routes[1].destination.namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set destination.namespace",
+			},
 		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate()
-			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
+			err := testCase.input.Validate(testCase.namespacesEnabled)
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
 			} else {
 				require.NoError(t, err)
 			}

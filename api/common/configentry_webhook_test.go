@@ -193,7 +193,7 @@ func (in *mockConfigEntry) ToConsul(string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{}
 }
 
-func (in *mockConfigEntry) Validate() error {
+func (in *mockConfigEntry) Validate(bool) error {
 	if !in.Valid {
 		return errors.New("invalid")
 	}

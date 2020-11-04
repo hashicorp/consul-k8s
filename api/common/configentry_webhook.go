@@ -53,7 +53,7 @@ func ValidateConfigEntry(
 			}
 		}
 	}
-	if err := cfgEntry.Validate(); err != nil {
+	if err := cfgEntry.Validate(enableConsulNamespaces); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Allowed(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()))
