@@ -143,7 +143,7 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ProxyDefaults) Validate() error {
+func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 

@@ -56,5 +56,5 @@ type ConfigEntryResource interface {
 	// DeepCopyObject should be implemented by the generated code.
 	DeepCopyObject() runtime.Object
 	// Validate returns an error if the resource is invalid.
-	Validate() error
+	Validate(namespacesEnabled bool) error
 }

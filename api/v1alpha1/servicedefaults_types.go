@@ -141,7 +141,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 
 // Validate validates the fields provided in the spec of the ServiceDefaults and
 // returns an error which lists all invalid fields in the resource spec.
-func (in *ServiceDefaults) Validate() error {
+func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 

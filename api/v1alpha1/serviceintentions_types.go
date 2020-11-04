@@ -248,7 +248,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	)
 }
 
-func (in *ServiceIntentions) Validate() error {
+func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	if len(in.Spec.Sources) == 0 {
@@ -268,6 +268,9 @@ func (in *ServiceIntentions) Validate() error {
 			}
 		}
 	}
+
+	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
@@ -316,9 +319,7 @@ func (in *ServiceIntentions) Default(consulNamespacesEnabled bool, destinationNa
 	}
 }
 
-// ValidateNamespaces returns an error if spec.destination.namespace or spec.sources[i].namespace
-// is set but namespaces are disabled.
-func (in *ServiceIntentions) ValidateNamespaces(namespacesEnabled bool) error {
+func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	if !namespacesEnabled {
@@ -331,12 +332,7 @@ func (in *ServiceIntentions) ValidateNamespaces(namespacesEnabled bool) error {
 			}
 		}
 	}
-	if len(errs) > 0 {
-		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
-			in.KubernetesName(), errs)
-	}
-	return nil
+	return errs
 }
 
 func (in IntentionAction) validate(path *field.Path) *field.Error {

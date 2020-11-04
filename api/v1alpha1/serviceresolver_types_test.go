@@ -445,10 +445,32 @@ func TestServiceResolver_ObjectMeta(t *testing.T) {
 
 func TestServiceResolver_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input          *ServiceResolver
-		expectedErrMsg string
+		input             *ServiceResolver
+		namespacesEnabled bool
+		expectedErrMsgs   []string
 	}{
-		"valid": {
+		"namespaces enabled: valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
+						Namespace: "namespace-a",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:   "baz",
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"namespaces disabled: valid": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -457,9 +479,15 @@ func TestServiceResolver_Validate(t *testing.T) {
 					Redirect: &ServiceResolverRedirect{
 						Service: "bar",
 					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service: "baz",
+						},
+					},
 				},
 			},
-			expectedErrMsg: "",
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
 		"failover service, servicesubset, namespace, datacenters empty": {
 			input: &ServiceResolver{
@@ -483,7 +511,11 @@ func TestServiceResolver_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: "serviceresolver.consul.hashicorp.com \"foo\" is invalid: [spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once, spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once]",
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.failover[failA]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once",
+				"spec.failover[failB]: Invalid value: \"{}\": service, serviceSubset, namespace and datacenters cannot all be empty at once",
+			},
 		},
 		"hashPolicy.field invalid": {
 			input: &ServiceResolver{
@@ -500,7 +532,10 @@ func TestServiceResolver_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+			},
 		},
 		"hashPolicy sourceIP and field set": {
 			input: &ServiceResolver{
@@ -518,7 +553,10 @@ func TestServiceResolver_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
+			},
 		},
 		"cookieConfig session and ttl set": {
 			input: &ServiceResolver{
@@ -539,14 +577,76 @@ func TestServiceResolver_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
+			},
+		},
+		"namespaces disabled: redirect namespace specified": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Namespace: "namespace-a",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.redirect.namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set redirect.namespace",
+			},
+		},
+		"namespaces disabled: single failover namespace specified": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Namespace: "namespace-a",
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+			},
+			namespacesEnabled: false,
+		},
+		"namespaces disabled: multiple failover namespaces specified": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Namespace: "namespace-a",
+						},
+						"failB": {
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+				"spec.failover[failB].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+			},
 		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate()
-			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
+			err := testCase.input.Validate(testCase.namespacesEnabled)
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
 			} else {
 				require.NoError(t, err)
 			}

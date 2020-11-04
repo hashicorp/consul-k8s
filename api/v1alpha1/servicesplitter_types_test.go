@@ -256,10 +256,32 @@ func TestServiceSplitter_ObjectMeta(t *testing.T) {
 
 func TestServiceSplitter_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input          *ServiceSplitter
-		expectedErrMsg string
+		input             *ServiceSplitter
+		namespacesEnabled bool
+		expectedErrMsgs   []string
 	}{
-		"valid": {
+		"namespaces enabled: valid": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight:    99.99,
+							Namespace: "namespace-a",
+						},
+						{
+							Weight:    0.01,
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"namespaces disabled: valid": {
 			input: &ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -275,9 +297,10 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
-
-		"valid - splits with 0 weight": {
+		"splits with 0 weight: valid": {
 			input: &ServiceSplitter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -299,6 +322,8 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   []string{},
 		},
 		"sum of weights must be 100": {
 			input: &ServiceSplitter{
@@ -316,7 +341,10 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: spec.splits: Invalid value: "[{\"weight\":90},{\"weight\":5}]": the sum of weights across all splits must add up to 100 percent, but adds up to 95.000000`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`servicesplitter.consul.hashicorp.com "foo" is invalid: spec.splits: Invalid value: "[{\"weight\":90},{\"weight\":5}]": the sum of weights across all splits must add up to 100 percent, but adds up to 95.000000`,
+			},
 		},
 		"weight must be between 0.01 and 100": {
 			input: &ServiceSplitter{
@@ -334,14 +362,65 @@ func TestServiceSplitter_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicesplitter.consul.hashicorp.com "foo" is invalid: [spec.splits[0].weight: Invalid value: 101: weight must be a percentage between 0.01 and 100, spec.splits[1].weight: Invalid value: 0.001: weight must be a percentage between 0.01 and 100, spec.splits: Invalid value: "[{\"weight\":101},{\"weight\":0.001}]": the sum of weights across all splits must add up to 100 percent, but adds up to 101.000999]`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.splits[0].weight: Invalid value: 101: weight must be a percentage between 0.01 and 100",
+				"spec.splits[1].weight: Invalid value: 0.001: weight must be a percentage between 0.01 and 100",
+				`spec.splits: Invalid value: "[{\"weight\":101},{\"weight\":0.001}]": the sum of weights across all splits must add up to 100 percent, but adds up to 101.000999]`,
+			},
+		},
+		"namespaces disabled: single split namespace specified": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Namespace: "namespace-a",
+							Weight:    100,
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"servicesplitter.consul.hashicorp.com \"foo\" is invalid: spec.splits[0].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set split.namespace",
+			},
+		},
+		"namespaces disabled: multiple split namespaces specified": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Namespace: "namespace-a",
+							Weight:    50,
+						},
+						{
+							Namespace: "namespace-b",
+							Weight:    50,
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.splits[0].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set split.namespace",
+				"spec.splits[1].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set split.namespace",
+			},
 		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate()
-			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
+			err := testCase.input.Validate(testCase.namespacesEnabled)
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
 			} else {
 				require.NoError(t, err)
 			}

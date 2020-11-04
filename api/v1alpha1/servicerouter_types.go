@@ -376,7 +376,7 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ServiceRouter) Validate() error {
+func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	for i, r := range in.Spec.Routes {
@@ -385,12 +385,29 @@ func (in *ServiceRouter) Validate() error {
 		}
 	}
 
+	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ServiceRouterKubeKind},
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !namespacesEnabled {
+		for i, r := range in.Spec.Routes {
+			if r.Destination != nil {
+				if r.Destination.Namespace != "" {
+					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("namespace"), r.Destination.Namespace, `consul namespaces must be enabled to set destination.namespace`))
+				}
+			}
+		}
+	}
+	return errs
 }
 
 // +kubebuilder:object:root=true
