@@ -495,20 +495,48 @@ namespace_prefix "prefix-" {
 
 func TestInjectRules(t *testing.T) {
 	cases := []struct {
-		Name             string
-		EnableNamespaces bool
-		Expected         string
+		Name               string
+		EnableNamespaces   bool
+		EnableHealthChecks bool
+		Expected           string
 	}{
 		{
-			"Namespaces are disabled",
+			"Namespaces are disabled, health checks controller disabled",
+			false,
 			false,
 			"",
 		},
 		{
-			"Namespaces are enabled",
+			"Namespaces are enabled, health checks controller disabled",
 			true,
+			false,
 			`
 operator = "write"`,
+		},
+		{
+			"Namespaces are disabled, health checks controller enabled",
+			false,
+			true,
+			`
+  node_prefix "" {
+     policy = "write"
+  }
+  service_prefix "" {
+     policy = "write"
+  }`,
+		},
+		{
+			"Namespaces are enabled, health checks controller enabled",
+			true,
+			true,
+			`
+operator = "write"
+  node_prefix "" {
+     policy = "write"
+  }
+  service_prefix "" {
+     policy = "write"
+  }`,
 		},
 	}
 
@@ -517,7 +545,8 @@ operator = "write"`,
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnableNamespaces:   tt.EnableNamespaces,
+				flagEnableHealthChecks: tt.EnableHealthChecks,
 			}
 
 			injectorRules, err := cmd.injectRules()

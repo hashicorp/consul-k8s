@@ -25,7 +25,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
 			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
+			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
 
 			ui := cli.NewMockUi()
@@ -39,7 +39,7 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", consulDestNamespace,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
@@ -143,9 +143,9 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeEnterpriseSetup(t)
+			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
+			setUpK8sServiceAccount(tt, k8s, ns)
 			require := require.New(tt)
 
 			ui := cli.NewMockUi()
@@ -159,7 +159,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
+				"-create-inject-token",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
@@ -169,7 +169,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			responseCode := cmd.Run(args)
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			bootToken := getBootToken(tt, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
 				Address: testAgent.HTTPAddr,
 				Token:   bootToken,
@@ -211,6 +211,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
 			k8s, testAgent := completeEnterpriseSetup(t)
+			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 			defer testAgent.Stop()
 			require := require.New(t)
 
@@ -224,7 +225,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-allow-dns",
 				"-create-mesh-gateway-token",
 				"-create-sync-token",
-				"-create-inject-namespace-token",
+				"-create-inject-token",
 				"-create-snapshot-agent-token",
 				"-create-enterprise-license-token",
 				"-ingress-gateway-name=gw",
@@ -259,7 +260,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anonymous-token-policy",
 				"client-token",
 				"catalog-sync-token",
-				"connect-inject-token",
 				"mesh-gateway-token",
 				"client-snapshot-agent-token",
 				"enterprise-license-token",
@@ -407,7 +407,6 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		"no ns => single dest ns": {
 			FirstRunArgs: nil,
 			SecondRunArgs: []string{
-				"-create-inject-auth-method",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace=dest",
 			},
@@ -517,7 +516,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			require := require.New(tt)
 			k8s, testAgent := completeEnterpriseSetup(tt)
 			defer testAgent.Stop()
-			setUpK8sServiceAccount(tt, k8s)
+			setUpK8sServiceAccount(tt, k8s, ns)
 
 			ui := cli.NewMockUi()
 			defaultArgs := []string{
@@ -525,7 +524,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
-				"-create-inject-auth-method",
+				"-create-inject-token",
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -549,7 +548,7 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			require.Equal(0, responseCode, ui.ErrorWriter.String())
 
 			// Now check that everything is as expected.
-			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			bootToken := getBootToken(tt, k8s, resourcePrefix, ns)
 			consul, err := api.NewClient(&api.Config{
 				Address: testAgent.HTTPAddr,
 				Token:   bootToken,
@@ -608,8 +607,8 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
 			LocalToken:  false,
 		},
-		"connect-inject-namespace token": {
-			TokenFlags:  []string{"-create-inject-namespace-token"},
+		"connect-inject-token": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -669,10 +668,25 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
 		},
+		"inject token with namespaces (deprecated)": {
+			TokenFlags:  []string{"-create-inject-auth-method", "-enable-namespaces", "-create-inject-namespace-token"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
+		"inject token with health checks and namespaces": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   nil,
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  false,
+		},
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
 			k8s, testSvr := completeEnterpriseSetup(t)
+			setUpK8sServiceAccount(t, k8s, ns)
 			defer testSvr.Stop()
 			require := require.New(t)
 
