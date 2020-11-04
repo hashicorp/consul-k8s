@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestHandlerEnvoySidecar(t *testing.T) {
@@ -39,6 +40,14 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 		{
 			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
+		},
+	})
+
+	require.Equal(container.LivenessProbe, &corev1.Probe{
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.Int, IntVal: 20000},
+			},
 		},
 	})
 }

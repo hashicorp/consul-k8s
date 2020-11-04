@@ -8,6 +8,7 @@ import (
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
@@ -37,6 +38,13 @@ func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod) (core
 			{
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.IntOrString{Type: intstr.Int, IntVal: 20000},
+				},
 			},
 		},
 		Command: cmd,
