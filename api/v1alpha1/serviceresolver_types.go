@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"sort"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -128,25 +127,19 @@ func (in *ServiceResolver) ConsulGlobalResource() bool {
 	return false
 }
 
-func (in *ServiceResolver) Validate() error {
+func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
-	// Iterate through failover map keys in sorted order so tests are
-	// deterministic.
-	keys := make([]string, 0, len(in.Spec.Failover))
-	for k := range in.Spec.Failover {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		f := in.Spec.Failover[k]
-		if err := f.validate(path.Child("failover").Key(k)); err != nil {
+	for k, v := range in.Spec.Failover {
+		if err := v.validate(path.Child("failover").Key(k)); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
+
+	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -154,6 +147,25 @@ func (in *ServiceResolver) Validate() error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !namespacesEnabled {
+		if in.Spec.Redirect != nil {
+			if in.Spec.Redirect.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `consul namespaces must be enabled to set redirect.namespace`))
+			}
+		}
+		for k, v := range in.Spec.Failover {
+			if v.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `consul namespaces must be enabled to set failover.namespace`))
+			}
+		}
+
+	}
+	return errs
 }
 
 func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {

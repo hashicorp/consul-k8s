@@ -61,7 +61,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 		}
 	}
 
-	if err := proxyDefaults.Validate(); err != nil {
+	if err := proxyDefaults.Validate(v.EnableConsulNamespaces); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))

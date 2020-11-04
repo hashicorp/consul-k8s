@@ -89,12 +89,8 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		}
 	}
 
-	if err := svcIntentions.Validate(); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
 	// ServiceIntentions are invalid if destination namespaces or source namespaces are set when Consul Namespaces are not enabled.
-	if err := svcIntentions.ValidateNamespaces(v.EnableConsulNamespaces); err != nil {
+	if err := svcIntentions.Validate(v.EnableConsulNamespaces); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

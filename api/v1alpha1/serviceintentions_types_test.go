@@ -532,236 +532,12 @@ func TestServiceIntentions_Default(t *testing.T) {
 
 func TestServiceIntentions_Validate(t *testing.T) {
 	cases := map[string]struct {
-		input          *ServiceIntentions
-		expectedErrMsg string
-	}{
-		"valid": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Namespace: "web",
-							Action:    "allow",
-						},
-						{
-							Name:      "db",
-							Namespace: "db",
-							Action:    "deny",
-						},
-						{
-							Name:      "bar",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-				},
-			},
-			"",
-		},
-		"no sources": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources: Required value: at least one source must be specified`,
-		},
-		"invalid action": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Namespace: "web",
-							Action:    "foo",
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].action: Invalid value: "foo": must be one of "allow", "deny"`,
-		},
-		"invalid permissions.http.pathPrefix": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathPrefix: "bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathPrefix: Invalid value: "bar": must begin with a '/'`,
-		},
-		"invalid permissions.http.pathExact": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathExact: Invalid value: "bar": must begin with a '/'`,
-		},
-		"invalid permissions.action": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "foobar",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].action: Invalid value: "foobar": must be one of "allow", "deny"`,
-		},
-		"both action and permissions specified": {
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Action:    "deny",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
-		},
-	}
-	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate()
-			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestServiceIntentions_ValidateNamespaces(t *testing.T) {
-	cases := map[string]struct {
-		namespacesEnabled bool
 		input             *ServiceIntentions
-		expectedErrMsg    string
+		namespacesEnabled bool
+		expectedErrMsgs   []string
 	}{
-		"enabled: valid": {
-			true,
-			&ServiceIntentions{
+		"namespaces enabled: valid": {
+			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-matter",
 				},
@@ -814,18 +590,17 @@ func TestServiceIntentions_ValidateNamespaces(t *testing.T) {
 					},
 				},
 			},
-			"",
+			namespacesEnabled: true,
+			expectedErrMsgs:   nil,
 		},
-		"disabled: destination namespace specified": {
-			false,
-			&ServiceIntentions{
+		"namespaces disabled: valid": {
+			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
 					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "foo",
+						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
 						{
@@ -868,181 +643,301 @@ func TestServiceIntentions_ValidateNamespaces(t *testing.T) {
 					},
 				},
 			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.destination.namespace: Invalid value: "foo": consul namespaces must be enabled to set destination.namespace`,
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
-		"disabled: single source namespace specified": {
-			false,
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "bar",
-						},
-						{
-							Name:   "db",
-							Action: "deny",
-						},
-						{
-							Name: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace`,
-		},
-		"disabled: multiple source namespace specified": {
-			false,
-			&ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "bar",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "baz",
-						},
-						{
-							Name:      "bar",
-							Namespace: "baz",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-				},
-			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace, spec.sources[1].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace, spec.sources[2].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
-		},
-		"disabled: multiple source and destination namespace specified": {
-			false,
-			&ServiceIntentions{
+		"no sources": {
+			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
 					Destination: Destination{
 						Name:      "dest-service",
-						Namespace: "foo",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources: Required value: at least one source must be specified`,
+			},
+		},
+		"invalid action": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Namespace: "web",
+							Action:    "foo",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].action: Invalid value: "foo": must be one of "allow", "deny"`,
+			},
+		},
+		"invalid permissions.http.pathPrefix": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathPrefix: "bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathPrefix: Invalid value: "bar": must begin with a '/'`,
+			},
+		},
+		"invalid permissions.http.pathExact": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathExact: Invalid value: "bar": must begin with a '/'`,
+			},
+		},
+		"invalid permissions.action": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "foobar",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].action: Invalid value: "foobar": must be one of "allow", "deny"`,
+			},
+		},
+		"both action and permissions specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Action:    "deny",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/bar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
+			},
+		},
+		"namespaces disabled: destination namespace specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "web",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.destination.namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set destination.namespace`,
+			},
+		},
+		"namespaces disabled: single source namespace specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
 						{
 							Name:      "web",
 							Action:    "allow",
-							Namespace: "bar",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "baz",
-						},
-						{
-							Name:      "bar",
-							Namespace: "baz",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
+							Namespace: "namespace-a",
 						},
 					},
 				},
 			},
-			`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.destination.namespace: Invalid value: "foo": consul namespaces must be enabled to set destination.namespace, spec.sources[0].namespace: Invalid value: "bar": consul namespaces must be enabled to set source.namespace, spec.sources[1].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace, spec.sources[2].namespace: Invalid value: "baz": consul namespaces must be enabled to set source.namespace]`,
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set source.namespace`,
+			},
+		},
+		"namespaces disabled: multiple source namespaces specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-a",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-b",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-c",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.sources[0].namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set source.namespace`,
+				`spec.sources[1].namespace: Invalid value: "namespace-b": Consul Enterprise namespaces must be enabled to set source.namespace`,
+				`spec.sources[2].namespace: Invalid value: "namespace-c": Consul Enterprise namespaces must be enabled to set source.namespace`,
+			},
+		},
+		"namespaces disabled: destination and multiple source namespaces specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-d",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.destination.namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set destination.namespace`,
+				`spec.sources[0].namespace: Invalid value: "namespace-b": Consul Enterprise namespaces must be enabled to set source.namespace`,
+				`spec.sources[1].namespace: Invalid value: "namespace-c": Consul Enterprise namespaces must be enabled to set source.namespace`,
+				`spec.sources[2].namespace: Invalid value: "namespace-d": Consul Enterprise namespaces must be enabled to set source.namespace`,
+			},
 		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.ValidateNamespaces(testCase.namespacesEnabled)
-			if testCase.expectedErrMsg != "" {
-				require.EqualError(t, err, testCase.expectedErrMsg)
+			err := testCase.input.Validate(testCase.namespacesEnabled)
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
 			} else {
 				require.NoError(t, err)
 			}

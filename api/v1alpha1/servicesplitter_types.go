@@ -153,8 +153,10 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceSplitterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ServiceSplitter) Validate() error {
+func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 	errs := in.Spec.Splits.validate(field.NewPath("spec").Child("splits"))
+
+	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -162,6 +164,20 @@ func (in *ServiceSplitter) Validate() error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !namespacesEnabled {
+		for i, s := range in.Spec.Splits {
+			if s.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("namespace"), s.Namespace, `consul namespaces must be enabled to set split.namespace`))
+			}
+
+		}
+	}
+	return errs
 }
 
 func (in ServiceSplits) validate(path *field.Path) field.ErrorList {
