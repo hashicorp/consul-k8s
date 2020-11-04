@@ -827,13 +827,13 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 
 // Test that when we provide a different k8s auth method parameters,
 // the auth method is updated.
-func TestRun_ConnectInjectAuthMethodUpdates(tt *testing.T) {
-	tt.Parallel()
+func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
+	t.Parallel()
 
 	// Test with deprecated -create-inject-auth-method flag.
 	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
 	for _, flag := range cases {
-		tt.Run(flag, func(t *testing.T) {
+		t.Run(flag, func(t *testing.T) {
 
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
