@@ -88,8 +88,11 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-enable-health-checks-controller=false"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+    yq 'any(contains("-enable-health-checks-controller"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-health-checks-reconcile-period"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "connectInject/Deployment: health checks can be enabled" {
@@ -116,15 +119,16 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-enable-health-checks-controller=false"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+    yq 'any(contains("-enable-health-checks-controller"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: health checks reconcile period set by default" {
+@test "connectInject/Deployment: health checks reconcile period set by default when health checks are enabled" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
