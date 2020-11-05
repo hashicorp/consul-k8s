@@ -111,7 +111,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
-		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug\").")
+		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagWriteServiceDefaults, "enable-central-config", false,
@@ -308,7 +308,7 @@ func (c *Command) Run(args []string) int {
 		ConsulClient:               c.consulClient,
 		ImageConsul:                c.flagConsulImage,
 		ImageEnvoy:                 c.flagEnvoyImage,
-		ExtraEnvoyOpts:             c.flagEnvoyExtraArgs,
+		ExtraEnvoyArgs:             c.flagEnvoyExtraArgs,
 		ImageConsulK8S:             c.flagConsulK8sImage,
 		RequireAnnotation:          !c.flagDefaultInject,
 		AuthMethod:                 c.flagACLAuthMethod,

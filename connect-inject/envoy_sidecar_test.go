@@ -61,15 +61,15 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 }
 
 // Test that we can pass extra flags to envoy.
-func TestHandlerEnvoySidecar_ExtraEnvoyFlags(t *testing.T) {
+func TestHandlerEnvoySidecar_ExtraEnvoyArgs(t *testing.T) {
 	cases := []struct {
 		name                     string
-		extraEnvoyOpts           string
+		extraEnvoyArgs           string
 		expectedContainerCommand []string
 	}{
 		{
 			name:           "no extra options provided",
-			extraEnvoyOpts: "",
+			extraEnvoyArgs: "",
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -77,7 +77,7 @@ func TestHandlerEnvoySidecar_ExtraEnvoyFlags(t *testing.T) {
 		},
 		{
 			name:           "extra log-level option",
-			extraEnvoyOpts: "--log-level debug",
+			extraEnvoyArgs: "--log-level debug",
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -86,7 +86,7 @@ func TestHandlerEnvoySidecar_ExtraEnvoyFlags(t *testing.T) {
 		},
 		{
 			name:           "extraEnvoyOpts with quotes inside",
-			extraEnvoyOpts: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			extraEnvoyArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -101,7 +101,7 @@ func TestHandlerEnvoySidecar_ExtraEnvoyFlags(t *testing.T) {
 			h := Handler{
 				ImageConsul:    "hashicorp/consul:latest",
 				ImageEnvoy:     "hashicorp/consul-k8s:latest",
-				ExtraEnvoyOpts: tc.extraEnvoyOpts,
+				ExtraEnvoyArgs: tc.extraEnvoyArgs,
 			}
 
 			c, err := h.envoySidecar(&corev1.Pod{}, "")
