@@ -33,7 +33,7 @@ rules:
   verbs:
   - use
 {{- end }}
-{{- if and .Values.global.acls.manageSystemACLs .Values.global.enableConsulNamespaces }}
+{{- if and .Values.global.acls.manageSystemACLs (or .Values.global.enableConsulNamespaces .Values.connectInject.healthChecks.enabled) }}
 - apiGroups: [""]
   resources:
     - secrets

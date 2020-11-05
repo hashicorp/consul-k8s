@@ -7,6 +7,8 @@ import (
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework"
 	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that health checks work in a default installation and a secure installation with TLS/auto-encrypt permutations.
@@ -44,6 +46,7 @@ func TestHealthChecks(t *testing.T) {
 				"connectInject.healthChecks.enabled": "true",
 				"global.tls.enabled":                 strconv.FormatBool(c.secure),
 				"global.tls.autoEncrypt":             strconv.FormatBool(c.autoEncrypt),
+				"global.acls.manageSystemACLs":       strconv.FormatBool(c.secure),
 			}
 
 			releaseName := helpers.RandomName()
@@ -53,6 +56,18 @@ func TestHealthChecks(t *testing.T) {
 			t.Log("creating static-server and static-client deployments")
 			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-hc")
 			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			// If ACLs are enabled we must create an intention.
+			if c.secure {
+				consulClient := consulCluster.SetupConsulClient(t, true)
+
+				t.Log("creating intention")
+				_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
+					SourceName:      staticClientName,
+					DestinationName: staticServerName,
+					Action:          api.IntentionActionAllow,
+				}, nil)
+				require.NoError(t, err)
+			}
 			// TODO: it would be nice to add a codepath which makes a connection to the agent where staticServer is running
 			// so that it can fetch the healthcheck and its status and assert on this. Right now the health check status
 			// is implied by the traffic passing or not.

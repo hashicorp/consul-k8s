@@ -873,6 +873,25 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: init container is created when global.acls.manageSystemACLs=true and healthChecks.enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "injector-acl-init" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "connectInject/Deployment: cross namespace policy is not added when global.acls.manageSystemACLs=false" {
   cd `chart_dir`
   local actual=$(helm template \
