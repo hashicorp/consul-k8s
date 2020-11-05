@@ -98,8 +98,10 @@ func (h *Handler) getContainerSidecarCommand() ([]string, error) {
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 	}
 
-	if h.ExtraEnvoyOpts != "" {
-		tokens, err := shlex.Split(h.ExtraEnvoyOpts)
+	if h.ExtraEnvoyArgs != "" {
+		// split string into tokens
+		// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
+		tokens, err := shlex.Split(h.ExtraEnvoyArgs)
 		if err != nil {
 			return []string{}, err
 		}
