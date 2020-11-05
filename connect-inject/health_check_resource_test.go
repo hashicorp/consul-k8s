@@ -42,6 +42,18 @@ var testPodSpec = corev1.PodSpec{
 	},
 }
 
+var completedInjectInitContainer = []corev1.ContainerStatus{
+	{
+		Name: InjectInitContainerName,
+		State: corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{
+				Reason: "Completed",
+			},
+		},
+		Ready: true,
+	},
+}
+
 func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
@@ -78,6 +90,40 @@ func TestReconcilePod(t *testing.T) {
 		Err                  string
 	}{
 		{
+			"inject init container has completed but containers not yet running",
+			false,
+			api.HealthPassing,
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Labels:    map[string]string{labelInject: "true"},
+					Annotations: map[string]string{
+						annotationStatus:  injected,
+						annotationService: testServiceNameAnnotation,
+					},
+				},
+				Spec: testPodSpec,
+				Status: corev1.PodStatus{
+					Phase:                 corev1.PodPending,
+					InitContainerStatuses: completedInjectInitContainer,
+					Conditions: []corev1.PodCondition{{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionFalse,
+					}},
+				},
+			},
+			&api.AgentCheck{
+				CheckID: testHealthCheckID,
+				Status:  api.HealthCritical,
+				Notes:   "",
+				Output:  "Pod is pending",
+				Type:    ttl,
+				Name:    name,
+			},
+			"",
+		},
+		{
 			"reconcilePod will create check and set passed",
 			false,
 			api.HealthPassing,
@@ -93,8 +139,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
@@ -127,8 +174,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:    corev1.PodReady,
 						Status:  corev1.ConditionFalse,
@@ -162,8 +210,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:    corev1.PodReady,
 						Status:  corev1.ConditionFalse,
@@ -196,8 +245,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
@@ -229,8 +279,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
@@ -247,33 +298,6 @@ func TestReconcilePod(t *testing.T) {
 			"",
 		},
 		{
-			"PodNotRunning will be ignored for processing",
-			false,
-			"",
-			&corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testPodName,
-					Namespace: "default",
-					Labels:    map[string]string{labelInject: "true"},
-					Annotations: map[string]string{
-						annotationStatus:  injected,
-						annotationService: testServiceNameAnnotation,
-					},
-				},
-				Spec: testPodSpec,
-				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodPending,
-					Conditions: []corev1.PodCondition{{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					}},
-				},
-			},
-			nil,
-			"",
-		},
-		{
 			"PodRunning no annotations will be ignored for processing",
 			false,
 			"",
@@ -285,8 +309,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
@@ -308,8 +333,9 @@ func TestReconcilePod(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 				},
 			},
 			nil,
@@ -342,6 +368,10 @@ func TestReconcilePod(t *testing.T) {
 			require.NoError(err)
 			// Get the agent checks if they were registered.
 			actual := getConsulAgentChecks(t, client, testHealthCheckID)
+
+			cmpOpts := cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)
+			require.True(cmp.Equal(actual, tt.Expected, cmpOpts),
+				cmp.Diff(actual, tt.Expected, cmpOpts))
 			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 		})
 	}
@@ -362,8 +392,9 @@ func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
 		},
 		Spec: testPodSpec,
 		Status: corev1.PodStatus{
-			HostIP: "127.0.0.1",
-			Phase:  corev1.PodRunning,
+			HostIP:                "127.0.0.1",
+			Phase:                 corev1.PodRunning,
+			InitContainerStatuses: completedInjectInitContainer,
 			Conditions: []corev1.PodCondition{{
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
@@ -391,8 +422,9 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 		},
 		Spec: testPodSpec,
 		Status: corev1.PodStatus{
-			HostIP: "127.0.0.1",
-			Phase:  corev1.PodRunning,
+			HostIP:                "127.0.0.1",
+			Phase:                 corev1.PodRunning,
+			InitContainerStatuses: completedInjectInitContainer,
 			Conditions: []corev1.PodCondition{{
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
@@ -406,6 +438,115 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	require.NoError(err)
 	actual := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(actual)
+}
+
+// Test pod statuses that the reconciler should ignore.
+// These test cases are based on actual observed startup phases.
+func TestReconcile_IgnoreStatuses(t *testing.T) {
+	t.Parallel()
+	cases := map[string]corev1.PodStatus{
+		"not scheduled": {
+			Phase: corev1.PodPending,
+		},
+		"scheduled and pending": {
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodScheduled,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+		"inject init container initializing": {
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodScheduled,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionFalse,
+				},
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				},
+				{
+					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionFalse,
+				},
+			},
+			InitContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: InjectInitContainerName,
+					State: corev1.ContainerState{
+						Waiting: &corev1.ContainerStateWaiting{
+							Reason: "Initializing",
+						},
+					},
+					Ready: false,
+				},
+			},
+			ContainerStatuses: unreadyAppContainers,
+		},
+		"inject init container running (but not terminated)": {
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodScheduled,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionFalse,
+				},
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				},
+				{
+					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionFalse,
+				},
+			},
+			InitContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: InjectInitContainerName,
+					State: corev1.ContainerState{
+						Waiting: nil,
+						Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()},
+					},
+					Ready: false,
+				},
+			},
+			ContainerStatuses: unreadyAppContainers,
+		},
+	}
+	for name, podStatus := range cases {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+					Annotations: map[string]string{
+						annotationStatus:  injected,
+						annotationService: testServiceNameAnnotation,
+					},
+				},
+				Spec:   testPodSpec,
+				Status: podStatus,
+			}
+			server, _, resource := testServerAgentResourceAndController(t, pod)
+			defer server.Stop()
+
+			// We would expect an error if the reconciler actually tried to
+			// register a health check because the underlying service hasn't
+			// been created.
+			require.NoError(resource.reconcilePod(pod))
+		})
+	}
 }
 
 // Test that stopch works for Reconciler.
@@ -461,8 +602,9 @@ func TestReconcileRun(t *testing.T) {
 		},
 		Spec: testPodSpec,
 		Status: corev1.PodStatus{
-			HostIP: "127.0.0.1",
-			Phase:  corev1.PodRunning,
+			HostIP:                "127.0.0.1",
+			Phase:                 corev1.PodRunning,
+			InitContainerStatuses: completedInjectInitContainer,
 			Conditions: []corev1.PodCondition{{
 				Type:    corev1.PodReady,
 				Status:  corev1.ConditionFalse,
@@ -566,4 +708,36 @@ func testServerAgentResourceAndControllerWithConsulNS(t *testing.T, pod *corev1.
 		ReconcilePeriod:     0,
 	}
 	return s, client, &healthResource
+}
+
+// unreadyAppContainers are the container statuses of an example connect pod's
+// non-init containers when init containers are still running.
+var unreadyAppContainers = []corev1.ContainerStatus{
+	{
+		Name: "consul-connect-envoy-sidecar",
+		State: corev1.ContainerState{
+			Waiting: &corev1.ContainerStateWaiting{
+				Reason: "PodInitializing",
+			},
+		},
+		Ready: false,
+	},
+	{
+		Name: "consul-connect-lifecycle-sidecar",
+		State: corev1.ContainerState{
+			Waiting: &corev1.ContainerStateWaiting{
+				Reason: "PodInitializing",
+			},
+		},
+		Ready: false,
+	},
+	{
+		Name: "app",
+		State: corev1.ContainerState{
+			Waiting: &corev1.ContainerStateWaiting{
+				Reason: "PodInitializing",
+			},
+		},
+		Ready: false,
+	},
 }
