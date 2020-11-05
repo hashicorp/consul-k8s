@@ -16,6 +16,9 @@ import (
 const (
 	testNamespace               = "testnamespace"
 	testNamespacedHealthCheckID = "testnamespace_test-pod-test-service_kubernetes-health-check-ttl"
+
+	testAlternateNamespace               = "testalternatenamespace"
+	testAlternateNamespacedHealthCheckID = "testalternatenamespace_test-pod-test-service_kubernetes-health-check-ttl"
 )
 
 var ignoredFieldsEnterprise = []string{"Node", "Definition", "ServiceID", "ServiceName"}
@@ -212,6 +215,40 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				Namespace: testNamespace,
 			},
 		},
+		{
+			Name:                 "precreate failed pod and change to passing, k8s/consul namespaces different",
+			PreCreateHealthCheck: true,
+			InitialState:         api.HealthCritical,
+			Pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testAlternateNamespace,
+					Labels:    map[string]string{labelInject: "true"},
+					Annotations: map[string]string{
+						annotationStatus:          injected,
+						annotationService:         testServiceNameAnnotation,
+						annotationConsulNamespace: testNamespace,
+					},
+				},
+				Spec: testPodSpec,
+				Status: corev1.PodStatus{
+					HostIP: "127.0.0.1",
+					Phase:  corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					}},
+				},
+			},
+			Expected: &api.AgentCheck{
+				CheckID:   testAlternateNamespacedHealthCheckID,
+				Status:    api.HealthPassing,
+				Output:    testCheckNotesPassing,
+				Type:      ttl,
+				Name:      name,
+				Namespace: testNamespace,
+			},
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -238,7 +275,7 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 			err = resource.reconcilePod(tt.Pod)
 			require.NoError(err)
 			// Get the agent checks if they were registered.
-			actual := getConsulAgentChecks(t, client, testNamespacedHealthCheckID)
+			actual := getConsulAgentChecks(t, client, tt.Expected.CheckID)
 			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFieldsEnterprise...)))
 		})
 	}
