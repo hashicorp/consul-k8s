@@ -531,12 +531,14 @@ operator = "write"`,
 			true,
 			`
 operator = "write"
+namespace_prefix "" {
   node_prefix "" {
      policy = "write"
   }
   service_prefix "" {
      policy = "write"
-  }`,
+  }
+}`,
 		},
 	}
 
