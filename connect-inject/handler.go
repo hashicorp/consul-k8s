@@ -87,6 +87,9 @@ const (
 
 	// injected is used as the annotation value for annotationInjected
 	injected = "injected"
+
+	// annotationConsulNamespace is the Consul namespace the service is registered into.
+	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 )
 
 var (
@@ -359,6 +362,15 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		map[string]string{
 			labelInject: injected,
 		})...)
+
+	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
+	if h.EnableNamespaces {
+		patches = append(patches, updateAnnotation(
+			pod.Annotations,
+			map[string]string{
+				annotationConsulNamespace: h.consulNamespace(req.Namespace),
+			})...)
+	}
 
 	// Generate the patch
 	var patch []byte

@@ -251,6 +251,9 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
 	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
+	if pod.Annotations[annotationConsulNamespace] != "" {
+		localConfig.Namespace = pod.Annotations[annotationConsulNamespace]
+	}
 	localClient, err := api.NewClient(localConfig)
 	if err != nil {
 		h.Log.Error("unable to get Consul API Client", "addr", newAddr, "err", err)
