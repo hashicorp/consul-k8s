@@ -223,7 +223,7 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 			_, _, err := client.Namespaces().Create(&api.Namespace{Name: testNamespace}, nil)
 			require.NoError(err)
 
-                       // Register the service with Consul.
+			// Register the service with Consul.
 			err = client.Agent().ServiceRegister(&api.AgentServiceRegistration{
 				ID:        testServiceNameReg,
 				Name:      testServiceNameAnnotation,
