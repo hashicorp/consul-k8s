@@ -402,6 +402,7 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+
 		{
 			"pod with existing label",
 			Handler{

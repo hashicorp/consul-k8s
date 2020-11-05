@@ -42,30 +42,6 @@ var testPodSpec = corev1.PodSpec{
 	},
 }
 
-func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
-	require := require.New(t)
-	// Setup server & client.
-	s, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(err)
-
-	clientConfig := &api.Config{Address: s.HTTPAddr}
-	require.NoError(err)
-	client, err := api.NewClient(clientConfig)
-	require.NoError(err)
-
-	schema := "http://"
-	consulUrl, err := url.Parse(schema + s.HTTPAddr)
-	require.NoError(err)
-
-	healthResource := HealthCheckResource{
-		Log:                 hclog.Default().Named("healthCheckResource"),
-		KubernetesClientset: fake.NewSimpleClientset(pod),
-		ConsulUrl:           consulUrl,
-		ReconcilePeriod:     0,
-	}
-	return s, client, &healthResource
-}
-
 func registerHealthCheck(t *testing.T, client *api.Client, initialState string) {
 	require := require.New(t)
 	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
@@ -83,12 +59,12 @@ func registerHealthCheck(t *testing.T, client *api.Client, initialState string) 
 }
 
 // We expect to already be pointed at the correct agent.
-func getConsulAgentChecks(t *testing.T, client *api.Client) *api.AgentCheck {
+func getConsulAgentChecks(t *testing.T, client *api.Client, healthCheckID string) *api.AgentCheck {
 	require := require.New(t)
-	filter := fmt.Sprintf("CheckID == `%s`", testHealthCheckID)
+	filter := fmt.Sprintf("CheckID == `%s`", healthCheckID)
 	checks, err := client.Agent().ChecksWithFilter(filter)
 	require.NoError(err)
-	return checks[testHealthCheckID]
+	return checks[healthCheckID]
 }
 
 func TestReconcilePod(t *testing.T) {
@@ -238,7 +214,7 @@ func TestReconcilePod(t *testing.T) {
 			"",
 		},
 		{
-			"precreacte failed check, no pod changes results in no healthcheck changes",
+			"precreate failed check, no pod changes results in no healthcheck changes",
 			true,
 			api.HealthCritical,
 			&corev1.Pod{
@@ -365,7 +341,7 @@ func TestReconcilePod(t *testing.T) {
 			}
 			require.NoError(err)
 			// Get the agent checks if they were registered.
-			actual := getConsulAgentChecks(t, client)
+			actual := getConsulAgentChecks(t, client, testHealthCheckID)
 			require.True(cmp.Equal(actual, tt.Expected, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 		})
 	}
@@ -428,7 +404,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	// Start the reconciler, it should not create a health check.
 	err := resource.Reconcile()
 	require.NoError(err)
-	actual := getConsulAgentChecks(t, client)
+	actual := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(actual)
 }
 
@@ -536,7 +512,7 @@ func TestReconcileRun(t *testing.T) {
 	})
 	require.NoError(err)
 	// Validate that there is no health check created by reconciler.
-	check := getConsulAgentChecks(t, client)
+	check := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(check)
 	// Add the service - only now will a health check have a service to register against.
 	srv.AddService(t, testServiceNameReg, api.HealthPassing, nil)
@@ -546,7 +522,7 @@ func TestReconcileRun(t *testing.T) {
 	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 1 * time.Second}
 	var actual *api.AgentCheck
 	retry.RunWith(timer, t, func(r *retry.R) {
-		actual = getConsulAgentChecks(t, client)
+		actual = getConsulAgentChecks(t, client, testHealthCheckID)
 		// The assertion is not on actual != nil, but below
 		// against an expected check.
 		if actual == nil || actual.Output == "" {
@@ -563,4 +539,31 @@ func TestReconcileRun(t *testing.T) {
 	}
 	// Validate the checks are set.
 	require.True(cmp.Equal(actual, expectedCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+}
+
+func testServerAgentResourceAndController(t *testing.T, pod *corev1.Pod) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
+	return testServerAgentResourceAndControllerWithConsulNS(t, pod, "")
+}
+
+func testServerAgentResourceAndControllerWithConsulNS(t *testing.T, pod *corev1.Pod, consulNS string) (*testutil.TestServer, *api.Client, *HealthCheckResource) {
+	require := require.New(t)
+	// Setup server & client.
+	s, err := testutil.NewTestServerConfigT(t, nil)
+	require.NoError(err)
+
+	clientConfig := &api.Config{Address: s.HTTPAddr, Namespace: consulNS}
+	client, err := api.NewClient(clientConfig)
+	require.NoError(err)
+
+	schema := "http://"
+	consulUrl, err := url.Parse(schema + s.HTTPAddr)
+	require.NoError(err)
+
+	healthResource := HealthCheckResource{
+		Log:                 hclog.Default().Named("healthCheckResource"),
+		KubernetesClientset: fake.NewSimpleClientset(pod),
+		ConsulUrl:           consulUrl,
+		ReconcilePeriod:     0,
+	}
+	return s, client, &healthResource
 }

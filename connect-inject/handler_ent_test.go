@@ -3,6 +3,7 @@
 package connectinject
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
+	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -505,6 +507,91 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				}
 
 			}
+		})
+	}
+}
+
+// Test that the annotation for the Consul namespace is added.
+func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
+	t.Parallel()
+	sourceKubeNS := "kube-ns"
+
+	cases := map[string]struct {
+		ConsulDestinationNamespace string
+		Mirroring                  bool
+		MirroringPrefix            string
+		ExpNamespaceAnnotation     string
+	}{
+		"dest: default": {
+			ConsulDestinationNamespace: "default",
+			ExpNamespaceAnnotation:     "default",
+		},
+		"dest: foo": {
+			ConsulDestinationNamespace: "foo",
+			ExpNamespaceAnnotation:     "foo",
+		},
+		"mirroring": {
+			Mirroring:              true,
+			ExpNamespaceAnnotation: sourceKubeNS,
+		},
+		"mirroring with prefix": {
+			Mirroring:              true,
+			MirroringPrefix:        "prefix-",
+			ExpNamespaceAnnotation: "prefix-" + sourceKubeNS,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Set up consul server
+			a, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer a.Stop()
+
+			// Set up consul client
+			client, err := api.NewClient(&api.Config{
+				Address: a.HTTPAddr,
+			})
+			require.NoError(err)
+
+			handler := Handler{
+				Log:                        hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet:      mapset.NewSet("*"),
+				DenyK8sNamespacesSet:       mapset.NewSet(),
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: c.ConsulDestinationNamespace,
+				EnableK8SNSMirroring:       c.Mirroring,
+				K8SNSMirroringPrefix:       c.MirroringPrefix,
+				ConsulClient:               client,
+			}
+
+			resp := handler.Mutate(&v1beta1.AdmissionRequest{
+				Object: encodeRaw(t, &corev1.Pod{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "web",
+							},
+						},
+					},
+				}),
+				Namespace: sourceKubeNS,
+			})
+			require.Equal(resp.Allowed, true)
+
+			// Check that the annotation was added as a patch.
+			var consulNamespaceAnnotationValue string
+			var patches []jsonpatch.JsonPatchOperation
+			require.NoError(json.Unmarshal(resp.Patch, &patches))
+			for _, patch := range patches {
+				if patch.Path == "/metadata/annotations/"+escapeJSONPointer(annotationConsulNamespace) {
+					consulNamespaceAnnotationValue = patch.Value.(string)
+				}
+			}
+			require.NotEmpty(consulNamespaceAnnotationValue, "no namespace annotation set")
+			require.Equal(c.ExpNamespaceAnnotation, consulNamespaceAnnotationValue)
 		})
 	}
 }
