@@ -24,6 +24,8 @@ const (
 
 	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul.
 	kubernetesSuccessReasonMsg = "Kubernetes Health Checks Passing"
+
+	podPendingReasonMsg = "Pod is pending"
 )
 
 type HealthCheckResource struct {
@@ -230,6 +232,13 @@ func (h *HealthCheckResource) getServiceCheck(client *api.Client, healthCheckID 
 // ready state of the pod along with the reason message which will be passed into the Notes
 // field of the Consul health check.
 func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, string, error) {
+	// A pod might be pending if the init containers have run but the non-init
+	// containers haven't reached running state. In this case we set a failing health
+	// check so the pod doesn't receive traffic before it's ready.
+	if pod.Status.Phase == corev1.PodPending {
+		return api.HealthCritical, podPendingReasonMsg, nil
+	}
+
 	for _, cond := range pod.Status.Conditions {
 		var consulStatus, reason string
 		if cond.Type == corev1.PodReady {
@@ -265,9 +274,21 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 
 // shouldProcess is a simple filter which determines if Upsert or Reconcile should attempt to process the pod.
 // This is done without making any client api calls so it is fast.
-// We only are interested in corev1.PodRunning pods as they have valid readiness probe status.
 func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
-	return pod.Annotations[annotationStatus] == injected && pod.Status.Phase == corev1.PodRunning
+	if pod.Annotations[annotationStatus] != injected {
+		return false
+	}
+	// We process any pod that has had its injection init container completed because
+	// this means the service instance has been registered with Consul and so we can
+	// and should set its health check status. If we don't set the health check
+	// immediately after registration, the pod will start to receive traffic,
+	// even if its non-init containers haven't yet been started.
+	for _, c := range pod.Status.InitContainerStatuses {
+		if c.Name == InjectInitContainerName {
+			return c.State.Terminated != nil && c.State.Terminated.Reason == "Completed"
+		}
+	}
+	return false
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent

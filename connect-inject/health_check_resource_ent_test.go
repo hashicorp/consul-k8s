@@ -58,8 +58,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
@@ -93,8 +94,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:    corev1.PodReady,
 						Status:  corev1.ConditionFalse,
@@ -129,8 +131,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:    corev1.PodReady,
 						Status:  corev1.ConditionFalse,
@@ -164,8 +167,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
@@ -198,8 +202,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
@@ -232,8 +237,9 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 				},
 				Spec: testPodSpec,
 				Status: corev1.PodStatus{
-					HostIP: "127.0.0.1",
-					Phase:  corev1.PodRunning,
+					HostIP:                "127.0.0.1",
+					Phase:                 corev1.PodRunning,
+					InitContainerStatuses: completedInjectInitContainer,
 					Conditions: []corev1.PodCondition{{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionTrue,
