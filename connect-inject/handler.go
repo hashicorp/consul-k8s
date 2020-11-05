@@ -144,6 +144,10 @@ type Handler struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
+	// Template content that will be use to generate
+	// the init container command for consul connect injection
+	InitContainerCommandTpl string
+
 	// EnableNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
 	// with injection into either a single Consul namespace or mirrored from

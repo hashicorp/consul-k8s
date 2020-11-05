@@ -35,21 +35,22 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flagListen               string
-	flagAutoName             string // MutatingWebhookConfiguration for updating
-	flagAutoHosts            string // SANs for the auto-generated TLS cert.
-	flagCertFile             string // TLS cert for listening (PEM)
-	flagKeyFile              string // TLS cert private key (PEM)
-	flagDefaultInject        bool   // True to inject by default
-	flagConsulImage          string // Docker image for Consul
-	flagEnvoyImage           string // Docker image for Envoy
-	flagConsulK8sImage       string // Docker image for consul-k8s
-	flagACLAuthMethod        string // Auth Method to use for ACLs, if enabled
-	flagWriteServiceDefaults bool   // True to enable central config injection
-	flagDefaultProtocol      string // Default protocol for use with central config
-	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
-	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
-	flagLogLevel             string
+	flagListen                  string
+	flagAutoName                string // MutatingWebhookConfiguration for updating
+	flagAutoHosts               string // SANs for the auto-generated TLS cert.
+	flagCertFile                string // TLS cert for listening (PEM)
+	flagKeyFile                 string // TLS cert private key (PEM)
+	flagDefaultInject           bool   // True to inject by default
+	flagConsulImage             string // Docker image for Consul
+	flagEnvoyImage              string // Docker image for Envoy
+	flagConsulK8sImage          string // Docker image for consul-k8s
+	flagACLAuthMethod           string // Auth Method to use for ACLs, if enabled
+	flagWriteServiceDefaults    bool   // True to enable central config injection
+	flagDefaultProtocol         string // Default protocol for use with central config
+	flagConsulCACert            string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
+	flagEnvoyExtraArgs          string // Extra envoy args when starting envoy
+	flagLogLevel                string
+	flagInitContainerCommandTpl string // Path to init container command template file to override the default template
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -122,6 +123,8 @@ func (c *Command) init() {
 		"The default protocol to use in central config registrations.")
 	c.flagSet.StringVar(&c.flagConsulCACert, "consul-ca-cert", "",
 		"[Deprecated] Please use '-ca-file' flag instead. Path to CA certificate to use if communicating with Consul clients over HTTPS.")
+	c.flagSet.StringVar(&c.flagInitContainerCommandTpl, "init-container-command-template", "",
+		"Path to init container command template to override the default one.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -285,6 +288,17 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// Load init container command template contents
+	var initContainerCommandTpl []byte
+	if c.flagInitContainerCommandTpl != "" {
+		var err error
+		initContainerCommandTpl, err = ioutil.ReadFile(c.flagInitContainerCommandTpl)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error reading init container command template %q: %s", cfg.TLSConfig.CAFile, err))
+			return 1
+		}
+	}
+
 	// Set up Consul client
 	if c.consulClient == nil {
 		var err error
@@ -346,6 +360,7 @@ func (c *Command) Run(args []string) int {
 		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+		InitContainerCommandTpl:    string(initContainerCommandTpl),
 		Log:                        logger.Named("handler"),
 	}
 	mux := http.NewServeMux()
