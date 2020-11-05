@@ -28,6 +28,7 @@ var testPodWithNamespace = corev1.Pod{
 	Spec: corev1.PodSpec{},
 }
 
+// Test that when consulNamespaces are enabled, the health check is registered in the right namespace.
 func TestReconcilePodWithNamespace(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -218,9 +219,11 @@ func TestReconcilePodWithNamespace(t *testing.T) {
 			// Get a server, client, and handler.
 			server, client, resource := testServerAgentResourceAndControllerWithConsulNS(t, tt.Pod, testNamespace)
 			defer server.Stop()
-			// Register the service with Consul.
+			// Create the namespace in Consul.
 			_, _, err := client.Namespaces().Create(&api.Namespace{Name: testNamespace}, nil)
 			require.NoError(err)
+
+                       // Register the service with Consul.
 			err = client.Agent().ServiceRegister(&api.AgentServiceRegistration{
 				ID:        testServiceNameReg,
 				Name:      testServiceNameAnnotation,
