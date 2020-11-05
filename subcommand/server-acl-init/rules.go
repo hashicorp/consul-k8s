@@ -217,17 +217,14 @@ node_prefix "" {
 }
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
+{{- end }}
   service_prefix "" {
     policy = "write"
   }
-}
-{{- else }}
-service_prefix "" {
-  policy = "write"
+{{- if .EnableNamespaces }}
 }
 {{- end }}
-{{- end }}
-`
+{{- end }}`
 	return c.renderRules(injectRulesTpl)
 }
 

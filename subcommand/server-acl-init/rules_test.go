@@ -521,9 +521,9 @@ operator = "write"`,
 node_prefix "" {
   policy = "write"
 }
-service_prefix "" {
-  policy = "write"
-}`,
+  service_prefix "" {
+    policy = "write"
+  }`,
 		},
 		{
 			"Namespaces are enabled, health checks controller enabled",
