@@ -134,3 +134,38 @@ load _helpers
   [ "${actual}" = "0" ]
 }
 
+@test "connectInject/ClusterRole: allows secret access with healthChecks and manageSystemACLs, no consulNamespaces" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "connectInject/ClusterRole: allows secret access with healthChecks, ACLs and consulNamespaces" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
+@test "connectInject/ClusterRole: no secret access with healthChecks, and no ACLs" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules | map(select(.resources[0] == "secrets")) | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}

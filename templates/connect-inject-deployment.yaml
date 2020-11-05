@@ -240,9 +240,9 @@ spec:
         {{- end }}
         {{- end }}
       {{- end }}
-      {{- if or (and .Values.global.acls.manageSystemACLs .Values.global.enableConsulNamespaces) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- if or (and .Values.global.acls.manageSystemACLs (or .Values.global.enableConsulNamespaces .Values.connectInject.healthChecks.enabled)) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
-      {{- if and .Values.global.acls.manageSystemACLs .Values.global.enableConsulNamespaces }}
+      {{- if (and .Values.global.acls.manageSystemACLs (or .Values.global.enableConsulNamespaces .Values.connectInject.healthChecks.enabled)) }}
       - name: injector-acl-init
         image: {{ .Values.global.imageK8S }}
         command:

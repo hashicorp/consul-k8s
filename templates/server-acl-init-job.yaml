@@ -134,10 +134,13 @@ spec:
                 -allow-dns=true \
                 {{- end }}
 
-                {{- if .Values.connectInject.enabled }}
-                -create-inject-auth-method=true \
+                {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
+                -create-inject-token=true \
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
+                {{- end }}
+                {{- if .Values.connectInject.healthChecks.enabled }}
+                -enable-health-checks \
                 {{- end }}
                 {{- end }}
 
@@ -227,7 +230,6 @@ spec:
 
                 {{- /* connectInject must be enabled to set inject flags */}}
                 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
-                -create-inject-namespace-token=true \
                 {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
                 -consul-inject-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
                 {{- end }}
