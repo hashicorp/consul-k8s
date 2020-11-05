@@ -518,12 +518,12 @@ operator = "write"`,
 			false,
 			true,
 			`
-  node_prefix "" {
-     policy = "write"
-  }
-  service_prefix "" {
-     policy = "write"
-  }`,
+node_prefix "" {
+  policy = "write"
+}
+service_prefix "" {
+  policy = "write"
+}`,
 		},
 		{
 			"Namespaces are enabled, health checks controller enabled",
@@ -531,12 +531,12 @@ operator = "write"`,
 			true,
 			`
 operator = "write"
+node_prefix "" {
+  policy = "write"
+}
 namespace_prefix "" {
-  node_prefix "" {
-     policy = "write"
-  }
   service_prefix "" {
-     policy = "write"
+    policy = "write"
   }
 }`,
 		},

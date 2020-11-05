@@ -212,16 +212,18 @@ func (c *Command) injectRules() (string, error) {
 operator = "write"
 {{- end }}
 {{- if .EnableHealthChecks }}
+node_prefix "" {
+  policy = "write"
+}
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
-{{- end }}
-  node_prefix "" {
-     policy = "write"
-  }
   service_prefix "" {
-     policy = "write"
+    policy = "write"
   }
-{{- if .EnableNamespaces }}
+}
+{{- else }}
+service_prefix "" {
+  policy = "write"
 }
 {{- end }}
 {{- end }}
