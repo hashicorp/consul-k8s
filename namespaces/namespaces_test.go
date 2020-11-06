@@ -69,6 +69,13 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 	}
 }
 
+// Test that if the namespace already exists the function succeeds.
+func TestEnsureExists_WildcardNamespace_AlreadyExists(tt *testing.T) {
+	created, err := EnsureExists(nil, WildcardNamespace, "")
+	require.NoError(tt, err)
+	require.False(tt, created)
+}
+
 // Test that it creates the namespace if it doesn't exist.
 func TestEnsureExists_CreatesNS(tt *testing.T) {
 	for _, c := range []struct {
