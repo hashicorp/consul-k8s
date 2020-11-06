@@ -71,3 +71,26 @@ load _helpers
       yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+#--------------------------------------------------------------------
+# connectInject.healthChecks
+
+@test "client/ConfigMap: check_update_interval is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq '.data["config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/ConfigMap: check_update_interval is set when health checks enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["config.json"] | contains("check_update_interval")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
