@@ -85,6 +85,13 @@ const (
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 
+	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
+	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
+	// e.g. consul.hashicorp.com/envoy-extra-args:--log-level debug --disable-hot-restart
+	// The arguments passed in via this annotation will take precendence over arguments
+	// passed via the global helm template value `global.envoyExtraArgs`
+	annotationEnvoyExtraArgs = "consul.hashicorp.com/envoy-extra-args"
+
 	// injected is used as the annotation value for annotationInjected
 	injected = "injected"
 )
@@ -115,7 +122,7 @@ type Handler struct {
 
 	// Optional: set when you need extra options to be set when running envoy
 	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
-	ExtraEnvoyArgs string
+	EnvoyExtraArgs string
 
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.

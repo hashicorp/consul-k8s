@@ -37,7 +37,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 		return corev1.Container{}, err
 	}
 
-	cmd, err := h.getContainerSidecarCommand()
+	cmd, err := h.getContainerSidecarCommand(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -91,17 +91,26 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 	return container, nil
 }
-
-func (h *Handler) getContainerSidecarCommand() ([]string, error) {
+func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) {
 	cmd := []string{
 		"envoy",
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 	}
 
-	if h.ExtraEnvoyArgs != "" {
+	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
+
+	if annotationSet || h.EnvoyExtraArgs != "" {
+
+		extraArgsToUse := h.EnvoyExtraArgs
+
+		// prefer args set by pod annotation over the global value from the helm chart (h.EnvoyExtraArgs)
+		if annotationSet {
+			extraArgsToUse = extraArgs
+		}
+
 		// split string into tokens
 		// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
-		tokens, err := shlex.Split(h.ExtraEnvoyArgs)
+		tokens, err := shlex.Split(extraArgsToUse)
 		if err != nil {
 			return []string{}, err
 		}
