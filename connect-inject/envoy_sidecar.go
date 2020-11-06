@@ -103,7 +103,7 @@ func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) 
 
 		extraArgsToUse := h.EnvoyExtraArgs
 
-		// prefer args set by pod annotation over the global value from the helm chart (h.EnvoyExtraArgs)
+		// prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs)
 		if annotationSet {
 			extraArgsToUse = extraArgs
 		}
