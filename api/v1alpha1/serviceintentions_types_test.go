@@ -564,17 +564,11 @@ func TestServiceIntentions_Validate(t *testing.T) {
 								{
 									Action: "allow",
 									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
+										PathExact: "/foo",
 										Header: IntentionHTTPHeaderPermissions{
 											{
 												Name:    "header",
 												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
 												Invert:  true,
 											},
 										},
@@ -617,18 +611,12 @@ func TestServiceIntentions_Validate(t *testing.T) {
 								{
 									Action: "allow",
 									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
+										PathRegex: "/baz",
 										Header: IntentionHTTPHeaderPermissions{
 											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
+												Name:   "header",
+												Regex:  "regex",
+												Invert: true,
 											},
 										},
 										Methods: []string{
@@ -719,6 +707,102 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathPrefix: Invalid value: "bar": must begin with a '/'`,
 			},
 		},
+		"invalid permissions.http pathPrefix,pathExact specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathPrefix: "/bar",
+										PathExact:  "/foo",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"/foo", PathPrefix:"/bar", PathRegex:"", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+			},
+		},
+		"invalid permissions.http pathPrefix,pathRegex specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathPrefix: "/bar",
+										PathRegex:  "foo",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"", PathPrefix:"/bar", PathRegex:"foo", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+			},
+		},
+		"invalid permissions.http pathRegex,pathExact specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathRegex: "bar",
+										PathExact: "/foo",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"/foo", PathPrefix:"", PathRegex:"bar", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+			},
+		},
 		"invalid permissions.http.pathExact": {
 			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
@@ -748,6 +832,102 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
 				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathExact: Invalid value: "bar": must begin with a '/'`,
+			},
+		},
+		"invalid permissions.http.methods": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										Methods: []string{
+											"FOO",
+											"GET",
+											"BAR",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"]`,
+			},
+		},
+		"invalid permissions.http.header": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "svc-2",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "exact-present",
+												Present: true,
+												Exact:   "foobar",
+											},
+											{
+												Name:   "prefix-exact",
+												Exact:  "foobar",
+												Prefix: "barfood",
+											},
+											{
+												Name:   "suffix-prefix",
+												Prefix: "foo",
+												Suffix: "bar",
+											},
+											{
+												Name:   "suffix-regex",
+												Suffix: "bar",
+												Regex:  "foo",
+											},
+											{
+												Name:    "regex-present",
+												Present: true,
+												Regex:   "foobar",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.sources[0].permissions[0].header[0]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"exact-present", Present:true, Exact:"foobar", Prefix:"", Suffix:"", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[1]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"prefix-exact", Present:false, Exact:"foobar", Prefix:"barfood", Suffix:"", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[2]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"suffix-prefix", Present:false, Exact:"", Prefix:"foo", Suffix:"bar", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[3]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"suffix-regex", Present:false, Exact:"", Prefix:"", Suffix:"bar", Regex:"foo", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[4]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"regex-present", Present:true, Exact:"", Prefix:"", Suffix:"", Regex:"foobar", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
 			},
 		},
 		"invalid permissions.action": {

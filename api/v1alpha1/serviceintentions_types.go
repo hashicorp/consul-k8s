@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -18,12 +19,21 @@ import (
 
 // ServiceIntentionsSpec defines the desired state of ServiceIntentions
 type ServiceIntentionsSpec struct {
-	Destination Destination      `json:"destination,omitempty"`
-	Sources     SourceIntentions `json:"sources,omitempty"`
+	Destination Destination `json:"destination,omitempty"`
+	// Sources is the list of all intention sources and the authorization granted to those sources.
+	// The order of this list does not matter, but out of convenience Consul will always store this
+	// reverse sorted by intention precedence, as that is the order that they will be evaluated at enforcement time.
+	Sources SourceIntentions `json:"sources,omitempty"`
 }
 
 type Destination struct {
-	Name      string `json:"name,omitempty"`
+	// Name is the destination of all intentions defined in this config entry.
+	// This may be set to the wildcard character (*) to match
+	// all services that don't otherwise have intentions defined.
+	Name string `json:"name,omitempty"`
+	// Namespace specifies the namespace the config entry will apply to.
+	// This may be set to the wildcard character (*) to match all services
+	// in all namespaces that don't otherwise have intentions defined.
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -32,36 +42,63 @@ type IntentionPermissions []*IntentionPermission
 type IntentionHTTPHeaderPermissions []IntentionHTTPHeaderPermission
 
 type SourceIntention struct {
-	Name        string               `json:"name,omitempty"`
-	Namespace   string               `json:"namespace,omitempty"`
-	Action      IntentionAction      `json:"action,omitempty"`
+	// Name is the source of the intention. This is the name of a
+	// Consul service. The service doesn't need to be registered.
+	Name string `json:"name,omitempty"`
+	// Namespace is the namespace for the Name parameter.
+	Namespace string `json:"namespace,omitempty"`
+	// Action is required for an L4 intention, and should be set to one of
+	// "allow" or "deny" for the action that should be taken if this intention matches a request.
+	Action IntentionAction `json:"action,omitempty"`
+	// Permissions is the list of all additional L7 attributes that extend the intention match criteria.
+	// Permission precedence is applied top to bottom. For any given request the first permission to match
+	// in the list is terminal and stops further evaluation. As with L4 intentions, traffic that fails to
+	// match any of the provided permissions in this intention will be subject to the default intention
+	// behavior is defined by the default ACL policy. This should be omitted for an L4 intention
+	// as it is mutually exclusive with the Action field.
 	Permissions IntentionPermissions `json:"permissions,omitempty"`
-	Description string               `json:"description,omitempty"`
+	// Description for the intention. This is not used by Consul, but is presented in API responses to assist tooling.
+	Description string `json:"description,omitempty"`
 }
 
 type IntentionPermission struct {
-	Action IntentionAction          `json:"action,omitempty"`
-	HTTP   *IntentionHTTPPermission `json:"http,omitempty"`
+	// Action is one of "allow" or "deny" for the action that
+	// should be taken if this permission matches a request.
+	Action IntentionAction `json:"action,omitempty"`
+	// HTTP is a set of HTTP-specific authorization criteria.
+	HTTP *IntentionHTTPPermission `json:"http,omitempty"`
 }
 
 type IntentionHTTPPermission struct {
-	PathExact  string `json:"pathExact,omitempty"`
+	// PathExact is the exact path to match on the HTTP request path.
+	PathExact string `json:"pathExact,omitempty"`
+	// PathPrefix is the path prefix to match on the HTTP request path.
 	PathPrefix string `json:"pathPrefix,omitempty"`
-	PathRegex  string `json:"pathRegex,omitempty"`
-
+	// PathRegex is the regular expression to match on the HTTP request path.
+	PathRegex string `json:"pathRegex,omitempty"`
+	// Header is a set of criteria that can match on HTTP request headers.
+	// If more than one is configured all must match for the overall match to apply.
 	Header IntentionHTTPHeaderPermissions `json:"header,omitempty"`
-
+	// Methods is a list of HTTP methods for which this match applies. If unspecified
+	// all HTTP methods are matched. If provided the names must be a valid method.
 	Methods []string `json:"methods,omitempty"`
 }
 
 type IntentionHTTPHeaderPermission struct {
-	Name    string `json:"name,omitempty"`
-	Present bool   `json:"present,omitempty"`
-	Exact   string `json:"exact,omitempty"`
-	Prefix  string `json:"prefix,omitempty"`
-	Suffix  string `json:"suffix,omitempty"`
-	Regex   string `json:"regex,omitempty"`
-	Invert  bool   `json:"invert,omitempty"`
+	// Name is the name of the header to match.
+	Name string `json:"name,omitempty"`
+	// Present matches if the header with the given name is present with any value.
+	Present bool `json:"present,omitempty"`
+	// Exact matches if the header with the given name is this value.
+	Exact string `json:"exact,omitempty"`
+	// Prefix matches if the header with the given name has this prefix.
+	Prefix string `json:"prefix,omitempty"`
+	// Suffix matches if the header with the given name has this suffix.
+	Suffix string `json:"suffix,omitempty"`
+	// Regex matches if the header with the given name matches this pattern.
+	Regex string `json:"regex,omitempty"`
+	// Invert inverts the logic of the match.
+	Invert bool `json:"invert,omitempty"`
 }
 
 // IntentionAction is the action that the intention represents. This
@@ -196,13 +233,13 @@ func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
 	for _, permission := range in {
 		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
 			Action: permission.Action.toConsul(),
-			HTTP:   permission.HTTP.ToConsul(),
+			HTTP:   permission.HTTP.toConsul(),
 		})
 	}
 	return consulIntentionPermissions
 }
 
-func (in *IntentionHTTPPermission) ToConsul() *capi.IntentionHTTPPermission {
+func (in *IntentionHTTPPermission) toConsul() *capi.IntentionHTTPPermission {
 	if in == nil {
 		return nil
 	}
@@ -296,11 +333,33 @@ func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
 
 func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
+	if (in.PathExact != "" && in.PathPrefix != "") || (in.PathExact != "" && in.PathRegex != "") || (in.PathPrefix != "" && in.PathRegex != "") {
+		errs = append(errs, field.Invalid(path, in, `At most only one of pathExact, pathPrefix, or pathRegex may be configured.`))
+	}
 	if invalidPathPrefix(in.PathPrefix) {
 		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, `must begin with a '/'`))
 	}
 	if invalidPathPrefix(in.PathExact) {
 		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, `must begin with a '/'`))
+	}
+	for i, method := range in.Methods {
+		methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"}
+		if !sliceContains(methods, strings.ToUpper(method)) {
+			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, notInSliceMessage(methods)))
+		}
+	}
+	errs = append(errs, in.Header.validate(path.Child("header"))...)
+	return errs
+}
+func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	for i, permission := range in {
+		if (permission.Regex != "" && permission.Suffix != "") || (permission.Regex != "" && permission.Prefix != "") || (permission.Regex != "" && permission.Exact != "") ||
+			(permission.Regex != "" && permission.Present) || (permission.Suffix != "" && permission.Prefix != "") || (permission.Suffix != "" && permission.Exact != "") ||
+			(permission.Suffix != "" && permission.Present) || (permission.Prefix != "" && permission.Exact != "") ||
+			(permission.Prefix != "" && permission.Present) || (permission.Exact != "" && permission.Present) {
+			errs = append(errs, field.Invalid(path.Index(i), in[i], `At most only one of exact, prefix, suffix, regex, or present may be configured.`))
+		}
 	}
 	return errs
 }
