@@ -71,44 +71,9 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 
 // Test that if the namespace already exists the function succeeds.
 func TestEnsureExists_WildcardNamespace_AlreadyExists(tt *testing.T) {
-	for _, c := range []struct {
-		ACLsEnabled bool
-	}{
-		{
-			ACLsEnabled: true,
-		},
-		{
-			ACLsEnabled: false,
-		},
-	} {
-		tt.Run(fmt.Sprintf("acls: %t", c.ACLsEnabled), func(t *testing.T) {
-			req := require.New(t)
-			ns := WildcardNamespace
-			masterToken := "master"
-
-			consul, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
-				cfg.ACL.Enabled = c.ACLsEnabled
-				cfg.ACL.DefaultPolicy = "deny"
-				cfg.ACL.Tokens.Master = masterToken
-			})
-			req.NoError(err)
-			defer consul.Stop()
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-				Token:   masterToken,
-			})
-			req.NoError(err)
-
-			// We do not create the namespace explicitly as the '*' namespace already exists.
-			var crossNSPolicy string
-			if c.ACLsEnabled {
-				crossNSPolicy = "cross-ns-policy"
-			}
-			created, err := EnsureExists(consulClient, ns, crossNSPolicy)
-			req.NoError(err)
-			require.False(t, created)
-		})
-	}
+	created, err := EnsureExists(nil, WildcardNamespace, "")
+	require.NoError(tt, err)
+	require.False(tt, created)
 }
 
 // Test that it creates the namespace if it doesn't exist.
