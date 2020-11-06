@@ -85,6 +85,13 @@ const (
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 
+	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
+	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
+	// e.g. consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"
+	// The arguments passed in via this annotation will take precendence over arguments
+	// passed via the -envoy-extra-args flag.
+	annotationEnvoyExtraArgs = "consul.hashicorp.com/envoy-extra-args"
+
 	// injected is used as the annotation value for annotationInjected
 	injected = "injected"
 
@@ -115,6 +122,10 @@ type Handler struct {
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the lifecycle-sidecar container.
 	ImageConsulK8S string
+
+	// Optional: set when you need extra options to be set when running envoy
+	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
+	EnvoyExtraArgs string
 
 	// RequireAnnotation means that the annotation must be given to inject.
 	// If this is false, injection is default.

@@ -3,9 +3,11 @@ package connectinject
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -31,6 +33,11 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 
 	resources, err := h.envoySidecarResources(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	cmd, err := h.getContainerSidecarCommand(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -64,10 +71,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 				},
 			},
 		},
-		Command: []string{
-			"envoy",
-			"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
-		},
+		Command: cmd,
 	}
 	if h.ConsulCACert != "" {
 		caCertEnvVar := corev1.EnvVar{
@@ -86,6 +90,38 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 		})
 	}
 	return container, nil
+}
+func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) {
+	cmd := []string{
+		"envoy",
+		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+	}
+
+	extraArgs, annotationSet := pod.Annotations[annotationEnvoyExtraArgs]
+
+	if annotationSet || h.EnvoyExtraArgs != "" {
+
+		extraArgsToUse := h.EnvoyExtraArgs
+
+		// Prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs).
+		if annotationSet {
+			extraArgsToUse = extraArgs
+		}
+
+		// Split string into tokens.
+		// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
+		tokens, err := shlex.Split(extraArgsToUse)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, t := range tokens {
+			if strings.Contains(t, " ") {
+				t = strconv.Quote(t)
+			}
+			cmd = append(cmd, t)
+		}
+	}
+	return cmd, nil
 }
 
 func (h *Handler) envoySidecarResources(pod *corev1.Pod) (corev1.ResourceRequirements, error) {
