@@ -518,11 +518,11 @@ operator = "write"`,
 			false,
 			true,
 			`
-  node_prefix "" {
-     policy = "write"
-  }
+node_prefix "" {
+  policy = "write"
+}
   service_prefix "" {
-     policy = "write"
+    policy = "write"
   }`,
 		},
 		{
@@ -531,12 +531,14 @@ operator = "write"`,
 			true,
 			`
 operator = "write"
-  node_prefix "" {
-     policy = "write"
-  }
+node_prefix "" {
+  policy = "write"
+}
+namespace_prefix "" {
   service_prefix "" {
-     policy = "write"
-  }`,
+    policy = "write"
+  }
+}`,
 		},
 	}
 
