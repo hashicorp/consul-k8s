@@ -441,7 +441,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 }
 
 // Test pod statuses that the reconciler should ignore.
-// These test cases are based on actual observed startup phases.
+// These test cases are based on actual observed startup and termination phases.
 func TestReconcile_IgnoreStatuses(t *testing.T) {
 	t.Parallel()
 	cases := map[string]corev1.PodStatus{
@@ -521,6 +521,74 @@ func TestReconcile_IgnoreStatuses(t *testing.T) {
 				},
 			},
 			ContainerStatuses: unreadyAppContainers,
+		},
+		"pod is terminating": {
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodScheduled,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				},
+				{
+					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionFalse,
+				},
+			},
+			InitContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: InjectInitContainerName,
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{StartedAt: metav1.Now()},
+					},
+					Ready: true,
+				},
+			},
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "consul-connect-envoy-sidecar",
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode:   0,
+							Reason:     "Completed",
+							StartedAt:  metav1.Time{},
+							FinishedAt: metav1.Time{},
+						},
+					},
+					Ready: false,
+				},
+				{
+					Name: "consul-connect-lifecycle-sidecar",
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode:   2,
+							Reason:     "Error",
+							StartedAt:  metav1.Time{},
+							FinishedAt: metav1.Time{},
+						},
+					},
+					Ready: false,
+				},
+				{
+					Name: "app",
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode:   137,
+							Reason:     "Error",
+							StartedAt:  metav1.Time{},
+							FinishedAt: metav1.Time{},
+						},
+					},
+					Ready: false,
+				},
+			},
 		},
 	}
 	for name, podStatus := range cases {

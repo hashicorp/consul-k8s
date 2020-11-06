@@ -278,11 +278,36 @@ func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
 	if pod.Annotations[annotationStatus] != injected {
 		return false
 	}
+
+	// If the pod has been terminated, we don't want to try and modify its
+	// health check status because the preStop hook will have deregistered
+	// this pod and so we'll get errors making API calls to set the status
+	// of a check for a service that doesn't exist.
+	// We detect a terminated pod by looking to see if all the containers
+	// have their state set as "terminated". Kubernetes will only send
+	// an update to this reconciler when all containers have stopped so if
+	// the conditions below are satisfied we're guaranteed that the preStop
+	// hook has run.
+	if pod.Status.Phase == corev1.PodRunning && len(pod.Status.ContainerStatuses) > 0 {
+		allTerminated := true
+		for _, c := range pod.Status.ContainerStatuses {
+			if c.State.Terminated == nil {
+				allTerminated = false
+				break
+			}
+		}
+		if allTerminated {
+			return false
+		}
+		// Otherwise we fall through to checking if the service has been
+		// registered yet.
+	}
+
 	// We process any pod that has had its injection init container completed because
 	// this means the service instance has been registered with Consul and so we can
 	// and should set its health check status. If we don't set the health check
 	// immediately after registration, the pod will start to receive traffic,
-	// even if its non-init containers haven't yet been started.
+	// even if its non-init containers haven't yet reached the running state.
 	for _, c := range pod.Status.InitContainerStatuses {
 		if c.Name == InjectInitContainerName {
 			return c.State.Terminated != nil && c.State.Terminated.Reason == "Completed"
