@@ -103,12 +103,12 @@ func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) 
 
 		extraArgsToUse := h.EnvoyExtraArgs
 
-		// prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs)
+		// Prefer args set by pod annotation over the flag to the consul-k8s binary (h.EnvoyExtraArgs).
 		if annotationSet {
 			extraArgsToUse = extraArgs
 		}
 
-		// split string into tokens
+		// Split string into tokens.
 		// e.g. "--foo bar --boo baz" --> ["--foo", "bar", "--boo", "baz"]
 		tokens, err := shlex.Split(extraArgsToUse)
 		if err != nil {

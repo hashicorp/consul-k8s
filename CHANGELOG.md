@@ -6,7 +6,7 @@ IMPROVEMENTS:
     * via a flag to the consul-k8s inject-connect command:
       e.g. `consul-k8s inject-connect -envoy-extra-args="--log-level debug --disable-hot-restart"`
     * via pod annotations
-      e.g. `consul.hashicorp.com/envoy-extra-args:"--log-level debug --disable-hot-restart"`
+      e.g. `consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"`
 
 BUG FIXES:
 * Federation: ensure replication ACL token can replicate policies and tokens in Consul namespaces other than `default` (Consul-enterprise only). [[GH-364](https://github.com/hashicorp/consul-k8s/issues/364)]
