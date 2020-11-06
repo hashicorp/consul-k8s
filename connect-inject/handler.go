@@ -89,7 +89,7 @@ const (
 	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
 	// e.g. consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"
 	// The arguments passed in via this annotation will take precendence over arguments
-	// passed via the helm template value `connectInject.envoyExtraArgs`
+	// passed via the -envoy-extra-args flag.
 	annotationEnvoyExtraArgs = "consul.hashicorp.com/envoy-extra-args"
 
 	// injected is used as the annotation value for annotationInjected
