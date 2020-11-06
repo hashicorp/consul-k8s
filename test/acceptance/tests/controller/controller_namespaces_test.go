@@ -30,7 +30,6 @@ const (
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestControllerNamespaces(t *testing.T) {
-	t.Skip()
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
@@ -77,8 +76,8 @@ func TestControllerNamespaces(t *testing.T) {
 				"controller.enabled":            "true",
 				"connectInject.enabled":         "true",
 
-				// todo: remove when Helm chart updates to 1.8.4
-				"global.image": "hashicorp/consul-enterprise:1.8.4-ent",
+				// todo: remove when Helm chart updates to 1.9.0
+				"global.image": "hashicorp/consul-enterprise:1.9.0-ent-beta2",
 
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
