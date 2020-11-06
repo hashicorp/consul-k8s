@@ -308,7 +308,7 @@ func (c *Command) Run(args []string) int {
 		ConsulClient:               c.consulClient,
 		ImageConsul:                c.flagConsulImage,
 		ImageEnvoy:                 c.flagEnvoyImage,
-		ExtraEnvoyArgs:             c.flagEnvoyExtraArgs,
+		EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
 		ImageConsulK8S:             c.flagConsulK8sImage,
 		RequireAnnotation:          !c.flagDefaultInject,
 		AuthMethod:                 c.flagACLAuthMethod,

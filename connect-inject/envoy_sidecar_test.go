@@ -60,24 +60,29 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	})
 }
 
-// Test that we can pass extra flags to envoy.
-func TestHandlerEnvoySidecar_ExtraEnvoyArgs(t *testing.T) {
+// Test that we can pass extra args to envoy via the extraEnvoyArgs flag
+// or via pod annotations. When arguments are passed in both ways, the
+// arguments set via pod annotations are used.
+func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 	cases := []struct {
 		name                     string
-		extraEnvoyArgs           string
+		envoyExtraArgs           string
+		pod                      *corev1.Pod
 		expectedContainerCommand []string
 	}{
 		{
 			name:           "no extra options provided",
-			extraEnvoyArgs: "",
+			envoyExtraArgs: "",
+			pod:            &corev1.Pod{},
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
 			},
 		},
 		{
-			name:           "extra log-level option",
-			extraEnvoyArgs: "--log-level debug",
+			name:           "via flag: extra log-level option",
+			envoyExtraArgs: "--log-level debug",
+			pod:            &corev1.Pod{},
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -85,8 +90,43 @@ func TestHandlerEnvoySidecar_ExtraEnvoyArgs(t *testing.T) {
 			},
 		},
 		{
-			name:           "extraEnvoyOpts with quotes inside",
-			extraEnvoyArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			name:           "via flag: multiple arguments with quotes",
+			envoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+			pod:            &corev1.Pod{},
+			expectedContainerCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--log-level", "debug",
+				"--admin-address-path", "\"/tmp/consul/foo bar\"",
+			},
+		},
+		{
+			name:           "via annotation: multiple arguments with quotes",
+			envoyExtraArgs: "",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+					},
+				},
+			},
+			expectedContainerCommand: []string{
+				"envoy",
+				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
+				"--log-level", "debug",
+				"--admin-address-path", "\"/tmp/consul/foo bar\"",
+			},
+		},
+		{
+			name:           "via flag and annotation: should prefer setting via the annotation",
+			envoyExtraArgs: "this should be overwritten",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationEnvoyExtraArgs: "--log-level debug --admin-address-path \"/tmp/consul/foo bar\"",
+					},
+				},
+			},
 			expectedContainerCommand: []string{
 				"envoy",
 				"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -101,10 +141,10 @@ func TestHandlerEnvoySidecar_ExtraEnvoyArgs(t *testing.T) {
 			h := Handler{
 				ImageConsul:    "hashicorp/consul:latest",
 				ImageEnvoy:     "hashicorp/consul-k8s:latest",
-				ExtraEnvoyArgs: tc.extraEnvoyArgs,
+				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(&corev1.Pod{}, "")
+			c, err := h.envoySidecar(tc.pod, k8sNamespace)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
