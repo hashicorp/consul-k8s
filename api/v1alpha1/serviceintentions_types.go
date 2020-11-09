@@ -352,7 +352,7 @@ func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 	}
 	if pathParts > 1 {
 		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON), `At most only one of pathExact, pathPrefix, or pathRegex may be configured.`))
+		errs = append(errs, field.Invalid(path, string(asJSON), `at most only one of pathExact, pathPrefix, or pathRegex may be configured.`))
 	}
 
 	found := make(map[string]struct{})
@@ -372,13 +372,14 @@ func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, notInSliceMessage(methods)))
 		}
 		if _, ok := found[method]; ok {
-			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, `Method contained more than once.`))
+			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, `method listed more than once.`))
 		}
 		found[method] = struct{}{}
 	}
 	errs = append(errs, in.Header.validate(path.Child("header"))...)
 	return errs
 }
+
 func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	for i, permission := range in {
@@ -386,20 +387,10 @@ func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorL
 		if permission.Present {
 			hdrParts++
 		}
-		if permission.Exact != "" {
-			hdrParts++
-		}
-		if permission.Regex != "" {
-			hdrParts++
-		}
-		if permission.Prefix != "" {
-			hdrParts++
-		}
-		if permission.Suffix != "" {
-			hdrParts++
-		}
+		hdrParts += numNotEmpty(permission.Exact, permission.Regex, permission.Prefix, permission.Suffix)
 		if hdrParts != 1 {
-			errs = append(errs, field.Invalid(path.Index(i), in[i], `At most only one of exact, prefix, suffix, regex, or present may be configured.`))
+			asJson, _ := json.Marshal(in[i])
+			errs = append(errs, field.Invalid(path.Index(i), string(asJson), `at most only one of exact, prefix, suffix, regex, or present may be configured.`))
 		}
 	}
 	return errs
@@ -454,4 +445,14 @@ type ServiceIntentionsList struct {
 
 func init() {
 	SchemeBuilder.Register(&ServiceIntentions{}, &ServiceIntentionsList{})
+}
+
+func numNotEmpty(ss ...string) int {
+	count := 0
+	for _, s := range ss {
+		if s != "" {
+			count++
+		}
+	}
+	return count
 }

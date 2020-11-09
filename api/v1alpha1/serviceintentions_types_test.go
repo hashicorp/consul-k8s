@@ -736,7 +736,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathPrefix\":\"/bar\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathPrefix\":\"/bar\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http pathPrefix,pathRegex specified": {
@@ -768,7 +768,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathPrefix\":\"/bar\",\"pathRegex\":\"foo\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathPrefix\":\"/bar\",\"pathRegex\":\"foo\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http pathRegex,pathExact specified": {
@@ -800,7 +800,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathRegex\":\"bar\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathRegex\":\"bar\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http.pathExact": {
@@ -868,7 +868,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[3]: Invalid value: "GET": Method contained more than once.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[3]: Invalid value: "GET": method listed more than once.`,
 			},
 		},
 		"invalid permissions.http.header": {
@@ -925,11 +925,11 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.sources[0].permissions[0].header[0]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"exact-present", Present:true, Exact:"foobar", Prefix:"", Suffix:"", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[1]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"prefix-exact", Present:false, Exact:"foobar", Prefix:"barfood", Suffix:"", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[2]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"suffix-prefix", Present:false, Exact:"", Prefix:"foo", Suffix:"bar", Regex:"", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[3]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"suffix-regex", Present:false, Exact:"", Prefix:"", Suffix:"bar", Regex:"foo", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[4]: Invalid value: v1alpha1.IntentionHTTPHeaderPermission{Name:"regex-present", Present:true, Exact:"", Prefix:"", Suffix:"", Regex:"foobar", Invert:false}: At most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[0]: Invalid value: "{\"name\":\"exact-present\",\"present\":true,\"exact\":\"foobar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[1]: Invalid value: "{\"name\":\"prefix-exact\",\"exact\":\"foobar\",\"prefix\":\"barfood\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[2]: Invalid value: "{\"name\":\"suffix-prefix\",\"prefix\":\"foo\",\"suffix\":\"bar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[3]: Invalid value: "{\"name\":\"suffix-regex\",\"suffix\":\"bar\",\"regex\":\"foo\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
+				`spec.sources[0].permissions[0].header[4]: Invalid value: "{\"name\":\"regex-present\",\"present\":true,\"regex\":\"foobar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
 			},
 		},
 		"invalid permissions.action": {
