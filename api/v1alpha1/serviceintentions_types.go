@@ -388,7 +388,7 @@ func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorL
 			hdrParts++
 		}
 		hdrParts += numNotEmpty(permission.Exact, permission.Regex, permission.Prefix, permission.Suffix)
-		if hdrParts != 1 {
+		if hdrParts > 1 {
 			asJson, _ := json.Marshal(in[i])
 			errs = append(errs, field.Invalid(path.Index(i), string(asJson), `at most only one of exact, prefix, suffix, regex, or present may be configured.`))
 		}
