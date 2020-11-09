@@ -141,6 +141,48 @@ func CheckStaticServerConnection(
 	})
 }
 
+// CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
+// and runs a curl command with the provided curlArgs.
+// This function assumes that the connection is made to the static-server and expects the output
+// to be "hello world" in a case of success.
+// If expectSuccess is true, it will expect connection to succeed,
+// otherwise it will expect failure due to intentions. If multiple failureMessages are provided it will assert
+// on the existence of any of them.
+func CheckStaticServerConnectionMultipleFailureMessages(
+	t *testing.T,
+	options *k8s.KubectlOptions,
+	expectSuccess bool,
+	deploymentName string,
+	failureMessages []string,
+	curlArgs ...string,
+) {
+	t.Helper()
+
+	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
+
+	args := []string{"exec", "deploy/" + deploymentName, "-c", deploymentName, "--", "curl", "-vvvsSf"}
+	args = append(args, curlArgs...)
+
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := RunKubectlAndGetOutputE(t, options, args...)
+		if expectSuccess {
+			require.NoError(r, err)
+			require.Contains(r, output, "hello world")
+		} else {
+			require.Error(r, err)
+			require.Condition(r, func() bool {
+				exists := false
+				for _, msg := range failureMessages {
+					if strings.Contains(output, msg) {
+						exists = true
+					}
+				}
+				return exists
+			})
+		}
+	})
+}
+
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
 func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
