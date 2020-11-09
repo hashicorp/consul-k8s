@@ -224,6 +224,31 @@ load _helpers
 
 
 #--------------------------------------------------------------------
+# extra envoy args
+
+@test "connectInject/Deployment: extra envoy args can be set via connectInject" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.envoyExtraArgs=--foo bar --boo baz' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-extra-args=\"--foo bar --boo baz\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: extra envoy args are not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-envoy-extra-args"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+
+#--------------------------------------------------------------------
 # cert secrets
 
 @test "connectInject/Deployment: no secretName: no tls-{cert,key}-file set" {

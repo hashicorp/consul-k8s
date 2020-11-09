@@ -821,6 +821,11 @@ connectInject:
     # at startup is completed.
     reconcilePeriod: "1m"
 
+  # envoyExtraArgs is used to pass arguments to the injected envoy sidecar.
+  # Valid arguments to pass to envoy can be found here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
+  # e.g "--log-level debug --disable-hot-restart"
+  envoyExtraArgs: null
+
   # Optional priorityClassName.
   priorityClassName: ""
 

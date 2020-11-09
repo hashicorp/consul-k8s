@@ -89,6 +89,9 @@ spec:
                 -enable-health-checks-controller=true \
                 -health-checks-reconcile-period={{ .Values.connectInject.healthChecks.reconcilePeriod }} \
                 {{- end }}
+                {{- if .Values.connectInject.envoyExtraArgs }}
+                -envoy-extra-args="{{ .Values.connectInject.envoyExtraArgs }}" \
+                {{- end }}
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}
