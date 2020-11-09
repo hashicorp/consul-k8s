@@ -83,12 +83,12 @@ func TestHealthChecks(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			t.Log("checking that connection is unsuccessful")
-			helpers.CheckStaticServerConnection(
+			helpers.CheckStaticServerConnectionMultipleFailureMessages(
 				t,
 				ctx.KubectlOptions(t),
 				false,
 				staticClientName,
-				"curl: (56) Recv failure: Connection reset by peer",
+				[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"},
 				"http://localhost:1234")
 		})
 	}

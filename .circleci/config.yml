@@ -139,7 +139,7 @@ jobs:
             exit_code=0
             for pkg in $(go list ./...)
             do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 20m -failfast \
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 30m -failfast \
                     -enable-enterprise \
                     -enable-multi-cluster \
                     -kubeconfig="$primary_kubeconfig" \
@@ -206,7 +206,7 @@ jobs:
           working_directory: test/acceptance/tests
           no_output_timeout: 30m
           command: |
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 30m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
               -enable-openshift \
               -enable-enterprise \
               -enable-multi-cluster \
