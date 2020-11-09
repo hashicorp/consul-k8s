@@ -1,54 +1,13 @@
 version: 2.1
-
 # reusable 'executor' object for jobs
 executors:
   go:
     docker:
       - image: docker.mirror.hashicorp.services/circleci/golang:1.14
     environment:
-      - TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      - CONSUL_VERSION: 71ba8300a3d25b335aff0de9f9dd2a82fc2e58f1 # Consul's OSS version to use in tests
-      - CONSUL_ENT_VERSION: 9fb10787b1ec44d6a7c42c3a5f326953943fc39e # Consul's enterprise version to use in tests
-
-commands:
-  get-aws-cli:
-    steps:
-      - run:
-          name: download and install AWS CLI
-          command: |
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            echo -e "${AWS_CLI_GPG_KEY}" | gpg --import
-            curl -o awscliv2.sig https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip.sig
-            gpg --verify awscliv2.sig awscliv2.zip
-            unzip awscliv2.zip
-            sudo ./aws/install
-  aws-assume-role:
-    steps:
-      - run:
-          name: assume-role aws creds
-          command: |
-            # assume role has duration of 15 min (the minimum allowed)
-            CREDENTIALS="$(aws sts assume-role --duration-seconds 900 --role-arn ${ROLE_ARN} --role-session-name build-${CIRCLE_SHA1} | jq '.Credentials')"
-            echo "export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.AccessKeyId')" >> $BASH_ENV
-            echo "export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.SecretAccessKey')" >> $BASH_ENV
-            echo "export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.SessionToken')" >> $BASH_ENV
-  install-dev-consul:
-    description: "Pull a dev version of consul/consul-enterprise for testing"
-    parameters:
-      bucket:
-        type: env_var_name
-        default: CONSUL_DEV_ARTIFACT_BUCKET # we use the same bucket for oss/ent dev builds (at different paths)
-      path:
-        type: env_var_name
-      sha:
-        type: env_var_name
-    steps:
-      - run:
-          name: download and install dev consul/consul-enterprise
-          command: |
-            aws s3 cp s3://${<< parameters.bucket >>}/${<< parameters.path >>}/${<< parameters.sha >>}.tar.gz /tmp
-            sudo tar -xzvf /tmp/${<< parameters.sha >>}.tar.gz -C /usr/local/bin
-            consul version
+      TEST_RESULTS: /tmp/test-results # path to where test results are saved
+      CONSUL_VERSION: 1.9.0-beta2 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.9.0+ent-beta2 # Consul's enterprise version to use in tests
 
 jobs:
   go-fmt-and-vet:
@@ -102,15 +61,12 @@ jobs:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
 
-      # pull a dev build of consul oss from s3
-      - get-aws-cli
-      - aws-assume-role
-      - install-dev-consul:
-          path: CONSUL_DEV_ARTIFACT_PATH
-          sha: CONSUL_VERSION
-
       # run go tests with gotestsum
       - run: |
+          # download and install the consul binary
+          wget https://releases.hashicorp.com/consul/"${CONSUL_VERSION}"/consul_"${CONSUL_VERSION}"_linux_amd64.zip && \
+               unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+               rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
           PACKAGE_NAMES=$(go list ./...)
           gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
@@ -133,14 +89,12 @@ jobs:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
 
-      # pull a dev build of consul ent from s3
-      - get-aws-cli
-      - aws-assume-role
-      - install-dev-consul:
-          path: CONSUL_ENT_DEV_ARTIFACT_PATH
-          sha: CONSUL_ENT_VERSION
-
       # run go tests with gotestsum
+      - run: |
+          # download and install the consul binary
+          wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
+               unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+               rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
       - run: |
           PACKAGE_NAMES=$(go list ./...)
           gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
