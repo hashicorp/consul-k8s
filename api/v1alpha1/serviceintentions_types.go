@@ -2,7 +2,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"strings"
+	"net/http"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -19,6 +19,7 @@ import (
 
 // ServiceIntentionsSpec defines the desired state of ServiceIntentions
 type ServiceIntentionsSpec struct {
+	// Destination is the intention destination that will have the authorization granted to.
 	Destination Destination `json:"destination,omitempty"`
 	// Sources is the list of all intention sources and the authorization granted to those sources.
 	// The order of this list does not matter, but out of convenience Consul will always store this
@@ -333,20 +334,47 @@ func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
 
 func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
-	if (in.PathExact != "" && in.PathPrefix != "") || (in.PathExact != "" && in.PathRegex != "") || (in.PathPrefix != "" && in.PathRegex != "") {
-		errs = append(errs, field.Invalid(path, in, `At most only one of pathExact, pathPrefix, or pathRegex may be configured.`))
+	pathParts := 0
+	if in.PathRegex != "" {
+		pathParts++
 	}
-	if invalidPathPrefix(in.PathPrefix) {
-		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, `must begin with a '/'`))
+	if in.PathPrefix != "" {
+		pathParts++
+		if invalidPathPrefix(in.PathPrefix) {
+			errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, `must begin with a '/'`))
+		}
 	}
-	if invalidPathPrefix(in.PathExact) {
-		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, `must begin with a '/'`))
+	if in.PathExact != "" {
+		pathParts++
+		if invalidPathPrefix(in.PathExact) {
+			errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, `must begin with a '/'`))
+		}
 	}
+	if pathParts > 1 {
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON), `At most only one of pathExact, pathPrefix, or pathRegex may be configured.`))
+	}
+
+	found := make(map[string]struct{})
 	for i, method := range in.Methods {
-		methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"}
-		if !sliceContains(methods, strings.ToUpper(method)) {
+		methods := []string{
+			http.MethodGet,
+			http.MethodHead,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+			http.MethodConnect,
+			http.MethodOptions,
+			http.MethodTrace,
+		}
+		if !sliceContains(methods, method) {
 			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, notInSliceMessage(methods)))
 		}
+		if _, ok := found[method]; ok {
+			errs = append(errs, field.Invalid(path.Child("methods").Index(i), method, `Method contained more than once.`))
+		}
+		found[method] = struct{}{}
 	}
 	errs = append(errs, in.Header.validate(path.Child("header"))...)
 	return errs
@@ -354,10 +382,23 @@ func (in *IntentionHTTPPermission) validate(path *field.Path) field.ErrorList {
 func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	for i, permission := range in {
-		if (permission.Regex != "" && permission.Suffix != "") || (permission.Regex != "" && permission.Prefix != "") || (permission.Regex != "" && permission.Exact != "") ||
-			(permission.Regex != "" && permission.Present) || (permission.Suffix != "" && permission.Prefix != "") || (permission.Suffix != "" && permission.Exact != "") ||
-			(permission.Suffix != "" && permission.Present) || (permission.Prefix != "" && permission.Exact != "") ||
-			(permission.Prefix != "" && permission.Present) || (permission.Exact != "" && permission.Present) {
+		hdrParts := 0
+		if permission.Present {
+			hdrParts++
+		}
+		if permission.Exact != "" {
+			hdrParts++
+		}
+		if permission.Regex != "" {
+			hdrParts++
+		}
+		if permission.Prefix != "" {
+			hdrParts++
+		}
+		if permission.Suffix != "" {
+			hdrParts++
+		}
+		if hdrParts != 1 {
 			errs = append(errs, field.Invalid(path.Index(i), in[i], `At most only one of exact, prefix, suffix, regex, or present may be configured.`))
 		}
 	}

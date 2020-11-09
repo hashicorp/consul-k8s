@@ -736,7 +736,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"/foo", PathPrefix:"/bar", PathRegex:"", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathPrefix\":\"/bar\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http pathPrefix,pathRegex specified": {
@@ -768,7 +768,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"", PathPrefix:"/bar", PathRegex:"foo", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathPrefix\":\"/bar\",\"pathRegex\":\"foo\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http pathRegex,pathExact specified": {
@@ -800,7 +800,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: v1alpha1.IntentionHTTPPermission{PathExact:"/foo", PathPrefix:"", PathRegex:"bar", Header:v1alpha1.IntentionHTTPHeaderPermissions(nil), Methods:[]string(nil)}: At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathRegex\":\"bar\"}": At most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
 			},
 		},
 		"invalid permissions.http.pathExact": {
@@ -856,6 +856,8 @@ func TestServiceIntentions_Validate(t *testing.T) {
 											"FOO",
 											"GET",
 											"BAR",
+											"GET",
+											"POST",
 										},
 									},
 								},
@@ -866,7 +868,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"]`,
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[3]: Invalid value: "GET": Method contained more than once.`,
 			},
 		},
 		"invalid permissions.http.header": {
