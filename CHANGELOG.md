@@ -1,5 +1,17 @@
 ## Unreleased
 
+IMPROVEMENTS:
+  * Connect: support passing extra arguments to the injected envoy sidecar. [[GH-675](https://github.com/hashicorp/consul-helm/pull/675)]
+
+    To pass extra arguments to envoy, set `connectInject.envoyExtraArgs` in your
+    Helm configuration:
+
+    ```yaml
+    connectInject:
+      enabled: true
+      envoyExtraArgs: "--log-level debug --disable-hot-restart"
+    ```
+
 ## 0.25.0 (Oct 12, 2020)
 
 FEATURES:
