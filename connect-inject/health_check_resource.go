@@ -23,7 +23,7 @@ const (
 	labelInject = "consul.hashicorp.com/connect-inject-status"
 
 	// kubernetesSuccessReasonMsg will be passed for passing health check's Reason to Consul.
-	kubernetesSuccessReasonMsg = "Kubernetes Health Checks Passing"
+	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 
 	podPendingReasonMsg = "Pod is pending"
 )
@@ -294,7 +294,7 @@ func (h *HealthCheckResource) shouldProcess(pod *corev1.Pod) bool {
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
 // where the health check is registered and deregistered.
 func (h *HealthCheckResource) getConsulHealthCheckID(pod *corev1.Pod) string {
-	return fmt.Sprintf("%s_%s_kubernetes-health-check-ttl", pod.Namespace, h.getConsulServiceID(pod))
+	return fmt.Sprintf("%s/%s/kubernetes-health-check", pod.Namespace, h.getConsulServiceID(pod))
 }
 
 // getConsulServiceID returns the serviceID of the connect service.
