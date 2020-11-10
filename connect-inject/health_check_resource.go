@@ -172,7 +172,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 		h.Log.Debug("registering new health check", "name", pod.Name, "id", healthCheckID)
 		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status)
 		if errors.Is(err, ServiceNotFoundErr) {
-			h.Log.Warn("skipping registration because service not registered with Consul-this may be because the pod is shutting down", "serviceID", serviceID)
+			h.Log.Warn("skipping registration because service not registered with Consul - this may be because the pod is shutting down", "serviceID", serviceID)
 			return nil
 		} else if err != nil {
 			return fmt.Errorf("unable to register health check: %s", err)
