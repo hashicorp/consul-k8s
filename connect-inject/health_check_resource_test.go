@@ -377,7 +377,9 @@ func TestReconcilePod(t *testing.T) {
 	}
 }
 
-func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
+// Test that when we call upsert and the service hasn't been registered
+// in Consul yet, we don't return an error.
+func TestUpsert_PodWithNoService(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	pod := &corev1.Pod{
@@ -403,9 +405,8 @@ func TestUpsert_PodWithNoServiceReturnsError(t *testing.T) {
 	}
 	server, _, resource := testServerAgentResourceAndController(t, pod)
 	defer server.Stop()
-	// Start Upsert, it will attempt to reconcile the Pod but the service doesnt exist in Consul so will fail.
 	err := resource.Upsert("", pod)
-	require.Contains(err.Error(), "test-pod-test-service\" does not exist)")
+	require.Nil(err)
 }
 
 func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {

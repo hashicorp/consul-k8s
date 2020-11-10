@@ -1,8 +1,10 @@
 package connectinject
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +29,9 @@ const (
 
 	podPendingReasonMsg = "Pod is pending"
 )
+
+// ServiceNotFoundErr is returned when a Consul service instance is not registered.
+var ServiceNotFoundErr = errors.New("service is not registered in Consul")
 
 type HealthCheckResource struct {
 	Log                 hclog.Logger
@@ -166,7 +171,10 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 		// Create a new health check.
 		h.Log.Debug("registering new health check", "name", pod.Name, "id", healthCheckID)
 		err = h.registerConsulHealthCheck(client, healthCheckID, serviceID, status)
-		if err != nil {
+		if errors.Is(err, ServiceNotFoundErr) {
+			h.Log.Warn("skipping registration because service not registered with Consul-this may be because the pod is shutting down", "serviceID", serviceID)
+			return nil
+		} else if err != nil {
 			return fmt.Errorf("unable to register health check: %s", err)
 		}
 		// Also update it, the reason this is separate is there is no way to set the Output field of the health check
@@ -212,6 +220,11 @@ func (h *HealthCheckResource) registerConsulHealthCheck(client *api.Client, cons
 		},
 	})
 	if err != nil {
+		// Full error looks like:
+		// Unexpected response code: 500 (ServiceID "consulnamespace/svc-id" does not exist)
+		if strings.Contains(err.Error(), fmt.Sprintf("%s\" does not exist", serviceID)) {
+			return ServiceNotFoundErr
+		}
 		return fmt.Errorf("registering health check for service %q: %s", serviceID, err)
 	}
 	return nil
