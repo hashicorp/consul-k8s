@@ -204,7 +204,7 @@ jobs:
       - run:
           name: Run acceptance tests
           working_directory: test/acceptance/tests
-          no_output_timeout: 30m
+          no_output_timeout: 40m
           command: |
             gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
               -enable-openshift \
