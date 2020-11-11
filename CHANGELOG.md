@@ -5,8 +5,8 @@ FEATURES:
     * Adds a new controller to the connect-inject webhook which is responsible for synchronizing Kubernetes pod health checks with Consul service instance health checks.
       A Consul health check is registered for each connect-injected pod which mirrors the pod's Readiness status to Consul. This modifies connect routing to only
       pods which have passing Kubernetes health checks. See breaking changes for more information.
-    * Add a new pod label per connect-injected pod which mirrors the `consul.hashicorp.com/connect-inject-status` annotation.
-  Consul-ENT only: Add a new annotation to each connect-injected pod when namespaces are enabled: `consul.hashicorp.com/consul-namespace` [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
+    * Adds a new label to connect-injected pods which mirror the `consul.hashicorp.com/connect-inject-status` annotation.
+  Consul-ENT only: Adds a new annotation to connect-injected pods when namespaces are enabled: `consul.hashicorp.com/consul-namespace` [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
 
 BREAKING CHANGES:
 * Connect: With the addition of the connect-inject health checks controller any connect services which have failing Kubernetes readiness
