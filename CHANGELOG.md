@@ -1,16 +1,38 @@
 ## Unreleased
 
+FEATURES:
+* Kubernetes health check synchronization with Consul for connect injected pods via `connectInject.healthChecks` [[GH-651](https://github.com/hashicorp/consul-helm/pull/651)].
+  The default behavior for this feature is `enabled: true`.
+  See [https://www.consul.io/docs/k8s/health](https://www.consul.io/docs/k8s/health) for more information.
+  In order to enable this feature for existing installations it is required to restart all connect injected deployments so that they are re-injected.
+  Until this is done health checks for these deployments will not be synced to Consul.
+
+  **It is recommended to enable TLS with this setting enabled because it requires making calls to Consul clients across the cluster.
+    Without TLS enabled, these calls could leak ACL tokens should the cluster network become compromised.**
+
+BREAKING CHANGES:
+* This helm release only supports consul-k8s versions 0.20+
+* With the addition of the connect-inject health checks controller any connect services which have failing Kubernetes readiness
+  probes will no longer be routable through connect until their Kubernetes health probes are passing.
+  Previously, if any connect services were failing their Kubernetes readiness checks they were still routable through connect.
+  Users should verify that their connect services are passing Kubernetes readiness probes prior to using health checks synchronization.
+
+BUG FIXES:
+* Fix issue where Consul enterprise license job would fail for Consul versions >= 1.8.1" [[GH-654](https://github.com/hashicorp/consul-helm/pull/654)].
+  [[#647](https://github.com/hashicorp/consul-helm/issues/647)]
+
 IMPROVEMENTS:
-  * Connect: support passing extra arguments to the injected envoy sidecar. [[GH-675](https://github.com/hashicorp/consul-helm/pull/675)]
+* Connect: support passing extra arguments to the injected envoy sidecar. [[GH-675](https://github.com/hashicorp/consul-helm/pull/675)]
 
-    To pass extra arguments to envoy, set `connectInject.envoyExtraArgs` in your
-    Helm configuration:
+  To pass extra arguments to envoy, set `connectInject.envoyExtraArgs` in your
+  Helm configuration:
 
-    ```yaml
-    connectInject:
-      enabled: true
-      envoyExtraArgs: "--log-level debug --disable-hot-restart"
-    ```
+  ```yaml
+  connectInject:
+    enabled: true
+    envoyExtraArgs: "--log-level debug --disable-hot-restart"
+  ```
+
 
 ## 0.25.0 (Oct 12, 2020)
 
