@@ -1,5 +1,25 @@
 ## UNRELEASED
 
+FEATURES:
+* Connect: Support Kubernetes health probe synchronization with Consul for connect injected pods. [[GH-363](https://github.com/hashicorp/consul-k8s/pull/363)]
+    * Adds a new controller to the connect-inject webhook which is responsible for synchronizing Kubernetes pod health checks with Consul service instance health checks.
+      A Consul health check is registered for each connect-injected pod which mirrors the pod's Readiness status to Consul. This modifies connect routing to only
+      pods which have passing Kubernetes health checks. See breaking changes for more information.
+    * Add a new pod label per connect-injected pod which mirrors the `consul.hashicorp.com/connect-inject-status` annotation.
+  Consul-ENT only: Add a new annotation to each connect-injected pod when namespaces are enabled: `consul.hashicorp.com/consul-namespace` [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
+
+BREAKING CHANGES:
+* Connect: With the addition of the connect-inject health checks controller any connect services which have failing Kubernetes readiness
+  probes will no longer be routable through connect until their Kubernetes health probes are passing.
+  Previously, if any connect services were failing their Kubernetes readiness checks they were still routable through connect.
+  Users should verify that their connect services are passing Kubernetes readiness probes prior to using health checks synchronization.
+
+DEPRECATIONS:
+* `create-inject-token` in the server-acl-init job has been undeprecated.
+  `create-inject-auth-method` has been deprecated and replaced by `create-inject-token`.
+  `create-inject-namespace-token` in the server-acl-init job has been deprecated. [[GH-665](https://github.com/hashicorp/consul-helm/pull/665)].
+  See: [[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)] for additional documentation regarding these changes.
+
 IMPROVEMENTS:
 * Connect: support passing extra arguments to the envoy binary. [[GH-378](https://github.com/hashicorp/consul-k8s/pull/378)]
     Arguments can be passed in 2 ways:
