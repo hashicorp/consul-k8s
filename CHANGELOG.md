@@ -17,8 +17,8 @@ BREAKING CHANGES:
 DEPRECATIONS:
 * `create-inject-token` in the server-acl-init command has been undeprecated.
   `-create-inject-auth-method` has been deprecated and replaced by `-create-inject-token`.
-  `-create-inject-namespace-token` in the server-acl-init command has been deprecated. Please use `-create-inject-token` and `-enable-namespaces` flags to achieve the same functionality. [[GH-665](https://github.com/hashicorp/consul-helm/pull/665)].
-  See: [[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)] for additional documentation regarding these changes.
+  `-create-inject-namespace-token` in the server-acl-init command has been deprecated.Please use `-create-inject-token` and `-enable-namespaces` flags
+  to achieve the same functionality.[[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)].
 
 IMPROVEMENTS:
 * Connect: support passing extra arguments to the envoy binary. [[GH-378](https://github.com/hashicorp/consul-k8s/pull/378)]
