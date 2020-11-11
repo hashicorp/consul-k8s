@@ -79,7 +79,7 @@ load _helpers
   [[ "$output" =~ "client.grpc must be true for connect injection" ]]
 }
 
-@test "connectInject/Deployment: health checks disabled by default" {
+@test "connectInject/Deployment: health checks enabled by default" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -89,23 +89,9 @@ load _helpers
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("-enable-health-checks-controller"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
   local actual=$(echo "$cmd" |
     yq 'any(contains("-health-checks-reconcile-period"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: health checks can be enabled" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-enable-health-checks-controller=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -947,11 +933,12 @@ load _helpers
 #--------------------------------------------------------------------
 # namespaces + http address
 
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable not set when namespaces are disabled" {
+@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable not set when namespaces and health checks are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -1012,11 +999,12 @@ load _helpers
 #--------------------------------------------------------------------
 # namespaces + host ip
 
-@test "connectInject/Deployment: HOST_IP env variable not set when namespaces are disabled" {
+@test "connectInject/Deployment: HOST_IP env variable not set when namespaces and health checks are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
+      --set 'connectInject.healthChecks.enabled=false' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
