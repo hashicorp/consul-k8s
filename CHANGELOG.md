@@ -5,7 +5,7 @@ FEATURES:
     * Adds a new controller to the connect-inject webhook which is responsible for synchronizing Kubernetes pod health checks with Consul service instance health checks.
       A Consul health check is registered for each connect-injected pod which mirrors the pod's Readiness status to Consul. This modifies connect routing to only
       pods which have passing Kubernetes health checks. See breaking changes for more information.
-    * Adds a new label to connect-injected pods which mirror the `consul.hashicorp.com/connect-inject-status` annotation.
+    * Adds a new label to connect-injected pods which mirrors the `consul.hashicorp.com/connect-inject-status` annotation.
   Consul-ENT only: Adds a new annotation to connect-injected pods when namespaces are enabled: `consul.hashicorp.com/consul-namespace` [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
 
 BREAKING CHANGES:
@@ -15,9 +15,9 @@ BREAKING CHANGES:
   Users should verify that their connect services are passing Kubernetes readiness probes prior to using health checks synchronization.
 
 DEPRECATIONS:
-* `create-inject-token` in the server-acl-init job has been undeprecated.
-  `create-inject-auth-method` has been deprecated and replaced by `create-inject-token`.
-  `create-inject-namespace-token` in the server-acl-init job has been deprecated. [[GH-665](https://github.com/hashicorp/consul-helm/pull/665)].
+* `create-inject-token` in the server-acl-init command has been undeprecated.
+  `-create-inject-auth-method` has been deprecated and replaced by `-create-inject-token`.
+  `-create-inject-namespace-token` in the server-acl-init command has been deprecated. Please use `-create-inject-token` and `-enable-namespaces` flags to achieve the same functionality. [[GH-665](https://github.com/hashicorp/consul-helm/pull/665)].
   See: [[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)] for additional documentation regarding these changes.
 
 IMPROVEMENTS:
