@@ -15,10 +15,10 @@ import (
 
 const (
 	testNamespace               = "testnamespace"
-	testNamespacedHealthCheckID = "testnamespace_test-pod-test-service_kubernetes-health-check-ttl"
+	testNamespacedHealthCheckID = "testnamespace/test-pod-test-service/kubernetes-health-check"
 
 	testAlternateNamespace               = "testalternatenamespace"
-	testAlternateNamespacedHealthCheckID = "testalternatenamespace_test-pod-test-service_kubernetes-health-check-ttl"
+	testAlternateNamespacedHealthCheckID = "testalternatenamespace/test-pod-test-service/kubernetes-health-check"
 )
 
 var ignoredFieldsEnterprise = []string{"Node", "Definition", "ServiceID", "ServiceName"}
