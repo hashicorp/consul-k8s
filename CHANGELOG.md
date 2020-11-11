@@ -17,7 +17,7 @@ BREAKING CHANGES:
 DEPRECATIONS:
 * `create-inject-token` in the server-acl-init command has been undeprecated.
   `-create-inject-auth-method` has been deprecated and replaced by `-create-inject-token`.
-  `-create-inject-namespace-token` in the server-acl-init command has been deprecated.Please use `-create-inject-token` and `-enable-namespaces` flags
+  `-create-inject-namespace-token` in the server-acl-init command has been deprecated. Please use `-create-inject-token` and `-enable-namespaces` flags
   to achieve the same functionality.[[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)].
 
 IMPROVEMENTS:
