@@ -24,9 +24,9 @@ const (
 	testPodName               = "test-pod"
 	testServiceNameAnnotation = "test-service"
 	testServiceNameReg        = "test-pod-test-service"
-	testHealthCheckID         = "default_test-pod-test-service_kubernetes-health-check-ttl"
+	testHealthCheckID         = "default/test-pod-test-service/kubernetes-health-check"
 	testFailureMessage        = "Kubernetes pod readiness probe failed"
-	testCheckNotesPassing     = "Kubernetes Health Checks Passing"
+	testCheckNotesPassing     = "Kubernetes health checks passing"
 	ttl                       = "ttl"
 	name                      = "Kubernetes Health Check"
 )
