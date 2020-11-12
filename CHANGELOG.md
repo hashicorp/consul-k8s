@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.20.0 (November 12, 2020)
 
 FEATURES:
 * Connect: Support Kubernetes health probe synchronization with Consul for connect injected pods. [[GH-363](https://github.com/hashicorp/consul-k8s/pull/363)]
