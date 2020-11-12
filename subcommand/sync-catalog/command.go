@@ -9,9 +9,10 @@ import (
 	"os/signal"
 	"regexp"
 	"sync"
+	"syscall"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
@@ -145,12 +146,12 @@ func (c *Command) init() {
 
 	c.help = flags.Usage(help, c.flags)
 
-	// Wait on an interrupt to exit. This channel must be initialized before
+	// Wait on an interrupt or terminate to exit. This channel must be initialized before
 	// Run() is called so that there are no race conditions where the channel
 	// is not defined.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, os.Interrupt)
+		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
 	}
 }
 
@@ -345,8 +346,9 @@ func (c *Command) Run(args []string) int {
 		}
 		return 1
 
-	// Interrupted, gracefully exit
-	case <-c.sigCh:
+	// Interrupted/terminated, gracefully exit
+	case sig := <-c.sigCh:
+		c.logger.Info("{} received, shutting down", sig)
 		cancelF()
 		if toConsulCh != nil {
 			<-toConsulCh

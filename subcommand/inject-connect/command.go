@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
@@ -163,11 +164,11 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 
-	// Wait on an interrupt for exit, be sure to init it before running
+	// Wait on an interrupt or terminate for exit, be sure to init it before running
 	// the controller so that we don't receive an interrupt before it's ready.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, os.Interrupt)
+		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
 	}
 }
 
@@ -390,8 +391,9 @@ func (c *Command) Run(args []string) int {
 		}()
 
 		select {
-		// Interrupted, gracefully exit.
-		case <-c.sigCh:
+		// Interrupted/terminated, gracefully exit.
+		case sig := <-c.sigCh:
+			c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
 			if err := server.Close(); err != nil {
 				c.UI.Error(fmt.Sprintf("shutting down server: %v", err))
 				return 1
