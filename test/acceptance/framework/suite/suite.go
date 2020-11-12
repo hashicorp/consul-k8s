@@ -1,42 +1,46 @@
-package framework
+package suite
 
 import (
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"testing"
+
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/environment"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/flags"
 )
 
 type suite struct {
 	m     *testing.M
-	env   *kubernetesEnvironment
-	cfg   *TestConfig
-	flags *TestFlags
+	env   *environment.KubernetesEnvironment
+	cfg   *config.TestConfig
+	flags *flags.TestFlags
 }
 
 type Suite interface {
 	Run() int
-	Environment() TestEnvironment
-	Config() *TestConfig
+	Environment() environment.TestEnvironment
+	Config() *config.TestConfig
 }
 
 func NewSuite(m *testing.M) Suite {
-	flags := NewTestFlags()
+	flags := flags.NewTestFlags()
 
 	flag.Parse()
 
-	testConfig := flags.testConfigFromFlags()
+	testConfig := flags.TestConfigFromFlags()
 
 	return &suite{
 		m:     m,
-		env:   newKubernetesEnvironmentFromConfig(testConfig),
+		env:   environment.NewKubernetesEnvironmentFromConfig(testConfig),
 		cfg:   testConfig,
 		flags: flags,
 	}
 }
 
 func (s *suite) Run() int {
-	err := s.flags.validate()
+	err := s.flags.Validate()
 	if err != nil {
 		fmt.Printf("Flag validation failed: %s\n", err)
 		return 1
@@ -55,10 +59,10 @@ func (s *suite) Run() int {
 	return s.m.Run()
 }
 
-func (s *suite) Environment() TestEnvironment {
+func (s *suite) Environment() environment.TestEnvironment {
 	return s.env
 }
 
-func (s *suite) Config() *TestConfig {
+func (s *suite) Config() *config.TestConfig {
 	return s.cfg
 }

@@ -5,8 +5,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,7 +28,7 @@ func TestExample(t *testing.T) {
 	releaseName := helpers.RandomName()
 
 	// Create a new Consul cluster object.
-	consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 	// Create the Consul cluster with Helm.
 	consulCluster.Create(t)
@@ -37,11 +38,11 @@ func TestExample(t *testing.T) {
 	// To run kubectl commands, you need to get KubectlOptions from the test context.
 	// There are a number of kubectl commands available in the helpers/kubectl.go file.
 	// For example, to call 'kubectl apply' from the test write the following:
-	helpers.KubectlApply(t, ctx.KubectlOptions(t), "path/to/config")
+	k8s.KubectlApply(t, ctx.KubectlOptions(t), "path/to/config")
 
 	// Clean up any Kubernetes resources you have created
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		helpers.KubectlDelete(t, ctx.KubectlOptions(t), "path/to/config")
+		k8s.KubectlDelete(t, ctx.KubectlOptions(t), "path/to/config")
 	})
 
 	// Similarly, you can obtain Kubernetes client from your test context.

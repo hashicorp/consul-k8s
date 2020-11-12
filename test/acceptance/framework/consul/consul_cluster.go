@@ -1,4 +1,4 @@
-package framework
+package consul
 
 import (
 	"context"
@@ -8,20 +8,19 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
-	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/environment"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
-
-// The path to the helm chart.
-// Note: this will need to be changed if this file is moved.
-const helmChartPath = "../../../.."
 
 // Cluster represents a consul cluster object
 type Cluster interface {
@@ -37,19 +36,20 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
-	ctx                TestContext
+	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
 	kubernetesClient   kubernetes.Interface
 	noCleanupOnFailure bool
 	debugDirectory     string
+	logger             terratestLogger.TestLogger
 }
 
 func NewHelmCluster(
 	t *testing.T,
 	helmValues map[string]string,
-	ctx TestContext,
-	cfg *TestConfig,
+	ctx environment.TestContext,
+	cfg *config.TestConfig,
 	releaseName string) Cluster {
 
 	// Deploy single-server cluster by default unless helmValues overwrites that
@@ -64,10 +64,12 @@ func NewHelmCluster(
 	mergeMaps(values, valuesFromConfig)
 	mergeMaps(values, helmValues)
 
+	logger := terratestLogger.New(logger.TestLogger{})
+
 	opts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: ctx.KubectlOptions(t),
-		Logger:         logger.TestingT,
+		Logger:         logger,
 	}
 	return &HelmCluster{
 		ctx:                ctx,
@@ -76,6 +78,7 @@ func NewHelmCluster(
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
+		logger:             logger,
 	}
 }
 
@@ -91,8 +94,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Fail if there are any existing installations of the Helm chart.
 	h.checkForPriorInstallations(t)
 
-	err := helm.InstallE(t, h.helmOptions, helmChartPath, h.releaseName)
-	require.NoError(t, err)
+	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -100,7 +102,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
-	helpers.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
+	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
@@ -174,7 +176,7 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
 	mergeMaps(h.helmOptions.SetValues, helmValues)
-	helm.Upgrade(t, h.helmOptions, helmChartPath, h.releaseName)
+	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
@@ -183,7 +185,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	config := api.DefaultConfig()
-	localPort := freeport.MustTake(1)[0]
+	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
 
 	if secure {
@@ -212,7 +214,13 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		}
 	}
 
-	tunnel := k8s.NewTunnel(h.helmOptions.KubectlOptions, k8s.ResourceTypePod, fmt.Sprintf("%s-consul-server-0", h.releaseName), localPort, remotePort)
+	tunnel := terratestk8s.NewTunnelWithLogger(
+		h.helmOptions.KubectlOptions,
+		terratestk8s.ResourceTypePod,
+		fmt.Sprintf("%s-consul-server-0", h.releaseName),
+		localPort,
+		remotePort,
+		h.logger)
 	tunnel.ForwardPort(t)
 
 	t.Cleanup(func() {

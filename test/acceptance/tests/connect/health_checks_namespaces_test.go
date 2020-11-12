@@ -4,9 +4,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )
@@ -71,32 +73,33 @@ func TestHealthCheckNamespaces(t *testing.T) {
 			}
 
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 			consulCluster.Create(t)
 
-			staticServerOpts := &k8s.KubectlOptions{
+			staticServerOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
-			staticClientOpts := &k8s.KubectlOptions{
+			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
-			t.Logf("creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
+
+			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
-			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			t.Log("creating static-server and static-client deployments")
-			helpers.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-hc")
-			helpers.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			logger.Log(t, "creating static-server and static-client deployments")
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-hc")
+			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			// If ACLs are enabled we must create an intention.
 			if c.Secure {
@@ -120,10 +123,10 @@ func TestHealthCheckNamespaces(t *testing.T) {
 				require.NoError(t, err)
 			}
 			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 
 			// Now create the file so that the readiness probe of the static-server pod fails.
-			helpers.RunKubectl(t, staticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, staticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -131,7 +134,7 @@ func TestHealthCheckNamespaces(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			t.Log("checking that connection is unsuccessful")
-			helpers.CheckStaticServerConnectionMultipleFailureMessages(
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(
 				t,
 				staticClientOpts,
 				false,

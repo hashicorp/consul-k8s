@@ -1,9 +1,10 @@
-package framework
+package consul
 
 import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -19,7 +20,7 @@ func TestNewHelmCluster(t *testing.T) {
 		"server.bootstrapExpect": "3",
 		"server.replicas":        "3",
 	}
-	cluster := NewHelmCluster(t, helmValues, &ctx{}, &TestConfig{ConsulImage: "test-config-image"}, "test")
+	cluster := NewHelmCluster(t, helmValues, &ctx{}, &config.TestConfig{ConsulImage: "test-config-image"}, "test")
 
 	require.Equal(t, cluster.(*HelmCluster).helmOptions.SetValues, helmValues)
 }

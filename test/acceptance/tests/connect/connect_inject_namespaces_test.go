@@ -4,9 +4,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )
@@ -72,35 +74,35 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			}
 
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
 
-			staticServerOpts := &k8s.KubectlOptions{
+			staticServerOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
-			staticClientOpts := &k8s.KubectlOptions{
+			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: ctx.KubectlOptions(t).ContextName,
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 
-			t.Logf("creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
-			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
+			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			helpers.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			t.Log("creating static-server and static-client deployments")
-			helpers.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			helpers.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			logger.Log(t, "creating static-server and static-client deployments")
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
@@ -126,8 +128,8 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			require.Len(t, services, 1)
 
 			if c.secure {
-				t.Log("checking that the connection is not successful because there's no intention")
-				helpers.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
+				logger.Log(t, "checking that the connection is not successful because there's no intention")
+				k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 
 				intention := &api.Intention{
 					SourceName:      staticClientName,
@@ -144,13 +146,13 @@ func TestConnectInjectNamespaces(t *testing.T) {
 					intention.DestinationNS = c.destinationNamespace
 				}
 
-				t.Log("creating intention")
+				logger.Log(t, "creating intention")
 				_, _, err := consulClient.Connect().IntentionCreate(intention, nil)
 				require.NoError(t, err)
 			}
 
-			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
+			logger.Log(t, "checking that connection is successful")
+			k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 		})
 	}
 }

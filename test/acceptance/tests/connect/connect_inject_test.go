@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )
@@ -39,21 +41,21 @@ func TestConnectInject(t *testing.T) {
 			}
 
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
 
-			t.Log("creating static-server and static-client deployments")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			logger.Log(t, "creating static-server and static-client deployments")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			if c.secure {
-				t.Log("checking that the connection is not successful because there's no intention")
-				helpers.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+				logger.Log(t, "checking that the connection is not successful because there's no intention")
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 
 				consulClient := consulCluster.SetupConsulClient(t, true)
 
-				t.Log("creating intention")
+				logger.Log(t, "creating intention")
 				_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
 					SourceName:      staticClientName,
 					DestinationName: staticServerName,
@@ -62,8 +64,8 @@ func TestConnectInject(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+			logger.Log(t, "checking that connection is successful")
+			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 		})
 	}
 }

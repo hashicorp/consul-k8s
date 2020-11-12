@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ func TestConsulDNS(t *testing.T) {
 			ctx := env.DefaultContext(t)
 			releaseName := helpers.RandomName()
 
-			cluster := framework.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
+			cluster := consul.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
 
 			k8sClient := ctx.KubernetesClient(t)
@@ -68,11 +69,11 @@ func TestConsulDNS(t *testing.T) {
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
 				// they should have different pod names.
-				helpers.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", podName)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", podName)
 			})
 
 			retry.Run(t, func(r *retry.R) {
-				logs, err := helpers.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
+				logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
 				require.NoError(r, err)
 
 				// When the `dig` request is successful, a section of it's response looks like the following:

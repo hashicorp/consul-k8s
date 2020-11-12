@@ -1,10 +1,11 @@
-package helpers
+package k8s
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/gruntwork-io/terratest/modules/logger"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,13 +16,13 @@ import (
 // RunKubectlAndGetOutputE runs an arbitrary kubectl command provided via args
 // and returns its output and error.
 func RunKubectlAndGetOutputE(t testing.TestingT, options *k8s.KubectlOptions, args ...string) (string, error) {
-	return RunKubectlAndGetOutputWithLoggerE(t, options, logger.TestingT, args...)
+	return RunKubectlAndGetOutputWithLoggerE(t, options, terratestLogger.New(logger.TestLogger{}), args...)
 }
 
 // RunKubectlAndGetOutputWithLoggerE is the same as RunKubectlAndGetOutputE but
 // it also allows you to provide a custom logger. This is useful if the command output
 // contains sensitive information, for example, when you can pass logger.Discard.
-func RunKubectlAndGetOutputWithLoggerE(t testing.TestingT, options *k8s.KubectlOptions, logger *logger.Logger, args ...string) (string, error) {
+func RunKubectlAndGetOutputWithLoggerE(t testing.TestingT, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
 	var cmdArgs []string
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)

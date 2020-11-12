@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/environment"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -23,7 +26,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	cfg := suite.Config()
 
 	primaryContext := env.DefaultContext(t)
-	secondaryContext := env.Context(t, framework.SecondaryContextName)
+	secondaryContext := env.Context(t, environment.SecondaryContextName)
 
 	primaryHelmValues := map[string]string{
 		"global.datacenter":                        "dc1",
@@ -41,12 +44,12 @@ func TestMeshGatewayDefault(t *testing.T) {
 	releaseName := helpers.RandomName()
 
 	// Install the primary consul cluster in the default kubernetes context
-	primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
+	primaryConsulCluster := consul.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 	primaryConsulCluster.Create(t)
 
 	// Get the federation secret from the primary cluster and apply it to secondary cluster
 	federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-	t.Logf("retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
+	logger.Logf(t, "retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
 	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 	federationSecret.ResourceVersion = ""
 	require.NoError(t, err)
@@ -79,25 +82,25 @@ func TestMeshGatewayDefault(t *testing.T) {
 	}
 
 	// Install the secondary consul cluster in the secondary kubernetes context
-	secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
+	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
 	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
 	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
 
 	// Verify federation between servers
-	t.Log("verifying federation was successful")
+	logger.Log(t, "verifying federation was successful")
 	verifyFederation(t, primaryClient, secondaryClient, false)
 
 	// Check that we can connect services over the mesh gateways
-	t.Log("creating static-server in dc2")
-	helpers.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	logger.Log(t, "creating static-server in dc2")
+	k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-	t.Log("creating static-client in dc1")
-	helpers.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	logger.Log(t, "creating static-client in dc1")
+	k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
-	t.Log("checking that connection is successful")
-	helpers.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
+	logger.Log(t, "checking that connection is successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -123,7 +126,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			cfg := suite.Config()
 
 			primaryContext := env.DefaultContext(t)
-			secondaryContext := env.Context(t, framework.SecondaryContextName)
+			secondaryContext := env.Context(t, environment.SecondaryContextName)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter":            "dc1",
@@ -145,12 +148,12 @@ func TestMeshGatewaySecure(t *testing.T) {
 			releaseName := helpers.RandomName()
 
 			// Install the primary consul cluster in the default kubernetes context
-			primaryConsulCluster := framework.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
+			primaryConsulCluster := consul.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
 			federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-			t.Logf("retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
+			logger.Logf(t, "retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
 			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 			require.NoError(t, err)
 			federationSecret.ResourceVersion = ""
@@ -188,24 +191,24 @@ func TestMeshGatewaySecure(t *testing.T) {
 			}
 
 			// Install the secondary consul cluster in the secondary kubernetes context
-			secondaryConsulCluster := framework.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
+			secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
 
 			primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
 			secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
 
 			// Verify federation between servers
-			t.Log("verifying federation was successful")
+			logger.Log(t, "verifying federation was successful")
 			verifyFederation(t, primaryClient, secondaryClient, true)
 
 			// Check that we can connect services over the mesh gateways
-			t.Log("creating static-server in dc2")
-			helpers.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			logger.Log(t, "creating static-server in dc2")
+			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-			t.Log("creating static-client in dc1")
-			helpers.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+			logger.Log(t, "creating static-client in dc1")
+			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
-			t.Log("creating intention")
+			logger.Log(t, "creating intention")
 			_, _, err = primaryClient.Connect().IntentionCreate(&api.Intention{
 				SourceName:      staticClientName,
 				DestinationName: "static-server",
@@ -213,8 +216,8 @@ func TestMeshGatewaySecure(t *testing.T) {
 			}, nil)
 			require.NoError(t, err)
 
-			t.Log("checking that connection is successful")
-			helpers.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
+			logger.Log(t, "checking that connection is successful")
+			k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
 		})
 	}
 }
