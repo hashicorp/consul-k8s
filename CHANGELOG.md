@@ -35,7 +35,7 @@ BUG FIXES:
 * CRDs: **(Consul Enterprise only)** validate custom resources can only set namespace fields if Consul namespaces are enabled. [[GH-375](https://github.com/hashicorp/consul-k8s/pull/375)]
 * CRDs: Ensure ACL token is global so that secondary DCs can manage custom resources.
   Without this fix, controllers running in secondary datacenters would get ACL errors. [[GH-369](https://github.com/hashicorp/consul-k8s/pull/369)]
-* CRDs: **(Consul Enterprise only)** do not attempt to create a `*` namespace when service intentions specify `*` as destination.namespace. [[GH-382](https://github.com/hashicorp/consul-k8s/pull/382)]
+* CRDs: **(Consul Enterprise only)** do not attempt to create a `*` namespace when service intentions specify `*` as `destination.namespace`. [[GH-382](https://github.com/hashicorp/consul-k8s/pull/382)]
 
 ## 0.19.0 (October 12, 2020)
 
