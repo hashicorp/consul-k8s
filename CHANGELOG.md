@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.26.0 (Nov 12, 2020)
+
 FEATURES:
 * Kubernetes health check synchronization with Consul for connect injected pods via `connectInject.healthChecks` [[GH-651](https://github.com/hashicorp/consul-helm/pull/651)].
   The default behavior for this feature is `enabled: true`.
