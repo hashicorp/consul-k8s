@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
-	"github.com/hashicorp/consul-helm/test/acceptance/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
@@ -54,16 +56,16 @@ func TestSyncCatalog(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			releaseName := helpers.RandomName()
-			consulCluster := framework.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
+			consulCluster := consul.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
 
 			consulCluster.Create(t)
 
-			t.Log("creating a static-server with a service")
-			helpers.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			logger.Log(t, "creating a static-server with a service")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient := consulCluster.SetupConsulClient(t, c.secure)
 
-			t.Log("checking that the service has been synced to Consul")
+			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string
 			syncedServiceName := fmt.Sprintf("static-server-%s", ctx.KubectlOptions(t).Namespace)
 			counter := &retry.Counter{Count: 10, Wait: 5 * time.Second}

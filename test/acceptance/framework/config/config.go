@@ -1,4 +1,4 @@
-package framework
+package config
 
 import (
 	"fmt"
@@ -7,6 +7,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
+
+// The path to the helm chart.
+// Note: this will need to be changed if this file is moved.
+const HelmChartPath = "../../../.."
 
 // TestConfig holds configuration for the test suite
 type TestConfig struct {
@@ -68,7 +72,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 // and sets global.image to the consul enterprise image with that version.
 func (t *TestConfig) entImage() (string, error) {
 	if t.helmChartPath == "" {
-		t.helmChartPath = helmChartPath
+		t.helmChartPath = HelmChartPath
 	}
 
 	// Unmarshal Chart.yaml to get appVersion (i.e. Consul version)

@@ -1,9 +1,11 @@
-package framework
+package flags
 
 import (
 	"errors"
 	"flag"
 	"sync"
+
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
 )
 
 type TestFlags struct {
@@ -77,7 +79,7 @@ func (t *TestFlags) init() {
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
 }
 
-func (t *TestFlags) validate() error {
+func (t *TestFlags) Validate() error {
 	if t.flagEnableMultiCluster {
 		if t.flagSecondaryKubecontext == "" && t.flagSecondaryKubeconfig == "" {
 			return errors.New("at least one of -secondary-kubecontext or -secondary-kubeconfig flags must be provided if -enable-multi-cluster is set")
@@ -93,10 +95,10 @@ func (t *TestFlags) validate() error {
 	return nil
 }
 
-func (t *TestFlags) testConfigFromFlags() *TestConfig {
+func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	tempDir := t.flagDebugDirectory
 
-	return &TestConfig{
+	return &config.TestConfig{
 		Kubeconfig:    t.flagKubeconfig,
 		KubeContext:   t.flagKubecontext,
 		KubeNamespace: t.flagNamespace,

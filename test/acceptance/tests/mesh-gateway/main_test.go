@@ -5,13 +5,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework"
+	testsuite "github.com/hashicorp/consul-helm/test/acceptance/framework/suite"
 )
 
-var suite framework.Suite
+var suite testsuite.Suite
 
 func TestMain(m *testing.M) {
-	suite = framework.NewSuite(m)
+	suite = testsuite.NewSuite(m)
 
 	if suite.Config().EnableMultiCluster {
 		os.Exit(suite.Run())
