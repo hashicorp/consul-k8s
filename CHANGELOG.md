@@ -6,7 +6,7 @@ FEATURES:
       A Consul health check is registered for each connect-injected pod which mirrors the pod's Readiness status to Consul. This modifies connect routing to only
       pods which have passing Kubernetes health checks. See breaking changes for more information.
     * Adds a new label to connect-injected pods which mirrors the `consul.hashicorp.com/connect-inject-status` annotation.
-  Consul-ENT only: Adds a new annotation to connect-injected pods when namespaces are enabled: `consul.hashicorp.com/consul-namespace` [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
+    * **(Consul Enterprise only)** Adds a new annotation to connect-injected pods when namespaces are enabled: `consul.hashicorp.com/consul-namespace`. [[GH-376](https://github.com/hashicorp/consul-k8s/pull/376)]
 
 BREAKING CHANGES:
 * Connect: With the addition of the connect-inject health checks controller any connect services which have failing Kubernetes readiness
@@ -15,25 +15,27 @@ BREAKING CHANGES:
   Users should verify that their connect services are passing Kubernetes readiness probes prior to using health checks synchronization.
 
 DEPRECATIONS:
-* `create-inject-token` in the server-acl-init command has been undeprecated.
+* `create-inject-token` in the server-acl-init command has been un-deprecated.
   `-create-inject-auth-method` has been deprecated and replaced by `-create-inject-token`.
+  
   `-create-inject-namespace-token` in the server-acl-init command has been deprecated. Please use `-create-inject-token` and `-enable-namespaces` flags
-  to achieve the same functionality.[[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)].
+  to achieve the same functionality. [[GH-368](https://github.com/hashicorp/consul-k8s/pull/368)]
 
 IMPROVEMENTS:
 * Connect: support passing extra arguments to the envoy binary. [[GH-378](https://github.com/hashicorp/consul-k8s/pull/378)]
+    
     Arguments can be passed in 2 ways:
-    * via a flag to the consul-k8s inject-connect command:
+    * via a flag to the consul-k8s inject-connect command,
       e.g. `consul-k8s inject-connect -envoy-extra-args="--log-level debug --disable-hot-restart"`
-    * via pod annotations
+    * via pod annotations,
       e.g. `consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"`
 
 BUG FIXES:
-* Federation: ensure replication ACL token can replicate policies and tokens in Consul namespaces other than `default` (Consul-enterprise only). [[GH-364](https://github.com/hashicorp/consul-k8s/issues/364)]
-* CRDs: validate custom resources can only set namespace fields if Consul namespaces are enabled [[GH-375](https://github.com/hashicorp/consul-k8s/pull/375)]
+* Federation: **(Consul Enterprise only)** ensure replication ACL token can replicate policies and tokens in Consul namespaces other than `default`. [[GH-364](https://github.com/hashicorp/consul-k8s/issues/364)]
+* CRDs: **(Consul Enterprise only)** validate custom resources can only set namespace fields if Consul namespaces are enabled. [[GH-375](https://github.com/hashicorp/consul-k8s/pull/375)]
 * CRDs: Ensure ACL token is global so that secondary DCs can manage custom resources.
   Without this fix, controllers running in secondary datacenters would get ACL errors. [[GH-369](https://github.com/hashicorp/consul-k8s/pull/369)]
-* CRDs: do not attempt to create a `*` namespace when service intentions specify `*` as destination.namespace. [[GH-382](https://github.com/hashicorp/consul-k8s/pull/382)]
+* CRDs: **(Consul Enterprise only)** do not attempt to create a `*` namespace when service intentions specify `*` as destination.namespace. [[GH-382](https://github.com/hashicorp/consul-k8s/pull/382)]
 
 ## 0.19.0 (October 12, 2020)
 
