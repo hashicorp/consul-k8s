@@ -112,7 +112,7 @@ func (c *Command) Run(args []string) int {
 		case <-time.After(c.flagSyncPeriod):
 			continue
 		case sig := <-c.sigCh:
-			logger.Info("{} received, shutting down", sig)
+			logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 			return 0
 		}
 	}
@@ -165,7 +165,11 @@ func (c *Command) parseConsulFlags() []string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 func (c *Command) Synopsis() string { return synopsis }

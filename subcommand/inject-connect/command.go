@@ -419,7 +419,11 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {

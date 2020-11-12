@@ -173,7 +173,7 @@ func (c *Command) Run(args []string) int {
 	// all the contexts that have been created by the process.
 	select {
 	case sig := <-c.sigCh:
-		c.logger.Info("{} received, shutting down", sig)
+		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 		cancelFunc()
 		for _, notifier := range notifiers {
 			notifier.Stop()
@@ -369,7 +369,11 @@ func (c *Command) Synopsis() string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"

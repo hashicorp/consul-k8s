@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -23,6 +24,28 @@ func TestRun_Defaults(t *testing.T) {
 	require.Equal(t, 10*time.Second, cmd.flagSyncPeriod)
 	require.Equal(t, "info", cmd.flagLogLevel)
 	require.Equal(t, "consul", cmd.flagConsulBinary)
+}
+
+func TestRun_ExitsCleanlyonSignals(t *testing.T) {
+	t.Run("SIGINT", testRunSignalHandling(syscall.SIGINT))
+	t.Run("SIGTERM", testRunSignalHandling(syscall.SIGTERM))
+}
+
+func testRunSignalHandling(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+		defer os.RemoveAll(tmpDir)
+
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI: ui,
+		}
+		// Run async because we need to kill it when the test is over.
+		exitChan := runCommandAsynchronously(&cmd, []string{
+			"-service-config", configFile,
+		})
+		defer stopCommand(t, &cmd, exitChan, sig)
+	}
 }
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -131,7 +154,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
-	defer stopCommand(t, &cmd, exitChan)
+	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
@@ -171,7 +194,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
-	defer stopCommand(t, &cmd, exitChan)
+	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
 
 	// Start the Consul agent after 500ms.
 	time.Sleep(500 * time.Millisecond)
@@ -231,7 +254,7 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
 	})
-	defer stopCommand(t, &cmd, exitChan)
+	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
 
 	expectedCommand := []string{
 		"services",
@@ -265,9 +288,9 @@ func runCommandAsynchronously(cmd *Command, args []string) chan int {
 	return exitChan
 }
 
-func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
+func stopCommand(t *testing.T, cmd *Command, exitChan chan int, sig os.Signal) {
 	if len(exitChan) == 0 {
-		cmd.interrupt()
+		cmd.sendSignal(sig)
 	}
 	select {
 	case c := <-exitChan:

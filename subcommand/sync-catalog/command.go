@@ -348,7 +348,7 @@ func (c *Command) Run(args []string) int {
 
 	// Interrupted/terminated, gracefully exit
 	case sig := <-c.sigCh:
-		c.logger.Info("{} received, shutting down", sig)
+		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 		cancelF()
 		if toConsulCh != nil {
 			<-toConsulCh
@@ -381,7 +381,11 @@ func (c *Command) Help() string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 func (c *Command) validateFlags() error {
