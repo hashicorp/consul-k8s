@@ -108,7 +108,16 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		exitChan := runCommandAsynchronously(&cmd, []string{
 			"-http-addr", testServer.HTTPAddr,
 		})
-		defer stopCommand(t, &cmd, exitChan, sig)
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitChan:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(time.Second * 10):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
 	}
 }
 

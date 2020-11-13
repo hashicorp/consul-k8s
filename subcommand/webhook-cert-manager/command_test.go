@@ -83,7 +83,16 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		exitCh := runCommandAsynchronously(&cmd, []string{
 			"-config-file", file.Name(),
 		})
-		defer stopCommand(t, &cmd, exitCh, sig)
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitCh:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(time.Second * 1):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
 	}
 }
 
