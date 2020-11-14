@@ -184,7 +184,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
 	})
-	defer stopCommand(t, &cmd, exitCh, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitCh)
 
 	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
@@ -292,7 +292,7 @@ func TestRun_SecretExists(t *testing.T) {
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
 	})
-	defer stopCommand(t, &cmd, exitCh, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitCh)
 
 	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
@@ -373,7 +373,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
 	})
-	defer stopCommand(t, &cmd, exitCh, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitCh)
 
 	var certificate, key []byte
 
@@ -447,7 +447,7 @@ func TestCertWatcher(t *testing.T) {
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
 	})
-	defer stopCommand(t, &cmd, exitCh, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitCh)
 
 	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
@@ -565,9 +565,9 @@ func runCommandAsynchronously(cmd *Command, args []string) chan int {
 	return exitChan
 }
 
-func stopCommand(t *testing.T, cmd *Command, exitChan chan int, sig os.Signal) {
+func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	if len(exitChan) == 0 {
-		cmd.sendSignal(sig)
+		cmd.interrupt()
 	}
 	select {
 	case c := <-exitChan:
