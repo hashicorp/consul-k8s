@@ -114,7 +114,11 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		select {
 		case exitCode := <-exitChan:
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-		case <-time.After(time.Second * 10):
+
+		// For some reason, this command cannot exit within 1s,
+		// so it's set higher than other tests in other commands
+		// to allow it to exit properly
+		case <-time.After(time.Second * 5):
 			// Fail if the signal was not caught.
 			require.Fail(t, "timeout waiting for command to exit")
 		}
