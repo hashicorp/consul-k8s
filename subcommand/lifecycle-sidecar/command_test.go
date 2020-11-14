@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -23,6 +24,37 @@ func TestRun_Defaults(t *testing.T) {
 	require.Equal(t, 10*time.Second, cmd.flagSyncPeriod)
 	require.Equal(t, "info", cmd.flagLogLevel)
 	require.Equal(t, "consul", cmd.flagConsulBinary)
+}
+
+func TestRun_ExitsCleanlyonSignals(t *testing.T) {
+	t.Run("SIGINT", testRunSignalHandling(syscall.SIGINT))
+	t.Run("SIGTERM", testRunSignalHandling(syscall.SIGTERM))
+}
+
+func testRunSignalHandling(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+		defer os.RemoveAll(tmpDir)
+
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI: ui,
+		}
+		// Run async because we need to kill it when the test is over.
+		exitChan := runCommandAsynchronously(&cmd, []string{
+			"-service-config", configFile,
+		})
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitChan:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(time.Second * 1):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
+	}
 }
 
 func TestRun_FlagValidation(t *testing.T) {

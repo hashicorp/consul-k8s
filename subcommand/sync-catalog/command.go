@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"regexp"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/deckarep/golang-set"
@@ -145,12 +146,12 @@ func (c *Command) init() {
 
 	c.help = flags.Usage(help, c.flags)
 
-	// Wait on an interrupt to exit. This channel must be initialized before
+	// Wait on an interrupt or terminate to exit. This channel must be initialized before
 	// Run() is called so that there are no race conditions where the channel
 	// is not defined.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, os.Interrupt)
+		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
 	}
 }
 
@@ -345,8 +346,9 @@ func (c *Command) Run(args []string) int {
 		}
 		return 1
 
-	// Interrupted, gracefully exit
-	case <-c.sigCh:
+	// Interrupted/terminated, gracefully exit
+	case sig := <-c.sigCh:
+		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 		cancelF()
 		if toConsulCh != nil {
 			<-toConsulCh
@@ -379,7 +381,11 @@ func (c *Command) Help() string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 func (c *Command) validateFlags() error {

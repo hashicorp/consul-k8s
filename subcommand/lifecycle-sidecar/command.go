@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -47,12 +48,12 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 
-	// Wait on an interrupt to exit. This channel must be initialized before
+	// Wait on an interrupt or terminate to exit. This channel must be initialized before
 	// Run() is called so that there are no race conditions where the channel
 	// is not defined.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, os.Interrupt)
+		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
 	}
 }
 
@@ -106,12 +107,12 @@ func (c *Command) Run(args []string) int {
 			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
 		}
 
-		// Re-loop after syncPeriod or exit if we receive an interrupt.
+		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
 		select {
 		case <-time.After(c.flagSyncPeriod):
 			continue
-		case <-c.sigCh:
-			logger.Info("SIGINT received, shutting down")
+		case sig := <-c.sigCh:
+			logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 			return 0
 		}
 	}
@@ -164,7 +165,11 @@ func (c *Command) parseConsulFlags() []string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 func (c *Command) Synopsis() string { return synopsis }

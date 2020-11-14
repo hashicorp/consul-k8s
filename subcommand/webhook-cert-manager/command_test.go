@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,6 +18,83 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+func TestRun_ExitsCleanlyOnSignals(t *testing.T) {
+	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
+	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
+}
+
+func testSignalHandling(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		webhookConfigOneName := "webhookOne"
+		webhookConfigTwoName := "webhookTwo"
+
+		caBundleOne := []byte("bootstrapped-CA-one")
+		caBundleTwo := []byte("bootstrapped-CA-two")
+
+		webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: webhookConfigOneName,
+			},
+			Webhooks: []admissionv1beta1.MutatingWebhook{
+				{
+					Name: "webhook-under-test",
+					ClientConfig: admissionv1beta1.WebhookClientConfig{
+						CABundle: caBundleOne,
+					},
+				},
+			},
+		}
+		webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: webhookConfigTwoName,
+			},
+			Webhooks: []admissionv1beta1.MutatingWebhook{
+				{
+					Name: "webhookOne-under-test",
+					ClientConfig: admissionv1beta1.WebhookClientConfig{
+						CABundle: caBundleTwo,
+					},
+				},
+				{
+					Name: "webhookTwo-under-test",
+					ClientConfig: admissionv1beta1.WebhookClientConfig{
+						CABundle: caBundleTwo,
+					},
+				},
+			},
+		}
+
+		k8s := fake.NewSimpleClientset(webhookOne, webhookTwo)
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI:        ui,
+			clientset: k8s,
+		}
+		cmd.init()
+
+		file, err := ioutil.TempFile("", "config.json")
+		require.NoError(t, err)
+		defer os.Remove(file.Name())
+
+		_, err = file.Write([]byte(configFile))
+		require.NoError(t, err)
+
+		exitCh := runCommandAsynchronously(&cmd, []string{
+			"-config-file", file.Name(),
+		})
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitCh:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(time.Second * 1):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
+	}
+}
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()

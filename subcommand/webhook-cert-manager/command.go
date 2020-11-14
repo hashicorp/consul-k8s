@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
@@ -65,12 +66,12 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flagSet)
 
-	// Wait on an interrupt to exit. This channel must be initialized before
+	// Wait on an interrupt or terminate to exit. This channel must be initialized before
 	// Run() is called so that there are no race conditions where the channel
 	// is not defined.
 	if c.sigCh == nil {
 		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, os.Interrupt)
+		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
 	}
 }
 
@@ -167,11 +168,12 @@ func (c *Command) Run(args []string) int {
 
 	go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 
-	// We define a signal handler for OS interrupts, and when an SIGINT is received,
+	// We define a signal handler for OS interrupts, and when an SIGINT or SIGTERM is received,
 	// we gracefully shut down, by first stopping our cert notifiers and then cancelling
 	// all the contexts that have been created by the process.
 	select {
-	case <-c.sigCh:
+	case sig := <-c.sigCh:
+		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 		cancelFunc()
 		for _, notifier := range notifiers {
 			notifier.Stop()
@@ -367,7 +369,11 @@ func (c *Command) Synopsis() string {
 // interrupt sends os.Interrupt signal to the command
 // so it can exit gracefully. This function is needed for tests
 func (c *Command) interrupt() {
-	c.sigCh <- os.Interrupt
+	c.sendSignal(syscall.SIGINT)
+}
+
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
 }
 
 const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"
