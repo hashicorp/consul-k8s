@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
