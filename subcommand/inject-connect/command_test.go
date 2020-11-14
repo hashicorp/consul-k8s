@@ -211,7 +211,7 @@ func TestRun_CommandFailsWithInvalidListener(t *testing.T) {
 // command cleanly.
 func TestRun_CommandExitsCleanlyAfterSignal(t *testing.T) {
 
-	t.Run("SIGNIT", testSignalHandling(syscall.SIGINT))
+	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
 }
 
