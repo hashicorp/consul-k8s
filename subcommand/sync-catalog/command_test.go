@@ -2,6 +2,8 @@ package synccatalog
 
 import (
 	"context"
+	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -79,6 +81,48 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 		require.Equal(r, "consul", serviceList.Items[0].Name)
 		require.Equal(r, "consul.service.consul", serviceList.Items[0].Spec.ExternalName)
 	})
+}
+
+// Test that the command exits cleanly on signals
+func TestRun_ExitCleanlyOnSignals(t *testing.T) {
+	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
+	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
+}
+
+func testSignalHandling(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		k8s, testServer := completeSetup(t)
+		defer testServer.Stop()
+
+		// Run the command.
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI:        ui,
+			clientset: k8s,
+			logger: hclog.New(&hclog.LoggerOptions{
+				Name:  t.Name(),
+				Level: hclog.Debug,
+			}),
+		}
+
+		exitChan := runCommandAsynchronously(&cmd, []string{
+			"-http-addr", testServer.HTTPAddr,
+		})
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitChan:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+
+		// For some reason, this command cannot exit within 1s,
+		// so it's set higher than other tests in other commands
+		// to allow it to exit properly
+		case <-time.After(time.Second * 5):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
+	}
 }
 
 // Test that when -add-k8s-namespace-suffix flag is used
