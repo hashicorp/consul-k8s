@@ -163,7 +163,7 @@ func TestRun_ServicesRegistration(t *testing.T) {
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,
@@ -203,7 +203,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	// Start the Consul agent after 500ms.
 	time.Sleep(500 * time.Millisecond)
@@ -263,7 +263,7 @@ func TestRun_ConsulCommandFlags(t *testing.T) {
 		"-ca-file=/ca/file",
 		"-ca-path=/ca/path",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	expectedCommand := []string{
 		"services",
@@ -297,9 +297,9 @@ func runCommandAsynchronously(cmd *Command, args []string) chan int {
 	return exitChan
 }
 
-func stopCommand(t *testing.T, cmd *Command, exitChan chan int, sig os.Signal) {
+func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	if len(exitChan) == 0 {
-		cmd.sendSignal(sig)
+		cmd.interrupt()
 	}
 	select {
 	case c := <-exitChan:

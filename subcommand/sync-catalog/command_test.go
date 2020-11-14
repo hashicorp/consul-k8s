@@ -72,7 +72,7 @@ func TestRun_Defaults_SyncsConsulServiceToK8s(t *testing.T) {
 	exitChan := runCommandAsynchronously(&cmd, []string{
 		"-http-addr", testServer.HTTPAddr,
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	retry.Run(t, func(r *retry.R) {
 		serviceList, err := k8s.CoreV1().Services(metav1.NamespaceDefault).List(context.Background(), metav1.ListOptions{})
@@ -156,7 +156,7 @@ func TestRun_ToConsulWithAddK8SNamespaceSuffix(t *testing.T) {
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	retry.Run(t, func(r *retry.R) {
 		services, _, err := consulClient.Catalog().Services(nil)
@@ -207,14 +207,14 @@ func TestCommand_Run_ToConsulChangeAddK8SNamespaceSuffixToTrue(t *testing.T) {
 		require.Contains(r, services, "foo")
 	})
 
-	stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	stopCommand(t, &cmd, exitChan)
 
 	// restart sync with -add-k8s-namespace-suffix
 	exitChan = runCommandAsynchronously(&cmd, []string{
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	// check that the name of the service is now namespaced
 	retry.Run(t, func(r *retry.R) {
@@ -263,7 +263,7 @@ func TestCommand_Run_ToConsulTwoServicesSameNameDifferentNamespace(t *testing.T)
 		"-consul-write-interval", "100ms",
 		"-add-k8s-namespace-suffix",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	// check that the name of the service is namespaced
 	retry.Run(t, func(r *retry.R) {
@@ -373,7 +373,7 @@ func TestRun_ToConsulAllowDenyLists(t *testing.T) {
 				}),
 			}
 			exitChan := runCommandAsynchronously(&cmd, flags)
-			defer stopCommand(tt, &cmd, exitChan, syscall.SIGINT)
+			defer stopCommand(tt, &cmd, exitChan)
 
 			retry.Run(tt, func(r *retry.R) {
 				svcs, _, err := consulClient.Catalog().Services(nil)
@@ -528,7 +528,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 						require.Equal(r, instances[0].ServiceName, svcName)
 					}
 				})
-				stopCommand(tt, &firstCmd, exitChan, syscall.SIGINT)
+				stopCommand(tt, &firstCmd, exitChan)
 			}
 			tt.Log("first command run complete")
 
@@ -544,7 +544,7 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 					}),
 				}
 				exitChan := runCommandAsynchronously(&secondCmd, append(commonArgs, c.SecondRunFlags...))
-				defer stopCommand(tt, &secondCmd, exitChan, syscall.SIGINT)
+				defer stopCommand(tt, &secondCmd, exitChan)
 
 				// Wait until the expected services are synced and the old ones
 				// deleted.
@@ -599,9 +599,9 @@ func runCommandAsynchronously(cmd *Command, args []string) chan int {
 	return exitChan
 }
 
-func stopCommand(t *testing.T, cmd *Command, exitChan chan int, sig os.Signal) {
+func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	if len(exitChan) == 0 {
-		cmd.sendSignal(sig)
+		cmd.interrupt()
 	}
 	select {
 	case c := <-exitChan:

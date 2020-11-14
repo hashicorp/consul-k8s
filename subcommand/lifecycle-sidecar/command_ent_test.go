@@ -4,7 +4,6 @@ package subcommand
 
 import (
 	"os"
-	"syscall"
 	"testing"
 	"time"
 
@@ -36,7 +35,7 @@ func TestRun_ServicesRegistration_Namespaces(t *testing.T) {
 		"-service-config", configFile,
 		"-sync-period", "100ms",
 	})
-	defer stopCommand(t, &cmd, exitChan, syscall.SIGINT)
+	defer stopCommand(t, &cmd, exitChan)
 
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPAddr,

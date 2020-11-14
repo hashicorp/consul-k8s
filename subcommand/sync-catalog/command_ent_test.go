@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -88,7 +87,7 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 				"-allow-k8s-namespace=*",
 				"-add-k8s-namespace-suffix=false",
 			})
-			defer stopCommand(tt, &cmd, exitChan, syscall.SIGINT)
+			defer stopCommand(tt, &cmd, exitChan)
 
 			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 			retry.RunWith(timer, tt, func(r *retry.R) {
@@ -227,7 +226,7 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 				"-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
 			}, c.ExtraFlags...)
 			exitChan := runCommandAsynchronously(&cmd, args)
-			defer stopCommand(tt, &cmd, exitChan, syscall.SIGINT)
+			defer stopCommand(tt, &cmd, exitChan)
 
 			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 			retry.RunWith(timer, tt, func(r *retry.R) {
@@ -513,7 +512,7 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 						require.Equal(r, instances[0].ServiceName, svcName)
 					}
 				})
-				stopCommand(tt, &firstCmd, exitChan, syscall.SIGINT)
+				stopCommand(tt, &firstCmd, exitChan)
 			}
 			tt.Log("first command run complete")
 
@@ -529,7 +528,7 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 					}),
 				}
 				exitChan := runCommandAsynchronously(&secondCmd, append(commonArgs, c.SecondRunFlags...))
-				defer stopCommand(tt, &secondCmd, exitChan, syscall.SIGINT)
+				defer stopCommand(tt, &secondCmd, exitChan)
 
 				// Wait until the expected services are synced and the old ones
 				// deleted.
@@ -694,7 +693,7 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 				"-consul-cross-namespace-acl-policy=cross-namespace-policy",
 			}
 			exitChan := runCommandAsynchronously(&cmd, append(commonArgs, c.Flags...))
-			defer stopCommand(tt, &cmd, exitChan, syscall.SIGINT)
+			defer stopCommand(tt, &cmd, exitChan)
 
 			// Check the namespaces are created correctly
 			timer = &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
