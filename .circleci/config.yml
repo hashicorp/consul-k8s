@@ -128,7 +128,7 @@ jobs:
       - run:
           name: Run acceptance tests
           working_directory: test/acceptance/tests
-          no_output_timeout: 30m
+          no_output_timeout: 1h
           command: |
             eval "$(echo export primary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[0]))"
             eval "$(echo export secondary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[1]))"
@@ -167,6 +167,77 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
+  acceptance-aks-1-19:
+    environment:
+      - TEST_RESULTS: /tmp/test-results
+    docker:
+      # This image is build from test/docker/Test.dockerfile
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.5.0
+
+    steps:
+      - checkout
+
+      - run:
+          name: terraform init & apply
+          working_directory: test/terraform/aks
+          command: |
+            terraform init
+
+            terraform apply -var client_id="$ARM_CLIENT_ID" -var client_secret="$ARM_CLIENT_SECRET" -var cluster_count=2 -auto-approve
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-modcache-v1-{{ checksum "test/acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run acceptance tests
+          working_directory: test/acceptance/tests
+          no_output_timeout: 1h
+          command: |
+            export primary_kubeconfig=$(terraform output -state ../../terraform/aks/terraform.tfstate -json | jq -r .kubeconfigs.value[0])
+            export secondary_kubeconfig=$(terraform output -state ../../terraform/aks/terraform.tfstate -json | jq -r .kubeconfigs.value[1])
+
+            # We have to run the tests for each package separately so that we can
+            # exit early if any test fails (-failfast only works within a single
+            # package).
+            exit_code=0
+            for pkg in $(go list ./...)
+            do
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 40m -failfast \
+                    -enable-enterprise \
+                    -enable-multi-cluster \
+                    -kubeconfig="$primary_kubeconfig" \
+                    -secondary-kubeconfig="$secondary_kubeconfig" \
+                    -debug-directory="$TEST_RESULTS/debug" \
+                    -consul-k8s-image=hashicorpdev/consul-k8s:latest
+              then
+                echo "Tests in ${pkg} failed, aborting early"
+                exit_code=1
+                break
+              fi
+            done
+            gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
+            exit $exit_code
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+      - run:
+          name: terraform destroy
+          working_directory: test/terraform/aks
+          command: |
+            terraform destroy -auto-approve
+          when: always
+
+      - slack/status:
+          fail_only: true
+          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-openshift:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -204,7 +275,7 @@ jobs:
       - run:
           name: Run acceptance tests
           working_directory: test/acceptance/tests
-          no_output_timeout: 40m
+          no_output_timeout: 1h
           command: |
             gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
               -enable-openshift \
@@ -276,6 +347,7 @@ workflows:
                 - master
     jobs:
       - acceptance-openshift
+      - acceptance-aks-1-19
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
