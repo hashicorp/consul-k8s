@@ -8,13 +8,16 @@ import (
 	capi "github.com/hashicorp/consul/api"
 )
 
-const WildcardNamespace string = "*"
+const (
+	WildcardNamespace = "*"
+	DefaultNamespace  = "default"
+)
 
 // EnsureExists ensures a Consul namespace with name ns exists. If it doesn't,
 // it will create it and set crossNSACLPolicy as a policy default.
 // Boolean return value indicates if the namespace was created by this call.
 func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) (bool, error) {
-	if ns == WildcardNamespace {
+	if ns == WildcardNamespace || ns == DefaultNamespace {
 		return false, nil
 	}
 	// Check if the Consul namespace exists.
