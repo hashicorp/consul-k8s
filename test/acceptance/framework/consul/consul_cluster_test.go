@@ -14,15 +14,45 @@ import (
 // to a helm install, it will respect the helmValues over
 // the values from TestConfig.
 func TestNewHelmCluster(t *testing.T) {
-	helmValues := map[string]string{
-		"global.image":           "test-image",
-		"feature.enabled":        "true",
-		"server.bootstrapExpect": "3",
-		"server.replicas":        "3",
+	tests := []struct {
+		name       string
+		helmValues map[string]string
+		want       map[string]string
+	}{
+		{
+			name:       "defaults are used when no helmValues are set",
+			helmValues: map[string]string{},
+			want: map[string]string{
+				"global.image":                 "test-config-image",
+				"server.bootstrapExpect":       "1",
+				"server.replicas":              "1",
+				"connectInject.envoyExtraArgs": "--log-level debug",
+			},
+		},
+		{
+			name: "when using helmValues, defaults are overridden",
+			helmValues: map[string]string{
+				"global.image":                 "test-image",
+				"server.bootstrapExpect":       "3",
+				"server.replicas":              "3",
+				"connectInject.envoyExtraArgs": "--foo",
+				"feature.enabled":              "true",
+			},
+			want: map[string]string{
+				"global.image":                 "test-image",
+				"server.bootstrapExpect":       "3",
+				"server.replicas":              "3",
+				"connectInject.envoyExtraArgs": "--foo",
+				"feature.enabled":              "true",
+			},
+		},
 	}
-	cluster := NewHelmCluster(t, helmValues, &ctx{}, &config.TestConfig{ConsulImage: "test-config-image"}, "test")
-
-	require.Equal(t, cluster.(*HelmCluster).helmOptions.SetValues, helmValues)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := NewHelmCluster(t, tt.helmValues, &ctx{}, &config.TestConfig{ConsulImage: "test-config-image"}, "test")
+			require.Equal(t, cluster.(*HelmCluster).helmOptions.SetValues, tt.want)
+		})
+	}
 }
 
 type ctx struct{}
