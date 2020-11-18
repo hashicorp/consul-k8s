@@ -52,10 +52,11 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string) Cluster {
 
-	// Deploy single-server cluster by default unless helmValues overwrites that
+	// Deploy with the following defaults unless helmValues overwrites it.
 	values := map[string]string{
-		"server.replicas":        "1",
-		"server.bootstrapExpect": "1",
+		"server.replicas":              "1",
+		"server.bootstrapExpect":       "1",
+		"connectInject.envoyExtraArgs": "--log-level debug",
 	}
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
