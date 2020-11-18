@@ -14,9 +14,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+func init() {
+	SchemeBuilder.Register(&ServiceRouter{}, &ServiceRouterList{})
+}
+
 const (
 	ServiceRouterKubeKind string = "servicerouter"
 )
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
+// ServiceRouter is the Schema for the servicerouters API
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+type ServiceRouter struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ServiceRouterSpec `json:"spec,omitempty"`
+	Status `json:"status,omitempty"`
+}
 
 // ServiceRouterSpec defines the desired state of ServiceRouter
 type ServiceRouterSpec struct {
@@ -35,47 +53,9 @@ type ServiceRoute struct {
 	Destination *ServiceRouteDestination `json:"destination,omitempty"`
 }
 
-func (in ServiceRoute) toConsul() capi.ServiceRoute {
-	return capi.ServiceRoute{
-		Match:       in.Match.toConsul(),
-		Destination: in.Destination.toConsul(),
-	}
-}
-
-func (in ServiceRoute) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	if in.Destination != nil && in.Destination.PrefixRewrite != "" {
-		if in.Match == nil || in.Match.HTTP == nil || (in.Match.HTTP.PathPrefix == "" && in.Match.HTTP.PathExact == "") {
-			asJSON, _ := json.Marshal(in)
-			errs = append(errs, field.Invalid(path, string(asJSON), "destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route"))
-		}
-	}
-	if err := in.Match.validate(path.Child("match")); err != nil {
-		errs = append(err, err...)
-	}
-
-	return errs
-}
-
 type ServiceRouteMatch struct {
 	// HTTP is a set of http-specific match criteria.
 	HTTP *ServiceRouteHTTPMatch `json:"http,omitempty"`
-}
-
-func (in *ServiceRouteMatch) toConsul() *capi.ServiceRouteMatch {
-	if in == nil {
-		return nil
-	}
-	return &capi.ServiceRouteMatch{
-		HTTP: in.HTTP.toConsul(),
-	}
-}
-
-func (in *ServiceRouteMatch) validate(path *field.Path) field.ErrorList {
-	if in == nil {
-		return nil
-	}
-	return in.HTTP.validate(path.Child("http"))
 }
 
 type ServiceRouteHTTPMatch struct {
@@ -97,56 +77,16 @@ type ServiceRouteHTTPMatch struct {
 	Methods []string `json:"methods,omitempty"`
 }
 
-func (in *ServiceRouteHTTPMatch) toConsul() *capi.ServiceRouteHTTPMatch {
-	if in == nil {
-		return nil
-	}
-	var header []capi.ServiceRouteHTTPMatchHeader
-	for _, h := range in.Header {
-		header = append(header, h.toConsul())
-	}
-	var query []capi.ServiceRouteHTTPMatchQueryParam
-	for _, q := range in.QueryParam {
-		query = append(query, q.toConsul())
-	}
-	return &capi.ServiceRouteHTTPMatch{
-		PathExact:  in.PathExact,
-		PathPrefix: in.PathPrefix,
-		PathRegex:  in.PathRegex,
-		Header:     header,
-		QueryParam: query,
-		Methods:    in.Methods,
-	}
-}
-
-func (in *ServiceRouteHTTPMatch) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	if in == nil {
-		return nil
-	}
-	if numNonZeroValue(in.PathExact, in.PathPrefix, in.PathRegex) > 1 {
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON), "at most only one of pathExact, pathPrefix, or pathRegex may be configured"))
-	}
-	if invalidPathPrefix(in.PathExact) {
-		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, "must begin with a '/'"))
-	}
-	if invalidPathPrefix(in.PathPrefix) {
-		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, "must begin with a '/'"))
-	}
-
-	for i, h := range in.Header {
-		if err := h.validate(path.Child("header").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	for i, q := range in.QueryParam {
-		if err := q.validate(path.Child("queryParam").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errs
+type ServiceRouteHTTPMatchQueryParam struct {
+	// Name is the name of the query parameter to match on.
+	Name string `json:"name"`
+	// Present will match if the query parameter with the given name is present
+	// with any value.
+	Present bool `json:"present,omitempty"`
+	// Exact will match if the query parameter with the given name is this value.
+	Exact string `json:"exact,omitempty"`
+	// Regex will match if the query parameter with the given name matches this pattern.
+	Regex string `json:"regex,omitempty"`
 }
 
 type ServiceRouteHTTPMatchHeader struct {
@@ -164,63 +104,6 @@ type ServiceRouteHTTPMatchHeader struct {
 	Regex string `json:"regex,omitempty"`
 	// Invert inverts the logic of the match.
 	Invert bool `json:"invert,omitempty"`
-}
-
-func (in ServiceRouteHTTPMatchHeader) toConsul() capi.ServiceRouteHTTPMatchHeader {
-	return capi.ServiceRouteHTTPMatchHeader{
-		Name:    in.Name,
-		Present: in.Present,
-		Exact:   in.Exact,
-		Prefix:  in.Prefix,
-		Suffix:  in.Suffix,
-		Regex:   in.Regex,
-		Invert:  in.Invert,
-	}
-}
-
-func (in *ServiceRouteHTTPMatchHeader) validate(path *field.Path) *field.Error {
-	if in == nil {
-		return nil
-	}
-
-	if numNonZeroValue(in.Exact, in.Prefix, in.Suffix, in.Regex, in.Present) > 1 {
-		asJSON, _ := json.Marshal(in)
-		return field.Invalid(path, string(asJSON), "at most only one of exact, prefix, suffix, regex, or present may be configured")
-	}
-	return nil
-}
-
-type ServiceRouteHTTPMatchQueryParam struct {
-	// Name is the name of the query parameter to match on.
-	Name string `json:"name"`
-	// Present will match if the query parameter with the given name is present
-	// with any value.
-	Present bool `json:"present,omitempty"`
-	// Exact will match if the query parameter with the given name is this value.
-	Exact string `json:"exact,omitempty"`
-	// Regex will match if the query parameter with the given name matches this pattern.
-	Regex string `json:"regex,omitempty"`
-}
-
-func (in ServiceRouteHTTPMatchQueryParam) toConsul() capi.ServiceRouteHTTPMatchQueryParam {
-	return capi.ServiceRouteHTTPMatchQueryParam{
-		Name:    in.Name,
-		Present: in.Present,
-		Exact:   in.Exact,
-		Regex:   in.Regex,
-	}
-}
-
-func (in *ServiceRouteHTTPMatchQueryParam) validate(path *field.Path) *field.Error {
-	if in == nil {
-		return nil
-	}
-
-	if numNonZeroValue(in.Exact, in.Regex, in.Present) > 1 {
-		asJSON, _ := json.Marshal(in)
-		return field.Invalid(path, string(asJSON), "at most only one of exact, regex, or present may be configured")
-	}
-	return nil
 }
 
 type ServiceRouteDestination struct {
@@ -250,34 +133,13 @@ type ServiceRouteDestination struct {
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
 }
 
-func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
-	if in == nil {
-		return nil
-	}
-	return &capi.ServiceRouteDestination{
-		Service:               in.Service,
-		ServiceSubset:         in.ServiceSubset,
-		Namespace:             in.Namespace,
-		PrefixRewrite:         in.PrefixRewrite,
-		RequestTimeout:        in.RequestTimeout,
-		NumRetries:            in.NumRetries,
-		RetryOnConnectFailure: in.RetryOnConnectFailure,
-		RetryOnStatusCodes:    in.RetryOnStatusCodes,
-	}
-}
-
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 
-// ServiceRouter is the Schema for the servicerouters API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-type ServiceRouter struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ServiceRouterSpec `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
+// ServiceRouterList contains a list of ServiceRouter
+type ServiceRouterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceRouter `json:"items"`
 }
 
 func (in *ServiceRouter) ConsulMirroringNS() string {
@@ -395,6 +257,59 @@ func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+func (in ServiceRoute) toConsul() capi.ServiceRoute {
+	return capi.ServiceRoute{
+		Match:       in.Match.toConsul(),
+		Destination: in.Destination.toConsul(),
+	}
+}
+
+func (in *ServiceRouteMatch) toConsul() *capi.ServiceRouteMatch {
+	if in == nil {
+		return nil
+	}
+	return &capi.ServiceRouteMatch{
+		HTTP: in.HTTP.toConsul(),
+	}
+}
+
+func (in ServiceRouteHTTPMatchHeader) toConsul() capi.ServiceRouteHTTPMatchHeader {
+	return capi.ServiceRouteHTTPMatchHeader{
+		Name:    in.Name,
+		Present: in.Present,
+		Exact:   in.Exact,
+		Prefix:  in.Prefix,
+		Suffix:  in.Suffix,
+		Regex:   in.Regex,
+		Invert:  in.Invert,
+	}
+}
+
+func (in ServiceRouteHTTPMatchQueryParam) toConsul() capi.ServiceRouteHTTPMatchQueryParam {
+	return capi.ServiceRouteHTTPMatchQueryParam{
+		Name:    in.Name,
+		Present: in.Present,
+		Exact:   in.Exact,
+		Regex:   in.Regex,
+	}
+}
+
+func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
+	if in == nil {
+		return nil
+	}
+	return &capi.ServiceRouteDestination{
+		Service:               in.Service,
+		ServiceSubset:         in.ServiceSubset,
+		Namespace:             in.Namespace,
+		PrefixRewrite:         in.PrefixRewrite,
+		RequestTimeout:        in.RequestTimeout,
+		NumRetries:            in.NumRetries,
+		RetryOnConnectFailure: in.RetryOnConnectFailure,
+		RetryOnStatusCodes:    in.RetryOnStatusCodes,
+	}
+}
+
 func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
@@ -410,17 +325,102 @@ func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorL
 	return errs
 }
 
-// +kubebuilder:object:root=true
+func (in ServiceRoute) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in.Destination != nil && in.Destination.PrefixRewrite != "" {
+		if in.Match == nil || in.Match.HTTP == nil || (in.Match.HTTP.PathPrefix == "" && in.Match.HTTP.PathExact == "") {
+			asJSON, _ := json.Marshal(in)
+			errs = append(errs, field.Invalid(path, string(asJSON), "destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route"))
+		}
+	}
+	if err := in.Match.validate(path.Child("match")); err != nil {
+		errs = append(err, err...)
+	}
 
-// ServiceRouterList contains a list of ServiceRouter
-type ServiceRouterList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceRouter `json:"items"`
+	return errs
 }
 
-func init() {
-	SchemeBuilder.Register(&ServiceRouter{}, &ServiceRouterList{})
+func (in *ServiceRouteMatch) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	return in.HTTP.validate(path.Child("http"))
+}
+
+func (in *ServiceRouteHTTPMatch) toConsul() *capi.ServiceRouteHTTPMatch {
+	if in == nil {
+		return nil
+	}
+	var header []capi.ServiceRouteHTTPMatchHeader
+	for _, h := range in.Header {
+		header = append(header, h.toConsul())
+	}
+	var query []capi.ServiceRouteHTTPMatchQueryParam
+	for _, q := range in.QueryParam {
+		query = append(query, q.toConsul())
+	}
+	return &capi.ServiceRouteHTTPMatch{
+		PathExact:  in.PathExact,
+		PathPrefix: in.PathPrefix,
+		PathRegex:  in.PathRegex,
+		Header:     header,
+		QueryParam: query,
+		Methods:    in.Methods,
+	}
+}
+
+func (in *ServiceRouteHTTPMatch) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in == nil {
+		return nil
+	}
+	if numNonZeroValue(in.PathExact, in.PathPrefix, in.PathRegex) > 1 {
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON), "at most only one of pathExact, pathPrefix, or pathRegex may be configured"))
+	}
+	if invalidPathPrefix(in.PathExact) {
+		errs = append(errs, field.Invalid(path.Child("pathExact"), in.PathExact, "must begin with a '/'"))
+	}
+	if invalidPathPrefix(in.PathPrefix) {
+		errs = append(errs, field.Invalid(path.Child("pathPrefix"), in.PathPrefix, "must begin with a '/'"))
+	}
+
+	for i, h := range in.Header {
+		if err := h.validate(path.Child("header").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	for i, q := range in.QueryParam {
+		if err := q.validate(path.Child("queryParam").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (in *ServiceRouteHTTPMatchHeader) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+
+	if numNonZeroValue(in.Exact, in.Prefix, in.Suffix, in.Regex, in.Present) > 1 {
+		asJSON, _ := json.Marshal(in)
+		return field.Invalid(path, string(asJSON), "at most only one of exact, prefix, suffix, regex, or present may be configured")
+	}
+	return nil
+}
+
+func (in *ServiceRouteHTTPMatchQueryParam) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+
+	if numNonZeroValue(in.Exact, in.Regex, in.Present) > 1 {
+		asJSON, _ := json.Marshal(in)
+		return field.Invalid(path, string(asJSON), "at most only one of exact, regex, or present may be configured")
+	}
+	return nil
 }
 
 // numNonZeroValue returns the number of elements that aren't set to their

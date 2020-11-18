@@ -17,6 +17,33 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+func init() {
+	SchemeBuilder.Register(&ServiceIntentions{}, &ServiceIntentionsList{})
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
+// ServiceIntentions is the Schema for the serviceintentions API
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+type ServiceIntentions struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ServiceIntentionsSpec `json:"spec,omitempty"`
+	Status `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ServiceIntentionsList contains a list of ServiceIntentions
+type ServiceIntentionsList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceIntentions `json:"items"`
+}
+
 // ServiceIntentionsSpec defines the desired state of ServiceIntentions
 type ServiceIntentionsSpec struct {
 	// Destination is the intention destination that will have the authorization granted to.
@@ -106,20 +133,6 @@ type IntentionHTTPHeaderPermission struct {
 // can be "allow" or "deny" to allowlist or denylist intentions.
 type IntentionAction string
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-
-// ServiceIntentions is the Schema for the serviceintentions API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-type ServiceIntentions struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ServiceIntentionsSpec `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
-}
-
 func (in *ServiceIntentions) ConsulMirroringNS() string {
 	return in.Spec.Destination.Namespace
 }
@@ -200,16 +213,77 @@ func (in *ServiceIntentions) ToConsul(datacenter string) api.ConfigEntry {
 	}
 }
 
+func (in *ServiceIntentions) ConsulGlobalResource() bool {
+	return false
+}
+
+func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
+	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
+	if !ok {
+		return false
+	}
+	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
+	return cmp.Equal(
+		in.ToConsul(""),
+		configEntry,
+		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
+		cmpopts.IgnoreUnexported(),
+		cmpopts.EquateEmpty(),
+	)
+}
+
+func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if len(in.Spec.Sources) == 0 {
+		errs = append(errs, field.Required(path.Child("sources"), `at least one source must be specified`))
+	}
+	for i, source := range in.Spec.Sources {
+		if len(source.Permissions) > 0 && source.Action != "" {
+			asJSON, _ := json.Marshal(source)
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), string(asJSON), `action and permissions are mutually exclusive and only one of them can be specified`))
+		} else if len(source.Permissions) == 0 {
+			if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			if err := source.Permissions.validate(path.Child("sources").Index(i)); err != nil {
+				errs = append(errs, err...)
+			}
+		}
+	}
+
+	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
+			in.KubernetesName(), errs)
+	}
+	return nil
+}
+
+// Default sets the namespace field on spec.destination to their default values if namespaces are enabled.
+func (in *ServiceIntentions) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	// If namespaces are enabled we want to set the destination namespace field to it's
+	// default. If namespaces are not enabled (i.e. OSS) we don't set the
+	// namespace fields because this would cause errors
+	// making API calls (because namespace fields can't be set in OSS).
+	if consulNamespacesEnabled {
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		if in.Spec.Destination.Namespace == "" {
+			in.Spec.Destination.Namespace = namespace
+		}
+	}
+}
+
 func (in SourceIntentions) toConsul() []*capi.SourceIntention {
 	var consulSourceIntentions []*capi.SourceIntention
 	for _, intention := range in {
 		consulSourceIntentions = append(consulSourceIntentions, intention.toConsul())
 	}
 	return consulSourceIntentions
-}
-
-func (in *ServiceIntentions) ConsulGlobalResource() bool {
-	return false
 }
 
 func (in *SourceIntention) toConsul() *capi.SourceIntention {
@@ -268,53 +342,6 @@ func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPe
 	}
 
 	return headerPermissions
-}
-
-func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
-	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
-	if !ok {
-		return false
-	}
-	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(
-		in.ToConsul(""),
-		configEntry,
-		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
-		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
-		cmpopts.IgnoreUnexported(),
-		cmpopts.EquateEmpty(),
-	)
-}
-
-func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	if len(in.Spec.Sources) == 0 {
-		errs = append(errs, field.Required(path.Child("sources"), `at least one source must be specified`))
-	}
-	for i, source := range in.Spec.Sources {
-		if len(source.Permissions) > 0 && source.Action != "" {
-			asJSON, _ := json.Marshal(source)
-			errs = append(errs, field.Invalid(path.Child("sources").Index(i), string(asJSON), `action and permissions are mutually exclusive and only one of them can be specified`))
-		} else if len(source.Permissions) == 0 {
-			if err := source.Action.validate(path.Child("sources").Index(i)); err != nil {
-				errs = append(errs, err)
-			}
-		} else {
-			if err := source.Permissions.validate(path.Child("sources").Index(i)); err != nil {
-				errs = append(errs, err...)
-			}
-		}
-	}
-
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
-
-	if len(errs) > 0 {
-		return apierrors.NewInvalid(
-			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: common.ServiceIntentions},
-			in.KubernetesName(), errs)
-	}
-	return nil
 }
 
 func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
@@ -396,20 +423,6 @@ func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorL
 	return errs
 }
 
-// Default sets the namespace field on spec.destination to their default values if namespaces are enabled.
-func (in *ServiceIntentions) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
-	// If namespaces are enabled we want to set the destination namespace field to it's
-	// default. If namespaces are not enabled (i.e. OSS) we don't set the
-	// namespace fields because this would cause errors
-	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
-		if in.Spec.Destination.Namespace == "" {
-			in.Spec.Destination.Namespace = namespace
-		}
-	}
-}
-
 func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
@@ -432,19 +445,6 @@ func (in IntentionAction) validate(path *field.Path) *field.Error {
 		return field.Invalid(path.Child("action"), in, notInSliceMessage(actions))
 	}
 	return nil
-}
-
-// +kubebuilder:object:root=true
-
-// ServiceIntentionsList contains a list of ServiceIntentions
-type ServiceIntentionsList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceIntentions `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ServiceIntentions{}, &ServiceIntentionsList{})
 }
 
 func numNotEmpty(ss ...string) int {
