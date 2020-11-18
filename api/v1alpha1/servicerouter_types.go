@@ -242,9 +242,7 @@ func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	for i, r := range in.Spec.Routes {
-		if err := r.validate(path.Child("routes").Index(i)); err != nil {
-			errs = append(errs, err...)
-		}
+		errs = append(errs, r.validate(path.Child("routes").Index(i))...)
 	}
 
 	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
@@ -333,9 +331,7 @@ func (in ServiceRoute) validate(path *field.Path) field.ErrorList {
 			errs = append(errs, field.Invalid(path, string(asJSON), "destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route"))
 		}
 	}
-	if err := in.Match.validate(path.Child("match")); err != nil {
-		errs = append(err, err...)
-	}
+	errs = append(errs, in.Match.validate(path.Child("match"))...)
 
 	return errs
 }
