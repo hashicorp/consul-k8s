@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Consul on Kubernetes GitHub Issues
+    url: https://github.com/hashicorp/consul-k8s/issues
+    about: Are you submitting an issue or feature enhancement for the consul-k8s binary? Please create an issue in the consul-k8s repository.
+  - name: Consul on Kubernetes Learn Tutorials
+    url: https://learn.hashicorp.com/collections/consul/kubernetes
+    about: Please check out our Learn Tutorials. These hands on tutorials deal with many of the tasks common to using Consul on Kubernetes.
