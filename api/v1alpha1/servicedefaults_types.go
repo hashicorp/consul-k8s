@@ -15,6 +15,10 @@ const (
 	ServiceDefaultsKubeKind string = "servicedefaults"
 )
 
+func init() {
+	SchemeBuilder.Register(&ServiceDefaults{}, &ServiceDefaultsList{})
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -26,6 +30,15 @@ type ServiceDefaults struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ServiceDefaultsSpec `json:"spec,omitempty"`
 	Status            `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ServiceDefaultsList contains a list of ServiceDefaults
+type ServiceDefaultsList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceDefaults `json:"items"`
 }
 
 // ServiceDefaultsSpec defines the desired state of ServiceDefaults
@@ -41,6 +54,32 @@ type ServiceDefaultsSpec struct {
 	// ExternalSNI is an optional setting that allows for the TLS SNI value
 	// to be changed to a non-connect value when federating with an external system.
 	ExternalSNI string `json:"externalSNI,omitempty"`
+}
+
+// ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
+// Users can expose individual paths and/or all HTTP/GRPC paths for checks.
+type ExposeConfig struct {
+	// Checks defines whether paths associated with Consul checks will be exposed.
+	// This flag triggers exposing all HTTP and GRPC check paths registered for the service.
+	Checks bool `json:"checks,omitempty"`
+
+	// Paths is the list of paths exposed through the proxy.
+	Paths []ExposePath `json:"paths,omitempty"`
+}
+
+type ExposePath struct {
+	// ListenerPort defines the port of the proxy's listener for exposed paths.
+	ListenerPort int `json:"listenerPort,omitempty"`
+
+	// Path is the path to expose through the proxy, ie. "/metrics".
+	Path string `json:"path,omitempty"`
+
+	// LocalPathPort is the port that the service is listening on for the given path.
+	LocalPathPort int `json:"localPathPort,omitempty"`
+
+	// Protocol describes the upstream's service protocol.
+	// Valid values are "http" and "http2", defaults to "http".
+	Protocol string `json:"protocol,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {
@@ -113,19 +152,6 @@ func (in *ServiceDefaults) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-// +kubebuilder:object:root=true
-
-// ServiceDefaultsList contains a list of ServiceDefaults
-type ServiceDefaultsList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceDefaults `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ServiceDefaults{}, &ServiceDefaultsList{})
-}
-
 // ToConsul converts the entry into it's Consul equivalent struct.
 func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{
@@ -171,32 +197,6 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 
 func (in *ServiceDefaults) ConsulGlobalResource() bool {
 	return false
-}
-
-// ExposeConfig describes HTTP paths to expose through Envoy outside of Connect.
-// Users can expose individual paths and/or all HTTP/GRPC paths for checks.
-type ExposeConfig struct {
-	// Checks defines whether paths associated with Consul checks will be exposed.
-	// This flag triggers exposing all HTTP and GRPC check paths registered for the service.
-	Checks bool `json:"checks,omitempty"`
-
-	// Paths is the list of paths exposed through the proxy.
-	Paths []ExposePath `json:"paths,omitempty"`
-}
-
-type ExposePath struct {
-	// ListenerPort defines the port of the proxy's listener for exposed paths.
-	ListenerPort int `json:"listenerPort,omitempty"`
-
-	// Path is the path to expose through the proxy, ie. "/metrics".
-	Path string `json:"path,omitempty"`
-
-	// LocalPathPort is the port that the service is listening on for the given path.
-	LocalPathPort int `json:"localPathPort,omitempty"`
-
-	// Protocol describes the upstream's service protocol.
-	// Valid values are "http" and "http2", defaults to "http".
-	Protocol string `json:"protocol,omitempty"`
 }
 
 // toConsul returns the ExposeConfig for the entry

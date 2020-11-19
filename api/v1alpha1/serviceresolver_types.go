@@ -16,6 +16,10 @@ import (
 
 const ServiceResolverKubeKind string = "serviceresolver"
 
+func init() {
+	SchemeBuilder.Register(&ServiceResolver{}, &ServiceResolverList{})
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -27,6 +31,159 @@ type ServiceResolver struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ServiceResolverSpec `json:"spec,omitempty"`
 	Status            `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ServiceResolverList contains a list of ServiceResolver
+type ServiceResolverList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceResolver `json:"items"`
+}
+
+// ServiceResolverSpec defines the desired state of ServiceResolver
+type ServiceResolverSpec struct {
+	// DefaultSubset is the subset to use when no explicit subset is requested.
+	// If empty the unnamed subset is used.
+	DefaultSubset string `json:"defaultSubset,omitempty"`
+	// Subsets is map of subset name to subset definition for all usable named
+	// subsets of this service. The map key is the name of the subset and all
+	// names must be valid DNS subdomain elements.
+	// This may be empty, in which case only the unnamed default subset will
+	// be usable.
+	Subsets ServiceResolverSubsetMap `json:"subsets,omitempty"`
+	// Redirect when configured, all attempts to resolve the service this
+	// resolver defines will be substituted for the supplied redirect
+	// EXCEPT when the redirect has already been applied.
+	// When substituting the supplied redirect, all other fields besides
+	// Kind, Name, and Redirect will be ignored.
+	Redirect *ServiceResolverRedirect `json:"redirect,omitempty"`
+	// Failover controls when and how to reroute traffic to an alternate pool of
+	// service instances.
+	// The map is keyed by the service subset it applies to and the special
+	// string "*" is a wildcard that applies to any subset not otherwise
+	// specified here.
+	Failover ServiceResolverFailoverMap `json:"failover,omitempty"`
+	// ConnectTimeout is the timeout for establishing new network connections
+	// to this service.
+	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
+	// LoadBalancer determines the load balancing policy and configuration for services
+	// issuing requests to this upstream service.
+	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
+}
+
+type ServiceResolverRedirect struct {
+	// Service is a service to resolve instead of the current service.
+	Service string `json:"service,omitempty"`
+	// ServiceSubset is a named subset of the given service to resolve instead
+	// of one defined as that service's DefaultSubset If empty the default
+	// subset is used.
+	ServiceSubset string `json:"serviceSubset,omitempty"`
+	// Namespace is the namespace to resolve the service from instead of the
+	// current one.
+	Namespace string `json:"namespace,omitempty"`
+	// Datacenter is the datacenter to resolve the service from instead of the
+	// current one.
+	Datacenter string `json:"datacenter,omitempty"`
+}
+
+type ServiceResolverSubsetMap map[string]ServiceResolverSubset
+
+type ServiceResolverFailoverMap map[string]ServiceResolverFailover
+
+type ServiceResolverSubset struct {
+	// Filter is the filter expression to be used for selecting instances of the
+	// requested service. If empty all healthy instances are returned. This
+	// expression can filter on the same selectors as the Health API endpoint.
+	Filter string `json:"filter,omitempty"`
+	// OnlyPassing specifies the behavior of the resolver's health check
+	// interpretation. If this is set to false, instances with checks in the
+	// passing as well as the warning states will be considered healthy. If this
+	// is set to true, only instances with checks in the passing state will be
+	// considered healthy.
+	OnlyPassing bool `json:"onlyPassing,omitempty"`
+}
+
+type ServiceResolverFailover struct {
+	// Service is the service to resolve instead of the default as the failover
+	// group of instances during failover.
+	Service string `json:"service,omitempty"`
+	// ServiceSubset is the named subset of the requested service to resolve as
+	// the failover group of instances. If empty the default subset for the
+	// requested service is used.
+	ServiceSubset string `json:"serviceSubset,omitempty"`
+	// Namespace is the namespace to resolve the requested service from to form
+	// the failover group of instances. If empty the current namespace is used.
+	Namespace string `json:"namespace,omitempty"`
+	// Datacenters is a fixed list of datacenters to try during failover.
+	Datacenters []string `json:"datacenters,omitempty"`
+}
+
+type LoadBalancer struct {
+	// Policy is the load balancing policy used to select a host.
+	Policy string `json:"policy,omitempty"`
+
+	// RingHashConfig contains configuration for the "ringHash" policy type.
+	RingHashConfig *RingHashConfig `json:"ringHashConfig,omitempty"`
+
+	// LeastRequestConfig contains configuration for the "leastRequest" policy type.
+	LeastRequestConfig *LeastRequestConfig `json:"leastRequestConfig,omitempty"`
+
+	// HashPolicies is a list of hash policies to use for hashing load balancing algorithms.
+	// Hash policies are evaluated individually and combined such that identical lists
+	// result in the same hash.
+	// If no hash policies are present, or none are successfully evaluated,
+	// then a random backend host will be selected.
+	HashPolicies []HashPolicy `json:"hashPolicies,omitempty"`
+}
+
+type RingHashConfig struct {
+	// MinimumRingSize determines the minimum number of entries in the hash ring.
+	MinimumRingSize uint64 `json:"minimumRingSize,omitempty"`
+
+	// MaximumRingSize determines the maximum number of entries in the hash ring.
+	MaximumRingSize uint64 `json:"maximumRingSize,omitempty"`
+}
+
+type LeastRequestConfig struct {
+	// ChoiceCount determines the number of random healthy hosts from which to select the one with the least requests.
+	ChoiceCount uint32 `json:"choiceCount,omitempty"`
+}
+
+type HashPolicy struct {
+	// Field is the attribute type to hash on.
+	// Must be one of "header", "cookie", or "query_parameter".
+	// Cannot be specified along with sourceIP.
+	Field string `json:"field,omitempty"`
+
+	// FieldValue is the value to hash.
+	// ie. header name, cookie name, URL query parameter name
+	// Cannot be specified along with sourceIP.
+	FieldValue string `json:"fieldValue,omitempty"`
+
+	// CookieConfig contains configuration for the "cookie" hash policy type.
+	CookieConfig *CookieConfig `json:"cookieConfig,omitempty"`
+
+	// SourceIP determines whether the hash should be of the source IP rather than of a field and field value.
+	// Cannot be specified along with field or fieldValue.
+	SourceIP bool `json:"sourceIP,omitempty"`
+
+	// Terminal will short circuit the computation of the hash when multiple hash policies are present.
+	// If a hash is computed when a Terminal policy is evaluated,
+	// then that hash will be used and subsequent hash policies will be ignored.
+	Terminal bool `json:"terminal,omitempty"`
+}
+
+type CookieConfig struct {
+	// Session determines whether to generate a session cookie with no expiration.
+	Session bool `json:"session,omitempty"`
+
+	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
+	TTL time.Duration `json:"ttl,omitempty"`
+
+	// Path is the path to set for the cookie.
+	Path string `json:"path,omitempty"`
 }
 
 func (in *ServiceResolver) ConsulKind() string {
@@ -149,237 +306,6 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.ErrorList {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	if !namespacesEnabled {
-		if in.Spec.Redirect != nil {
-			if in.Spec.Redirect.Namespace != "" {
-				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `Consul Enterprise namespaces must be enabled to set redirect.namespace`))
-			}
-		}
-		for k, v := range in.Spec.Failover {
-			if v.Namespace != "" {
-				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `Consul Enterprise namespaces must be enabled to set failover.namespace`))
-			}
-		}
-
-	}
-	return errs
-}
-
-func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
-	if in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 {
-		// NOTE: We're passing "{}" here as our value because we know that the
-		// error is we have an empty object.
-		return field.Invalid(path, "{}",
-			"service, serviceSubset, namespace and datacenters cannot all be empty at once")
-	}
-	return nil
-}
-
-// +kubebuilder:object:root=true
-
-// ServiceResolverList contains a list of ServiceResolver
-type ServiceResolverList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceResolver `json:"items"`
-}
-
-// ServiceResolverSpec defines the desired state of ServiceResolver
-type ServiceResolverSpec struct {
-	// DefaultSubset is the subset to use when no explicit subset is requested.
-	// If empty the unnamed subset is used.
-	DefaultSubset string `json:"defaultSubset,omitempty"`
-	// Subsets is map of subset name to subset definition for all usable named
-	// subsets of this service. The map key is the name of the subset and all
-	// names must be valid DNS subdomain elements.
-	// This may be empty, in which case only the unnamed default subset will
-	// be usable.
-	Subsets ServiceResolverSubsetMap `json:"subsets,omitempty"`
-	// Redirect when configured, all attempts to resolve the service this
-	// resolver defines will be substituted for the supplied redirect
-	// EXCEPT when the redirect has already been applied.
-	// When substituting the supplied redirect, all other fields besides
-	// Kind, Name, and Redirect will be ignored.
-	Redirect *ServiceResolverRedirect `json:"redirect,omitempty"`
-	// Failover controls when and how to reroute traffic to an alternate pool of
-	// service instances.
-	// The map is keyed by the service subset it applies to and the special
-	// string "*" is a wildcard that applies to any subset not otherwise
-	// specified here.
-	Failover ServiceResolverFailoverMap `json:"failover,omitempty"`
-	// ConnectTimeout is the timeout for establishing new network connections
-	// to this service.
-	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
-	// LoadBalancer determines the load balancing policy and configuration for services
-	// issuing requests to this upstream service.
-	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
-}
-
-type ServiceResolverRedirect struct {
-	// Service is a service to resolve instead of the current service.
-	Service string `json:"service,omitempty"`
-	// ServiceSubset is a named subset of the given service to resolve instead
-	// of one defined as that service's DefaultSubset If empty the default
-	// subset is used.
-	ServiceSubset string `json:"serviceSubset,omitempty"`
-	// Namespace is the namespace to resolve the service from instead of the
-	// current one.
-	Namespace string `json:"namespace,omitempty"`
-	// Datacenter is the datacenter to resolve the service from instead of the
-	// current one.
-	Datacenter string `json:"datacenter,omitempty"`
-}
-
-type ServiceResolverSubsetMap map[string]ServiceResolverSubset
-
-type ServiceResolverFailoverMap map[string]ServiceResolverFailover
-
-type ServiceResolverSubset struct {
-	// Filter is the filter expression to be used for selecting instances of the
-	// requested service. If empty all healthy instances are returned. This
-	// expression can filter on the same selectors as the Health API endpoint.
-	Filter string `json:"filter,omitempty"`
-	// OnlyPassing specifies the behavior of the resolver's health check
-	// interpretation. If this is set to false, instances with checks in the
-	// passing as well as the warning states will be considered healthy. If this
-	// is set to true, only instances with checks in the passing state will be
-	// considered healthy.
-	OnlyPassing bool `json:"onlyPassing,omitempty"`
-}
-
-type ServiceResolverFailover struct {
-	// Service is the service to resolve instead of the default as the failover
-	// group of instances during failover.
-	Service string `json:"service,omitempty"`
-	// ServiceSubset is the named subset of the requested service to resolve as
-	// the failover group of instances. If empty the default subset for the
-	// requested service is used.
-	ServiceSubset string `json:"serviceSubset,omitempty"`
-	// Namespace is the namespace to resolve the requested service from to form
-	// the failover group of instances. If empty the current namespace is used.
-	Namespace string `json:"namespace,omitempty"`
-	// Datacenters is a fixed list of datacenters to try during failover.
-	Datacenters []string `json:"datacenters,omitempty"`
-}
-
-type LoadBalancer struct {
-	// Policy is the load balancing policy used to select a host.
-	Policy string `json:"policy,omitempty"`
-
-	// RingHashConfig contains configuration for the "ringHash" policy type.
-	RingHashConfig *RingHashConfig `json:"ringHashConfig,omitempty"`
-
-	// LeastRequestConfig contains configuration for the "leastRequest" policy type.
-	LeastRequestConfig *LeastRequestConfig `json:"leastRequestConfig,omitempty"`
-
-	// HashPolicies is a list of hash policies to use for hashing load balancing algorithms.
-	// Hash policies are evaluated individually and combined such that identical lists
-	// result in the same hash.
-	// If no hash policies are present, or none are successfully evaluated,
-	// then a random backend host will be selected.
-	HashPolicies []HashPolicy `json:"hashPolicies,omitempty"`
-}
-
-func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
-	if in == nil {
-		return nil
-	}
-	var errs field.ErrorList
-	for i, p := range in.HashPolicies {
-		if err := p.validate(path.Child("hashPolicies").Index(i)); err != nil {
-			errs = append(errs, err...)
-		}
-	}
-	return errs
-}
-
-type RingHashConfig struct {
-	// MinimumRingSize determines the minimum number of entries in the hash ring.
-	MinimumRingSize uint64 `json:"minimumRingSize,omitempty"`
-
-	// MaximumRingSize determines the maximum number of entries in the hash ring.
-	MaximumRingSize uint64 `json:"maximumRingSize,omitempty"`
-}
-
-type LeastRequestConfig struct {
-	// ChoiceCount determines the number of random healthy hosts from which to select the one with the least requests.
-	ChoiceCount uint32 `json:"choiceCount,omitempty"`
-}
-
-type HashPolicy struct {
-	// Field is the attribute type to hash on.
-	// Must be one of "header", "cookie", or "query_parameter".
-	// Cannot be specified along with sourceIP.
-	Field string `json:"field,omitempty"`
-
-	// FieldValue is the value to hash.
-	// ie. header name, cookie name, URL query parameter name
-	// Cannot be specified along with sourceIP.
-	FieldValue string `json:"fieldValue,omitempty"`
-
-	// CookieConfig contains configuration for the "cookie" hash policy type.
-	CookieConfig *CookieConfig `json:"cookieConfig,omitempty"`
-
-	// SourceIP determines whether the hash should be of the source IP rather than of a field and field value.
-	// Cannot be specified along with field or fieldValue.
-	SourceIP bool `json:"sourceIP,omitempty"`
-
-	// Terminal will short circuit the computation of the hash when multiple hash policies are present.
-	// If a hash is computed when a Terminal policy is evaluated,
-	// then that hash will be used and subsequent hash policies will be ignored.
-	Terminal bool `json:"terminal,omitempty"`
-}
-
-func (in HashPolicy) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	validFields := []string{"header", "cookie", "query_parameter"}
-	if !sliceContains(validFields, in.Field) {
-		errs = append(errs, field.Invalid(path.Child("field"), in.Field,
-			notInSliceMessage(validFields)))
-	}
-
-	if in.Field != "" && in.SourceIP {
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON),
-			"cannot set both field and sourceIP"))
-	}
-
-	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {
-		errs = append(errs, err)
-	}
-	return errs
-}
-
-type CookieConfig struct {
-	// Session determines whether to generate a session cookie with no expiration.
-	Session bool `json:"session,omitempty"`
-
-	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
-	TTL time.Duration `json:"ttl,omitempty"`
-
-	// Path is the path to set for the cookie.
-	Path string `json:"path,omitempty"`
-}
-
-func (in *CookieConfig) validate(path *field.Path) *field.Error {
-	if in == nil {
-		return nil
-	}
-
-	if in.Session && in.TTL > 0 {
-		asJSON, _ := json.Marshal(in)
-		return field.Invalid(path, string(asJSON), "cannot set both session and ttl")
-	}
-	return nil
-}
-
-func init() {
-	SchemeBuilder.Register(&ServiceResolver{}, &ServiceResolverList{})
-}
-
 func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSubset {
 	if in == nil {
 		return nil
@@ -485,4 +411,78 @@ func (in *CookieConfig) toConsul() *capi.CookieConfig {
 		TTL:     in.TTL,
 		Path:    in.Path,
 	}
+}
+
+func (in *CookieConfig) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+
+	if in.Session && in.TTL > 0 {
+		asJSON, _ := json.Marshal(in)
+		return field.Invalid(path, string(asJSON), "cannot set both session and ttl")
+	}
+	return nil
+}
+
+func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !namespacesEnabled {
+		if in.Spec.Redirect != nil {
+			if in.Spec.Redirect.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `Consul Enterprise namespaces must be enabled to set redirect.namespace`))
+			}
+		}
+		for k, v := range in.Spec.Failover {
+			if v.Namespace != "" {
+				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `Consul Enterprise namespaces must be enabled to set failover.namespace`))
+			}
+		}
+
+	}
+	return errs
+}
+
+func (in *ServiceResolverFailover) validate(path *field.Path) *field.Error {
+	if in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 {
+		// NOTE: We're passing "{}" here as our value because we know that the
+		// error is we have an empty object.
+		return field.Invalid(path, "{}",
+			"service, serviceSubset, namespace and datacenters cannot all be empty at once")
+	}
+	return nil
+}
+
+func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+	for i, p := range in.HashPolicies {
+		if err := p.validate(path.Child("hashPolicies").Index(i)); err != nil {
+			errs = append(errs, err...)
+		}
+	}
+	return errs
+}
+
+func (in HashPolicy) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	validFields := []string{"header", "cookie", "query_parameter"}
+	if !sliceContains(validFields, in.Field) {
+		errs = append(errs, field.Invalid(path.Child("field"), in.Field,
+			notInSliceMessage(validFields)))
+	}
+
+	if in.Field != "" && in.SourceIP {
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"cannot set both field and sourceIP"))
+	}
+
+	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {
+		errs = append(errs, err)
+	}
+	return errs
 }
