@@ -683,6 +683,17 @@ load _helpers
 #--------------------------------------------------------------------
 # namespaces
 
+@test "connectInject/Deployment: fails if namespaces are disabled and mirroringK8S is true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.enableConsulNamespaces=false' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.enableConsulNamespaces must be true if mirroringK8S=true" ]]
+}
+
 @test "connectInject/Deployment: namespace options disabled by default" {
   cd `chart_dir`
   local object=$(helm template \
