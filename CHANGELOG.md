@@ -5,7 +5,7 @@
 FEATURES:
 * Kubernetes health check synchronization with Consul for connect injected pods via `connectInject.healthChecks` [[GH-651](https://github.com/hashicorp/consul-helm/pull/651)].
   The default behavior for this feature is `enabled: true`.
-  See [https://www.consul.io/docs/k8s/health](https://www.consul.io/docs/k8s/health) for more information.
+  See [https://www.consul.io/docs/k8s/connect/health](https://www.consul.io/docs/k8s/connect/health) for more information.
   In order to enable this feature for existing installations it is required to restart all connect injected deployments so that they are re-injected.
   Until this is done, health checks for these deployments will not be synced to Consul.
 
