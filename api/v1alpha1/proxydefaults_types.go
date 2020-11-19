@@ -20,6 +20,10 @@ const (
 	ProxyDefaultsKubeKind string = "proxydefaults"
 )
 
+func init() {
+	SchemeBuilder.Register(&ProxyDefaults{}, &ProxyDefaultsList{})
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -31,6 +35,15 @@ type ProxyDefaults struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ProxyDefaultsSpec `json:"spec,omitempty"`
 	Status            `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ProxyDefaultsList contains a list of ProxyDefaults
+type ProxyDefaultsList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ProxyDefaults `json:"items"`
 }
 
 // RawMessage for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
@@ -190,17 +203,4 @@ func (in *ProxyDefaults) validateConfig(path *field.Path) *field.Error {
 		return field.Invalid(path, in.Spec.Config, fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
-}
-
-// +kubebuilder:object:root=true
-
-// ProxyDefaultsList contains a list of ProxyDefaults
-type ProxyDefaultsList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProxyDefaults `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ProxyDefaults{}, &ProxyDefaultsList{})
 }

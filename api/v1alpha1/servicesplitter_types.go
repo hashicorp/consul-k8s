@@ -15,6 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+func init() {
+	SchemeBuilder.Register(&ServiceSplitter{}, &ServiceSplitterList{})
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -27,6 +31,15 @@ type ServiceSplitter struct {
 
 	Spec   ServiceSplitterSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ServiceSplitterList contains a list of ServiceSplitter
+type ServiceSplitterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceSplitter `json:"items"`
 }
 
 type ServiceSplits []ServiceSplit
@@ -50,15 +63,6 @@ type ServiceSplit struct {
 	// The namespace to resolve the service from instead of the current namespace.
 	// If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ServiceSplitterList contains a list of ServiceSplitter
-type ServiceSplitterList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceSplitter `json:"items"`
 }
 
 func (in *ServiceSplitter) GetObjectMeta() metav1.ObjectMeta {
@@ -166,6 +170,24 @@ func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+func (in ServiceSplits) toConsul() []capi.ServiceSplit {
+	var consulServiceSplits []capi.ServiceSplit
+	for _, split := range in {
+		consulServiceSplits = append(consulServiceSplits, split.toConsul())
+	}
+
+	return consulServiceSplits
+}
+
+func (in ServiceSplit) toConsul() capi.ServiceSplit {
+	return capi.ServiceSplit{
+		Weight:        in.Weight,
+		Service:       in.Service,
+		ServiceSubset: in.ServiceSubset,
+		Namespace:     in.Namespace,
+	}
+}
+
 func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
@@ -211,26 +233,4 @@ func (in ServiceSplit) validate(path *field.Path) *field.Error {
 	}
 
 	return nil
-}
-
-func (in ServiceSplits) toConsul() []capi.ServiceSplit {
-	var consulServiceSplits []capi.ServiceSplit
-	for _, split := range in {
-		consulServiceSplits = append(consulServiceSplits, split.toConsul())
-	}
-
-	return consulServiceSplits
-}
-
-func (in ServiceSplit) toConsul() capi.ServiceSplit {
-	return capi.ServiceSplit{
-		Weight:        in.Weight,
-		Service:       in.Service,
-		ServiceSubset: in.ServiceSubset,
-		Namespace:     in.Namespace,
-	}
-}
-
-func init() {
-	SchemeBuilder.Register(&ServiceSplitter{}, &ServiceSplitterList{})
 }
