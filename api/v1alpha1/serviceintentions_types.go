@@ -248,9 +248,7 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 				errs = append(errs, err)
 			}
 		} else {
-			if err := source.Permissions.validate(path.Child("sources").Index(i)); err != nil {
-				errs = append(errs, err...)
-			}
+			errs = append(errs, source.Permissions.validate(path.Child("sources").Index(i))...)
 		}
 	}
 
@@ -351,9 +349,7 @@ func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
 			errs = append(errs, err)
 		}
 		if permission.HTTP != nil {
-			if err := permission.HTTP.validate(path.Child("permissions").Index(i)); err != nil {
-				errs = append(errs, err...)
-			}
+			errs = append(errs, permission.HTTP.validate(path.Child("permissions").Index(i))...)
 		}
 	}
 	return errs

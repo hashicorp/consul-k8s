@@ -460,9 +460,7 @@ func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
 	}
 	var errs field.ErrorList
 	for i, p := range in.HashPolicies {
-		if err := p.validate(path.Child("hashPolicies").Index(i)); err != nil {
-			errs = append(errs, err...)
-		}
+		errs = append(errs, p.validate(path.Child("hashPolicies").Index(i))...)
 	}
 	return errs
 }
