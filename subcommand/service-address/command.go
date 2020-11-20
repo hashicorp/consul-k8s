@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -79,15 +78,12 @@ func (c *Command) Run(args []string) int {
 	if c.retryDuration == 0 {
 		c.retryDuration = 1 * time.Second
 	}
-	log := hclog.New(&hclog.LoggerOptions{
-		Level:  hclog.Info,
-		Output: os.Stderr,
-	})
+	logger := hclog.Default()
 
 	// Run until we get an address from the service.
 	var address string
 	var unretryableErr error
-	backoff.Retry(withErrLogger(log, func() error {
+	backoff.Retry(withErrLogger(logger, func() error {
 		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(context.TODO(), c.flagServiceName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("getting service %s: %s", c.flagServiceName, err)

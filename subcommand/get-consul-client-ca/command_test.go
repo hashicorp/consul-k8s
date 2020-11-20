@@ -44,7 +44,7 @@ func TestRun_FlagsValidation(t *testing.T) {
 				"-server-addr=foo.com",
 				"-log-level=invalid-log-level",
 			},
-			expErr: "Unknown log level: invalid-log-level",
+			expErr: "unknown log level: invalid-log-level",
 		},
 	}
 

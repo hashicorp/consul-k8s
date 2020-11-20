@@ -177,6 +177,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 		} else if err != nil {
 			return fmt.Errorf("unable to register health check: %s", err)
 		}
+		h.Log.Debug("updating health check status", "name", pod.Name, "status", status, "reason", reason)
 		// Also update it, the reason this is separate is there is no way to set the Output field of the health check
 		// at creation time, and this is what is displayed on the UI as opposed to the Notes field.
 		err = h.updateConsulHealthCheckStatus(client, healthCheckID, status, reason)
@@ -185,6 +186,7 @@ func (h *HealthCheckResource) reconcilePod(pod *corev1.Pod) error {
 		}
 	} else if serviceCheck.Status != status {
 		// Update the healthCheck.
+		h.Log.Debug("updating health check status", "name", pod.Name, "status", status, "reason", reason)
 		err = h.updateConsulHealthCheckStatus(client, healthCheckID, status, reason)
 		if err != nil {
 			return fmt.Errorf("error updating health check: %s", err)
