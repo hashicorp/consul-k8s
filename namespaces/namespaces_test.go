@@ -76,6 +76,13 @@ func TestEnsureExists_WildcardNamespace_AlreadyExists(tt *testing.T) {
 	require.False(tt, created)
 }
 
+// Test that if the default namespace is passed in the function succeeds.
+func TestEnsureExists_DefaultNamespace(tt *testing.T) {
+	created, err := EnsureExists(nil, DefaultNamespace, "")
+	require.NoError(tt, err)
+	require.False(tt, created)
+}
+
 // Test that it creates the namespace if it doesn't exist.
 func TestEnsureExists_CreatesNS(tt *testing.T) {
 	for _, c := range []struct {
