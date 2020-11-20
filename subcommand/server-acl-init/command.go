@@ -423,7 +423,13 @@ func (c *Command) Run(args []string) int {
 		}
 		_, _, err = consulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
 		if err != nil {
-			c.log.Error("Error updating the default namespace to include the cross namespace policy", "err", err)
+			if strings.Contains(strings.ToLower(err.Error()), "unexpected response code: 404") {
+				// If this returns a 404 it's most likely because they're not running
+				// Consul Enterprise.
+				c.log.Error("Error updating the default namespace to include the cross namespace policy - ensure you're running Consul Enterprise with namespaces enabled", "err", err)
+			} else {
+				c.log.Error("Error updating the default namespace to include the cross namespace policy", "err", err)
+			}
 			return 1
 		}
 	}
