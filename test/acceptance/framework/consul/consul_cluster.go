@@ -149,7 +149,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	// Delete any secrets that have h.releaseName in their name.
-	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	for _, secret := range secrets.Items {
 		if strings.Contains(secret.Name, h.releaseName) {
