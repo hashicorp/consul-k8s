@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -93,7 +94,7 @@ func TestControllerNamespaces(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			t.Logf("creating namespace %q", KubeNS)
+			logger.Logf(t, "creating namespace %q", KubeNS)
 			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "ns", KubeNS)
 			if err != nil && !strings.Contains(out, "(AlreadyExists)") {
 				require.NoError(t, err)
@@ -119,7 +120,7 @@ func TestControllerNamespaces(t *testing.T) {
 
 			// Test creation.
 			{
-				t.Log("creating custom resources")
+				logger.Log(t, "creating custom resources")
 				retry.Run(t, func(r *retry.R) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
@@ -180,26 +181,26 @@ func TestControllerNamespaces(t *testing.T) {
 
 			// Test updates.
 			{
-				t.Log("patching service-defaults custom resource")
+				logger.Log(t, "patching service-defaults custom resource")
 				patchProtocol := "tcp"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
 
-				t.Log("patching service-resolver custom resource")
+				logger.Log(t, "patching service-resolver custom resource")
 				patchRedirectSvc := "baz"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
 
-				t.Log("patching proxy-defaults custom resource")
+				logger.Log(t, "patching proxy-defaults custom resource")
 				patchMeshGatewayMode := "remote"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
 
-				t.Log("patching service-router custom resource")
+				logger.Log(t, "patching service-router custom resource")
 				patchPathPrefix := "/baz"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicerouter", "router", "-p", fmt.Sprintf(`{"spec":{"routes":[{"match":{"http":{"pathPrefix":"%s"}}}]}}`, patchPathPrefix), "--type=merge")
 
-				t.Log("patching service-splitter custom resource")
+				logger.Log(t, "patching service-splitter custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "servicesplitter", "splitter", "-p", `{"spec": {"splits": [{"weight": 50}, {"weight": 50, "service": "other-splitter"}]}}`, "--type=merge")
 
-				t.Log("patching service-intentions custom resource")
+				logger.Log(t, "patching service-intentions custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}]}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
@@ -252,22 +253,22 @@ func TestControllerNamespaces(t *testing.T) {
 
 			// Test a delete.
 			{
-				t.Log("deleting service-defaults custom resource")
+				logger.Log(t, "deleting service-defaults custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicedefaults", "defaults")
 
-				t.Log("deleting service-resolver custom resource")
+				logger.Log(t, "deleting service-resolver custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "serviceresolver", "resolver")
 
-				t.Log("deleting proxy-defaults custom resource")
+				logger.Log(t, "deleting proxy-defaults custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "proxydefaults", "global")
 
-				t.Log("deleting service-router custom resource")
+				logger.Log(t, "deleting service-router custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicerouter", "router")
 
-				t.Log("deleting service-splitter custom resource")
+				logger.Log(t, "deleting service-splitter custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "servicesplitter", "splitter")
 
-				t.Log("deleting service-intentions custom resource")
+				logger.Log(t, "deleting service-intentions custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "serviceintentions", "intentions")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
