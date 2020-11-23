@@ -9,8 +9,9 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/gruntwork-io/terratest/modules/logger"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,13 +31,13 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
-		t.Logf("dumping logs and pod info for %s to %s", labelSelector, testDebugDirectory)
+		logger.Logf(t, "dumping logs and pod info for %s to %s", labelSelector, testDebugDirectory)
 		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		require.NoError(t, err)
 
 		for _, pod := range pods.Items {
 			// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
-			logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "logs", "--all-containers=true", pod.Name)
+			logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "--all-containers=true", pod.Name)
 
 			// Write logs or err to file name <pod.Name>.log
 			logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
@@ -78,7 +79,7 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 // e.g. 'daemonset' so that this function can run 'kubectl describe daemonset foo'.
 func writeResourceInfoToFile(t *testing.T, resourceName, resourceType, testDebugDirectory string, kubectlOptions *k8s.KubectlOptions) {
 	// Describe resource
-	desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, logger.Discard, "describe", resourceType, resourceName)
+	desc, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "describe", resourceType, resourceName)
 
 	// Write resource info or error to file name <resource.Name>-resourceType.txt
 	if err != nil {

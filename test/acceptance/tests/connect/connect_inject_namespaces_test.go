@@ -167,7 +167,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// We are expecting a "connection reset by peer" error because in a case of health checks,
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
-			t.Log("checking that connection is unsuccessful")
+			logger.Log(t, "checking that connection is unsuccessful")
 			k8s.CheckStaticServerConnectionMultipleFailureMessages(
 				t,
 				staticClientOpts,
