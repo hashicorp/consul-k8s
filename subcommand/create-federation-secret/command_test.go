@@ -68,7 +68,7 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-mesh-gateway-service-name=name",
 				"-log-level=invalid",
 			},
-			expErr: "Unknown log level: invalid",
+			expErr: "unknown log level: invalid",
 		},
 	}
 

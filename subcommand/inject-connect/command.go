@@ -20,9 +20,9 @@ import (
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -49,6 +49,7 @@ type Command struct {
 	flagDefaultProtocol      string // Default protocol for use with central config
 	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
+	flagLogLevel             string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -140,6 +141,9 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -184,9 +188,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	logger, err := common.Logger(c.flagLogLevel)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	// Proxy resources
 	var sidecarProxyCPULimit, sidecarProxyCPURequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
-	var err error
 	if c.flagDefaultSidecarProxyCPURequest != "" {
 		sidecarProxyCPURequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
 		if err != nil {
@@ -329,7 +338,7 @@ func (c *Command) Run(args []string) int {
 		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-		Log:                        hclog.Default().Named("handler"),
+		Log:                        logger.Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)
@@ -365,7 +374,7 @@ func (c *Command) Run(args []string) int {
 		}()
 
 		healthResource := connectinject.HealthCheckResource{
-			Log:                 hclog.Default().Named("healthCheckResource"),
+			Log:                 logger.Named("healthCheckResource"),
 			KubernetesClientset: c.clientset,
 			ConsulUrl:           consulUrl,
 			Ctx:                 ctx,
@@ -373,7 +382,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		ctl := &controller.Controller{
-			Log:      hclog.Default().Named("healthCheckController"),
+			Log:      logger.Named("healthCheckController"),
 			Resource: &healthResource,
 		}
 

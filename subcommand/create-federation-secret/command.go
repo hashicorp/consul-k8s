@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -108,16 +107,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Create logger.
-	level := hclog.LevelFromString(c.flagLogLevel)
-	if level == hclog.NoLevel {
-		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+	logger, err := common.Logger(c.flagLogLevel)
+	if err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  level,
-		Output: os.Stderr,
-	})
 
 	// The initial secret struct. We will be filling in its data map
 	// as we continue.

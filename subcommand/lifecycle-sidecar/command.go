@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
 
@@ -74,10 +74,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  hclog.LevelFromString(c.flagLogLevel),
-		Output: os.Stderr,
-	})
+	logger, err := common.Logger(c.flagLogLevel)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	// Log initial configuration
 	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
@@ -118,7 +119,7 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
-// validateFlags validates the flags and returns the logLevel.
+// validateFlags validates the flags.
 func (c *Command) validateFlags() error {
 	if c.flagServiceConfig == "" {
 		return errors.New("-service-config must be set")
@@ -141,10 +142,6 @@ func (c *Command) validateFlags() error {
 	_, err = exec.LookPath(c.flagConsulBinary)
 	if err != nil {
 		return fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
-	}
-	logLevel := hclog.LevelFromString(c.flagLogLevel)
-	if logLevel == hclog.NoLevel {
-		return fmt.Errorf("unknown log level: %s", c.flagLogLevel)
 	}
 
 	return nil

@@ -24,6 +24,10 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-consul-k8s-image must be set",
 		},
 		{
+			flags:  []string{"-consul-k8s-image", "foo", "-log-level", "invalid"},
+			expErr: "unknown log level: invalid",
+		},
+		{
 			flags:  []string{"-consul-k8s-image", "foo", "-ca-file", "bar"},
 			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},
