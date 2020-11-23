@@ -17,6 +17,7 @@ import (
 	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -198,15 +199,12 @@ func (c *Command) Run(args []string) int {
 
 	// Set up logging
 	if c.logger == nil {
-		level := hclog.LevelFromString(c.flagLogLevel)
-		if level == hclog.NoLevel {
-			c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+		var err error
+		c.logger, err = common.Logger(c.flagLogLevel)
+		if err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
-		c.logger = hclog.New(&hclog.LoggerOptions{
-			Level:  level,
-			Output: os.Stderr,
-		})
 	}
 
 	// Convert allow/deny lists to sets

@@ -4,13 +4,13 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
@@ -81,16 +81,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// create a logger
-	level := hclog.LevelFromString(c.flagLogLevel)
-	if level == hclog.NoLevel {
-		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+	logger, err := common.Logger(c.flagLogLevel)
+	if err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  level,
-		Output: os.Stderr,
-	})
 
 	// create Consul client
 	consulClient, err := c.consulClient(logger)

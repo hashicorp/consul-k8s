@@ -18,6 +18,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
@@ -106,15 +107,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.logger == nil {
-		level := hclog.LevelFromString(c.flagLogLevel)
-		if level == hclog.NoLevel {
-			c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+		var err error
+		c.logger, err = common.Logger(c.flagLogLevel)
+		if err != nil {
+			c.UI.Error(err.Error())
 			return 1
 		}
-		c.logger = hclog.New(&hclog.LoggerOptions{
-			Level:  level,
-			Output: os.Stderr,
-		})
 	}
 
 	configFile, err := ioutil.ReadFile(c.flagConfigFile)

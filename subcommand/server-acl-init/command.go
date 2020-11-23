@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -276,16 +275,12 @@ func (c *Command) Run(args []string) int {
 	// The context will only ever be intentionally ended by the timeout.
 	defer cancel()
 
-	// Configure our logger
-	level := hclog.LevelFromString(c.flagLogLevel)
-	if level == hclog.NoLevel {
-		c.UI.Error(fmt.Sprintf("Unknown log level: %s", c.flagLogLevel))
+	var err error
+	c.log, err = common.Logger(c.flagLogLevel)
+	if err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
-	c.log = hclog.New(&hclog.LoggerOptions{
-		Level:  level,
-		Output: os.Stderr,
-	})
 
 	serverAddresses := c.flagServerAddresses
 	// Check if the provided addresses contain a cloud-auto join string.
