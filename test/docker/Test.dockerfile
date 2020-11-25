@@ -12,7 +12,7 @@ FROM circleci/golang:1.14
 USER root
 
 ENV BATS_VERSION "1.1.0"
-ENV TERRAFORM_VERSION "0.12.26"
+ENV TERRAFORM_VERSION "0.13.5"
 
 # base packages
 RUN apt-get install -y \
@@ -53,6 +53,18 @@ RUN curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz \
     && tar -zxvf /tmp/oc.tar.gz -C /tmp  \
     && mv /tmp/oc /usr/local/bin/oc
+
+# AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install --bin-dir /usr/local/bin \
+    && rm awscliv2.zip \
+    && rm -rf ./aws
+
+# AWS IAM authenticator
+RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/aws-iam-authenticator \
+    && chmod +x ./aws-iam-authenticator \
+    && mv ./aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 
 # change the user back to what circleci/golang image has
 USER circleci

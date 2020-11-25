@@ -83,21 +83,7 @@ func CheckStaticServerConnection(
 ) {
 	t.Helper()
 
-	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
-
-	args := []string{"exec", "deploy/" + deploymentName, "-c", deploymentName, "--", "curl", "-vvvsSf"}
-	args = append(args, curlArgs...)
-
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		output, err := RunKubectlAndGetOutputE(t, options, args...)
-		if expectSuccess {
-			require.NoError(r, err)
-			require.Contains(r, output, "hello world")
-		} else {
-			require.Error(r, err)
-			require.Contains(r, output, failureMessage)
-		}
-	})
+	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, deploymentName, []string{failureMessage}, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
