@@ -46,11 +46,19 @@ func GenerateCA(commonName string) (
 
 	// Create the CA cert
 	caCertTemplate = &x509.Certificate{
-		SerialNumber:          sn,
-		Subject:               pkix.Name{CommonName: commonName},
+		SerialNumber: sn,
+		Subject: pkix.Name{
+			CommonName:    commonName,
+			Country:       []string{"US"},
+			PostalCode:    []string{"94105"},
+			Province:      []string{"CA"},
+			Locality:      []string{"San Francisco"},
+			StreetAddress: []string{"101 Second Street"},
+			Organization:  []string{"HashiCorp Inc."},
+		},
 		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		IsCA:                  true,
 		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
 		NotBefore:             time.Now().Add(-1 * time.Minute),
@@ -102,7 +110,7 @@ func GenerateCert(
 		Subject:               pkix.Name{CommonName: commonName},
 		BasicConstraintsValid: true,
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		NotAfter:              time.Now().Add(expiry),
 		NotBefore:             time.Now().Add(-1 * time.Minute),
 	}
@@ -142,6 +150,23 @@ func ParseCert(pemValue []byte) (*x509.Certificate, error) {
 	return x509.ParseCertificate(block.Bytes)
 }
 
+// ParseSigner parses a crypto.Signer from a PEM-encoded key. The private key
+// is expected to be the first block in the PEM value.
+func ParseSigner(pemValue string) (crypto.Signer, error) {
+	// The _ result below is not an error but the remaining PEM bytes.
+	block, _ := pem.Decode([]byte(pemValue))
+	if block == nil {
+		return nil, fmt.Errorf("no PEM-encoded data found")
+	}
+
+	switch block.Type {
+	case "EC PRIVATE KEY":
+		return x509.ParseECPrivateKey(block.Bytes)
+	default:
+		return nil, fmt.Errorf("unknown PEM block type for signing key: %s", block.Type)
+	}
+}
+
 // privateKey returns a new ECDSA-based private key. Both a crypto.Signer
 // and the key in PEM format are returned.
 func privateKey() (crypto.Signer, string, error) {
@@ -166,7 +191,12 @@ func privateKey() (crypto.Signer, string, error) {
 
 // serialNumber generates a new random serial number.
 func serialNumber() (*big.Int, error) {
-	return rand.Int(rand.Reader, (&big.Int{}).Exp(big.NewInt(2), big.NewInt(159), nil))
+	l := new(big.Int).Lsh(big.NewInt(1), 128)
+	s, err := rand.Int(rand.Reader, l)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // keyId returns a x509 keyId from the given signing key. The key must be

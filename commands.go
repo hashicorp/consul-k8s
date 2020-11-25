@@ -13,6 +13,7 @@ import (
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
+	cmdTLSInit "github.com/hashicorp/consul-k8s/subcommand/tls-init"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
 	webhookCertManager "github.com/hashicorp/consul-k8s/subcommand/webhook-cert-manager"
 	"github.com/hashicorp/consul-k8s/version"
@@ -69,8 +70,13 @@ func init() {
 		"controller": func() (cli.Command, error) {
 			return &cmdController.Command{UI: ui}, nil
 		},
+
 		"webhook-cert-manager": func() (cli.Command, error) {
 			return &webhookCertManager.Command{UI: ui}, nil
+		},
+
+		"tls-init": func() (cli.Command, error) {
+			return &cmdTLSInit.Command{UI: ui}, nil
 		},
 	}
 }
