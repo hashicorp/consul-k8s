@@ -86,6 +86,9 @@ spec:
                 -envoy-image="{{ .Values.global.imageEnvoy }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -listen=:8080 \
+                {{- if .Values.connectInject.logLevel }}
+                -log-level={{ .Values.connectInject.logLevel }} \
+                {{- end }}
                 {{- if .Values.connectInject.healthChecks.enabled }}
                 -enable-health-checks-controller=true \
                 -health-checks-reconcile-period={{ .Values.connectInject.healthChecks.reconcilePeriod }} \
