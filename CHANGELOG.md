@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Connect: support `connectInject.logLevel` setting. [[GH-699](https://github.com/hashicorp/consul-helm/pull/699)]
+
 ## 0.26.0 (Nov 12, 2020)
 
 FEATURES:

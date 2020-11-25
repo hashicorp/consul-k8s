@@ -27,6 +27,7 @@ func TestNewHelmCluster(t *testing.T) {
 				"server.bootstrapExpect":       "1",
 				"server.replicas":              "1",
 				"connectInject.envoyExtraArgs": "--log-level debug",
+				"connectInject.logLevel":       "debug",
 			},
 		},
 		{
@@ -36,6 +37,7 @@ func TestNewHelmCluster(t *testing.T) {
 				"server.bootstrapExpect":       "3",
 				"server.replicas":              "3",
 				"connectInject.envoyExtraArgs": "--foo",
+				"connectInject.logLevel":       "debug",
 				"feature.enabled":              "true",
 			},
 			want: map[string]string{
@@ -43,6 +45,7 @@ func TestNewHelmCluster(t *testing.T) {
 				"server.bootstrapExpect":       "3",
 				"server.replicas":              "3",
 				"connectInject.envoyExtraArgs": "--foo",
+				"connectInject.logLevel":       "debug",
 				"feature.enabled":              "true",
 			},
 		},

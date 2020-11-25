@@ -833,6 +833,9 @@ connectInject:
   # Defaults to global.image.
   imageConsul: null
 
+  # Log verbosity level. One of "debug", "info", "warn", or "error".
+  logLevel: info
+
   # Resource settings for connect inject pods.
   resources:
     requests:
