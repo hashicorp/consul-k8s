@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.21.0 (November 25, 2020)
 
 IMPROVEMENTS:
 * Connect: Add `-log-level` flag to `inject-connect` command. [[GH-400](https://github.com/hashicorp/consul-k8s/pull/400)]
