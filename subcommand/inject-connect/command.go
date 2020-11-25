@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,6 +44,7 @@ type Command struct {
 	flagDefaultInject        bool   // True to inject by default
 	flagConsulImage          string // Docker image for Consul
 	flagEnvoyImage           string // Docker image for Envoy
+	flagEnvoyVersion         string // Version of Envoy being run. If not set we will try to parse from flagImageEnvoy's tag.
 	flagConsulK8sImage       string // Docker image for consul-k8s
 	flagACLAuthMethod        string // Auth Method to use for ACLs, if enabled
 	flagWriteServiceDefaults bool   // True to enable central config injection
@@ -106,10 +108,12 @@ func (c *Command) init() {
 		"PEM-encoded TLS certificate to serve. If blank, will generate random cert.")
 	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
 		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
-	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", connectinject.DefaultConsulImage,
+	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", "",
 		"Docker image for Consul. Defaults to consul:1.7.1.")
-	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", connectinject.DefaultEnvoyImage,
-		"Docker image for Envoy. Defaults to envoyproxy/envoy-alpine:v1.13.0.")
+	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", "",
+		"Docker image for Envoy.")
+	c.flagSet.StringVar(&c.flagEnvoyVersion, "envoy-version", "",
+		"Version of Envoy running. If not set, the tag of -envoy-image will be parsed.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
@@ -187,6 +191,14 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-consul-k8s-image must be set")
 		return 1
 	}
+	if c.flagConsulImage == "" {
+		c.UI.Error("-consul-image must be set")
+		return 1
+	}
+	if c.flagEnvoyImage == "" {
+		c.UI.Error("-envoy-image must be set")
+		return 1
+	}
 
 	logger, err := common.Logger(c.flagLogLevel)
 	if err != nil {
@@ -240,6 +252,12 @@ func (c *Command) Run(args []string) int {
 
 	// Validate resource request/limit flags and parse into corev1.ResourceRequirements
 	initResources, lifecycleResources, err := c.parseAndValidateResourceFlags()
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
+	envoyVersion, err := c.parseEnvoyVersion()
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -318,6 +336,7 @@ func (c *Command) Run(args []string) int {
 		ConsulClient:               c.consulClient,
 		ImageConsul:                c.flagConsulImage,
 		ImageEnvoy:                 c.flagEnvoyImage,
+		EnvoyVersion:               envoyVersion,
 		EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
 		ImageConsulK8S:             c.flagConsulK8sImage,
 		RequireAnnotation:          !c.flagDefaultInject,
@@ -600,6 +619,32 @@ func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, 
 	}
 
 	return initResources, lifecycleResources, nil
+}
+
+// parseEnvoyVersion parses the envoy version set via the -envoy-image or
+// -envoy-version flags.
+func (c *Command) parseEnvoyVersion() (*version.Version, error) {
+	// The -envoy-version flag has precedence. If it's set, we ignore the tag
+	// of -envoy-image.
+	if c.flagEnvoyVersion != "" {
+		envoyVersion, err := version.NewVersion(c.flagEnvoyVersion)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing -envoy-version %q: %s", c.flagEnvoyVersion, err)
+		}
+		return envoyVersion, nil
+	}
+
+	// Otherwise we try and parse the version from the tag of the envoy Docker
+	// image.
+	envoyImageSplit := strings.Split(c.flagEnvoyImage, ":")
+	if len(envoyImageSplit) != 2 {
+		return nil, fmt.Errorf("envoy image %q has no tag and -envoy-version is not set so unable to determine Envoy version", c.flagEnvoyImage)
+	}
+	envoyVersion, err := version.NewVersion(envoyImageSplit[1])
+	if err != nil {
+		return nil, fmt.Errorf("error parsing Envoy version from -envoy-image %q: %s; -envoy-version can be set to specify the version", c.flagEnvoyImage, err)
+	}
+	return envoyVersion, nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

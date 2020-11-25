@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -101,6 +102,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -589,7 +591,9 @@ services {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			var h Handler
+			h := Handler{
+				EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
+			}
 			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
@@ -650,6 +654,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -707,6 +712,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
@@ -724,6 +730,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -781,6 +788,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
@@ -799,6 +807,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -863,6 +872,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
@@ -883,6 +893,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -947,6 +958,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
@@ -967,6 +979,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				DefaultProtocol:            "http",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -1034,6 +1047,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
@@ -1055,6 +1069,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
@@ -1130,6 +1145,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
@@ -1149,6 +1165,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`proxy {
@@ -1174,6 +1191,7 @@ cp /bin/consul /consul/connect-inject/consul`,
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			},
 			k8sNamespace,
 			`proxy {
@@ -1211,6 +1229,7 @@ func TestHandlerContainerInit_writeServiceDefaultsDefaultProtocol(t *testing.T) 
 	h := Handler{
 		WriteServiceDefaults: true,
 		DefaultProtocol:      "grpc",
+		EnvoyVersion:         version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1246,6 +1265,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -1258,6 +1278,7 @@ func TestHandlerContainerInit_writeServiceDefaultsPodProtocol(t *testing.T) {
 	h := Handler{
 		WriteServiceDefaults: true,
 		DefaultProtocol:      "http",
+		EnvoyVersion:         version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1294,6 +1315,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Copy the Consul binary
@@ -1303,7 +1325,8 @@ cp /bin/consul /consul/connect-inject/consul`)
 func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		AuthMethod: "release-name-consul-k8s-auth-method",
+		AuthMethod:   "release-name-consul-k8s-auth-method",
+		EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1345,6 +1368,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
 }
@@ -1355,6 +1379,7 @@ func TestHandlerContainerInit_authMethodAndCentralConfig(t *testing.T) {
 		AuthMethod:           "release-name-consul-k8s-auth-method",
 		WriteServiceDefaults: true,
 		DefaultProtocol:      "grpc",
+		EnvoyVersion:         version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1405,6 +1430,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="1.16.0" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 `)
@@ -1417,6 +1443,7 @@ func TestHandlerContainerInit_noDefaultProtocol(t *testing.T) {
 	h := Handler{
 		WriteServiceDefaults: true,
 		DefaultProtocol:      "",
+		EnvoyVersion:         version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1456,6 +1483,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
 		ConsulCACert: "consul-ca-cert",
+		EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1500,6 +1528,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 				corev1.ResourceMemory: resource.MustParse("25Mi"),
 			},
 		},
+		EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1533,7 +1562,8 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsEnabled(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		AuthMethod: "auth-method",
+		AuthMethod:   "auth-method",
+		EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1557,7 +1587,9 @@ func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsEna
 
 func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsDisabled(t *testing.T) {
 	require := require.New(t)
-	h := Handler{}
+	h := Handler{
+		EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
+	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{

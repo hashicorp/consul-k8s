@@ -35,6 +35,7 @@ type initContainerCommandData struct {
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
 	ConsulCACert string
+	EnvoyVersion string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -68,6 +69,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
+		EnvoyVersion:              h.EnvoyVersion.String(),
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -398,6 +400,7 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  -envoy-version="{{ .EnvoyVersion }}" \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}

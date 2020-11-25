@@ -3,6 +3,13 @@
 IMPROVEMENTS:
 * Connect: Add `-log-level` flag to `inject-connect` command. [[GH-400](https://github.com/hashicorp/consul-k8s/pull/400)]
 
+BREAKING CHANGES:
+* Connect: the flags `-envoy-image` and `-consul-image` for command `inject-connect` are now required. [[GH-403](https://github.com/hashicorp/consul-k8s/pull/403)]
+* Connect: the Docker image passed to `-envoy-image` must contain a tag that can be parsed to determine
+  the Envoy image, e.g. `envoy:1.16.0`. The new flag `-envoy-version` can be used to set the Envoy version
+  if the image tag is not parseable. [[GH-403](https://github.com/hashicorp/consul-k8s/pull/403)]
+* Connect: the flag `-envoy-version` is passed to all Envoy sidecars now. This requires Consul >= 1.7.0. [[GH-403](https://github.com/hashicorp/consul-k8s/pull/403)]
+
 ## 0.20.0 (November 12, 2020)
 
 FEATURES:

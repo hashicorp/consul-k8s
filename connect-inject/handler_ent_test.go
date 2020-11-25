@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-version"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
@@ -43,6 +44,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"single destination namespace 'default' from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -61,6 +63,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"single destination namespace 'default' from k8s 'non-default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -79,6 +82,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"single destination namespace 'dest' from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -97,6 +101,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"single destination namespace 'dest' from k8s 'non-default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -115,6 +120,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"mirroring from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -134,6 +140,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"mirroring from k8s 'dest'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -153,6 +160,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"mirroring with prefix from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -173,6 +181,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			"mirroring with prefix from k8s 'dest'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -261,6 +270,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + single destination namespace 'default' from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -280,6 +290,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + single destination namespace 'default' from k8s 'non-default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -299,6 +310,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + single destination namespace 'dest' from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -318,6 +330,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + single destination namespace 'dest' from k8s 'non-default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -337,6 +350,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + mirroring from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -357,6 +371,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + mirroring from k8s 'dest'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -377,6 +392,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + mirroring with prefix from k8s 'default'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -398,6 +414,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			"acls + mirroring with prefix from k8s 'dest'",
 			Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -558,6 +575,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 
 			handler := Handler{
 				Log:                        hclog.Default().Named("handler"),
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,

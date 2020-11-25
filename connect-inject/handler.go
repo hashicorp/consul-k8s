@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-version"
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,11 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-)
-
-const (
-	DefaultConsulImage = "consul:1.7.1"
-	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.13.0"
 )
 
 const (
@@ -118,6 +114,9 @@ type Handler struct {
 	// Both of these MUST be set.
 	ImageConsul string
 	ImageEnvoy  string
+
+	// EnvoyVersion is the version of Envoy contained in ImageEnvoy.
+	EnvoyVersion *version.Version
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the lifecycle-sidecar container.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-version"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
@@ -38,6 +39,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Namespace: metav1.NamespaceSystem,
@@ -55,6 +57,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -77,6 +80,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -122,6 +126,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -189,6 +194,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -211,6 +217,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -264,6 +271,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -311,6 +319,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -360,6 +369,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -409,6 +419,7 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			},
 			v1beta1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
@@ -489,6 +500,7 @@ func TestHandlerHandle_badContentType(t *testing.T) {
 		Log:                   hclog.Default().Named("handler"),
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
+		EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 	}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
@@ -506,6 +518,7 @@ func TestHandlerHandle_noBody(t *testing.T) {
 		Log:                   hclog.Default().Named("handler"),
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
+		EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 	}
 	rec := httptest.NewRecorder()
 	h.Handle(rec, req)
@@ -663,7 +676,10 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			var h Handler
+			h := Handler{
+				EnvoyVersion: version.Must(version.NewVersion("1.16.0")),
+			}
+
 			var patches []jsonpatch.JsonPatchOperation
 			err := h.defaultAnnotations(tt.Pod, &patches)
 			if (tt.Err != "") != (err != nil) {
@@ -861,6 +877,7 @@ func TestConsulNamespace(t *testing.T) {
 				ConsulDestinationNamespace: tt.ConsulDestinationNamespace,
 				EnableK8SNSMirroring:       tt.EnableK8SNSMirroring,
 				K8SNSMirroringPrefix:       tt.K8SNSMirroringPrefix,
+				EnvoyVersion:               version.Must(version.NewVersion("1.16.0")),
 			}
 
 			ns := h.consulNamespace(tt.K8sNamespace)
@@ -1163,6 +1180,7 @@ func TestShouldInject(t *testing.T) {
 				EnableNamespaces:      tt.EnableNamespaces,
 				AllowK8sNamespacesSet: tt.AllowK8sNamespacesSet,
 				DenyK8sNamespacesSet:  tt.DenyK8sNamespacesSet,
+				EnvoyVersion:          version.Must(version.NewVersion("1.16.0")),
 			}
 
 			injected, err := h.shouldInject(tt.Pod, tt.K8sNamespace)
