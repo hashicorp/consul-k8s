@@ -133,6 +133,11 @@ jobs:
             eval "$(echo export primary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[0]))"
             eval "$(echo export secondary_kubeconfig=$(terraform output -state ../../terraform/gke/terraform.tfstate -json | jq -r .kubeconfigs.value[1]))"
 
+            # Create an enterprise license secret in the primary cluster.
+            # This license is set as a CircleCI project env variable.
+            # The license expires 15-Oct-2025.
+            KUBECONFIG=$primary_kubeconfig kubectl create secret generic ent-license --from-literal=key="${CONSUL_ENT_LICENSE}"
+
             # We have to run the tests for each package separately so that we can
             # exit early if any test fails (-failfast only works within a single
             # package).
@@ -141,6 +146,8 @@ jobs:
             do
               if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 30m -failfast \
                     -enable-enterprise \
+                    -enterprise-license-secret-name=ent-license \
+                    -enterprise-license-secret-key=key \
                     -enable-multi-cluster \
                     -kubeconfig="$primary_kubeconfig" \
                     -secondary-kubeconfig="$secondary_kubeconfig" \

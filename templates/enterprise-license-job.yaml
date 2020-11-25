@@ -81,7 +81,7 @@ spec:
                 #!/bin/sh
                 while true; do
                   echo "Applying license..."
-                  if consul license put "${ENTERPRISE_LICENSE}"; then
+                  if consul license put "${ENTERPRISE_LICENSE}" 2>&1; then
                     echo "License applied successfully"
                     break
                   fi
