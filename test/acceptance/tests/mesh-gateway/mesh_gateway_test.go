@@ -75,6 +75,11 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 		"server.extraVolumes[0].items[0].path": "config.json",
 
+		// Enterprise license job will fail if it runs in the secondary DC,
+		// so we're explicitly setting these values to empty to avoid that.
+		"server.enterpriseLicense.secretName": "",
+		"server.enterpriseLicense.secretKey":  "",
+
 		"connectInject.enabled": "true",
 
 		"meshGateway.enabled":  "true",
@@ -183,6 +188,11 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"server.extraVolumes[0].load":          "true",
 				"server.extraVolumes[0].items[0].key":  "serverConfigJSON",
 				"server.extraVolumes[0].items[0].path": "config.json",
+
+				// Enterprise license job will fail if it runs in the secondary DC,
+				// so we're explicitly setting these values to empty to avoid that.
+				"server.enterpriseLicense.secretName": "",
+				"server.enterpriseLicense.secretKey":  "",
 
 				"connectInject.enabled": "true",
 
