@@ -43,6 +43,6 @@ resource "null_resource" "kubectl" {
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
-    command    = "rm $HOME/.kube/${google_container_cluster.cluster[count.index].name}"
+    command    = "rm $HOME/.kube/consul-k8s*"
   }
 }
