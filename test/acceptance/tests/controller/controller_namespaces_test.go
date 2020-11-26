@@ -78,9 +78,6 @@ func TestControllerNamespaces(t *testing.T) {
 				"controller.enabled":            "true",
 				"connectInject.enabled":         "true",
 
-				// todo: remove when Helm chart updates to 1.9.0
-				"global.image": "hashicorp/consul-enterprise:1.9.0-ent-beta2",
-
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
