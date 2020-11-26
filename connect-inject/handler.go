@@ -22,11 +22,6 @@ import (
 )
 
 const (
-	DefaultConsulImage = "consul:1.7.1"
-	DefaultEnvoyImage  = "envoyproxy/envoy-alpine:v1.13.0"
-)
-
-const (
 	// annotationStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
 	annotationStatus = "consul.hashicorp.com/connect-inject-status"
