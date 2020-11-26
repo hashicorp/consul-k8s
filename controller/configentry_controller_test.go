@@ -297,6 +297,50 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "/path", svcIntentions.Sources[2].Permissions[0].HTTP.PathExact)
 			},
 		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResource: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+					Listeners: []v1alpha1.IngressListener{
+						{
+							Port:     80,
+							Protocol: "http",
+							Services: []v1alpha1.IngressService{
+								{
+									Name: "*",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.IngressGatewayConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, true, resource.TLS.Enabled)
+				require.Equal(t, 80, resource.Listeners[0].Port)
+				require.Equal(t, "http", resource.Listeners[0].Protocol)
+				require.Equal(t, "*", resource.Listeners[0].Services[0].Name)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -643,6 +687,54 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[1].Permissions[0].Action)
 			},
 		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResource: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+					Listeners: []v1alpha1.IngressListener{
+						{
+							Port:     80,
+							Protocol: "http",
+							Services: []v1alpha1.IngressService{
+								{
+									Name: "*",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				igw := resource.(*v1alpha1.IngressGateway)
+				igw.Spec.TLS.Enabled = false
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.IngressGatewayConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, false, resource.TLS.Enabled)
+				require.Equal(t, 80, resource.Listeners[0].Port)
+				require.Equal(t, "http", resource.Listeners[0].Protocol)
+				require.Equal(t, "*", resource.Listeners[0].Services[0].Name)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -943,6 +1035,44 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResourceWithDeletion: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+					Listeners: []v1alpha1.IngressListener{
+						{
+							Port:     80,
+							Protocol: "http",
+							Services: []v1alpha1.IngressService{
+								{
+									Name: "*",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1130,6 +1260,31 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResource: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -1393,6 +1548,50 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ServiceIntentionsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResource: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+					Listeners: []v1alpha1.IngressListener{
+						{
+							Port:     80,
+							Protocol: "http",
+							Services: []v1alpha1.IngressService{
+								{
+									Name: "*",
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha1.Status{
+					Conditions: v1alpha1.Conditions{
+						{
+							Type:   v1alpha1.ConditionSynced,
+							Status: corev1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -1674,6 +1873,31 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResource: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -2012,6 +2236,49 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				svcIntentions := &v1alpha1.ServiceIntentions{}
 				_ = cli.Get(ctx, name, svcIntentions)
 				require.Empty(t, svcIntentions.Finalizers())
+			},
+		},
+		{
+			kubeKind:   "IngressGateway",
+			consulKind: capi.IngressGateway,
+			configEntryResourceWithDeletion: &v1alpha1.IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.IngressGatewaySpec{
+					TLS: v1alpha1.GatewayTLSConfig{
+						Enabled: true,
+					},
+					Listeners: []v1alpha1.IngressListener{
+						{
+							Port:     80,
+							Protocol: "http",
+							Services: []v1alpha1.IngressService{
+								{
+									Name: "*",
+								},
+							},
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			confirmDelete: func(t *testing.T, cli client.Client, ctx context.Context, name types.NamespacedName) {
+				resource := &v1alpha1.IngressGateway{}
+				_ = cli.Get(ctx, name, resource)
+				require.Empty(t, resource.Finalizers())
 			},
 		},
 	}

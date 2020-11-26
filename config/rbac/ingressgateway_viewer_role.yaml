@@ -1,0 +1,20 @@
+# permissions for end users to view ingressgateways.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ingressgateway-viewer-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - ingressgateways
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - ingressgateways/status
+  verbs:
+  - get

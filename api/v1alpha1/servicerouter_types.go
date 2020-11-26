@@ -36,6 +36,15 @@ type ServiceRouter struct {
 	Status `json:"status,omitempty"`
 }
 
+// +kubebuilder:object:root=true
+
+// ServiceRouterList contains a list of ServiceRouter
+type ServiceRouterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceRouter `json:"items"`
+}
+
 // ServiceRouterSpec defines the desired state of ServiceRouter
 type ServiceRouterSpec struct {
 	// Routes are the list of routes to consider when processing L7 requests.
@@ -131,15 +140,6 @@ type ServiceRouteDestination struct {
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ServiceRouterList contains a list of ServiceRouter
-type ServiceRouterList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceRouter `json:"items"`
 }
 
 func (in *ServiceRouter) ConsulMirroringNS() string {
