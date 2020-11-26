@@ -148,6 +148,11 @@ ctrl-manifests: controller-gen
 ctrl-generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
+# Copy CRD YAML to consul-helm.
+# Usage: make ctrl-crd-copy helm=<path-to-consul-helm-repo>
+ctrl-crd-copy:
+	@cd hack/crds-to-consul-helm; go run ./... $(helm)
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
