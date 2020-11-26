@@ -248,7 +248,7 @@ func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 	var installedReleases []map[string]string
 
 	err = json.Unmarshal([]byte(output), &installedReleases)
-	require.NoError(t, err)
+	require.NoError(t, err, "unmarshalling %q", output)
 
 	for _, r := range installedReleases {
 		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
