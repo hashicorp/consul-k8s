@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Connect: the flags `-envoy-image` and `-consul-image` for command `inject-connect` are now required. [[GH-405](https://github.com/hashicorp/consul-k8s/pull/405)]
+
 ## 0.21.0 (November 25, 2020)
 
 IMPROVEMENTS:
