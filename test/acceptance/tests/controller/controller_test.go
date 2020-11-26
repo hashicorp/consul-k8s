@@ -38,11 +38,8 @@ func TestController(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"controller.enabled":    "true",
-				"connectInject.enabled": "true",
-				// todo: remove when 1.9.0 is released.
-				"global.image": "hashicorp/consul-enterprise:1.9.0-ent-beta2",
-
+				"controller.enabled":           "true",
+				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),

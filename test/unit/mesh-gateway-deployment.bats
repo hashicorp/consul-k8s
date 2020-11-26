@@ -236,7 +236,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "envoyproxy/envoy-alpine:v1.14.4" ]
+  [ "${actual}" = "envoyproxy/envoy-alpine:v1.16.0" ]
 }
 
 @test "meshGateway/Deployment: setting meshGateway.imageEnvoy fails" {
