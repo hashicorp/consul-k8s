@@ -207,6 +207,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.IngressGateway)
 		return 1
 	}
+	if err = (&controller.TerminatingGatewayController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.TerminatingGateway),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.TerminatingGateway)
+		return 1
+	}
 
 	if c.flagEnableWebhooks {
 		// This webhook server sets up a Cert Watcher on the CertDir. This watches for file changes and updates the webhook certificates
@@ -270,6 +279,14 @@ func (c *Command) Run(args []string) int {
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
+			&webhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.TerminatingGateway),
 				EnableConsulNamespaces: c.flagEnableNamespaces,
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
