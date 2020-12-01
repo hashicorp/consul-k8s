@@ -24,7 +24,11 @@ spec:
     - 'projected'
     - 'secret'
     - 'downwardAPI'
+  {{- if .Values.meshGateway.hostNetwork }}
+  hostNetwork: {{ .Values.meshGateway.hostNetwork }}
+  {{- else }}
   hostNetwork: false
+  {{- end }}
   hostIPC: false
   hostPID: false
   runAsUser:
