@@ -1,5 +1,8 @@
 ## Unreleased
 
+BUG FIXES:
+* Fix pod security policy when running mesh gateways in `hostNetwork` mode. [[GH-605](https://github.com/hashicorp/consul-helm/issues/605)]
+
 ## 0.27.0 (Nov 25, 2020)
 
 IMPROVEMENTS:
