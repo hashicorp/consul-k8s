@@ -31,6 +31,8 @@ type TestFlags struct {
 
 	flagDebugDirectory string
 
+	flagUseKind bool
+
 	once sync.Once
 }
 
@@ -77,6 +79,9 @@ func (t *TestFlags) init() {
 
 	flag.StringVar(&t.flagDebugDirectory, "debug-directory", "", "The directory where to write debug information about failed test runs, "+
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
+
+	flag.BoolVar(&t.flagUseKind, "use-kind", false,
+		"If true, the tests will assume they are running against a local kind cluster(s).")
 }
 
 func (t *TestFlags) Validate() error {
@@ -119,5 +124,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
+		UseKind:            t.flagUseKind,
 	}
 }

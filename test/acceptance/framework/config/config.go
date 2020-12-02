@@ -35,6 +35,8 @@ type TestConfig struct {
 	NoCleanupOnFailure bool
 	DebugDirectory     string
 
+	UseKind bool
+
 	helmChartPath string
 }
 
