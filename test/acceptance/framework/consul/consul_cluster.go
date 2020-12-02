@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,7 +225,14 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		localPort,
 		remotePort,
 		h.logger)
-	tunnel.ForwardPort(t)
+
+	// Retry creating the port forward since it can fail occasionally.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
+		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
+		// get used to fail the test, just for logging.
+		require.NoError(r, tunnel.ForwardPortE(t))
+	})
 
 	t.Cleanup(func() {
 		tunnel.Close()
