@@ -231,7 +231,6 @@ github.com/gruntwork-io/gruntwork-cli v0.7.0 h1:YgSAmfCj9c61H+zuvHwKfYUwlMhu5arn
 github.com/gruntwork-io/gruntwork-cli v0.7.0/go.mod h1:jp6Z7NcLF2avpY8v71fBx6hds9eOFPELSuD/VPv7w00=
 github.com/gruntwork-io/terratest v0.30.15 h1:/OAnHKEERSsy03wYi8dyEwnpYy2XV8wpzwq0c4BHvoc=
 github.com/gruntwork-io/terratest v0.30.15/go.mod h1:vl/YEB2AEqVZOv9zg0nlBX+fgfqcqNcpqNfjvhRFLXo=
-github.com/hashicorp/consul-helm v0.25.0 h1:aXYK733Z7lIWdiVNczND+bBwrheGNtp6wvLe7N/8TgU=
 github.com/hashicorp/consul/api v1.4.1-0.20201015173526-812fe06d6c64 h1:8/zXC/mxIXKRqcRACIu/G016QKE/XWWBXsuNnJO3O9s=
 github.com/hashicorp/consul/api v1.4.1-0.20201015173526-812fe06d6c64/go.mod h1:duA0cMzNQkvdlj8Ayz6LmyaMUta7iVW8qY2w2bic/Iw=
 github.com/hashicorp/consul/sdk v0.6.0 h1:FfhMEkwvQl57CildXJyGHnwGGM4HMODGyfjGwNM1Vdw=
