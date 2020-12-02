@@ -41,6 +41,11 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"meshGateway.replicas": "1",
 	}
 
+	if cfg.UseKind {
+		primaryHelmValues["meshGateway.service.type"] = "NodePort"
+		primaryHelmValues["meshGateway.service.nodePort"] = "30000"
+	}
+
 	releaseName := helpers.RandomName()
 
 	// Install the primary consul cluster in the default kubernetes context
@@ -84,6 +89,11 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
+	}
+
+	if cfg.UseKind {
+		secondaryHelmValues["meshGateway.service.type"] = "NodePort"
+		secondaryHelmValues["meshGateway.service.nodePort"] = "30000"
 	}
 
 	// Install the secondary consul cluster in the secondary kubernetes context
@@ -150,6 +160,11 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"meshGateway.replicas": "1",
 			}
 
+			if cfg.UseKind {
+				primaryHelmValues["meshGateway.service.type"] = "NodePort"
+				primaryHelmValues["meshGateway.service.nodePort"] = "30000"
+			}
+
 			releaseName := helpers.RandomName()
 
 			// Install the primary consul cluster in the default kubernetes context
@@ -198,6 +213,11 @@ func TestMeshGatewaySecure(t *testing.T) {
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
+			}
+
+			if cfg.UseKind {
+				secondaryHelmValues["meshGateway.service.type"] = "NodePort"
+				secondaryHelmValues["meshGateway.service.nodePort"] = "30000"
 			}
 
 			// Install the secondary consul cluster in the secondary kubernetes context
