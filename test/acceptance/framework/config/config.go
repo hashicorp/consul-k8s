@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -89,7 +91,19 @@ func (t *TestConfig) entImage() (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent", chartMap["appVersion"]), nil
+	appVersion, ok := chartMap["appVersion"].(string)
+	if !ok {
+		return "", errors.New("unable to cast chartMap.appVersion to string")
+	}
+	var preRelease string
+	// Handle versions like 1.9.0-rc1.
+	if strings.Contains(appVersion, "-") {
+		split := strings.Split(appVersion, "-")
+		appVersion = split[0]
+		preRelease = fmt.Sprintf("-%s", split[1])
+	}
+
+	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent%s", appVersion, preRelease), nil
 }
 
 // setIfNotEmpty sets key to val in map m if value is not empty
