@@ -518,7 +518,8 @@ workflows:
               only:
                 - master
     jobs:
-      - acceptance-openshift
+      # OpenShift temporarily disabled until we get a new mirror.
+      # - acceptance-openshift
       - acceptance-gke-1-16
       - acceptance-eks-1-17
       - acceptance-aks-1-19
