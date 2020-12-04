@@ -198,8 +198,9 @@ spec:
                 -advertise="${ADVERTISE_IP}" \
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
-                -node-meta=pod-name:${HOSTNAME} \
-                -node-meta=host-ip:${HOST_IP} \
+                {{- range $k, $v := .Values.client.nodeMeta }}
+                -node-meta={{ $k }}:{{ $v }} \
+                {{- end }}
                 -hcl='leave_on_terminate = true' \
                 {{- if .Values.global.tls.enabled }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \

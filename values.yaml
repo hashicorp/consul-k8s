@@ -725,6 +725,12 @@ client:
   # required for Connect.
   grpc: true
 
+  # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node 
+  # (see https://www.consul.io/docs/agent/options.html#_node_meta)
+  nodeMeta:
+    pod-name: ${HOSTNAME}
+    host-ip: ${HOST_IP}
+
   # If true, the Helm chart will expose the clients' gossip ports as hostPorts.
   # This is only necessary if pod IPs in the k8s cluster are not directly routable
   # and the Consul servers are outside of the k8s cluster.
