@@ -623,6 +623,18 @@ key2: value2' \
   [ "${actual}" = "key" ]
 }
 
+@test "meshGateway/Deployment: CA cert volume present when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 

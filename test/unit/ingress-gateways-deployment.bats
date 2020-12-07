@@ -161,6 +161,18 @@ load _helpers
   [ "${actual}" = "key" ]
 }
 
+@test "ingressGateway/Deployment: CA cert volume present when TLS is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 
