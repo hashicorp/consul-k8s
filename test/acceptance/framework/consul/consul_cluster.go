@@ -250,14 +250,23 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 	t.Helper()
 
-	// check if there's an existing cluster and fail if there is
-	output, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--output", "json")
-	require.NoError(t, err)
+	var helmListOutput string
+	// Check if there's an existing cluster and fail if there is one.
+	// We may need to retry since this is the first command run once the Kube
+	// cluster is created and sometimes the API server returns errors.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+		var err error
+		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
+		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
+		// get used to fail the test, just for logging.
+		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--output", "json")
+		require.NoError(r, err)
+	})
 
 	var installedReleases []map[string]string
 
-	err = json.Unmarshal([]byte(output), &installedReleases)
-	require.NoError(t, err, "unmarshalling %q", output)
+	err := json.Unmarshal([]byte(helmListOutput), &installedReleases)
+	require.NoError(t, err, "unmarshalling %q", helmListOutput)
 
 	for _, r := range installedReleases {
 		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
