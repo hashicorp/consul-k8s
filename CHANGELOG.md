@@ -11,6 +11,8 @@ IMPROVEMENTS:
 * Updated the default Consul image to `hashicorp/consul:1.9.0`.
 * Updated the default consul-k8s image to `hashicorp/consul-k8s:0.21.0`.
 * Updated the default envoy image to `envoyproxy/envoy-alpine:v1.16.0`.
+* Add Server ConfigMap and Client ConfigMap values as hashes on Server StatefulSet and Client DaemonSet annotations respectively. This recreates
+  the Server/Client Pod when the Server/Client ConfigMap is updated via `helm upgrade`. This updates the previously hashed values of the extraConfig. [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
 
 ## 0.26.0 (Nov 12, 2020)
 

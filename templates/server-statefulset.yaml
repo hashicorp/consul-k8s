@@ -44,7 +44,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ .Values.server.extraConfig | sha256sum }}
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
