@@ -370,7 +370,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# extraConfig
+# config-configmap
 
 @test "client/DaemonSet: adds config-checksum annotation when extraConfig is blank" {
   cd `chart_dir`
@@ -378,7 +378,11 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356 ]
+  if [[ $(v2) ]]; then
+    [ "${actual}" = c8c40738a067bbeb4392ec038ad3b1a94d3cd747118b62d72825e44246814951 ]
+  else
+    [ "${actual}" = 1cfdb3a2989f349021d0a4beb7d854a1de35b89d45184caf5290c49460955a33 ]
+  fi
 }
 
 @test "client/DaemonSet: adds config-checksum annotation when extraConfig is provided" {
@@ -388,7 +392,25 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 83df36fdaf1b4acb815f1764f9ff2782c520ca012511f282ba9c57a04401a239 ]
+  if [[ $(v2) ]]; then
+    [ "${actual}" = 7e0bc6cb882996b13c2aad2295ea0a3573185456ba8e1770519b86779075da47 ]
+  else
+    [ "${actual}" = d864eda42c5c072921663de14fd9e0593a9ebce192da82a3239e6ded98ff2e8d ]
+  fi
+}
+
+@test "client/DaemonSet: adds config-checksum annotation when client config is updated" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
+  if [[ $(v2) ]]; then
+    [ "${actual}" = ab9a9f78fc78a0c7509ec21d2f270052c556c28a1eceb26e4b40ef0068a34889 ]
+  else
+    [ "${actual}" = 56e95d32e8bc31f566498a05dc8e1e08b2cb049880ce589d2e9143f45308638c ]
+  fi
 }
 
 #--------------------------------------------------------------------
