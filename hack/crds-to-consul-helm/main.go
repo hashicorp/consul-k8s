@@ -62,6 +62,10 @@ func realMain(helmPathAbs string) error {
 		// Add {{- if .Values.controller.enabled }} {{- end }} wrapper.
 		contents = fmt.Sprintf("{{- if .Values.controller.enabled }}\n%s{{- end }}\n", contents)
 
+		// Hack: handle an issue where controller-gen generates the wrong type
+		// for the proxydefaults.config struct.
+		contents = strings.Replace(contents, proxyDefaultsSearch, proxyDefaultsReplace, 1)
+
 		// Add labels, this is hacky because we're relying on the line number
 		// but it means we don't need to regex or yaml parse.
 		splitOnNewlines := strings.Split(contents, "\n")
@@ -86,6 +90,14 @@ func realMain(helmPathAbs string) error {
 		return ioutil.WriteFile(destinationPath, []byte(contents), 0644)
 	})
 }
+
+var proxyDefaultsSearch = `              description: Config is an arbitrary map of configuration values used by Connect proxies. Any values that your proxy allows can be configured globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+              format: byte
+              type: string
+`
+var proxyDefaultsReplace = `              description: Config is an arbitrary map of configuration values used by Connect proxies. Any values that your proxy allows can be configured globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+              type: object
+`
 
 func printf(format string, args ...interface{}) {
 	fmt.Println(fmt.Sprintf(format, args...))
