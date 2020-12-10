@@ -7,7 +7,6 @@ metadata:
   name: mutating-webhook-configuration
 webhooks:
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
@@ -26,7 +25,6 @@ webhooks:
     - proxydefaults
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
@@ -45,7 +43,6 @@ webhooks:
     - servicedefaults
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
@@ -64,7 +61,6 @@ webhooks:
     - serviceintentions
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
@@ -83,7 +79,6 @@ webhooks:
     - serviceresolvers
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
@@ -102,7 +97,6 @@ webhooks:
     - servicerouters
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: system
