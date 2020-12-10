@@ -242,7 +242,15 @@ server:
   enabled: "-"
   image: null
   replicas: 3
-  bootstrapExpect: 3 # Should <= replicas count
+
+  # bootstrapExpect is the number of servers that are expected to be running.
+  # It defaults to server.replicas.
+  # In most cases the default should be used, however if there are more
+  # servers in this datacenter than server.replicas it might make sense
+  # to override the default. This would be the case if two kube clusters
+  # were joined into the same datacenter and each cluster ran a certain number
+  # of servers.
+  bootstrapExpect: null
 
   # enterpriseLicense refers to a Kubernetes secret that you have created that
   # contains your enterprise license. It is required if you are using an
