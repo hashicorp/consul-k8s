@@ -2,6 +2,7 @@
 {{- if and .Values.global.federation.enabled (not .Values.global.tls.enabled) }}{{ fail "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" }}{{ end }}
 {{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
 {{- if .Values.server.disableFsGroupSecurityContext }}{{ fail "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." }}{{ end }}
+{{- if .Values.server.bootstrapExpect }}{{ if lt (int .Values.server.bootstrapExpect) (int .Values.server.replicas) }}{{ fail "server.bootstrapExpect cannot be less than server.replicas" }}{{ end }}{{ end }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -143,7 +144,7 @@ spec:
               exec /bin/consul agent \
                 -advertise="${POD_IP}" \
                 -bind=0.0.0.0 \
-                -bootstrap-expect={{ .Values.server.bootstrapExpect }} \
+                -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
                 {{- if .Values.global.tls.enabled }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 -hcl='cert_file = "/consul/tls/server/tls.crt"' \

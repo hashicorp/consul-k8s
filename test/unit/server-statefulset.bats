@@ -916,3 +916,34 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | join(" ") | contains("auto_encrypt = {allow_tls = true}")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# -bootstrap-expect
+
+@test "server/StatefulSet: -bootstrap-expect defaults to replicas" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-bootstrap-expect=3")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: -bootstrap-expect can be set by server.bootstrapExpect" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.bootstrapExpect=5' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-bootstrap-expect=5")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: errors if bootstrapExpect < replicas" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.bootstrapExpect=1' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.bootstrapExpect cannot be less than server.replicas" ]]
+}
