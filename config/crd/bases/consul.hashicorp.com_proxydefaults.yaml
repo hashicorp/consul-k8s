@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.0
+    controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
   name: proxydefaults.consul.hashicorp.com
 spec:
@@ -43,7 +43,8 @@ spec:
           properties:
             config:
               description: Config is an arbitrary map of configuration values used by Connect proxies. Any values that your proxy allows can be configured globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
-              type: Any
+              format: byte
+              type: string
             expose:
               description: Expose controls the default expose path configuration for Envoy.
               properties:
