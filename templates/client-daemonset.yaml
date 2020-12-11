@@ -275,10 +275,6 @@ spec:
               {{- end }}
               protocol: "UDP"
               name: serflan-udp
-            - containerPort: 8302
-              name: serfwan
-            - containerPort: 8300
-              name: server
             - containerPort: 8600
               name: dns-tcp
               protocol: "TCP"
