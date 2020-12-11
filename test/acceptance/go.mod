@@ -12,3 +12,5 @@ require (
 	k8s.io/apimachinery v0.19.3
 	k8s.io/client-go v0.19.3
 )
+
+replace github.com/gruntwork-io/terratest => github.com/ndhanushkodi/terratest v0.31.1-0.20201209054802-bd90ebf8ddad
