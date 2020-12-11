@@ -378,4 +378,4 @@ Here are some things to consider before adding a test:
   either Consul itself or consul-k8s? In that case, it should be tested there rather than in the Helm chart.
   For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
   and their respective flags. Something like that should be tested in the consul-k8s repository.
- 
+

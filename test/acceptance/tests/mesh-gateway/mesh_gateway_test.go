@@ -256,7 +256,8 @@ func TestMeshGatewaySecure(t *testing.T) {
 // by first checking members are alive from the perspective of both servers.
 // If secure is true, it will also check that the ACL replication is running on the secondary server.
 func verifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, releaseName string, secure bool) {
-	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+	start := time.Now()
 
 	// Check that server in dc1 is healthy from the perspective of the server in dc2, and vice versa.
 	// We're calling the Consul health API, as opposed to checking serf membership status,
@@ -282,4 +283,6 @@ func verifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, 
 			require.True(r, replicationStatus.Running)
 		}
 	})
+
+	logger.Logf(t, "Took %s to verify federation", time.Since(start))
 }
