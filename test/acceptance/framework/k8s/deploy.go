@@ -9,6 +9,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
@@ -131,7 +132,9 @@ func CheckStaticServerConnectionMultipleFailureMessages(
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
 func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+	start := time.Now()
 	CheckStaticServerConnection(t, options, true, deploymentName, "", curlArgs...)
+	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
