@@ -522,7 +522,8 @@ workflows:
       # - acceptance-openshift
       - acceptance-gke-1-16
       - acceptance-eks-1-17
-      - acceptance-aks-1-19
+      # AKS temporarily disabled until we get a new mirror.
+      # - acceptance-aks-1-19
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
