@@ -1,6 +1,7 @@
 package subcommand
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -90,6 +91,18 @@ func (c *Command) Run(args []string) int {
 	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
 	c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
 
+	// ctx that we pass in to the main work loop, signal handling is handled in another thread
+	// due to the length of time it can take for the cmd to complete causing synchronization issues
+	// on shutdown. Also passing a context in so that it can interrupt the cmd and exit cleanly.
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case sig := <-c.sigCh:
+			logger.Info(fmt.Sprintf("%s received, shutting down", sig))
+			cancelFunc()
+			return
+		}
+	}()
 	// The main work loop. We continually re-register our service every
 	// syncPeriod. Consul is smart enough to know when the service hasn't changed
 	// and so won't update any indices. This means we won't be causing a lot
@@ -98,22 +111,24 @@ func (c *Command) Run(args []string) int {
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
-		cmd := exec.Command(c.flagConsulBinary, c.consulCommand...)
+		start := time.Now()
+		cmd := exec.CommandContext(ctx, c.flagConsulBinary, c.consulCommand...)
 
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
+		// Currently this command is taking >7s, need to investigate
+		logger.Debug("time to run resync:", "time", time.Since(start))
+
 		if err != nil {
 			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err)
 		} else {
 			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
 		}
-
-		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
 		select {
+		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
 		case <-time.After(c.flagSyncPeriod):
 			continue
-		case sig := <-c.sigCh:
-			logger.Info(fmt.Sprintf("%s received, shutting down", sig))
+		case <-ctx.Done():
 			return 0
 		}
 	}
