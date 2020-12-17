@@ -19,6 +19,8 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	policyv1beta "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -38,6 +40,7 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
+	cfg                config.TestConfig
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -52,7 +55,12 @@ func NewHelmCluster(
 	helmValues map[string]string,
 	ctx environment.TestContext,
 	cfg *config.TestConfig,
-	releaseName string) Cluster {
+	releaseName string,
+) Cluster {
+
+	if cfg.EnablePodSecurityPolicies {
+		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+	}
 
 	// Deploy with the following defaults unless helmValues overwrites it.
 	values := map[string]string{
@@ -279,6 +287,113 @@ func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 	for _, r := range installedReleases {
 		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
 	}
+}
+
+// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
+// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
+// We bind the default service account for tests that are spinning up pods without a service account set so that
+// they will not be rejected by the kube pod security policy controller.
+func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	pspName := "test-psp"
+
+	// Pod Security Policy
+	{
+		// Check if the pod security policy with this name already exists
+		psp, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
+		// If it doesn't exist, create it.
+		if errors.IsNotFound(err) {
+			// This pod security policy can be used by any tests resources.
+			// This policy is fairly simple and only prevents from running privileged containers.
+			psp = &policyv1beta.PodSecurityPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-psp",
+				},
+				Spec: policyv1beta.PodSecurityPolicySpec{
+					Privileged: false,
+					SELinux: policyv1beta.SELinuxStrategyOptions{
+						Rule: policyv1beta.SELinuxStrategyRunAsAny,
+					},
+					SupplementalGroups: policyv1beta.SupplementalGroupsStrategyOptions{
+						Rule: policyv1beta.SupplementalGroupsStrategyRunAsAny,
+					},
+					RunAsUser: policyv1beta.RunAsUserStrategyOptions{
+						Rule: policyv1beta.RunAsUserStrategyRunAsAny,
+					},
+					FSGroup: policyv1beta.FSGroupStrategyOptions{
+						Rule: policyv1beta.FSGroupStrategyRunAsAny,
+					},
+					Volumes: []policyv1beta.FSType{policyv1beta.All},
+				},
+			}
+			_, err = client.PolicyV1beta1().PodSecurityPolicies().Create(context.Background(), psp, metav1.CreateOptions{})
+			require.NoError(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+	}
+
+	// Cluster role for the PSP.
+	{
+		// Check if we have a cluster role that authorizes the use of the pod security policy.
+		pspClusterRole, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
+
+		// If it doesn't exist, create the clusterrole.
+		if errors.IsNotFound(err) {
+			pspClusterRole = &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pspName,
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:         []string{"use"},
+						APIGroups:     []string{"policy"},
+						Resources:     []string{"podsecuritypolicies"},
+						ResourceNames: []string{pspName},
+					},
+				},
+			}
+			_, err = client.RbacV1().ClusterRoles().Create(context.Background(), pspClusterRole, metav1.CreateOptions{})
+			require.NoError(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+	}
+
+	// A role binding to allow default service account in the installation namespace access to the PSP.
+	{
+		// Check if this cluster role binding already exists.
+		pspRoleBinding, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
+
+		if errors.IsNotFound(err) {
+			pspRoleBinding = &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pspName,
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:      rbacv1.ServiceAccountKind,
+						Name:      "default",
+						Namespace: namespace,
+					},
+				},
+				RoleRef: rbacv1.RoleRef{
+					Kind: "ClusterRole",
+					Name: pspName,
+				},
+			}
+
+			_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), pspRoleBinding, metav1.CreateOptions{})
+			require.NoError(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+	}
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+	})
 }
 
 // mergeValues will merge the values in b with values in a and save in a.

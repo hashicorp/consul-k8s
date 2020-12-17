@@ -24,6 +24,8 @@ type TestFlags struct {
 
 	flagEnableOpenshift bool
 
+	flagEnablePodSecurityPolicies bool
+
 	flagConsulImage    string
 	flagConsulK8sImage string
 
@@ -73,6 +75,9 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
+	flag.BoolVar(&t.flagEnablePodSecurityPolicies, "enable-pod-security-policies", false,
+		"If true, the test suite will run tests with pod security policies enabled.")
+
 	flag.BoolVar(&t.flagNoCleanupOnFailure, "no-cleanup-on-failure", false,
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
@@ -118,6 +123,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnterpriseLicenseSecretKey:  t.flagEnterpriseLicenseSecretKey,
 
 		EnableOpenshift: t.flagEnableOpenshift,
+
+		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
 		ConsulImage:    t.flagConsulImage,
 		ConsulK8SImage: t.flagConsulK8sImage,

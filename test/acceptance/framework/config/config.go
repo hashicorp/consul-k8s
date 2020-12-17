@@ -31,6 +31,8 @@ type TestConfig struct {
 
 	EnableOpenshift bool
 
+	EnablePodSecurityPolicies bool
+
 	ConsulImage    string
 	ConsulK8SImage string
 
@@ -64,6 +66,10 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
+	}
+
+	if t.EnablePodSecurityPolicies {
+		setIfNotEmpty(helmValues, "global.enablePodSecurityPolicies", "true")
 	}
 
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
