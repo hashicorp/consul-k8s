@@ -378,4 +378,68 @@ Here are some things to consider before adding a test:
   either Consul itself or consul-k8s? In that case, it should be tested there rather than in the Helm chart.
   For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
   and their respective flags. Something like that should be tested in the consul-k8s repository.
+ 
+## Helm Reference Docs
+ 
+The helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
+generated from our `values.yaml` file.
 
+### Code Generation
+ 
+To generate the docs and update the `helm.mdx` file, run:
+ 
+```bash
+make gen-docs consul=<path-to-consul-repo>
+```
+
+Where `<path-to-consul-repo>` is the relative or absolute path to the `hashicorp/consul`
+repo on disk.
+
+### values.yaml Annotations
+
+The code generation will attempt to parse the `values.yaml` file and extract all
+the information needed to create the documentation but depending on the yaml
+you may need to add some annotations.
+
+#### @type
+If the type is unknown because the field is `null` or you wish to override
+the type, use `@type`:
+
+```yaml
+# My docs
+# @type: string
+myKey: null
+```
+
+#### @default
+The default will be set to the current value but you may want to override
+it for specific use cases:
+
+```yaml
+server:
+  # My docs
+  # @default: global.enabled
+  enabled: "-"
+```
+
+#### @recurse
+In rare cases, we don't want the documentation generation to recurse deeper
+into the object. To stop the recursion, set `@recurse: false`.
+For example, the ingress gateway ports config looks like:
+
+```yaml
+# Port docs
+# @type: array<map>
+# @default: [{port: 8080, port: 8443}]
+# @recurse: false
+ports:
+- port: 8080
+  nodePort: null
+- port: 8443
+  nodePort: null
+```
+
+So that the documentation can look like:
+```markdown
+- `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
+```
