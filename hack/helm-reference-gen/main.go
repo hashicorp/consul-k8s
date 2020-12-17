@@ -115,7 +115,7 @@ func main() {
 	helmReferenceContents := string(helmReferenceBytes)
 
 	// Swap out the contents between the codegen markers.
-	startStr := "<!-- codegen: start -->\n"
+	startStr := "<!-- codegen: start -->\n\n"
 	endStr := "\n  <!-- codegen: end -->"
 	start := strings.Index(helmReferenceContents, startStr)
 	if start == -1 {
