@@ -132,3 +132,21 @@ webhooks:
     resources:
     - servicesplitters
   sideEffects: None
+- clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-terminatinggateway
+  failurePolicy: Fail
+  name: mutate-terminatinggateway.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - terminatinggateways
+  sideEffects: None

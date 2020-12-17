@@ -341,6 +341,47 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "*", resource.Listeners[0].Services[0].Name)
 			},
 		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResource: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.TerminatingGatewayConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Len(t, resource.Services, 1)
+				require.Equal(t, "name", resource.Services[0].Name)
+				require.Equal(t, "caFile", resource.Services[0].CAFile)
+				require.Equal(t, "certFile", resource.Services[0].CertFile)
+				require.Equal(t, "keyFile", resource.Services[0].KeyFile)
+				require.Equal(t, "sni", resource.Services[0].SNI)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -735,6 +776,51 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "*", resource.Listeners[0].Services[0].Name)
 			},
 		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResource: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				igw := resource.(*v1alpha1.TerminatingGateway)
+				igw.Spec.Services[0].SNI = "new-sni"
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.TerminatingGatewayConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Len(t, resource.Services, 1)
+				require.Equal(t, "name", resource.Services[0].Name)
+				require.Equal(t, "caFile", resource.Services[0].CAFile)
+				require.Equal(t, "certFile", resource.Services[0].CertFile)
+				require.Equal(t, "keyFile", resource.Services[0].KeyFile)
+				require.Equal(t, "new-sni", resource.Services[0].SNI)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1073,6 +1159,39 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResourceWithDeletion: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1285,6 +1404,37 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResource: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -1601,6 +1751,37 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResource: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1898,6 +2079,37 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &IngressGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResource: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
@@ -2277,6 +2489,44 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			},
 			confirmDelete: func(t *testing.T, cli client.Client, ctx context.Context, name types.NamespacedName) {
 				resource := &v1alpha1.IngressGateway{}
+				_ = cli.Get(ctx, name, resource)
+				require.Empty(t, resource.Finalizers())
+			},
+		},
+		{
+			kubeKind:   "TerminatingGateway",
+			consulKind: capi.TerminatingGateway,
+			configEntryResourceWithDeletion: &v1alpha1.TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.TerminatingGatewaySpec{
+					Services: []v1alpha1.LinkedService{
+						{
+							Name:     "name",
+							CAFile:   "caFile",
+							CertFile: "certFile",
+							KeyFile:  "keyFile",
+							SNI:      "sni",
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			confirmDelete: func(t *testing.T, cli client.Client, ctx context.Context, name types.NamespacedName) {
+				resource := &v1alpha1.TerminatingGateway{}
 				_ = cli.Get(ctx, name, resource)
 				require.Empty(t, resource.Finalizers())
 			},

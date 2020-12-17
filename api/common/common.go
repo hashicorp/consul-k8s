@@ -2,13 +2,14 @@
 package common
 
 const (
-	ServiceDefaults   string = "servicedefaults"
-	ProxyDefaults     string = "proxydefaults"
-	ServiceResolver   string = "serviceresolver"
-	ServiceRouter     string = "servicerouter"
-	ServiceSplitter   string = "servicesplitter"
-	ServiceIntentions string = "serviceintentions"
-	IngressGateway    string = "ingressgateway"
+	ServiceDefaults    string = "servicedefaults"
+	ProxyDefaults      string = "proxydefaults"
+	ServiceResolver    string = "serviceresolver"
+	ServiceRouter      string = "servicerouter"
+	ServiceSplitter    string = "servicesplitter"
+	ServiceIntentions  string = "serviceintentions"
+	IngressGateway     string = "ingressgateway"
+	TerminatingGateway string = "terminatinggateway"
 
 	Global                 string = "global"
 	DefaultConsulNamespace string = "default"
