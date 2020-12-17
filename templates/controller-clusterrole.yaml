@@ -19,6 +19,7 @@ rules:
   - servicerouters
   - servicesplitters
   - serviceintentions
+  - ingressgateways
   verbs:
   - create
   - delete
@@ -36,6 +37,7 @@ rules:
   - servicerouters/status
   - servicesplitters/status
   - serviceintentions/status
+  - ingressgateways/status
   verbs:
   - get
   - patch
