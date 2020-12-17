@@ -1,16 +1,24 @@
 ## Unreleased
 
-BUG FIXES:
-* Fix pod security policy when running mesh gateways in `hostNetwork` mode. [[GH-605](https://github.com/hashicorp/consul-helm/issues/605)]
+BREAKING CHANGES:
+* Setting `server.bootstrapExpect` to a value less than `server.replicas` will now
+  give an error. This was a misconfiguration as the servers wouldn't wait
+  until the proper number have started before electing a leader. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
+
+FEATURES:
+* CRDs: add new CRD `IngressGateway` for configuring Consul's [ingress-gateway](https://www.consul.io/docs/agent/config-entries/ingress-gateway) config entry. [[GH-714](https://github.com/hashicorp/consul-helm/pull/714)]
 
 IMPROVEMENTS:
 * Make `server.bootstrapExpect` optional. If not set, will now default to `server.replicas`.
   If you're currently setting `server.replicas`, there is no effect. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
 
-BREAKING CHANGES:
-* Setting `server.bootstrapExpect` to a value less than `server.replicas` will now
-  give an error. This was a misconfiguration as the servers wouldn't wait
-  until the proper number have started before electing a leader. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
+BUG FIXES:
+* Fix pod security policy when running mesh gateways in `hostNetwork` mode. [[GH-605](https://github.com/hashicorp/consul-helm/issues/605)]
+* CRDs: **(Consul Enterprise only)** change `ServiceResolver` field `failover[].namespaces` to `failover[].namespace`.
+  This will not affect existing `ServiceResolver` resources and will only update the documentation for that field.
+ 
+  If `failover[].namespaces` was used previously, it was ignored and after this change it will still be ignored.
+  If `failover[].namespace` was used previously, it worked correctly and after this change it will still work correctly. [[GH-714](https://github.com/hashicorp/consul-helm/pull/714)]
 
 ## 0.27.0 (Nov 25, 2020)
 

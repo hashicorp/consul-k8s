@@ -114,6 +114,17 @@ func TestController(t *testing.T) {
 					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
 					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[0].Action)
 					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[1].Permissions[0].Action)
+
+					// ingress-gateway
+					entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+					require.NoError(r, err)
+					ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
+					require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
+					require.Len(r, ingressGatewayEntry.Listeners, 1)
+					require.Equal(r, "tcp", ingressGatewayEntry.Listeners[0].Protocol)
+					require.Equal(r, 8080, ingressGatewayEntry.Listeners[0].Port)
+					require.Len(r, ingressGatewayEntry.Listeners[0].Services, 1)
+					require.Equal(r, "foo", ingressGatewayEntry.Listeners[0].Services[0].Name)
 				})
 			}
 
@@ -140,6 +151,10 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "patching service-intentions custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}, {"name": "svc3", "permissions": [{"action": "deny", "http": {"pathExact": "/foo", "methods": ["GET", "PUT"]}}]}]}}`, "--type=merge")
+
+				logger.Log(t, "patching ingress-gateway custom resource")
+				patchPort := 9090
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ingressgateway", "ingress-gateway", "-p", fmt.Sprintf(`{"spec": {"listeners": [{"port": %d, "protocol": "tcp", "services": [{"name": "foo"}]}]}}`, patchPort), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -187,6 +202,13 @@ func TestController(t *testing.T) {
 					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
 					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[0].Action)
 					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[1].Permissions[0].Action)
+
+					// ingress-gateway
+					entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+					require.NoError(r, err)
+					ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
+					require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
+					require.Equal(r, patchPort, ingressGatewayEntry.Listeners[0].Port)
 				})
 			}
 
@@ -209,6 +231,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting service-intentions custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceintentions", "intentions")
+
+				logger.Log(t, "deleting ingress-gateway custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ingressgateway", "ingress-gateway")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -239,6 +264,11 @@ func TestController(t *testing.T) {
 
 					// service-intentions
 					_, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// ingress-gateway
+					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
