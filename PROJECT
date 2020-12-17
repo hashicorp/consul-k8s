@@ -23,6 +23,9 @@ resources:
 - group: consul
   kind: ServiceSplitter
   version: v1alpha1
+- group: consul
+  kind: TerminatingGateway
+  version: v1alpha1
 version: 3-alpha
 plugins:
   go.operator-sdk.io/v2-alpha: {}
