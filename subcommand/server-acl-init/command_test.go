@@ -1097,6 +1097,69 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 	}
 }
 
+// Test that we give an error if an ACL policy we were going to create
+// already exists but it has a different description than what consul-k8s
+// expected. In this case, it's likely that a user manually created an ACL
+// policy with the same name and so we want to error.
+// This test will test with the catalog sync policy but any policy
+// that we try to update will work for testing.
+func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	// Create Consul with ACLs already bootstrapped so that we can
+	// then seed it with our manually created policy.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tokenFile, fileCleanup := writeTempFile(t, bootToken)
+	defer fileCleanup()
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	setUpK8sServiceAccount(t, k8s, ns)
+	defer testAgent.Stop()
+
+	consul, err := api.NewClient(&api.Config{
+		Address: testAgent.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+
+	// Create the policy manually.
+	description := "not the expected description"
+	policy, _, err := consul.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "catalog-sync-token",
+		Description: description,
+	}, nil)
+	require.NoError(err)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmdArgs := []string{
+		"-timeout=1s",
+		"-k8s-namespace", ns,
+		"-bootstrap-token-file", tokenFile,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
+		"-create-sync-token",
+	}
+	responseCode := cmd.Run(cmdArgs)
+
+	// We expect the command to time out.
+	require.Equal(1, responseCode)
+	// NOTE: Since the error is logged through the logger instead of the UI
+	// there's no good way to test that we logged the expected error however
+	// we also test this directly in create_or_update_test.go.
+
+	// Check that the policy wasn't modified.
+	rereadPolicy, _, err := consul.ACL().PolicyRead(policy.ID, nil)
+	require.NoError(err)
+	require.Equal(description, rereadPolicy.Description)
+}
+
 // Test that if the servers aren't available at first that bootstrap
 // still succeeds.
 func TestRun_DelayedServers(t *testing.T) {
