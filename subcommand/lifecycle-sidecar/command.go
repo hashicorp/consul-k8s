@@ -116,13 +116,10 @@ func (c *Command) Run(args []string) int {
 
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
-		// Currently this command is taking >7s, need to investigate
-		logger.Debug("time to run resync:", "time", time.Since(start))
-
 		if err != nil {
-			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err)
+			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
 		} else {
-			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)))
+			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
 		}
 		select {
 		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
