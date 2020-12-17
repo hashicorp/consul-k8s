@@ -125,6 +125,18 @@ func TestController(t *testing.T) {
 					require.Equal(r, 8080, ingressGatewayEntry.Listeners[0].Port)
 					require.Len(r, ingressGatewayEntry.Listeners[0].Services, 1)
 					require.Equal(r, "foo", ingressGatewayEntry.Listeners[0].Services[0].Name)
+
+					// terminating-gateway
+					entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+					require.NoError(r, err)
+					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
+					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
+					require.Len(r, terminatingGatewayEntry.Services, 1)
+					require.Equal(r, "name", terminatingGatewayEntry.Services[0].Name)
+					require.Equal(r, "caFile", terminatingGatewayEntry.Services[0].CAFile)
+					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
+					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
+					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
 				})
 			}
 
@@ -155,6 +167,10 @@ func TestController(t *testing.T) {
 				logger.Log(t, "patching ingress-gateway custom resource")
 				patchPort := 9090
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ingressgateway", "ingress-gateway", "-p", fmt.Sprintf(`{"spec": {"listeners": [{"port": %d, "protocol": "tcp", "services": [{"name": "foo"}]}]}}`, patchPort), "--type=merge")
+
+				logger.Log(t, "patching terminating-gateway custom resource")
+				patchSNI := "patch-sni"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -209,6 +225,13 @@ func TestController(t *testing.T) {
 					ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
 					require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
 					require.Equal(r, patchPort, ingressGatewayEntry.Listeners[0].Port)
+
+					// terminating-gateway
+					entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+					require.NoError(r, err)
+					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
+					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
+					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
 				})
 			}
 
@@ -234,6 +257,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting ingress-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ingressgateway", "ingress-gateway")
+
+				logger.Log(t, "deleting terminating-gateway custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "terminatinggateway", "terminating-gateway")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -269,6 +295,11 @@ func TestController(t *testing.T) {
 
 					// ingress-gateway
 					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// terminating-gateway
+					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "terminating-gateway", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
