@@ -52,6 +52,8 @@ func testRunSignalHandling(sig os.Signal) func(*testing.T) {
 		// Run async because we need to kill it when the test is over.
 		exitChan := runCommandAsynchronously(&cmd, []string{
 			"-service-config", configFile,
+			"-http-addr", a.HTTPAddr,
+			"-sync-period", "1s",
 		})
 		cmd.sendSignal(sig)
 
