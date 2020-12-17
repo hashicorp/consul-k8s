@@ -1,7 +1,28 @@
-# this is a generated file used for operator sdk during code generation of CRDs, Controllers and webhooks
 domain: hashicorp.com
 layout: go.kubebuilder.io/v2
 repo: github.com/hashicorp/consul-k8s
+resources:
+- group: consul
+  kind: IngressGateway
+  version: v1alpha1
+- group: consul
+  kind: ProxyDefaults
+  version: v1alpha1
+- group: consul
+  kind: ServiceIntentions
+  version: v1alpha1
+- group: consul
+  kind: ServiceDefaults
+  version: v1alpha1
+- group: consul
+  kind: ServiceResolver
+  version: v1alpha1
+- group: consul
+  kind: ServiceRouter
+  version: v1alpha1
+- group: consul
+  kind: ServiceSplitter
+  version: v1alpha1
 version: 3-alpha
 plugins:
   go.operator-sdk.io/v2-alpha: {}

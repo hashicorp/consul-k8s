@@ -8,6 +8,7 @@ const (
 	ServiceRouter     string = "servicerouter"
 	ServiceSplitter   string = "servicesplitter"
 	ServiceIntentions string = "serviceintentions"
+	IngressGateway    string = "ingressgateway"
 
 	Global                 string = "global"
 	DefaultConsulNamespace string = "default"
