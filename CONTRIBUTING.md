@@ -92,10 +92,14 @@ Below is the list of available flags:
     The consul-k8s image to use for all tests.
 -debug-directory
     The directory where to write debug information about failed test runs, such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.
--enable-multi-cluster
-    If true, the tests that require multiple Kubernetes clusters will be run. At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.
 -enable-enterprise
     If true, the test suite will run tests for enterprise features. Note that some features may require setting the enterprise license flags below.
+-enable-multi-cluster
+    If true, the tests that require multiple Kubernetes clusters will be run. At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.
+-enable-openshift
+    If true, the tests will automatically add Openshift Helm value for each Helm install.
+-enable-pod-security-policies
+    If true, the test suite will run tests with pod security policies enabled.
 -enterprise-license-secret-name
     The name of the Kubernetes secret containing the enterprise license.
 -enterprise-license-secret-key
