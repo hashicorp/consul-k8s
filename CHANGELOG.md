@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Connect: on termination of a connect injected pod the lifecycle-sidecar sometimes re-registered the application resulting in
+  stale service entries for applications which no longer existed. [[GH-409](https://github.com/hashicorp/consul-k8s/pull/409/)]
+
 BREAKING CHANGES:
 * Connect: the flags `-envoy-image` and `-consul-image` for command `inject-connect` are now required. [[GH-405](https://github.com/hashicorp/consul-k8s/pull/405)]
 
