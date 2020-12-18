@@ -288,6 +288,22 @@ ports:
 
 - $ports$ ((#v-ports)) ($array<map>$) - port docs`,
 		},
+		"@type: map": {
+			Input: `---
+# @type: map
+key: null
+`,
+			Exp: `- $key$ ((#v-key)) ($map$)`,
+		},
+		"if of type map and not annotated with @type": {
+			Input: `---
+key:
+  foo: bar
+`,
+			Exp: `- $key$ ((#v-key))
+
+  - $foo$ ((#v-key-foo)) ($string: bar$)`,
+		},
 	}
 
 	for name, c := range cases {
