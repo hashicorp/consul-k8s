@@ -55,7 +55,7 @@ var (
 	docNodeTmpl = template.Must(
 		template.New("").Parse(
 			strings.Replace(
-				`{{ .LeadingIndent }}- ${{ .Key }}$ ((#v{{ .HTMLAnchor }})){{ if ne .Kind "map" }} (${{ .Kind }}{{ if .FormattedDefault }}: {{ .FormattedDefault }}{{ end }}$){{ end }}{{ if .FormattedDocumentation}} - {{ .FormattedDocumentation }}{{ end }}`,
+				`{{ .LeadingIndent }}- ${{ .Key }}$ ((#v{{ .HTMLAnchor }})){{ if ne .FormattedKind "" }} (${{ .FormattedKind }}{{ if .FormattedDefault }}: {{ .FormattedDefault }}{{ end }}$){{ end }}{{ if .FormattedDocumentation}} - {{ .FormattedDocumentation }}{{ end }}`,
 				"$", "`", -1)),
 	)
 )

@@ -48,8 +48,9 @@ type DocNode struct {
 
 // Validate returns an error if this node is invalid, else nil.
 func (n DocNode) Validate() error {
-	if strings.Contains(n.Kind(), UnknownKindError) {
-		return errors.New(n.Kind())
+	kind := n.FormattedKind()
+	if strings.Contains(kind, UnknownKindError) {
+		return errors.New(kind)
 	}
 	return nil
 }
@@ -68,9 +69,9 @@ func (n DocNode) FormattedDefault() string {
 		return match[len(match)-1][1]
 	}
 
-	// We don't show the default if the kind is a map of arrays because the
+	// We don't show the default if the kind is a map of arrays or map because the
 	// default will be too big to show inline.
-	if n.Kind() == "array<map>" {
+	if n.FormattedKind() == "array<map>" || n.FormattedKind() == "map" {
 		return ""
 	}
 
@@ -135,8 +136,8 @@ func (n DocNode) FormattedDocumentation() string {
 	return strings.TrimRight(strings.Join(indentedLines, "\n"), "\n ")
 }
 
-// Kind returns the kind of this node, e.g. string, boolean, etc.
-func (n DocNode) Kind() string {
+// FormattedKind returns the kind of this node, e.g. string, boolean, etc.
+func (n DocNode) FormattedKind() string {
 
 	// Check for the annotation first.
 	if match := typeAnnotation.FindAllStringSubmatch(n.Comment, -1); len(match) > 0 {
@@ -159,7 +160,13 @@ func (n DocNode) Kind() string {
 	case "bool":
 		return "boolean"
 	case "map":
-		return "map"
+		// We don't show the kind if its of type because it's obvious it's a map
+		// because it will have subkeys and so showing the type as map would
+		// just complicate reading without any benefit.
+		// NOTE: If it's been explicitly annotated with @type: map then we
+		// will show it as that is handled above via the typeAnnotation regex
+		// match.
+		return ""
 	default:
 		return fmt.Sprintf("%s '%v'", UnknownKindError, n.KindTag)
 	}
