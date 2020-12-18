@@ -1055,3 +1055,55 @@ rollingUpdate:
       yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":5}}' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.openshift.enabled & client.securityContext
+
+@test "client/DaemonSet: securityContext is not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+#--------------------------------------------------------------------
+# client.securityContext
+
+@test "client/DaemonSet: sets default security context settings" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $security_context | jq -r .fsGroup)
+  [ "${actual}" = "1000" ]
+
+  local actual=$(echo $security_context | jq -r .runAsUser)
+  [ "${actual}" = "100" ]
+
+  local actual=$(echo $security_context | jq -r .runAsGroup)
+  [ "${actual}" = "1000" ]
+}
+
+@test "client/DaemonSet: can overwrite security context settings" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.securityContext.runAsNonRoot=false' \
+      --set 'client.securityContext.privileged=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $security_context | jq -r .privileged)
+  [ "${actual}" = "true" ]
+}

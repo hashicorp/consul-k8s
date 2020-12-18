@@ -60,9 +60,9 @@ spec:
     {{- end }}
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
-      {{- if not .Values.global.openshift.enabled}}
+      {{- if not .Values.global.openshift.enabled }}
       securityContext:
-        fsGroup: 1000
+        {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
         - name: config

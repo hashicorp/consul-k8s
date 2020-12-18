@@ -364,6 +364,20 @@ server:
       memory: "100Mi"
       cpu: "100m"
 
+  # The security context for the server pods. This should be a YAML map corresponding to a
+  # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
+  # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
+  # which correspond to the consul user and group created by the Consul docker image.
+  # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
+  # by the OpenShift platform.
+  # @type: map
+  # @recurse: false
+  securityContext:
+    runAsNonRoot: true
+    runAsGroup: 1000
+    runAsUser: 100
+    fsGroup: 1000
+
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
   # partition (https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions)
@@ -640,6 +654,20 @@ client:
     limits:
       memory: "100Mi"
       cpu: "100m"
+
+  # The security context for the client pods. This should be a YAML map corresponding to a
+  # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
+  # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
+  # which correspond to the consul user and group created by the Consul docker image.
+  # Note: if running on OpenShift, this setting is ignored because the user and group are set automatically
+  # by the OpenShift platform.
+  # @type: map
+  # @recurse: false
+  securityContext:
+    runAsNonRoot: true
+    runAsGroup: 1000
+    runAsUser: 100
+    fsGroup: 1000
 
   # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
