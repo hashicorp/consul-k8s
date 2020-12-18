@@ -21,12 +21,14 @@ func TestValidateConfigEntry(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
-		existingResources []ConfigEntryResource
-		newResource       ConfigEntryResource
-		enableNamespaces  bool
-		nsMirroring       bool
-		expAllow          bool
-		expErrMessage     string
+		existingResources   []ConfigEntryResource
+		newResource         ConfigEntryResource
+		enableNamespaces    bool
+		nsMirroring         bool
+		consulDestinationNS string
+		nsMirroringPrefix   string
+		expAllow            bool
+		expErrMessage       string
 	}{
 		"no duplicates, valid": {
 			existingResources: nil,
@@ -112,7 +114,9 @@ func TestValidateConfigEntry(t *testing.T) {
 				lister,
 				c.newResource,
 				c.enableNamespaces,
-				c.nsMirroring)
+				c.nsMirroring,
+				c.consulDestinationNS,
+				c.nsMirroringPrefix)
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
@@ -198,6 +202,9 @@ func (in *mockConfigEntry) Validate(bool) error {
 		return errors.New("invalid")
 	}
 	return nil
+}
+
+func (in *mockConfigEntry) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
 }
 
 func (in *mockConfigEntry) MatchesConsul(_ capi.ConfigEntry) bool {

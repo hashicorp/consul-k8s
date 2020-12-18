@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/api/common"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -170,6 +171,21 @@ func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+func (in *ServiceSplitter) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	// If namespaces are enabled we want to set the namespace fields to it's
+	// default. If namespaces are not enabled (i.e. OSS) we don't set the
+	// namespace fields because this would cause errors
+	// making API calls (because namespace fields can't be set in OSS).
+	if consulNamespacesEnabled {
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		for i, s := range in.Spec.Splits {
+			if s.Namespace == "" {
+				in.Spec.Splits[i].Namespace = namespace
+			}
+		}
+	}
+}
+
 func (in ServiceSplits) toConsul() []capi.ServiceSplit {
 	var consulServiceSplits []capi.ServiceSplit
 	for _, split := range in {
@@ -196,7 +212,6 @@ func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.Erro
 			if s.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("namespace"), s.Namespace, `Consul Enterprise namespaces must be enabled to set split.namespace`))
 			}
-
 		}
 	}
 	return errs

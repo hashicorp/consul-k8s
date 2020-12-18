@@ -26,6 +26,9 @@ type ServiceSplitterWebhook struct {
 	// be created in the matching Consul namespace.
 	EnableNSMirroring bool
 
+	ConsulDestinationNamespace string
+	NSMirroringPrefix          string
+
 	decoder *admission.Decoder
 	client.Client
 }
@@ -52,7 +55,9 @@ func (v *ServiceSplitterWebhook) Handle(ctx context.Context, req admission.Reque
 		v,
 		&serviceSplitter,
 		v.EnableConsulNamespaces,
-		v.EnableNSMirroring)
+		v.EnableNSMirroring,
+		v.ConsulDestinationNamespace,
+		v.NSMirroringPrefix)
 }
 
 func (v *ServiceSplitterWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

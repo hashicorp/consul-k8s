@@ -26,6 +26,9 @@ type ServiceResolverWebhook struct {
 	// be created in the matching Consul namespace.
 	EnableNSMirroring bool
 
+	ConsulDestinationNamespace string
+	NSMirroringPrefix          string
+
 	decoder *admission.Decoder
 	client.Client
 }
@@ -51,7 +54,9 @@ func (v *ServiceResolverWebhook) Handle(ctx context.Context, req admission.Reque
 		v,
 		&svcResolver,
 		v.EnableConsulNamespaces,
-		v.EnableNSMirroring)
+		v.EnableNSMirroring,
+		v.ConsulDestinationNamespace,
+		v.NSMirroringPrefix)
 }
 
 func (v *ServiceResolverWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

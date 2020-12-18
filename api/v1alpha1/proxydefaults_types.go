@@ -176,6 +176,11 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+// Default has no behaviour here as proxy-defaults have no namespace specific fields.
+func (in *ProxyDefaults) Default(_ bool, _ string, _ bool, _ string) {
+	return
+}
+
 // convertConfig converts the config of type json.RawMessage which is stored
 // by the resource into type map[string]interface{} which is saved by the
 // consul API.

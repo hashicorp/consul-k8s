@@ -26,6 +26,9 @@ type IngressGatewayWebhook struct {
 	// be created in the matching Consul namespace.
 	EnableNSMirroring bool
 
+	ConsulDestinationNamespace string
+	NSMirroringPrefix          string
+
 	decoder *admission.Decoder
 	client.Client
 }
@@ -51,7 +54,9 @@ func (v *IngressGatewayWebhook) Handle(ctx context.Context, req admission.Reques
 		v,
 		&resource,
 		v.EnableConsulNamespaces,
-		v.EnableNSMirroring)
+		v.EnableNSMirroring,
+		v.ConsulDestinationNamespace,
+		v.NSMirroringPrefix)
 }
 
 func (v *IngressGatewayWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -275,6 +276,81 @@ func TestTerminatingGateway_Validate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// Test defaulting behavior when namespaces are enabled as well as disabled.
+func TestTerminatingGateway_Default(t *testing.T) {
+	namespaceConfig := map[string]struct {
+		enabled              bool
+		destinationNamespace string
+		mirroring            bool
+		prefix               string
+		expectedDestination  string
+	}{
+		"disabled": {
+			enabled:              false,
+			destinationNamespace: "",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "",
+		},
+		"destinationNS": {
+			enabled:              true,
+			destinationNamespace: "foo",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "foo",
+		},
+		"mirroringEnabledWithoutPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "",
+			expectedDestination:  "bar",
+		},
+		"mirroringWithPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "ns-",
+			expectedDestination:  "ns-bar",
+		},
+	}
+
+	for name, s := range namespaceConfig {
+		input := &TerminatingGateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+			},
+			Spec: TerminatingGatewaySpec{
+				Services: []LinkedService{
+					{
+						Name: "foo",
+					},
+				},
+			},
+		}
+		output := &TerminatingGateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+			},
+			Spec: TerminatingGatewaySpec{
+				Services: []LinkedService{
+					{
+						Name:      "foo",
+						Namespace: s.expectedDestination,
+					},
+				},
+			},
+		}
+
+		t.Run(name, func(t *testing.T) {
+			input.Default(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			require.True(t, cmp.Equal(input, output))
 		})
 	}
 }
