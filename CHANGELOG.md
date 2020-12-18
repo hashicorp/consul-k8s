@@ -4,6 +4,9 @@ BREAKING CHANGES:
 * Setting `server.bootstrapExpect` to a value less than `server.replicas` will now
   give an error. This was a misconfiguration as the servers wouldn't wait
   until the proper number have started before electing a leader. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
+* Clients and servers now run as non root. Users can also configure `server.securityContext` and `client.securityContext`
+  if they wish to overwrite this behavior. Please see [Helm reference](https://www.consul.io/docs/k8s/helm) for more information.
+  [[GH-748](https://github.com/hashicorp/consul-helm/pull/748)]
 
 FEATURES:
 * CRDs: add new CRD `IngressGateway` for configuring Consul's [ingress-gateway](https://www.consul.io/docs/agent/config-entries/ingress-gateway) config entry. [[GH-714](https://github.com/hashicorp/consul-helm/pull/714)]

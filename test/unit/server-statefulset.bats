@@ -590,7 +590,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.openshift.enabled
+# global.openshift.enabled & server.securityContext
 
 @test "server/StatefulSet: setting server.disableFsGroupSecurityContext fails" {
   cd `chart_dir`
@@ -601,7 +601,7 @@ load _helpers
   [[ "$output" =~ "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." ]]
 }
 
-@test "server/StatefulSet: fsGroup is not set when global.openshift.enabled=true" {
+@test "server/StatefulSet: securityContext is not set when global.openshift.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -611,13 +611,43 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "server/StatefulSet: default fsGroup security context settings fsGroup: 1000" {
+#--------------------------------------------------------------------
+# server.securityContext
+
+@test "server/StatefulSet: sets default security context settings" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local security_context=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.securityContext.fsGroup' | tee /dev/stderr)
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $security_context | jq -r .fsGroup)
   [ "${actual}" = "1000" ]
+
+  local actual=$(echo $security_context | jq -r .runAsUser)
+  [ "${actual}" = "100" ]
+
+  local actual=$(echo $security_context | jq -r .runAsGroup)
+  [ "${actual}" = "1000" ]
+}
+
+@test "server/StatefulSet: can overwrite security context settings" {
+  cd `chart_dir`
+  local security_context=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.securityContext.runAsNonRoot=false' \
+      --set 'server.securityContext.privileged=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
+
+  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $security_context | jq -r .privileged)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
