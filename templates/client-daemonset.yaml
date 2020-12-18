@@ -121,12 +121,12 @@ spec:
             - name: ADVERTISE_IP
               valueFrom:
                 fieldRef:
-                  {{- if not .Values.client.exposeGossipPorts }}
-                  fieldPath: status.podIP
-                  {{- else }}
-                  # Clients will be exposed on their node's hostPort for external-to-k8s communication,
-                  # so they need to advertise their host ip instead of their pod ip.
+                  {{- if .Values.client.exposeGossipPorts }}
+                  {{- /* Clients will be exposed on their node's hostPort for external-to-k8s communication,
+                  so they need to advertise their host ip instead of their pod ip. */}}
                   fieldPath: status.hostIP
+                  {{- else }}
+                  fieldPath: status.podIP
                   {{- end }}
             - name: NAMESPACE
               valueFrom:
@@ -219,8 +219,9 @@ spec:
                 {{- end }}
                 {{- else }}
                 {{- if .Values.server.enabled }}
+                {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
                 {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc" \
+                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
                 {{- end }}
                 {{- end }}
                 {{- end }}
