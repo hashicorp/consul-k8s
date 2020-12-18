@@ -161,6 +161,128 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# exposeGossipAndRPCPorts
+
+@test "server/StatefulSet: server gossip and RPC ports are not exposed by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr )
+
+  # Test that hostPort is not set for gossip ports
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-tcp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  # Test that hostPort is not set for rpc ports
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "server")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  # Test that ADVERTISE_IP is being set to podIP
+  local actual=$(echo "$object" |
+    yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ADVERTISE_IP"))' | tee /dev/stderr)
+  [ "${actual}" = '[{"name":"ADVERTISE_IP","valueFrom":{"fieldRef":{"fieldPath":"status.podIP"}}}]' ]
+}
+
+@test "server/StatefulSet: server gossip and RPC ports can be exposed" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.exposeGossipAndRPCPorts=true' \
+      . | tee /dev/stderr)
+
+  # Test that hostPort is set for gossip ports
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-tcp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "8301" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "8301" ]
+
+  # Test that hostPort is set for rpc ports
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "server")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "8300" ]
+
+  # Test that ADVERTISE_IP is being set to hostIP
+  local actual=$(echo "$object" |
+    yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ADVERTISE_IP"))' | tee /dev/stderr)
+  [ "${actual}" = '[{"name":"ADVERTISE_IP","valueFrom":{"fieldRef":{"fieldPath":"status.hostIP"}}}]' ]
+
+}
+
+#--------------------------------------------------------------------
+# serflan
+
+@test "server/StatefulSet: server.ports.serflan.port is set to 8301 by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr )
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-tcp")' | yq -r '.containerPort' | tee /dev/stderr)
+  [ "${actual}" = "8301" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.containerPort' | tee /dev/stderr)
+  [ "${actual}" = "8301" ]
+
+  local command=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-serf-lan-port=8301"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: server.ports.serflan.port can be customized" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr )
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-tcp")' | yq -r '.containerPort' | tee /dev/stderr)
+  [ "${actual}" = "9301" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.containerPort' | tee /dev/stderr)
+  [ "${actual}" = "9301" ]
+
+  local command=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-serf-lan-port=9301"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: retry join uses server.ports.serflan.port" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.replicas=3' \
+      --set 'server.ports.serflan.port=9301' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # extraVolumes
 
 @test "server/StatefulSet: adds extra volume" {
@@ -574,19 +696,19 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.[2].name' | tee /dev/stderr)
+      yq -r '.[3].name' | tee /dev/stderr)
   [ "${actual}" = "custom_proxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[2].value' | tee /dev/stderr)
+      yq -r '.[3].value' | tee /dev/stderr)
   [ "${actual}" = "fakeproxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[3].name' | tee /dev/stderr)
+      yq -r '.[4].name' | tee /dev/stderr)
   [ "${actual}" = "no_proxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[3].value' | tee /dev/stderr)
+      yq -r '.[4].value' | tee /dev/stderr)
   [ "${actual}" = "custom_no_proxy" ]
 }
 
