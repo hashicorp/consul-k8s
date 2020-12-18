@@ -388,16 +388,27 @@ Here are some things to consider before adding a test:
 The helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
 generated from our `values.yaml` file.
 
-### Code Generation
+### Generating Helm Reference Docs
  
-To generate the docs and update the `helm.mdx` file, run:
- 
-```bash
-make gen-docs consul=<path-to-consul-repo>
-```
+To generate the docs and update the `helm.mdx` file:
 
-Where `<path-to-consul-repo>` is the relative or absolute path to the `hashicorp/consul`
-repo on disk.
+1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub
+1. Clone your fork:
+   ```shell-session
+   git clone https://github.com/your-username/consul.git
+   ```
+1. Change directory into your `consul-helm` repo: 
+   ```shell-session
+   cd /path/to/consul-helm
+   ```
+1. Run `make gen-docs` using the path to your consul (not consul-helm) repo:
+   ```shell-session
+   make gen-docs consul=<path-to-consul-repo>
+   # Examples:
+   # make gen-docs consul=/Users/my-name/code/hashicorp/consul
+   # make gen-docs consul=../consul
+   ```
+1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-helm` pull request)
 
 ### values.yaml Annotations
 
