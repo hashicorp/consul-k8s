@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.22.0 (December 21, 2020)
 
 BUG FIXES:
 * Connect: on termination of a connect injected pod the lifecycle-sidecar sometimes re-registered the application resulting in
