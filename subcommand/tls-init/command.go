@@ -31,28 +31,28 @@ type Command struct {
 	UI        cli.Ui
 	clientset kubernetes.Interface
 
-	flags *flag.FlagSet
-	k8s   *flags.K8SFlags
+	flags    *flag.FlagSet
+	k8sFlags *flags.K8SFlags
 
 	// flags that support the CA/key as files on disk.
-	caFile  string
-	keyFile string
+	flagCaFile  string
+	flagKeyFile string
 
-	// flags that support the CA/key as secrets in Kubernetes.
+	// value that support the CA/key as secrets in Kubernetes.
 	caCertSecret *corev1.Secret
 	caKeySecret  *corev1.Secret
 
 	// flags that dictate the specifications of the created certs.
-	days        int
-	domain      string
-	dc          string
-	dnsnames    flags.AppendSliceValue
-	ipaddresses flags.AppendSliceValue
+	flagDays        int
+	flagDomain      string
+	flagDC          string
+	flagDNSNames    flags.AppendSliceValue
+	flagIPAddresses flags.AppendSliceValue
 
 	// flags that dictate specifics for the secret name and namespace
 	// that are created by the command.
-	k8sNamespace string
-	namePrefix   string
+	flagK8sNamespace string
+	flagNamePrefix   string
 
 	// log
 	log          hclog.Logger
@@ -67,9 +67,6 @@ type Command struct {
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	if err := c.flags.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
-		}
 		c.UI.Error(fmt.Sprintf("Failed to parse args: %v", err))
 		return 1
 	}
@@ -103,19 +100,21 @@ func (c *Command) Run(args []string) int {
 	defer cancel()
 
 	// Verify if CA cert and key exist as Kubernetes secrets if they are not provided as file.
-	if c.caFile == "" && c.keyFile == "" {
-		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.namePrefix), metav1.GetOptions{})
+	if c.flagCaFile == "" && c.flagKeyFile == "" {
+		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.flagNamePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
 			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
+			// Explicitly set value to nil if the secret isn't found.
 			c.caCertSecret = nil
 		}
-		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.namePrefix), metav1.GetOptions{})
+		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.flagNamePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
 			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
+			// Explicitly set value to nil if the secret isn't found.
 			c.caKeySecret = nil
 		}
 	}
@@ -129,11 +128,11 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		c.log.Info("saving CA certificate", "secret", fmt.Sprintf("%s-ca-cert", c.namePrefix))
-		_, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Create(c.ctx, &corev1.Secret{
+		c.log.Info("saving CA certificate", "secret", fmt.Sprintf("%s-ca-cert", c.flagNamePrefix))
+		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-ca-cert", c.namePrefix),
-				Namespace: c.k8sNamespace,
+				Name:      fmt.Sprintf("%s-ca-cert", c.flagNamePrefix),
+				Namespace: c.flagK8sNamespace,
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey: []byte(ca),
@@ -146,10 +145,10 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		c.log.Info("saving ca private key")
-		_, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Create(c.ctx, &corev1.Secret{
+		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-ca-key", c.namePrefix),
-				Namespace: c.k8sNamespace,
+				Name:      fmt.Sprintf("%s-ca-key", c.flagNamePrefix),
+				Namespace: c.flagK8sNamespace,
 			},
 			Data: map[string][]byte{
 				corev1.TLSPrivateKeyKey: []byte(pk),
@@ -168,55 +167,39 @@ func (c *Command) Run(args []string) int {
 	var name string
 	var caBytes, keyBytes []byte
 
-	if c.caFile != "" && c.keyFile != "" {
+	if c.flagCaFile != "" && c.flagKeyFile != "" {
 		c.log.Info("reading CA certificate from provided file")
-		caBytes, err = ioutil.ReadFile(c.caFile)
+		caBytes, err = ioutil.ReadFile(c.flagCaFile)
 		if err != nil {
 			c.log.Error("error reading provided CA file", "err", err)
 			return 1
 		}
 		c.log.Info("reading CA private key from provided file")
-		keyBytes, err = ioutil.ReadFile(c.keyFile)
+		keyBytes, err = ioutil.ReadFile(c.flagKeyFile)
 		if err != nil {
 			c.log.Error("error reading provided private key file", "err", err)
 			return 1
 		}
 	} else {
-		if c.caCertSecret == nil {
-			c.log.Info("reading CA certificate from secret in cluster")
-			c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.namePrefix), metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				c.log.Error("error reading secret from kubernetes client", "err", err)
-				return 1
-			}
-		}
-		if c.caKeySecret == nil {
-			c.log.Info("reading CA private key from secret in cluster")
-			c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.namePrefix), metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				c.log.Error("error reading secret from kubernetes client", "err", err)
-				return 1
-			}
-		}
 		caBytes = c.caCertSecret.Data[corev1.TLSCertKey]
 		keyBytes = c.caKeySecret.Data[corev1.TLSPrivateKeyKey]
 	}
 	ca = string(caBytes)
 	pk = string(keyBytes)
 
-	for _, d := range c.dnsnames {
+	for _, d := range c.flagDNSNames {
 		if len(d) > 0 {
 			hosts = append(hosts, strings.TrimSpace(d))
 		}
 	}
 
-	for _, i := range c.ipaddresses {
+	for _, i := range c.flagIPAddresses {
 		if len(i) > 0 {
 			hosts = append(hosts, strings.TrimSpace(i))
 		}
 	}
 
-	name = fmt.Sprintf("server.%s.%s", c.dc, c.domain)
+	name = fmt.Sprintf("server.%s.%s", c.flagDC, c.flagDomain)
 	hosts = append(hosts, name, "localhost", "127.0.0.1")
 
 	c.log.Info("parsing certificate signer from CA private key")
@@ -240,13 +223,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	serverCertSecret, err := c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-server-cert", c.namePrefix), metav1.GetOptions{})
+	serverCertSecret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-server-cert", c.flagNamePrefix), metav1.GetOptions{})
 	if err != nil && k8serrors.IsNotFound(err) {
 		c.log.Info("creating server certificate and private key secret")
-		_, err := c.clientset.CoreV1().Secrets(c.k8sNamespace).Create(c.ctx, &corev1.Secret{
+		_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: c.k8sNamespace,
-				Name:      fmt.Sprintf("%s-server-cert", c.namePrefix),
+				Namespace: c.flagK8sNamespace,
+				Name:      fmt.Sprintf("%s-server-cert", c.flagNamePrefix),
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       []byte(serverCert),
@@ -264,7 +247,7 @@ func (c *Command) Run(args []string) int {
 			corev1.TLSPrivateKeyKey: []byte(serverKey),
 		}
 		c.log.Info("updating server certificate and private key secret")
-		_, err := c.clientset.CoreV1().Secrets(c.k8sNamespace).Update(c.ctx, serverCertSecret, metav1.UpdateOptions{})
+		_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Update(c.ctx, serverCertSecret, metav1.UpdateOptions{})
 		if err != nil {
 			c.log.Error("error updating server certificate secret in kubernetes", "err", err)
 			return 1
@@ -280,7 +263,7 @@ func (c *Command) Run(args []string) int {
 // getDaysAsDuration returns number of days the certificate
 // is valid for as a time.Duration.
 func (c *Command) getDaysAsDuration() time.Duration {
-	duration, err := time.ParseDuration(fmt.Sprintf("%dh", 24*c.days))
+	duration, err := time.ParseDuration(fmt.Sprintf("%dh", 24*c.flagDays))
 	if err != nil {
 		c.log.Error("error parsing duration from days", "err", err)
 		return 1
@@ -290,28 +273,28 @@ func (c *Command) getDaysAsDuration() time.Duration {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.IntVar(&c.days, "days", 1825, "The number of days the CA is valid for from now on. Defaults to 5 years.")
-	c.flags.StringVar(&c.domain, "domain", "consul", "Domain of consul cluster. Only used in combination with -name-constraint. Defaults to consul.")
-	c.flags.StringVar(&c.caFile, "ca", "", "Path to the CA certificate file.")
-	c.flags.StringVar(&c.keyFile, "key", "", "Path to the CA key file.")
-	c.flags.StringVar(&c.dc, "dc", "dc1", "Datacenter of the Consul cluster. Defaults to dc1.")
-	c.flags.StringVar(&c.namePrefix, "name-prefix", "", "Name prefix for secrets containing the CA, server certificate and private key")
-	c.flags.StringVar(&c.k8sNamespace, "k8s-namespace", "default", "Name of Kubernetes namespace where secrets should be created and read from.")
-	c.flags.Var(&c.dnsnames, "additional-dnsname", "Additional DNS name to add to the Consul server certificate as Subject Alternative Name. "+
+	c.flags.IntVar(&c.flagDays, "days", 1825, "The number of days the CA is valid for from now on. Defaults to 5 years.")
+	c.flags.StringVar(&c.flagDomain, "domain", "consul", "Domain of consul cluster. Only used in combination with -name-constraint. Defaults to consul.")
+	c.flags.StringVar(&c.flagCaFile, "ca", "", "Path to the CA certificate file.")
+	c.flags.StringVar(&c.flagKeyFile, "key", "", "Path to the CA key file.")
+	c.flags.StringVar(&c.flagDC, "dc", "dc1", "Datacenter of the Consul cluster. Defaults to dc1.")
+	c.flags.StringVar(&c.flagNamePrefix, "name-prefix", "", "Name prefix for secrets containing the CA, server certificate and private key")
+	c.flags.StringVar(&c.flagK8sNamespace, "k8s-namespace", "default", "Name of Kubernetes namespace where secrets should be created and read from.")
+	c.flags.Var(&c.flagDNSNames, "additional-dnsname", "Additional DNS name to add to the Consul server certificate as Subject Alternative Name. "+
 		"localhost is always included. This flag may be provided multiple times.")
-	c.flags.Var(&c.ipaddresses, "additional-ipaddress", "Additional IP address to add to the Consul server certificate as the Subject Alternative Name. "+
+	c.flags.Var(&c.flagIPAddresses, "additional-ipaddress", "Additional IP address to add to the Consul server certificate as the Subject Alternative Name. "+
 		"127.0.0.1 is always included. This flag may be provided multiple times.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.k8s = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.k8s.Flags())
+	c.k8sFlags = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.k8sFlags.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
 
 // configureKubeClient initialized the K8s clientset.
 func (c *Command) configureKubeClient() error {
-	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+	config, err := subcommand.K8SConfig(c.k8sFlags.KubeConfig())
 	if err != nil {
 		return fmt.Errorf("error retrieving Kubernetes auth: %s", err)
 	}
@@ -334,7 +317,7 @@ func (c *Command) Synopsis() string {
 // existingCA returns true if a CA certificate and key already
 // exist and should be re-used.
 func (c *Command) existingCA() bool {
-	if c.caFile != "" && c.keyFile != "" {
+	if c.flagCaFile != "" && c.flagKeyFile != "" {
 		return true
 	}
 	if c.caKeySecret != nil && c.caCertSecret != nil {
@@ -346,23 +329,25 @@ func (c *Command) existingCA() bool {
 // validateFlags returns an error if an invalid combination of
 // flags are utilized.
 func (c *Command) validateFlags() error {
-	if (c.keyFile != "" && c.caFile == "") || (c.caFile != "" && c.keyFile == "") {
+	if (c.flagKeyFile != "" && c.flagCaFile == "") || (c.flagCaFile != "" && c.flagKeyFile == "") {
 		return errors.New("either both -ca and -key or neither must be set")
 	}
-	if c.namePrefix == "" {
+	if c.flagNamePrefix == "" {
 		return errors.New("-name-prefix must be set")
 	}
-	if c.days < 0 {
+	if c.flagDays < 0 {
 		return errors.New("-days must be a positive integer")
 	}
 
 	return nil
 }
 
-const synopsis = "TBD"
+const synopsis = "Initialize CA and Server Certificates during Consul install."
 const help = `
 Usage: consul-k8s tls-init [options]
 
-  TBD
+  Bootstraps the installation with a CA certificate, CA private keys and TLS Certificates
+  for the Consul server. It manages the rotation of the Server certificates on subsequent
+  runs. It can be provided the CA and Key as a file on disk or can manage it's own CA.
 
 `

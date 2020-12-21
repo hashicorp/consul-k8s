@@ -191,12 +191,7 @@ func privateKey() (crypto.Signer, string, error) {
 
 // serialNumber generates a new random serial number.
 func serialNumber() (*big.Int, error) {
-	l := new(big.Int).Lsh(big.NewInt(1), 128)
-	s, err := rand.Int(rand.Reader, l)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
+	return rand.Int(rand.Reader, (&big.Int{}).Exp(big.NewInt(2), big.NewInt(159), nil))
 }
 
 // keyId returns a x509 keyId from the given signing key. The key must be
