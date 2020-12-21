@@ -106,14 +106,14 @@ func (c *Command) Run(args []string) int {
 	if c.caFile == "" && c.keyFile == "" {
 		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.namePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
-			c.log.Error("error reading secret from kubernetes client", "err", err)
+			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
 			c.caCertSecret = nil
 		}
 		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.namePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
-			c.log.Error("error reading secret from kubernetes client", "err", err)
+			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
 			c.caKeySecret = nil
@@ -122,14 +122,14 @@ func (c *Command) Run(args []string) int {
 
 	// Only create a CA certificate/key pair if it doesn't exist or hasn't been provided
 	if !c.existingCA() {
-		c.log.Info("creating CA certificate and key as it does not exists")
+		c.log.Info("creating CA certificate and key because they don't exist")
 		_, pk, ca, _, err = cert.GenerateCA("Consul Agent CA")
 		if err != nil {
 			c.log.Error("error generating Consul Agent CA certificate and private key", "err", err)
 			return 1
 		}
 
-		c.log.Info("saving ca certificate")
+		c.log.Info("saving CA certificate", "secret", fmt.Sprintf("%s-ca-cert", c.namePrefix))
 		_, err = c.clientset.CoreV1().Secrets(c.k8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-cert", c.namePrefix),
@@ -290,16 +290,16 @@ func (c *Command) getDaysAsDuration() time.Duration {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.IntVar(&c.days, "days", 1825, "Provide number of days the CA is valid for from now on. Defaults to 5 years.")
+	c.flags.IntVar(&c.days, "days", 1825, "The number of days the CA is valid for from now on. Defaults to 5 years.")
 	c.flags.StringVar(&c.domain, "domain", "consul", "Domain of consul cluster. Only used in combination with -name-constraint. Defaults to consul.")
-	c.flags.StringVar(&c.caFile, "ca", "", "Provide path to the ca.")
-	c.flags.StringVar(&c.keyFile, "key", "", "Provide path to the key.")
-	c.flags.StringVar(&c.dc, "dc", "dc1", "Provide the datacenter. Matters only for -server certificates. Defaults to dc1.")
-	c.flags.StringVar(&c.namePrefix, "name-prefix", "", "Provide the name prefix for secrets created with the ca, certificate and private key")
-	c.flags.StringVar(&c.k8sNamespace, "k8s-namespace", "default", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed..")
-	c.flags.Var(&c.dnsnames, "additional-dnsname", "Provide an additional dnsname for Subject Alternative Names. "+
+	c.flags.StringVar(&c.caFile, "ca", "", "Path to the CA certificate file.")
+	c.flags.StringVar(&c.keyFile, "key", "", "Path to the CA key file.")
+	c.flags.StringVar(&c.dc, "dc", "dc1", "Datacenter of the Consul cluster. Defaults to dc1.")
+	c.flags.StringVar(&c.namePrefix, "name-prefix", "", "Name prefix for secrets containing the CA, server certificate and private key")
+	c.flags.StringVar(&c.k8sNamespace, "k8s-namespace", "default", "Name of Kubernetes namespace where secrets should be created and read from.")
+	c.flags.Var(&c.dnsnames, "additional-dnsname", "Additional DNS name to add to the Consul server certificate as Subject Alternative Name. "+
 		"localhost is always included. This flag may be provided multiple times.")
-	c.flags.Var(&c.ipaddresses, "additional-ipaddress", "Provide an additional ipaddress for Subject Alternative Names. "+
+	c.flags.Var(&c.ipaddresses, "additional-ipaddress", "Additional IP address to add to the Consul server certificate as the Subject Alternative Name. "+
 		"127.0.0.1 is always included. This flag may be provided multiple times.")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
