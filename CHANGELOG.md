@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.28.0 (Dec 21, 2020)
+
 BREAKING CHANGES:
 * Setting `server.bootstrapExpect` to a value less than `server.replicas` will now
   give an error. This was a misconfiguration as the servers wouldn't wait
@@ -23,6 +25,10 @@ FEATURES:
   [[GH-740](https://github.com/hashicorp/consul-helm/pull/740)]
 
 IMPROVEMENTS:
+* Updated the default consul-k8s image to `hashicorp/consul-k8s:0.22.0`.
+  This release includes an important bug fix where the lifecycle-sidecar sometimes re-registered the application.
+  Please see consul-k8s [v0.22.0](https://github.com/hashicorp/consul-k8s/releases/tag/v0.22.0) release for more info.
+* Updated the default Consul image to `hashicorp/consul:1.9.1`.
 * Make `server.bootstrapExpect` optional. If not set, will now default to `server.replicas`.
   If you're currently setting `server.replicas`, there is no effect. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
 
@@ -33,6 +39,10 @@ BUG FIXES:
  
   If `failover[].namespaces` was used previously, it was ignored and after this change it will still be ignored.
   If `failover[].namespace` was used previously, it worked correctly and after this change it will still work correctly. [[GH-714](https://github.com/hashicorp/consul-helm/pull/714)]
+* Recreate the Server/Client Pod when the Server/Client ConfigMap is updated via `helm upgrade`
+  by using Server ConfigMap and Client ConfigMap values as hashes on Server StatefulSet and Client DaemonSet annotations respectively.
+  This updates the previously hashed values of the extraConfig. [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
+* Remove unused ports `8302` and `8300` from the client daemonset pods. [[GH-737](https://github.com/hashicorp/consul-helm/pull/737)]
 
 ## 0.27.0 (Nov 25, 2020)
 
@@ -42,8 +52,6 @@ IMPROVEMENTS:
 * Updated the default Consul image to `hashicorp/consul:1.9.0`.
 * Updated the default consul-k8s image to `hashicorp/consul-k8s:0.21.0`.
 * Updated the default envoy image to `envoyproxy/envoy-alpine:v1.16.0`.
-* Add Server ConfigMap and Client ConfigMap values as hashes on Server StatefulSet and Client DaemonSet annotations respectively. This recreates
-  the Server/Client Pod when the Server/Client ConfigMap is updated via `helm upgrade`. This updates the previously hashed values of the extraConfig. [[GH-550](https://github.com/hashicorp/consul-helm/pull/550)]
 
 ## 0.26.0 (Nov 12, 2020)
 
