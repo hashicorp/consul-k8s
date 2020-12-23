@@ -31,6 +31,7 @@ global:
   # # Consul Enterprise 1.5.0
   # image: "hashicorp/consul-enterprise:1.5.0-ent"
   # ```
+  # @default: hashicorp/consul:<latest version>
   image: "hashicorp/consul:1.9.1"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
@@ -50,6 +51,7 @@ global:
   # The name (and tag) of the consul-k8s (https://github.com/hashicorp/consul-k8s)
   # Docker image that is used for functionality such the catalog sync.
   # This can be overridden per component.
+  # @default: hashicorp/consul-k8s:<latest version>
   imageK8S: "hashicorp/consul-k8s:0.22.0"
 
   # The name of the datacenter that the agents should
@@ -229,6 +231,8 @@ global:
   # The lifecycle sidecar ensures the Consul services
   # are always registered with their local Consul clients and is used by the
   # ingress/terminating/mesh gateways as well as with every Connect-injected service.
+  # @recurse: false
+  # @type: map
   lifecycleSidecarContainer:
     resources:
       requests:
@@ -241,6 +245,7 @@ global:
   # The name (and tag) of the Envoy Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
+  # @default: envoyproxy/envoy-alpine:<latest supported version>
   imageEnvoy: "envoyproxy/envoy-alpine:v1.16.0"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
@@ -356,6 +361,9 @@ server:
   #     memory: '100Mi'
   #     cpu: '100m'
   # ```
+  #
+  # @recurse: false
+  # @type: map
   resources:
     requests:
       memory: "100Mi"
@@ -647,6 +655,8 @@ client:
   # Resource settings for Client agents.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
+  # @recurse: false
+  # @type: map
   resources:
     requests:
       memory: "100Mi"
@@ -835,6 +845,8 @@ client:
       secretKey: null
 
     # Resource settings for snapshot agent pods.
+    # @recurse: false
+    # @type: map
     resources:
       requests:
         memory: "50Mi"
@@ -1110,6 +1122,8 @@ syncCatalog:
   tolerations: null
 
   # Resource settings for sync catalog pods.
+  # @recurse: false
+  # @type: map
   resources:
     requests:
       memory: "50Mi"
@@ -1172,6 +1186,8 @@ connectInject:
   logLevel: info
 
   # Resource settings for connect inject pods.
+  # @recurse: false
+  # @type: map
   resources:
     requests:
       memory: "50Mi"
@@ -1323,7 +1339,11 @@ connectInject:
   # This token needs to have `operator = "write"` privileges to be able to
   # create Consul namespaces.
   aclInjectToken:
+    # The name of the Kubernetes secret.
+    # @type: string
     secretName: null
+    # The key of the Kubernetes secret.
+    # @type: string
     secretKey: null
 
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
@@ -1359,6 +1379,7 @@ connectInject:
     # - `consul.hashicorp.com/sidecar-proxy-cpu-request`
     # - `consul.hashicorp.com/sidecar-proxy-memory-limit`
     # - `consul.hashicorp.com/sidecar-proxy-memory-request`
+    # @type: map
     resources:
       requests:
         # Recommended default: 100Mi
@@ -1376,6 +1397,8 @@ connectInject:
         cpu: null
 
   # Resource settings for the Connect injected init container.
+  # @recurse: false
+  # @type: map
   initContainer:
     resources:
       requests:
@@ -1389,13 +1412,18 @@ connectInject:
 # Requires consul >= 1.8.4.
 # ServiceIntentions require consul 1.9+.
 controller:
+  # Enables the controller for managing custom resources.
   enabled: false
+
+  # The number of deployment replicas.
   replicas: 1
 
   # Log verbosity level. One of "debug", "info", "warn", or "error".
   logLevel: info
 
   # Resource settings for controller pods.
+  # @recurse: false
+  # @type: map
   resources:
     limits:
       cpu: 100m
@@ -1543,6 +1571,8 @@ meshGateway:
   # Resource settings for mesh gateway pods.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
+  # @recurse: false
+  # @type: map
   resources:
     requests:
       memory: "100Mi"
@@ -1552,6 +1582,8 @@ meshGateway:
       cpu: "100m"
 
   # Resource settings for the `copy-consul-bin` init container.
+  # @recurse: false
+  # @type: map
   initCopyConsulContainer:
     resources:
       requests:
@@ -1657,6 +1689,8 @@ ingressGateways:
       additionalSpec: null
 
     # Resource limits for all ingress gateway pods
+    # @recurse: false
+    # @type: map
     resources:
       requests:
         memory: "100Mi"
@@ -1666,6 +1700,8 @@ ingressGateways:
         cpu: "100m"
 
     # Resource settings for the `copy-consul-bin` init container.
+    # @recurse: false
+    # @type: map
     initCopyConsulContainer:
       resources:
         requests:
@@ -1764,6 +1800,8 @@ terminatingGateways:
     extraVolumes: []
 
     # Resource limits for all terminating gateway pods
+    # @recurse: false
+    # @type: map
     resources:
       requests:
         memory: "100Mi"
@@ -1773,6 +1811,8 @@ terminatingGateways:
         cpu: "100m"
 
     # Resource settings for the `copy-consul-bin` init container.
+    # @recurse: false
+    # @type: map
     initCopyConsulContainer:
       resources:
         requests:
