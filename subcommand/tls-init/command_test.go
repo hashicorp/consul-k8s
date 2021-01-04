@@ -86,14 +86,14 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	serverCert := serverCertSecret.Data[corev1.TLSCertKey]
 	serverKey := serverCertSecret.Data[corev1.TLSPrivateKeyKey]
 
-	certBlock, _ := pem.Decode([]byte(serverCert))
+	certBlock, _ := pem.Decode(serverCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
 	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4()}, certificate.IPAddresses)
 
-	keyBlock, _ := pem.Decode([]byte(serverKey))
+	keyBlock, _ := pem.Decode(serverKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
@@ -140,14 +140,14 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 	newServerKey := serverCertSecret.Data[corev1.TLSPrivateKeyKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
+	require.NotEqual(t, []byte(serverCert), newServerCert)
 	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"test.dns.name", "server.dc1.consul", "localhost"}, certificate.DNSNames)
 
-	require.NotEqual(t, serverKey, newServerKey)
+	require.NotEqual(t, []byte(serverKey), newServerKey)
 	keyBlock, _ := pem.Decode(newServerKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
@@ -195,14 +195,14 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	serverCert := serverCertSecret.Data[corev1.TLSCertKey]
 	serverKey := serverCertSecret.Data[corev1.TLSPrivateKeyKey]
 
-	certBlock, _ := pem.Decode([]byte(serverCert))
+	certBlock, _ := pem.Decode(serverCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
 	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4()}, certificate.IPAddresses)
 
-	keyBlock, _ := pem.Decode([]byte(serverKey))
+	keyBlock, _ := pem.Decode(serverKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
@@ -223,16 +223,14 @@ func TestRun_CreatesServerCertificatesWithoutExistingCerts(t *testing.T) {
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 	newServerKey := serverCertSecret.Data[corev1.TLSPrivateKeyKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
-	certBlock, _ := pem.Decode([]byte(newServerCert))
+	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
 	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4()}, certificate.IPAddresses)
 
-	require.NotEqual(t, serverKey, newServerKey)
-	keyBlock, _ := pem.Decode([]byte(newServerKey))
+	keyBlock, _ := pem.Decode(newServerKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
@@ -290,18 +288,61 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 	newServerKey := serverCertSecret.Data[corev1.TLSPrivateKeyKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
-	certBlock, _ := pem.Decode([]byte(newServerCert))
+	require.NotEqual(t, []byte(serverCert), newServerCert)
+	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"test.dns.name", "server.dc1.consul", "localhost"}, certificate.DNSNames)
 
-	require.NotEqual(t, serverKey, newServerKey)
-	keyBlock, _ := pem.Decode([]byte(newServerKey))
+	require.NotEqual(t, []byte(serverKey), newServerKey)
+	keyBlock, _ := pem.Decode(newServerKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
+}
+
+func TestRun_DoesNotRecreateExistingCACertSecrets(t *testing.T) {
+	ui := cli.NewMockUi()
+	cmd := Command{UI: ui}
+	k8s := fake.NewSimpleClientset()
+	cmd.clientset = k8s
+
+	_, err := k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "consul-ca-cert",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			corev1.TLSCertKey: []byte(caCert),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "consul-ca-key",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			corev1.TLSPrivateKeyKey: []byte(caKey),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	flags := []string{"-name-prefix", "consul"}
+	exitCode := cmd.Run(flags)
+	require.Equal(t, 0, exitCode)
+
+	consulCACert, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-cert", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, []byte(caCert), consulCACert.Data[corev1.TLSCertKey])
+
+	consulCAKey, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-key", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, []byte(caKey), consulCAKey.Data[corev1.TLSPrivateKeyKey])
 }
 
 func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T) {
@@ -342,8 +383,8 @@ func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
-	certBlock, _ := pem.Decode([]byte(newServerCert))
+	require.NotEqual(t, []byte(serverCert), newServerCert)
+	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, time.Now().AddDate(1, 0, 0).Unix(), certificate.NotAfter.Unix())
@@ -387,8 +428,8 @@ func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
-	certBlock, _ := pem.Decode([]byte(newServerCert))
+	require.NotEqual(t, []byte(serverCert), newServerCert)
+	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, []string{"test.name.one", "test.name.two", "server.dc1.consul", "localhost"}, certificate.DNSNames)
@@ -435,7 +476,7 @@ func TestRun_CreatesServerCertificatesWithSpecifiedNamePrefix(t *testing.T) {
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
+	require.NotEqual(t, []byte(serverCert), newServerCert)
 	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
@@ -482,8 +523,8 @@ func TestRun_CreatesServerCertificatesWithSpecifiedDomainAndDC(t *testing.T) {
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
 
-	require.NotEqual(t, serverCert, newServerCert)
-	certBlock, _ := pem.Decode([]byte(newServerCert))
+	require.NotEqual(t, []byte(serverCert), newServerCert)
+	certBlock, _ := pem.Decode(newServerCert)
 	certificate, err := x509.ParseCertificate(certBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, []string{"server.testdc.foobar", "localhost"}, certificate.DNSNames)
