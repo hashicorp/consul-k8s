@@ -80,6 +80,10 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
+	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
+	require.NoError(t, err)
+
 	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-server-cert", metav1.GetOptions{})
 	require.NoError(t, err)
 	serverCert := serverCertSecret.Data[corev1.TLSCertKey]
@@ -96,6 +100,8 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
+
+	require.NoError(t, certificate.CheckSignatureFrom(caCertificate))
 }
 
 func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
@@ -134,6 +140,10 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
+	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
+	require.NoError(t, err)
+
 	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-server-cert", metav1.GetOptions{})
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
@@ -151,6 +161,8 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
+
+	require.NoError(t, certificate.CheckSignatureFrom(caCertificate))
 }
 
 func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
@@ -189,6 +201,10 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
+	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
+	require.NoError(t, err)
+
 	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-server-cert", metav1.GetOptions{})
 	require.NoError(t, err)
 	serverCert := serverCertSecret.Data[corev1.TLSCertKey]
@@ -205,6 +221,8 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
+
+	require.NoError(t, certificate.CheckSignatureFrom(caCertificate))
 }
 
 func TestRun_CreatesServerCertificatesWithoutExistingCerts(t *testing.T) {
@@ -282,13 +300,9 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
-	consulCACert, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-cert", metav1.GetOptions{})
+	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
 	require.NoError(t, err)
-	require.Equal(t, []byte(caCert), consulCACert.Data[corev1.TLSCertKey])
-
-	consulCAKey, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-key", metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, []byte(caKey), consulCAKey.Data[corev1.TLSPrivateKeyKey])
 
 	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-server-cert", metav1.GetOptions{})
 	require.NoError(t, err)
@@ -307,6 +321,8 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
+
+	require.NoError(t, certificate.CheckSignatureFrom(caCertificate))
 }
 
 func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T) {
