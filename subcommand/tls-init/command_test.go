@@ -58,7 +58,7 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-func TestRun_CreatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
+func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{UI: ui}
 	k8s := fake.NewSimpleClientset()
@@ -434,7 +434,6 @@ func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"test.name.one", "test.name.two", "server.dc1.consul", "localhost"}, certificate.DNSNames)
 	require.Equal(t, []net.IP{net.ParseIP(`10.0.0.1`).To4(), net.ParseIP(`127.0.0.1`).To4()}, certificate.IPAddresses)
-
 }
 
 func TestRun_CreatesServerCertificatesWithSpecifiedNamePrefix(t *testing.T) {
@@ -489,7 +488,6 @@ func TestRun_CreatesServerCertificatesWithSpecifiedDomainAndDC(t *testing.T) {
 	cmd := Command{UI: ui}
 	k8s := fake.NewSimpleClientset()
 	cmd.clientset = k8s
-	//namePrefix := "foo"
 
 	_, err := k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

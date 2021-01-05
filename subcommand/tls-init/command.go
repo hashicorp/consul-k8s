@@ -99,14 +99,15 @@ func (c *Command) Run(args []string) int {
 	c.ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	// Verify if CA cert and key exist as Kubernetes secrets if they are not provided as file.
+	// Get CA cert and key from the Kubernetes secrets if they are not provided as files.
 	if c.flagCaFile == "" && c.flagKeyFile == "" {
 		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.flagNamePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
 			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
-			// Explicitly set value to nil if the secret isn't found.
+			// Explicitly set value to nil if the secret isn't found
+			// so that we can later determine whether to create a new CA.
 			c.caCertSecret = nil
 		}
 		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.flagNamePrefix), metav1.GetOptions{})
@@ -114,14 +115,15 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("error reading secret from Kubernetes", "err", err)
 			return 1
 		} else if err != nil {
-			// Explicitly set value to nil if the secret isn't found.
+			// Explicitly set value to nil if the secret isn't found
+			// so that we can later determine whether to create a new CA.
 			c.caKeySecret = nil
 		}
 	}
 
 	// Only create a CA certificate/key pair if it doesn't exist or hasn't been provided
 	if !c.existingCA() {
-		c.log.Info("creating CA certificate and key because they don't exist")
+		c.log.Info("no existing CA found; generating new CA certificate and key")
 		_, pk, ca, _, err = cert.GenerateCA("Consul Agent CA")
 		if err != nil {
 			c.log.Error("error generating Consul Agent CA certificate and private key", "err", err)
@@ -144,7 +146,7 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("error saving CA certificate secret to kubernetes", "err", err)
 			return 1
 		}
-		c.log.Info("saving ca private key")
+		c.log.Info("saving ca private key", "secret", fmt.Sprintf("%s-ca-key", c.flagNamePrefix)))
 		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-key", c.flagNamePrefix),
@@ -160,7 +162,9 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("error saving CA private key secret to kubernetes", "err", err)
 			return 1
 		}
-		c.log.Info("successfully saved ca and private key")
+		c.log.Info("successfully saved CA certificate and private key")
+	} else {
+	  c.log.Info("using existing CA")
 	}
 
 	var hosts []string
@@ -181,6 +185,8 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	} else {
+		// We assume that these secrets aren't nil becase
+		// we created them above in case they are nil.
 		caBytes = c.caCertSecret.Data[corev1.TLSCertKey]
 		keyBytes = c.caKeySecret.Data[corev1.TLSPrivateKeyKey]
 	}
@@ -273,7 +279,7 @@ func (c *Command) getDaysAsDuration() time.Duration {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.IntVar(&c.flagDays, "days", 1825, "The number of days the CA is valid for from now on. Defaults to 5 years.")
+	c.flags.IntVar(&c.flagDays, "days", 1825, "The number of days the Consul server certificate is valid for from now on. Defaults to 5 years.")
 	c.flags.StringVar(&c.flagDomain, "domain", "consul", "Domain of consul cluster. Only used in combination with -name-constraint. Defaults to consul.")
 	c.flags.StringVar(&c.flagCaFile, "ca", "", "Path to the CA certificate file.")
 	c.flags.StringVar(&c.flagKeyFile, "key", "", "Path to the CA key file.")
@@ -335,7 +341,7 @@ func (c *Command) validateFlags() error {
 	if c.flagNamePrefix == "" {
 		return errors.New("-name-prefix must be set")
 	}
-	if c.flagDays < 0 {
+	if c.flagDays <= 0 {
 		return errors.New("-days must be a positive integer")
 	}
 
@@ -346,8 +352,8 @@ const synopsis = "Initialize CA and Server Certificates during Consul install."
 const help = `
 Usage: consul-k8s tls-init [options]
 
-  Bootstraps the installation with a CA certificate, CA private keys and TLS Certificates
+  Bootstraps the installation with a CA certificate, CA private key and TLS Certificates
   for the Consul server. It manages the rotation of the Server certificates on subsequent
-  runs. It can be provided the CA and Key as a file on disk or can manage it's own CA.
+  runs. It can be provided with the CA certificate and key files on disk or can manage it's own CA.
 
 `
