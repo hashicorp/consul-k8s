@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -283,6 +282,14 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
+	consulCACert, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-cert", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, []byte(caCert), consulCACert.Data[corev1.TLSCertKey])
+
+	consulCAKey, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-key", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, []byte(caKey), consulCAKey.Data[corev1.TLSPrivateKeyKey])
+
 	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-server-cert", metav1.GetOptions{})
 	require.NoError(t, err)
 	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
@@ -300,49 +307,6 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	require.NoError(t, err)
 	require.Equal(t, &privateKey.PublicKey, certificate.PublicKey)
-}
-
-func TestRun_DoesNotRecreateExistingCACertSecrets(t *testing.T) {
-	ui := cli.NewMockUi()
-	cmd := Command{UI: ui}
-	k8s := fake.NewSimpleClientset()
-	cmd.clientset = k8s
-
-	_, err := k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-ca-cert",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
-		},
-		Type: corev1.SecretTypeOpaque,
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	_, err = k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-ca-key",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
-		},
-		Type: corev1.SecretTypeOpaque,
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	flags := []string{"-name-prefix", "consul"}
-	exitCode := cmd.Run(flags)
-	require.Equal(t, 0, exitCode)
-
-	consulCACert, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-cert", metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, []byte(caCert), consulCACert.Data[corev1.TLSCertKey])
-
-	consulCAKey, err := k8s.CoreV1().Secrets("default").Get(context.Background(), "consul-ca-key", metav1.GetOptions{})
-	require.NoError(t, err)
-	require.Equal(t, []byte(caKey), consulCAKey.Data[corev1.TLSPrivateKeyKey])
 }
 
 func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T) {
@@ -434,53 +398,6 @@ func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"test.name.one", "test.name.two", "server.dc1.consul", "localhost"}, certificate.DNSNames)
 	require.Equal(t, []net.IP{net.ParseIP(`10.0.0.1`).To4(), net.ParseIP(`127.0.0.1`).To4()}, certificate.IPAddresses)
-}
-
-func TestRun_CreatesServerCertificatesWithSpecifiedNamePrefix(t *testing.T) {
-	ui := cli.NewMockUi()
-	cmd := Command{UI: ui}
-	k8s := fake.NewSimpleClientset()
-	cmd.clientset = k8s
-	namePrefix := "foo"
-
-	_, err := k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-ca-cert", namePrefix),
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
-		},
-		Type: corev1.SecretTypeOpaque,
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	_, err = k8s.CoreV1().Secrets("default").Create(context.Background(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-ca-key", namePrefix),
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
-		},
-		Type: corev1.SecretTypeOpaque,
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	flags := []string{"-name-prefix", "consul", "-name-prefix", namePrefix}
-	exitCode := cmd.Run(flags)
-	require.Equal(t, 0, exitCode)
-
-	serverCertSecret, err := k8s.CoreV1().Secrets("default").Get(context.Background(), fmt.Sprintf("%s-server-cert", namePrefix), metav1.GetOptions{})
-	require.NoError(t, err)
-	newServerCert := serverCertSecret.Data[corev1.TLSCertKey]
-
-	require.NotEqual(t, []byte(serverCert), newServerCert)
-	certBlock, _ := pem.Decode(newServerCert)
-	certificate, err := x509.ParseCertificate(certBlock.Bytes)
-	require.NoError(t, err)
-	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
-	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4()}, certificate.IPAddresses)
 }
 
 func TestRun_CreatesServerCertificatesWithSpecifiedDomainAndDC(t *testing.T) {

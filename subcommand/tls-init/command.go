@@ -22,11 +22,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var (
-	ca string
-	pk string
-)
-
 type Command struct {
 	UI        cli.Ui
 	clientset kubernetes.Interface
@@ -90,7 +85,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.clientset == nil {
 		if err := c.configureKubeClient(); err != nil {
-			c.log.Error("error configuring kubernetes client", "err", err.Error())
+			c.UI.Error(fmt.Sprintf("error configuring kubernetes: %v", err))
 			return 1
 		}
 	}
@@ -103,7 +98,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagCaFile == "" && c.flagKeyFile == "" {
 		c.caCertSecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-cert", c.flagNamePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
-			c.log.Error("error reading secret from Kubernetes", "err", err)
+			c.UI.Error(fmt.Sprintf("error reading secret from Kubernetes: %v", err))
 			return 1
 		} else if err != nil {
 			// Explicitly set value to nil if the secret isn't found
@@ -112,7 +107,7 @@ func (c *Command) Run(args []string) int {
 		}
 		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, fmt.Sprintf("%s-ca-key", c.flagNamePrefix), metav1.GetOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
-			c.log.Error("error reading secret from Kubernetes", "err", err)
+			c.UI.Error(fmt.Sprintf("error reading secret from Kubernetes: %v", err))
 			return 1
 		} else if err != nil {
 			// Explicitly set value to nil if the secret isn't found
@@ -121,8 +116,13 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	var (
+		ca string
+		pk string
+	)
+
 	// Only create a CA certificate/key pair if it doesn't exist or hasn't been provided
-	if !c.existingCA() {
+	if !c.caExists() {
 		c.log.Info("no existing CA found; generating new CA certificate and key")
 		_, pk, ca, _, err = cert.GenerateCA("Consul Agent CA")
 		if err != nil {
@@ -146,7 +146,7 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("error saving CA certificate secret to kubernetes", "err", err)
 			return 1
 		}
-		c.log.Info("saving ca private key", "secret", fmt.Sprintf("%s-ca-key", c.flagNamePrefix)))
+		c.log.Info("saving ca private key", "secret", fmt.Sprintf("%s-ca-key", c.flagNamePrefix))
 		c.caKeySecret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-key", c.flagNamePrefix),
@@ -164,7 +164,7 @@ func (c *Command) Run(args []string) int {
 		}
 		c.log.Info("successfully saved CA certificate and private key")
 	} else {
-	  c.log.Info("using existing CA")
+		c.log.Info("using existing CA")
 	}
 
 	var hosts []string
@@ -320,9 +320,9 @@ func (c *Command) Synopsis() string {
 	return synopsis
 }
 
-// existingCA returns true if a CA certificate and key already
+// caExists returns true if a CA certificate and key already
 // exist and should be re-used.
-func (c *Command) existingCA() bool {
+func (c *Command) caExists() bool {
 	if c.flagCaFile != "" && c.flagKeyFile != "" {
 		return true
 	}
