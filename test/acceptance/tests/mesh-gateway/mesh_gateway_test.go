@@ -107,6 +107,17 @@ func TestMeshGatewayDefault(t *testing.T) {
 	logger.Log(t, "verifying federation was successful")
 	verifyFederation(t, primaryClient, secondaryClient, releaseName, false)
 
+	// Log services in DC2 that DC1 is aware of before exiting this test
+	// TODO: remove this code once issue has been debugged
+	defer func() {
+		svcs, _, err := primaryClient.Catalog().Services(&api.QueryOptions{Datacenter: "dc2"})
+		if err != nil {
+			logger.Logf(t, "error calling primary on /v1/catalog/services?dc=dc2: %s\n", err.Error())
+			return
+		}
+		logger.Logf(t, "primary on /v1/catalog/services?dc=dc2: %+v\n", svcs)
+	}()
+
 	// Check that we can connect services over the mesh gateways
 	logger.Log(t, "creating static-server in dc2")
 	k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
