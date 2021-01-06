@@ -107,7 +107,7 @@ func (c *Command) Run(args []string) int {
 		// Write the data out as a file.
 		// Must be 0644 because this is written by the consul-k8s user but needs
 		// to be readable by the consul user.
-		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
+		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0o644)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error writing config file: %s", err))
 			return 1
@@ -117,7 +117,7 @@ func (c *Command) Run(args []string) int {
 	if c.flagTokenSinkFile != "" {
 		// Must be 0600 in case this command is re-run. In that case we need
 		// to have permissions to overwrite our file.
-		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0600)
+		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0o600)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
 			return 1
@@ -143,14 +143,16 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Initialize ACLs on non-server components."
-const help = `
+const (
+	synopsis = "Initialize ACLs on non-server components."
+	help     = `
 Usage: consul-k8s acl-init [options]
 
   Bootstraps non-server components with ACLs by waiting for a
   secret to be populated with an ACL token to be used.
 
 `
+)
 
 const clientACLConfigTpl = `
 {

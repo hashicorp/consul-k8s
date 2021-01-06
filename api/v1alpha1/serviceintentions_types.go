@@ -65,9 +65,11 @@ type Destination struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-type SourceIntentions []*SourceIntention
-type IntentionPermissions []*IntentionPermission
-type IntentionHTTPHeaderPermissions []IntentionHTTPHeaderPermission
+type (
+	SourceIntentions               []*SourceIntention
+	IntentionPermissions           []*IntentionPermission
+	IntentionHTTPHeaderPermissions []IntentionHTTPHeaderPermission
+)
 
 type SourceIntention struct {
 	// Name is the source of the intention. This is the name of a

@@ -243,6 +243,7 @@ func TestServiceSplitter_ConsulNamespace(t *testing.T) {
 func TestServiceSplitter_ConsulGlobalResource(t *testing.T) {
 	require.False(t, (&ServiceSplitter{}).ConsulGlobalResource())
 }
+
 func TestServiceSplitter_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",

@@ -68,7 +68,7 @@ type ServiceResource struct {
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
 
-	//ConsulServicePrefix prepends K8s services in Consul with a prefix
+	// ConsulServicePrefix prepends K8s services in Consul with a prefix
 	ConsulServicePrefix string
 
 	// ExplictEnable should be set to true to require explicit enabling
@@ -588,7 +588,6 @@ func (t *ServiceResource) registerServiceInstance(
 	overridePortName string,
 	overridePortNumber int,
 	useHostname bool) {
-
 	if t.endpointsMap == nil {
 		return
 	}

@@ -113,7 +113,7 @@ func (c *Command) Run(args []string) int {
 		return nil
 	}, backoff.NewConstantBackOff(1*time.Second))
 
-	err = ioutil.WriteFile(c.flagOutputFile, []byte(activeRoot), 0644)
+	err = ioutil.WriteFile(c.flagOutputFile, []byte(activeRoot), 0o644)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error writing CA file: %s", err))
 		return 1
@@ -162,7 +162,6 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 // 2. Otherwise, it uses the address provided by the -server-addr
 //    and the -server-port flags.
 func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
-
 	// First, check if the server address is a cloud auto-join string.
 	// If not, return serverAddr:serverPort set by the provided flags.
 	if !strings.Contains(c.flagServerAddr, "provider=") {
@@ -208,11 +207,13 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Retrieve Consul client CA if using auto-encrypt feature."
-const help = `
+const (
+	synopsis = "Retrieve Consul client CA if using auto-encrypt feature."
+	help     = `
 Usage: consul-k8s get-consul-client-ca [options]
 
   Retrieve Consul client CA certificate by continuously polling
   Consul servers and save it at the provided file location.
 
 `
+)

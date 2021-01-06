@@ -10,18 +10,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	lifecycleResources = corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("10m"),
-			corev1.ResourceMemory: resource.MustParse("25Mi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("20m"),
-			corev1.ResourceMemory: resource.MustParse("50Mi"),
-		},
-	}
-)
+var lifecycleResources = corev1.ResourceRequirements{
+	Requests: corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("10m"),
+		corev1.ResourceMemory: resource.MustParse("25Mi"),
+	},
+	Limits: corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("20m"),
+		corev1.ResourceMemory: resource.MustParse("50Mi"),
+	},
+}
 
 // NOTE: This is tested here rather than in handler_test because doing it there
 // would require a lot of boilerplate to get at the underlying patches that would

@@ -163,10 +163,12 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Delete Kubernetes Job when complete."
-const help = `
+const (
+	synopsis = "Delete Kubernetes Job when complete."
+	help     = `
 Usage: consul-k8s delete-completed-job [name] [options]
 
   Waits for job to complete, then deletes it. If the job reaches its
   backoff limit then the command will exit.
 `
+)

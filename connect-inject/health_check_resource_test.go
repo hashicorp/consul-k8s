@@ -36,7 +36,7 @@ var ignoredFields = []string{"Node", "Namespace", "Definition", "ServiceID", "Se
 
 var testPodSpec = corev1.PodSpec{
 	Containers: []corev1.Container{
-		corev1.Container{
+		{
 			Name: testPodName,
 		},
 	},

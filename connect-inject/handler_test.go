@@ -19,7 +19,7 @@ import (
 func TestHandlerHandle(t *testing.T) {
 	basicSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
-			corev1.Container{
+			{
 				Name: "web",
 			},
 		},
@@ -470,7 +470,7 @@ func TestHandlerHandle(t *testing.T) {
 			var actual []jsonpatch.JsonPatchOperation
 			if len(resp.Patch) > 0 {
 				require.NoError(json.Unmarshal(resp.Patch, &actual))
-				for i, _ := range actual {
+				for i := range actual {
 					actual[i].Value = nil
 				}
 			}
@@ -532,11 +532,11 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -559,11 +559,11 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -580,17 +580,17 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									Name:          "http",
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -608,16 +608,16 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -641,11 +641,11 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -705,17 +705,17 @@ func TestHandlerPortValue(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									Name:          "http",
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -731,16 +731,16 @@ func TestHandlerPortValue(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},

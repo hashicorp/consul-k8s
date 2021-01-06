@@ -125,7 +125,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write the address to file.
-	err := ioutil.WriteFile(c.flagOutputFile, []byte(address), 0600)
+	err := ioutil.WriteFile(c.flagOutputFile, []byte(address), 0o600)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to write address to file: %s", err))
 		return 1
@@ -192,8 +192,9 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Output Kubernetes Service address to file"
-const help = `
+const (
+	synopsis = "Output Kubernetes Service address to file"
+	help     = `
 Usage: consul-k8s service-address [options]
 
   Waits until the Kubernetes service specified by -name in namespace
@@ -204,3 +205,4 @@ Usage: consul-k8s service-address [options]
     LoadBalancer - Load balancer's IP or hostname
     ExternalName - Not Supported
 `
+)

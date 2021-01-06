@@ -639,29 +639,41 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			LocalToken:  false,
 		},
 		"ingress gateway tokens": {
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"-ingress-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+				"another-gateway-ingress-gateway-token",
+			},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		"terminating gateway tokens": {
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"-terminating-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+				"another-gateway-terminating-gateway-token",
+			},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-terminating-terminating-gateway-acl-token",
 				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		"acl-replication token": {
@@ -771,12 +783,16 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 	}{
 		{
 			TestName: "Ingress gateway tokens, namespaces not provided",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"-ingress-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+				"another-gateway-ingress-gateway-token",
+			},
 			ExpectedPolicies: []string{`
 namespace "default" {
   service "ingress" {
@@ -814,12 +830,16 @@ namespace "default" {
 		},
 		{
 			TestName: "Ingress gateway tokens, namespaces provided",
-			TokenFlags: []string{"-ingress-gateway-name=ingress.",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress.",
 				"-ingress-gateway-name=gateway.namespace1",
-				"-ingress-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"-ingress-gateway-name=another-gateway.namespace2",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+				"another-gateway-ingress-gateway-token",
+			},
 			ExpectedPolicies: []string{`
 namespace "default" {
   service "ingress" {
@@ -857,12 +877,16 @@ namespace "namespace2" {
 		},
 		{
 			TestName: "Terminating gateway tokens, namespaces not provided",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"-terminating-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+				"another-gateway-terminating-gateway-token",
+			},
 			ExpectedPolicies: []string{`
 namespace "default" {
   service "terminating" {
@@ -891,12 +915,16 @@ namespace "default" {
 		},
 		{
 			TestName: "Terminating gateway tokens, namespaces provided",
-			TokenFlags: []string{"-terminating-gateway-name=terminating.",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating.",
 				"-terminating-gateway-name=gateway.namespace1",
-				"-terminating-gateway-name=another-gateway.namespace2"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"-terminating-gateway-name=another-gateway.namespace2",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+				"another-gateway-terminating-gateway-token",
+			},
 			ExpectedPolicies: []string{`
 namespace "default" {
   service "terminating" {

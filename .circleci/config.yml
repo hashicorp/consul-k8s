@@ -10,7 +10,7 @@ executors:
       CONSUL_ENT_VERSION: 1.9.0+ent-rc1 # Consul's enterprise version to use in tests
 
 jobs:
-  go-fmt-and-vet:
+  gofumt-and-vet:
     executor: go
     steps:
       - checkout
@@ -30,11 +30,11 @@ jobs:
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
-          name: check go fmt
+          name: check gofumt
           command: |
-            files=$(go fmt ./...)
+            files=$(gofumpt -l -s .)
             if [ -n "$files" ]; then
-              echo "The following file(s) do not conform to go fmt:"
+              echo "The following file(s) do not conform to gofumt:"
               echo "$files"
               exit 1
             fi
@@ -149,15 +149,15 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-      - go-fmt-and-vet
+      - gofumt-and-vet
       - lint-consul-retry
       - test:
           requires:
-            - go-fmt-and-vet
+            - gofumt-and-vet
             - lint-consul-retry
       - test_enterprise:
           requires:
-            - go-fmt-and-vet
+            - gofumt-and-vet
             - lint-consul-retry
       - build-distro:
           OS: "darwin freebsd linux windows"

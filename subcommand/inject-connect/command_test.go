@@ -32,120 +32,156 @@ func TestRun_FlagValidation(t *testing.T) {
 			expErr: "-envoy-image must be set",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-log-level", "invalid"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-log-level", "invalid",
+			},
 			expErr: "unknown log level: invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-ca-file", "bar"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-ca-file", "bar",
+			},
 			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-default-sidecar-proxy-cpu-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-default-sidecar-proxy-cpu-limit=unparseable",
+			},
 			expErr: "-default-sidecar-proxy-cpu-limit is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-default-sidecar-proxy-cpu-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-default-sidecar-proxy-cpu-request=unparseable",
+			},
 			expErr: "-default-sidecar-proxy-cpu-request is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-default-sidecar-proxy-memory-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-default-sidecar-proxy-memory-limit=unparseable",
+			},
 			expErr: "-default-sidecar-proxy-memory-limit is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-default-sidecar-proxy-memory-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-default-sidecar-proxy-memory-request=unparseable",
+			},
 			expErr: "-default-sidecar-proxy-memory-request is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-default-sidecar-proxy-memory-request=50Mi",
 				"-default-sidecar-proxy-memory-limit=25Mi",
 			},
 			expErr: "request must be <= limit: -default-sidecar-proxy-memory-request value of \"50Mi\" is greater than the -default-sidecar-proxy-memory-limit value of \"25Mi\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-default-sidecar-proxy-cpu-request=50m",
 				"-default-sidecar-proxy-cpu-limit=25m",
 			},
 			expErr: "request must be <= limit: -default-sidecar-proxy-cpu-request value of \"50m\" is greater than the -default-sidecar-proxy-cpu-limit value of \"25m\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-init-container-cpu-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-init-container-cpu-limit=unparseable",
+			},
 			expErr: "-init-container-cpu-limit 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-init-container-cpu-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-init-container-cpu-request=unparseable",
+			},
 			expErr: "-init-container-cpu-request 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-init-container-memory-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-init-container-memory-limit=unparseable",
+			},
 			expErr: "-init-container-memory-limit 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-init-container-memory-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-init-container-memory-request=unparseable",
+			},
 			expErr: "-init-container-memory-request 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-init-container-memory-request=50Mi",
 				"-init-container-memory-limit=25Mi",
 			},
 			expErr: "request must be <= limit: -init-container-memory-request value of \"50Mi\" is greater than the -init-container-memory-limit value of \"25Mi\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-init-container-cpu-request=50m",
 				"-init-container-cpu-limit=25m",
 			},
 			expErr: "request must be <= limit: -init-container-cpu-request value of \"50m\" is greater than the -init-container-cpu-limit value of \"25m\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-cpu-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-lifecycle-sidecar-cpu-limit=unparseable",
+			},
 			expErr: "-lifecycle-sidecar-cpu-limit 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-cpu-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-lifecycle-sidecar-cpu-request=unparseable",
+			},
 			expErr: "-lifecycle-sidecar-cpu-request 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-memory-limit=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-lifecycle-sidecar-memory-limit=unparseable",
+			},
 			expErr: "-lifecycle-sidecar-memory-limit 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-memory-request=unparseable"},
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-lifecycle-sidecar-memory-request=unparseable",
+			},
 			expErr: "-lifecycle-sidecar-memory-request 'unparseable' is invalid",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-lifecycle-sidecar-memory-request=50Mi",
 				"-lifecycle-sidecar-memory-limit=25Mi",
 			},
 			expErr: "request must be <= limit: -lifecycle-sidecar-memory-request value of \"50Mi\" is greater than the -lifecycle-sidecar-memory-limit value of \"25Mi\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+			flags: []string{
+				"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-lifecycle-sidecar-cpu-request=50m",
 				"-lifecycle-sidecar-cpu-limit=25m",
 			},
 			expErr: "request must be <= limit: -lifecycle-sidecar-cpu-request value of \"50m\" is greater than the -lifecycle-sidecar-cpu-limit value of \"25m\"",
 		},
 		{
-			flags: []string{"-consul-k8s-image", "hashicorpdev/consul-k8s:latest", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true"},
+			flags: []string{
+				"-consul-k8s-image", "hashicorpdev/consul-k8s:latest", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-health-checks-controller=true",
+			},
 			expErr: "CONSUL_HTTP_ADDR is not specified",
 		},
 	}
@@ -191,8 +227,10 @@ func TestRun_ValidationHealthCheckEnv(t *testing.T) {
 	}{
 		{
 			envVars: []string{api.HTTPAddrEnvName, "0.0.0.0:999999"},
-			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true"},
+			flags: []string{
+				"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-health-checks-controller=true",
+			},
 			expErr: "Error parsing CONSUL_HTTP_ADDR: parse \"0.0.0.0:999999\": first path segment in URL cannot contain colon",
 		},
 	}
@@ -236,7 +274,6 @@ func TestRun_CommandFailsWithInvalidListener(t *testing.T) {
 // Test that when healthchecks are enabled that SIGINT/SIGTERM exits the
 // command cleanly.
 func TestRun_CommandExitsCleanlyAfterSignal(t *testing.T) {
-
 	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
 }

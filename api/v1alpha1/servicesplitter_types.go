@@ -196,7 +196,6 @@ func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.Erro
 			if s.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("namespace"), s.Namespace, `Consul Enterprise namespaces must be enabled to set split.namespace`))
 			}
-
 		}
 	}
 	return errs

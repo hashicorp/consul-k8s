@@ -91,6 +91,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 	return container, nil
 }
+
 func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) {
 	cmd := []string{
 		"envoy",

@@ -275,7 +275,6 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 					}
 
 				}
-
 			})
 		})
 	}
@@ -729,7 +728,6 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 					}
 
 				}
-
 			})
 		})
 	}

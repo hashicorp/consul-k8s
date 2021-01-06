@@ -27,7 +27,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 
 	basicSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
-			corev1.Container{
+			{
 				Name: "web",
 			},
 		},
@@ -245,7 +245,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 	basicSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
-			corev1.Container{
+			{
 				Name: "web",
 			},
 		},

@@ -84,7 +84,6 @@ func (r *ConfigEntryController) ReconcileEntry(
 	crdCtrl Controller,
 	req ctrl.Request,
 	configEntry common.ConfigEntryResource) (ctrl.Result, error) {
-
 	ctx := context.Background()
 	logger := crdCtrl.Logger(req.NamespacedName)
 
@@ -260,7 +259,6 @@ func (r *ConfigEntryController) syncUnknownWithError(ctx context.Context,
 	configEntry common.ConfigEntryResource,
 	errType string,
 	err error) (ctrl.Result, error) {
-
 	configEntry.SetSyncedCondition(corev1.ConditionUnknown, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, configEntry); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.

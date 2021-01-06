@@ -390,7 +390,7 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	invalidDnsRe := regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
 	const maxDNSLabelLength = 63
 
 	if invalidDnsRe.MatchString(c.flagConsulNodeName) {
@@ -409,8 +409,9 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-const synopsis = "Sync Kubernetes services and Consul services."
-const help = `
+const (
+	synopsis = "Sync Kubernetes services and Consul services."
+	help     = `
 Usage: consul-k8s sync-catalog [options]
 
   Sync K8S pods, services, and more with the Consul service catalog.
@@ -419,3 +420,4 @@ Usage: consul-k8s sync-catalog [options]
   K8S services.
 
 `
+)

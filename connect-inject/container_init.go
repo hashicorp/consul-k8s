@@ -168,7 +168,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
-		corev1.VolumeMount{
+		{
 			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
 		},

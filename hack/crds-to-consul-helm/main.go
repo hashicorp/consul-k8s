@@ -87,7 +87,7 @@ func realMain(helmPathAbs string) error {
 
 		// Write it.
 		printf("writing to %s", destinationPath)
-		return ioutil.WriteFile(destinationPath, []byte(contents), 0644)
+		return ioutil.WriteFile(destinationPath, []byte(contents), 0o644)
 	})
 }
 
@@ -95,6 +95,7 @@ var proxyDefaultsSearch = `              description: Config is an arbitrary map
               format: byte
               type: string
 `
+
 var proxyDefaultsReplace = `              description: Config is an arbitrary map of configuration values used by Connect proxies. Any values that your proxy allows can be configured globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
               type: object
 `

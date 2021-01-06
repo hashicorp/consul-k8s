@@ -310,10 +310,12 @@ func (c *Command) Synopsis() string {
 	return synopsis
 }
 
-const synopsis = "Starts the Consul Kubernetes controller"
-const help = `
+const (
+	synopsis = "Starts the Consul Kubernetes controller"
+	help     = `
 Usage: consul-k8s controller [options]
 
   Starts the Consul Kubernetes controller that manages Consul Custom Resource Definitions
 
 `
+)

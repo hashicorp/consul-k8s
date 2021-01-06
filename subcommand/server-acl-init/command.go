@@ -804,7 +804,7 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	invalidDnsRe := regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
 	const maxDNSLabelLength = 63
 
 	if invalidDnsRe.MatchString(c.flagSyncConsulNodeName) {
@@ -825,9 +825,10 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-const consulDefaultNamespace = "default"
-const synopsis = "Initialize ACLs on Consul servers and other components."
-const help = `
+const (
+	consulDefaultNamespace = "default"
+	synopsis               = "Initialize ACLs on Consul servers and other components."
+	help                   = `
 Usage: consul-k8s server-acl-init [options]
 
   Bootstraps servers with ACLs and creates policies and ACL tokens for other
@@ -836,3 +837,4 @@ Usage: consul-k8s server-acl-init [options]
   and safe to run multiple times.
 
 `
+)

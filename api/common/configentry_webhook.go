@@ -29,7 +29,6 @@ func ValidateConfigEntry(
 	cfgEntry ConfigEntryResource,
 	enableConsulNamespaces bool,
 	nsMirroring bool) admission.Response {
-
 	// On create we need to validate that there isn't already a resource with
 	// the same name in a different namespace if we're need to mapping all Kube
 	// resources to a single Consul namespace. The only case where we're not

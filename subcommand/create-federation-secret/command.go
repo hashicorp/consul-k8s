@@ -371,7 +371,7 @@ func (c *Command) serverCfg(datacenter string, gatewayAddrs []string) ([]byte, e
 func (c *Command) consulDatacenter(logger hclog.Logger) string {
 	// withLog is a helper method we'll use in the retry loop below to ensure
 	// that errors are logged.
-	var withLog = func(fn func() error) func() error {
+	withLog := func(fn func() error) func() error {
 		return func() error {
 			err := fn()
 			if err != nil {
@@ -429,8 +429,9 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Create a Kubernetes secret containing data needed for federation"
-const help = `
+const (
+	synopsis = "Create a Kubernetes secret containing data needed for federation"
+	help     = `
 Usage: consul-k8s create-federation-secret [options]
 
   Creates a Kubernetes secret that contains all the data required for a secondary
@@ -438,3 +439,4 @@ Usage: consul-k8s create-federation-secret [options]
   primary datacenter.
 
 `
+)

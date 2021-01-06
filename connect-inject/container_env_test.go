@@ -9,7 +9,6 @@ import (
 )
 
 func TestContainerEnvVars(t *testing.T) {
-
 	cases := []struct {
 		Name     string
 		Upstream string

@@ -20,7 +20,6 @@ const defaultKubernetesHost = "https://kubernetes.default.svc"
 // configureConnectInject sets up auth methods so that connect injection will
 // work.
 func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client) error {
-
 	authMethodName := c.withPrefix("k8s-auth-method")
 
 	// Create the auth method template. This requires calls to the

@@ -298,7 +298,6 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 	}
 	for name, c := range cases {
 		tt.Run(name, func(t *testing.T) {
-
 			// Set up Consul server with TLS.
 			caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
 			defer cleanup()
@@ -407,7 +406,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 			if c.gossipKey {
 				f, err := ioutil.TempFile("", "")
 				require.NoError(t, err)
-				err = ioutil.WriteFile(f.Name(), []byte(gossipEncryptionKey), 0644)
+				err = ioutil.WriteFile(f.Name(), []byte(gossipEncryptionKey), 0o644)
 				require.NoError(t, err)
 				gossipKeyFile = f.Name()
 			}

@@ -16,8 +16,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-const nodeName1 = "ip-10-11-12-13.ec2.internal"
-const nodeName2 = "ip-10-11-12-14.ec2.internal"
+const (
+	nodeName1 = "ip-10-11-12-13.ec2.internal"
+	nodeName2 = "ip-10-11-12-14.ec2.internal"
+)
 
 func init() {
 	hclog.DefaultOptions.Level = hclog.Debug

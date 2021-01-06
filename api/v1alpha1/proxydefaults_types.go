@@ -76,7 +76,6 @@ func (in *ProxyDefaults) RemoveFinalizer(name string) {
 		}
 	}
 	in.ObjectMeta.Finalizers = newFinalizers
-
 }
 
 func (in *ProxyDefaults) Finalizers() []string {

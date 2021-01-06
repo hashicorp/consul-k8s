@@ -6,8 +6,10 @@ import (
 
 // ResourceUpsertFunc and ResourceDeleteFunc are the callback types for
 // when a resource is inserted, updated, or deleted.
-type ResourceUpsertFunc func(string, interface{}) error
-type ResourceDeleteFunc func(string) error
+type (
+	ResourceUpsertFunc func(string, interface{}) error
+	ResourceDeleteFunc func(string) error
+)
 
 // Resource should be implemented by anything that should be watchable
 // by Controller. The Resource needs to be aware of how to create the Informer

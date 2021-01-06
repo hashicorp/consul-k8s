@@ -330,7 +330,7 @@ func createServicesTmpFile(t *testing.T, serviceHCL string) (string, string) {
 	require.NoError(t, err)
 
 	configFile := filepath.Join(tmpDir, "svc.hcl")
-	err = ioutil.WriteFile(configFile, []byte(serviceHCL), 0600)
+	err = ioutil.WriteFile(configFile, []byte(serviceHCL), 0o600)
 	require.NoError(t, err)
 
 	return tmpDir, configFile

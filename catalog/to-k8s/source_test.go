@@ -185,7 +185,8 @@ func TestSource_deleteService(t *testing.T) {
 
 	// Delete the service
 	_, err = client.Catalog().Deregister(&api.CatalogDeregistration{
-		Node: "hostB", ServiceID: "svcB"}, nil)
+		Node: "hostB", ServiceID: "svcB",
+	}, nil)
 	require.NoError(err)
 
 	retry.Run(t, func(r *retry.R) {
@@ -246,7 +247,8 @@ func TestSource_deleteServiceInstance(t *testing.T) {
 
 	// Delete the service
 	_, err = client.Catalog().Deregister(&api.CatalogDeregistration{
-		Node: "hostB", ServiceID: "svcA"}, nil)
+		Node: "hostB", ServiceID: "svcA",
+	}, nil)
 	require.NoError(err)
 
 	retry.Run(t, func(r *retry.R) {

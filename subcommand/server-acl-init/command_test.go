@@ -30,8 +30,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-var ns = "default"
-var resourcePrefix = "release-name-consul"
+var (
+	ns             = "default"
+	resourcePrefix = "release-name-consul"
+)
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
@@ -195,30 +197,42 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"-ingress-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
+				"another-gateway-ingress-gateway-token",
+			},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		{
 			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"-terminating-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
+				"another-gateway-terminating-gateway-token",
+			},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-terminating-terminating-gateway-acl-token",
 				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		{
@@ -366,30 +380,42 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		},
 		{
 			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token-dc2",
+				"-ingress-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token-dc2",
 				"gateway-ingress-gateway-token-dc2",
-				"another-gateway-ingress-gateway-token-dc2"},
+				"another-gateway-ingress-gateway-token-dc2",
+			},
 			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		{
 			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token-dc2",
+				"-terminating-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token-dc2",
 				"gateway-terminating-gateway-token-dc2",
-				"another-gateway-terminating-gateway-token-dc2"},
+				"another-gateway-terminating-gateway-token-dc2",
+			},
 			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+			SecretNames: []string{
+				resourcePrefix + "-terminating-terminating-gateway-acl-token",
 				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token",
+			},
 			LocalToken: true,
 		},
 		{
@@ -504,27 +530,39 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		},
 		{
 			TestName: "Ingress gateway tokens",
-			TokenFlags: []string{"-ingress-gateway-name=ingress",
+			TokenFlags: []string{
+				"-ingress-gateway-name=ingress",
 				"-ingress-gateway-name=gateway",
-				"-ingress-gateway-name=another-gateway"},
-			PolicyNames: []string{"ingress-ingress-gateway-token",
+				"-ingress-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
-				"another-gateway-ingress-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
+				"another-gateway-ingress-gateway-token",
+			},
+			SecretNames: []string{
+				resourcePrefix + "-ingress-ingress-gateway-acl-token",
 				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-ingress-gateway-acl-token",
+			},
 		},
 		{
 			TestName: "Terminating gateway tokens",
-			TokenFlags: []string{"-terminating-gateway-name=terminating",
+			TokenFlags: []string{
+				"-terminating-gateway-name=terminating",
 				"-terminating-gateway-name=gateway",
-				"-terminating-gateway-name=another-gateway"},
-			PolicyNames: []string{"terminating-terminating-gateway-token",
+				"-terminating-gateway-name=another-gateway",
+			},
+			PolicyNames: []string{
+				"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
-				"another-gateway-terminating-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
+				"another-gateway-terminating-gateway-token",
+			},
+			SecretNames: []string{
+				resourcePrefix + "-terminating-terminating-gateway-acl-token",
 				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+				resourcePrefix + "-another-gateway-terminating-gateway-acl-token",
+			},
 		},
 		{
 			TestName:    "ACL replication token",
@@ -773,7 +811,6 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
-
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
@@ -848,7 +885,6 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 	cases := []string{"-create-inject-auth-method", "-create-inject-token"}
 	for _, flag := range cases {
 		t.Run(flag, func(t *testing.T) {
-
 			k8s, testSvr := completeSetup(t)
 			defer testSvr.Stop()
 			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
@@ -1802,7 +1838,6 @@ func TestRun_GatewayErrors(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(tt *testing.T) {
-
 			k8s, testSvr := completeSetup(tt)
 			defer testSvr.Stop()
 			require := require.New(tt)
@@ -2139,5 +2174,7 @@ func writeTempFile(t *testing.T, contents string) (string, func()) {
 	}
 }
 
-var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
-var serviceAccountToken = "ZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNklpSjkuZXlKcGMzTWlPaUpyZFdKbGNtNWxkR1Z6TDNObGNuWnBZMlZoWTJOdmRXNTBJaXdpYTNWaVpYSnVaWFJsY3k1cGJ5OXpaWEoyYVdObFlXTmpiM1Z1ZEM5dVlXMWxjM0JoWTJVaU9pSmtaV1poZFd4MElpd2lhM1ZpWlhKdVpYUmxjeTVwYnk5elpYSjJhV05sWVdOamIzVnVkQzl6WldOeVpYUXVibUZ0WlNJNkltdG9ZV3RwTFdGeVlXTm9ibWxrTFdOdmJuTjFiQzFqYjI1dVpXTjBMV2x1YW1WamRHOXlMV0YxZEdodFpYUm9iMlF0YzNaakxXRmpZMjlvYm1SaWRpSXNJbXQxWW1WeWJtVjBaWE11YVc4dmMyVnlkbWxqWldGalkyOTFiblF2YzJWeWRtbGpaUzFoWTJOdmRXNTBMbTVoYldVaU9pSnJhR0ZyYVMxaGNtRmphRzVwWkMxamIyNXpkV3d0WTI5dWJtVmpkQzFwYm1wbFkzUnZjaTFoZFhSb2JXVjBhRzlrTFhOMll5MWhZMk52ZFc1MElpd2lhM1ZpWlhKdVpYUmxjeTVwYnk5elpYSjJhV05sWVdOamIzVnVkQzl6WlhKMmFXTmxMV0ZqWTI5MWJuUXVkV2xrSWpvaU4yVTVOV1V4TWprdFpUUTNNeTB4TVdVNUxUaG1ZV0V0TkRJd01UQmhPREF3TVRJeUlpd2ljM1ZpSWpvaWMzbHpkR1Z0T25ObGNuWnBZMlZoWTJOdmRXNTBPbVJsWm1GMWJIUTZhMmhoYTJrdFlYSmhZMmh1YVdRdFkyOXVjM1ZzTFdOdmJtNWxZM1F0YVc1cVpXTjBiM0l0WVhWMGFHMWxkR2h2WkMxemRtTXRZV05qYjNWdWRDSjkuWWk2M01NdHpoNU1CV0tLZDNhN2R6Q0pqVElURTE1aWtGeV9UbnBka19Bd2R3QTlKNEFNU0dFZUhONXZXdEN1dUZqb19sTUpxQkJQSGtLMkFxYm5vRlVqOW01Q29wV3lxSUNKUWx2RU9QNGZVUS1SYzBXMVBfSmpVMXJaRVJIRzM5YjVUTUxnS1BRZ3V5aGFpWkVKNkNqVnRtOXdVVGFncmdpdXFZVjJpVXFMdUY2U1lObTZTckt0a1BTLWxxSU8tdTdDMDZ3Vms1bTV1cXdJVlFOcFpTSUNfNUxzNWFMbXlaVTNuSHZILVY3RTNIbUJoVnlaQUI3NmpnS0IwVHlWWDFJT3NrdDlQREZhck50VTNzdVp5Q2p2cUMtVUpBNnNZZXlTZTRkQk5Lc0tsU1o2WXV4VVVtbjFSZ3YzMllNZEltbnNXZzhraGYtekp2cWdXazdCNUVB"
+var (
+	serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+	serviceAccountToken  = "ZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNklpSjkuZXlKcGMzTWlPaUpyZFdKbGNtNWxkR1Z6TDNObGNuWnBZMlZoWTJOdmRXNTBJaXdpYTNWaVpYSnVaWFJsY3k1cGJ5OXpaWEoyYVdObFlXTmpiM1Z1ZEM5dVlXMWxjM0JoWTJVaU9pSmtaV1poZFd4MElpd2lhM1ZpWlhKdVpYUmxjeTVwYnk5elpYSjJhV05sWVdOamIzVnVkQzl6WldOeVpYUXVibUZ0WlNJNkltdG9ZV3RwTFdGeVlXTm9ibWxrTFdOdmJuTjFiQzFqYjI1dVpXTjBMV2x1YW1WamRHOXlMV0YxZEdodFpYUm9iMlF0YzNaakxXRmpZMjlvYm1SaWRpSXNJbXQxWW1WeWJtVjBaWE11YVc4dmMyVnlkbWxqWldGalkyOTFiblF2YzJWeWRtbGpaUzFoWTJOdmRXNTBMbTVoYldVaU9pSnJhR0ZyYVMxaGNtRmphRzVwWkMxamIyNXpkV3d0WTI5dWJtVmpkQzFwYm1wbFkzUnZjaTFoZFhSb2JXVjBhRzlrTFhOMll5MWhZMk52ZFc1MElpd2lhM1ZpWlhKdVpYUmxjeTVwYnk5elpYSjJhV05sWVdOamIzVnVkQzl6WlhKMmFXTmxMV0ZqWTI5MWJuUXVkV2xrSWpvaU4yVTVOV1V4TWprdFpUUTNNeTB4TVdVNUxUaG1ZV0V0TkRJd01UQmhPREF3TVRJeUlpd2ljM1ZpSWpvaWMzbHpkR1Z0T25ObGNuWnBZMlZoWTJOdmRXNTBPbVJsWm1GMWJIUTZhMmhoYTJrdFlYSmhZMmh1YVdRdFkyOXVjM1ZzTFdOdmJtNWxZM1F0YVc1cVpXTjBiM0l0WVhWMGFHMWxkR2h2WkMxemRtTXRZV05qYjNWdWRDSjkuWWk2M01NdHpoNU1CV0tLZDNhN2R6Q0pqVElURTE1aWtGeV9UbnBka19Bd2R3QTlKNEFNU0dFZUhONXZXdEN1dUZqb19sTUpxQkJQSGtLMkFxYm5vRlVqOW01Q29wV3lxSUNKUWx2RU9QNGZVUS1SYzBXMVBfSmpVMXJaRVJIRzM5YjVUTUxnS1BRZ3V5aGFpWkVKNkNqVnRtOXdVVGFncmdpdXFZVjJpVXFMdUY2U1lObTZTckt0a1BTLWxxSU8tdTdDMDZ3Vms1bTV1cXdJVlFOcFpTSUNfNUxzNWFMbXlaVTNuSHZILVY3RTNIbUJoVnlaQUI3NmpnS0IwVHlWWDFJT3NrdDlQREZhck50VTNzdVp5Q2p2cUMtVUpBNnNZZXlTZTRkQk5Lc0tsU1o2WXV4VVVtbjFSZ3YzMllNZEltbnNXZzhraGYtekp2cWdXazdCNUVB"
+)
