@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* CRDs: Fix issue where a `ServiceIntentions` resource could be continually resynced with Consul
+  because Consul's internal representation had a different order for an array than the Kubernetes resource. [[GH-416](https://github.com/hashicorp/consul-k8s/pull/416)] 
+
 ## 0.22.0 (December 21, 2020)
 
 BUG FIXES:

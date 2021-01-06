@@ -162,6 +162,49 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 			},
 			Matches: false,
 		},
+		"different order of sources matches": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "bar",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "*",
+							Action: "allow",
+						},
+						{
+							Name:   "foo",
+							Action: "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Name:        "bar",
+				Kind:        capi.ServiceIntentions,
+				CreateIndex: 1,
+				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+				Sources: []*capi.SourceIntention{
+					{
+						Name:   "foo",
+						Action: "allow",
+					},
+					{
+						Name:   "*",
+						Action: "allow",
+					},
+				},
+			},
+			Matches: true,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

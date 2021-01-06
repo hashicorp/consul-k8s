@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -222,6 +223,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
 	return cmp.Equal(
 		in.ToConsul(""),
@@ -230,6 +232,13 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
+		// Consul will sort the sources by precedence when returning the resource
+		// so we need to re-sort the sources to ensure our comparison is accurate.
+		cmpopts.SortSlices(func(a *capi.SourceIntention, b *capi.SourceIntention) bool {
+			// SortSlices expects a "less than" comparator function so we can
+			// piggyback on strings.Compare that returns -1 if a < b.
+			return strings.Compare(sourceIntentionSortKey(a), sourceIntentionSortKey(b)) == -1
+		}),
 	)
 }
 
@@ -451,4 +460,25 @@ func numNotEmpty(ss ...string) int {
 		}
 	}
 	return count
+}
+
+// sourceIntentionSortKey returns a string that can be used to sort intention
+// sources.
+func sourceIntentionSortKey(ixn *capi.SourceIntention) string {
+	if ixn == nil {
+		return ""
+	}
+
+	// Zero out fields Consul sets automatically because the Kube resource
+	// won't have them set.
+	ixn.LegacyCreateTime = nil
+	ixn.LegacyUpdateTime = nil
+	ixn.LegacyID = ""
+	ixn.LegacyMeta = nil
+	ixn.Precedence = 0
+
+	// It's okay to swallow this error because we know the intention is JSON
+	// marshal-able since it was ingested as JSON.
+	asJSON, _ := json.Marshal(ixn)
+	return string(asJSON)
 }
