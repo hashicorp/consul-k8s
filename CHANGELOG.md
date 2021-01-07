@@ -1,5 +1,9 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Use `consul-k8s` subcommand to perform `tls-init` job. This allows for server certificates to get rotated on subsequent runs.
+  Consul servers have to be restarted in order for them to update their server certificates [[GH-749](https://github.com/hashicorp/consul-helm/pull/721)]
+
 ## 0.28.0 (Dec 21, 2020)
 
 BREAKING CHANGES:
@@ -31,8 +35,6 @@ IMPROVEMENTS:
 * Updated the default Consul image to `hashicorp/consul:1.9.1`.
 * Make `server.bootstrapExpect` optional. If not set, will now default to `server.replicas`.
   If you're currently setting `server.replicas`, there is no effect. [[GH-721](https://github.com/hashicorp/consul-helm/pull/721)]
-* Use `consul-k8s` subcommand to perform `tls-init` job. This allows for server certificates to get rotated on subsequent runs.
-  Consul servers have to be restarted in order for them to update their server certificates [[GH-749](https://github.com/hashicorp/consul-helm/pull/721)]
 
 BUG FIXES:
 * Fix pod security policy when running mesh gateways in `hostNetwork` mode. [[GH-605](https://github.com/hashicorp/consul-helm/issues/605)]
