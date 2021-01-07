@@ -104,7 +104,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(
 ) {
 	t.Helper()
 
-	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 500 * time.Millisecond}
+	retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
 
 	args := []string{"exec", "deploy/" + deploymentName, "-c", deploymentName, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
