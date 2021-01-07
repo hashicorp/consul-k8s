@@ -46,42 +46,25 @@ spec:
       {{- end }}
       containers:
         - name: tls-init
-          image: "{{ .Values.global.image }}"
+          image: "{{ .Values.global.imageK8S }}"
           env:
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          # We're using POST requests below to create secrets via Kubernetes API.
-          # Note that in the subsequent runs of the job, POST requests will
-          # return a 409 because these secrets would already exist;
-          # we are ignoring these response codes.
           workingDir: /tmp
           command:
             - "/bin/sh"
             - "-ec"
             - |
-              {{- if (not (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName)) }}
-              consul tls ca create \
-                -domain={{ .Values.global.domain }}
-              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
-                -H "Content-Type: application/json" \
-                -H "Accept: application/json" \
-                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"{{ template "consul.fullname" . }}-ca-cert\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"tls.crt\": \"$( cat {{ .Values.global.domain }}-agent-ca.pem | base64 | tr -d '\n' )\" }}" > /dev/null
-              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
-                -H "Content-Type: application/json" \
-                -H "Accept: application/json" \
-                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"{{ template "consul.fullname" . }}-ca-key\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"tls.key\": \"$( cat {{ .Values.global.domain }}-agent-ca-key.pem | base64 | tr -d '\n' )\" }}" > /dev/null
-              {{- end }}
               # Suppress globbing so we can interpolate the $NAMESPACE environment variable
               # and use * at the start of the dns name when setting -additional-dnsname.
               set -o noglob
-              consul tls cert create -server \
+              consul-k8s tls-init \
+                -domain={{ .Values.global.domain }} \
                 -days=730 \
+                -name-prefix={{ template "consul.fullname" . }} \
+                -k8s-namespace=${NAMESPACE} \
                 {{- if (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName) }}
                 -ca=/consul/tls/ca/cert/tls.crt \
                 -key=/consul/tls/ca/key/tls.key \
@@ -95,17 +78,9 @@ spec:
                 -additional-ipaddress={{ . }} \
                 {{- end }}
                 {{- range .Values.global.tls.serverAdditionalDNSSANs }}
-                 -additional-dnsname={{ . }} \
-                 {{- end }}
-                -dc={{ .Values.global.datacenter }} \
-                -domain={{ .Values.global.domain }}
-              set +o noglob
-              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
-                -H "Content-Type: application/json" \
-                -H "Accept: application/json" \
-                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"{{ template "consul.fullname" . }}-server-cert\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"kubernetes.io/tls\", \"data\": { \"tls.crt\": \"$( cat {{ .Values.global.datacenter }}-server-{{ .Values.global.domain }}-0.pem | base64 | tr -d '\n' )\", \"tls.key\": \"$( cat {{ .Values.global.datacenter }}-server-{{ .Values.global.domain }}-0-key.pem | base64 | tr -d '\n' )\" } }" > /dev/null
+                -additional-dnsname={{ . }} \
+                {{- end }}
+                -dc={{ .Values.global.datacenter }}
           {{- if (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName) }}
           volumeMounts:
             - name: consul-ca-cert
