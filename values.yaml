@@ -1392,30 +1392,6 @@ connectInject:
     # @type: string
     secretKey: null
 
-  # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
-  centralConfig:
-    # Controls whether central config is enabled on all servers and clients.
-    # See https://www.consul.io/docs/agent/options.html#enable_central_service_config.
-    # If changing this after installation, servers and clients must be restarted
-    # for the change to take effect.
-    enabled: true
-
-    # Allows you to specify a convenience default protocol if
-    # most of your services are of the same protocol type. The individual annotation
-    # on any given pod will override this value.
-    # Valid values are "http", "http2", "grpc" and "tcp".
-    # @type: string
-    defaultProtocol: null
-
-    # Raw json string that will be written as the value of
-    # the "config" key of the global proxy-defaults config entry.
-    # See: https://www.consul.io/docs/agent/config-entries/proxy-defaults.html
-    # NOTE: Changes to this value after the chart is first installed have _no_
-    # effect. In order to change the proxy-defaults config after installation,
-    # you must use the Consul API.
-    proxyDefaults: |
-      {}
-
   sidecarProxy:
     # Set default resources for sidecar proxy. If null, that resource won't
     # be set.

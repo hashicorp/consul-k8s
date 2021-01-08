@@ -27,45 +27,8 @@ data:
       }
     }
   {{- end }}
-  {{- if and .Values.connectInject.enabled .Values.connectInject.centralConfig.enabled }}
   central-config.json: |-
     {
       "enable_central_service_config": true
     }
-  {{- if gt (len .Values.connectInject.centralConfig.proxyDefaults) 3 }}
-  proxy-defaults-config.json: |-
-    {
-      "config_entries": {
-        "bootstrap": [
-          {
-            "kind": "proxy-defaults",
-            "name": "global",
-            {{- if and .Values.meshGateway.enabled .Values.meshGateway.globalMode }}
-            "mesh_gateway": {
-              "mode": {{ .Values.meshGateway.globalMode | quote }}
-            },
-            {{- end }}
-            "config":
-{{ tpl .Values.connectInject.centralConfig.proxyDefaults . | trimAll "\"" | indent 14 }}
-          }
-        ]
-      }
-    }
-  {{- else if and .Values.meshGateway.enabled .Values.meshGateway.globalMode }}
-  proxy-defaults-config.json: |-
-    {
-      "config_entries": {
-        "bootstrap": [
-          {
-            "kind": "proxy-defaults",
-            "name": "global",
-            "mesh_gateway": {
-              "mode": {{ .Values.meshGateway.globalMode | quote }}
-            }
-          }
-        ]
-      }
-    }
-  {{- end }}
-  {{- end }}
 {{- end }}

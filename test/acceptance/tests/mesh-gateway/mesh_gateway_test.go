@@ -36,6 +36,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"global.federation.createFederationSecret": "true",
 
 		"connectInject.enabled": "true",
+		"controller.enabled":    "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -107,6 +108,15 @@ func TestMeshGatewayDefault(t *testing.T) {
 	logger.Log(t, "verifying federation was successful")
 	verifyFederation(t, primaryClient, secondaryClient, releaseName, false)
 
+	// Create a ProxyDefaults resource to configure services to use the mesh
+	// gateways.
+	logger.Log(t, "creating proxy-defaults config")
+	kustomizeDir := "../fixtures/bases/mesh-gateway"
+	k8s.KubectlApplyK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		k8s.KubectlDeleteK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+	})
+
 	// Log services in DC2 that DC1 is aware of before exiting this test
 	// TODO: remove this code once issue has been debugged
 	defer func() {
@@ -166,6 +176,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"global.federation.createFederationSecret": "true",
 
 				"connectInject.enabled": "true",
+				"controller.enabled":    "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -241,6 +252,15 @@ func TestMeshGatewaySecure(t *testing.T) {
 			// Verify federation between servers
 			logger.Log(t, "verifying federation was successful")
 			verifyFederation(t, primaryClient, secondaryClient, releaseName, true)
+
+			// Create a ProxyDefaults resource to configure services to use the mesh
+			// gateways.
+			logger.Log(t, "creating proxy-defaults config")
+			kustomizeDir := "../fixtures/bases/mesh-gateway"
+			k8s.KubectlApplyK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.KubectlDeleteK(t, primaryContext.KubectlOptions(t), kustomizeDir)
+			})
 
 			// Check that we can connect services over the mesh gateways
 			logger.Log(t, "creating static-server in dc2")

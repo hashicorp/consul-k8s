@@ -14,12 +14,10 @@ metadata:
 data:
   extra-from-values.json: |-
 {{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
-  {{- if (and .Values.connectInject.enabled .Values.connectInject.centralConfig.enabled) }}
   central-config.json: |-
     {
       "enable_central_service_config": true
     }
-  {{- end }}
 
   {{- if (and .Values.connectInject.enabled .Values.connectInject.healthChecks.enabled) }}
   {{/* We set check_update_interval to 0s so that check output is immediately viewable

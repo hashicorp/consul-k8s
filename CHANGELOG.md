@@ -15,6 +15,83 @@ BUG FIXES:
   For example, for a server with 3 replicas the quorum size should always be 2.
   [[GH-764](https://github.com/hashicorp/consul-helm/pull/764)]
 
+BREAKING CHANGES:
+* `connectInject.centralConfig.defaultProtocol` is no longer supported. Instead,
+   [`controller.enabled`](https://www.consul.io/docs/k8s/helm#v-controller-enabled) must be set to true and
+   a [`ServiceDefaults`](https://www.consul.io/docs/agent/config-entries/service-defaults) resource
+   must be created to set *each* service's protocol, e.g.:
+   
+   ```yaml
+   apiVersion: consul.hashicorp.com/v1alpha1
+   kind: ServiceDefaults
+   metadata:
+     name: my-service-name
+   spec:
+     protocol: "http"
+   ```
+  
+  This setting is being removed because it didn't support changing the
+  protocol after a service was first run and because it didn't work in secondary
+  datacenters.
+  
+  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
+  for more information on how to migrate to using custom resources to manage
+  service protocols. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
+* `connectInject.centralConfig.proxyDefaults` is no longer supported. Instead,
+   [`controller.enabled`](https://www.consul.io/docs/k8s/helm#v-controller-enabled) must be set to true and
+   a [`ProxyDefaults`](https://www.consul.io/docs/agent/config-entries/proxy-defaults) resource
+   must be created.
+  
+  This setting is being removed because it didn't support any modifications to the
+  config after the cluster was first installed.
+  
+  If you were previously setting this, see [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
+  for more information on how to upgrade. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
+* `connectInject.centralConfig.enabled` is no longer supported. Instead,
+   central config will always be set to `true`. If you were previously setting
+   this to `true` then this change has no effect. If you were previously setting
+   this to `false`, then you must instead, override this setting in
+   `client.extraConfig` and `server.extraConfig`:
+   
+   ```yaml
+   client:
+     extraConfig: |
+       {"enable_central_service_config": false}
+   server:
+     extraConfig: |
+       {"enable_central_service_config": false}
+   ``` 
+  [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
+* The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is
+  no longer supported with the latest version of `consul-k8s`.
+
+  Current deployments that have the annotation should remove it, otherwise they
+  will get an error if a pod from that deployment is rescheduled.
+
+  This annotation is being removed because it didn't support changing the
+  protocol after a service was first run and because it didn't work in secondary
+  datacenters.
+
+  Removing the annotation will not change their protocol
+  since the config entry was already written to Consul. If you wish to change
+  the protocol you must migrate the config entry to be managed by a
+  [`ServiceDefaults`](https://www.consul.io/docs/agent/config-entries/service-defaults) resource.
+  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds) for more
+  information.
+
+  To set the protocol for __new__ services, you must use the
+  [`ServiceDefaults`](https://www.consul.io/docs/agent/config-entries/service-defaults) resource,
+  e.g.
+
+  ```yaml
+  apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceDefaults
+  metadata:
+    name: my-service-name
+  spec:
+    protocol: "http"
+  ```
+
 ## 0.28.0 (Dec 21, 2020)
 ⚠️  This release defaults the Consul image to 1.9.1, which panics on upgrades
 ([Issue](https://github.com/hashicorp/consul/issues/9566)). We recommend using

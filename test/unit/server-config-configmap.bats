@@ -62,100 +62,15 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# connectInject.centralConfig
+# connectInject.centralConfig [DEPRECATED]
 
-@test "server/ConfigMap: centralConfig is enabled by default" {
+@test "server/ConfigMap: centralConfig is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.data["central-config.json"] | contains("enable_central_service_config")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "server/ConfigMap: centralConfig can be disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: proxyDefaults disabled by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.data["proxy-defaults-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/ConfigMap: proxyDefaults can be enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["proxy-defaults-config.json"] | match("world") | length' | tee /dev/stderr)
-  [ ! -z "${actual}" ]
-}
-
-@test "server/ConfigMap: proxyDefaults and meshGateways can be enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
-      --set 'meshGateway.enabled=true' \
-      --set 'meshGateway.globalMode=remote' \
-      . | tee /dev/stderr |
-      yq -r '.data["proxy-defaults-config.json"]' | yq -r '.config_entries.bootstrap[0].mesh_gateway.mode' | tee /dev/stderr)
-  [ "${actual}" = "remote" ]
-}
-
-@test "server/ConfigMap: proxyDefaults should have no gateway mode if set to empty string" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
-      --set 'meshGateway.enabled=true' \
-      --set 'meshGateway.globalMode=' \
-      . | tee /dev/stderr |
-      yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "server/ConfigMap: proxyDefaults should have no gateway mode if set to null" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.proxyDefaults="{\"hello\": \"world\"}"' \
-      --set 'meshGateway.enabled=true' \
-      --set 'meshGateway.globalMode=null' \
-      . | tee /dev/stderr |
-      yq -r '.data["proxy-defaults-config.json"]' | yq '.config_entries.bootstrap[0].mesh_gateway' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "server/ConfigMap: global gateway mode is set even if there are no proxyDefaults" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.proxyDefaults=""' \
-      --set 'meshGateway.enabled=true' \
-      --set 'meshGateway.globalMode=remote' \
-      . | tee /dev/stderr |
-      yq -r '.data["proxy-defaults-config.json"]' | yq -r '.config_entries.bootstrap[0].mesh_gateway.mode' | tee /dev/stderr)
-  [ "${actual}" = "remote" ]
 }
 
 #--------------------------------------------------------------------

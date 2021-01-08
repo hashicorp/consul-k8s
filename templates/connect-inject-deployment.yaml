@@ -2,6 +2,9 @@
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled for connect injection" }}{{ end }}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for connect injection" }}{{ end }}
 {{- if and .Values.connectInject.consulNamespaces.mirroringK8S (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if mirroringK8S=true" }}{{ end }}
+{{- if .Values.connectInject.centralConfig }}{{- if eq (toString .Values.connectInject.centralConfig.enabled) "false" }}{{ fail "connectInject.centralConfig.enabled cannot be set to false; to disable, set enable_central_service_config to false in server.extraConfig and client.extraConfig" }}{{ end -}}{{ end -}}
+{{- if .Values.connectInject.centralConfig }}{{- if .Values.connectInject.centralConfig.defaultProtocol }}{{ fail "connectInject.centralConfig.defaultProtocol is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end -}}
+{{- if .Values.connectInject.centralConfig }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.imageEnvoy }}{{ fail "connectInject.imageEnvoy must be specified in global.imageEnvoy" }}{{ end }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
@@ -100,12 +103,6 @@ spec:
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
-                {{- end }}
-                {{- if .Values.connectInject.centralConfig.enabled }}
-                -enable-central-config=true \
-                {{- end }}
-                {{- if (and .Values.connectInject.centralConfig.enabled .Values.connectInject.centralConfig.defaultProtocol) }}
-                -default-protocol="{{ .Values.connectInject.centralConfig.defaultProtocol }}" \
                 {{- end }}
                 {{- range $value := .Values.connectInject.k8sAllowNamespaces }}
                 -allow-k8s-namespace="{{ $value }}" \
