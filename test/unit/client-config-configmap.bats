@@ -49,9 +49,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# connectInject.centralConfig
+# connectInject.centralConfig [DEPRECATED]
 
-@test "client/ConfigMap: centralConfig is enabled by default" {
+@test "client/ConfigMap: centralConfig is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-config-configmap.yaml  \
@@ -59,17 +59,6 @@ load _helpers
       . | tee /dev/stderr |
       yq '.data["central-config.json"] | contains("enable_central_service_config")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "client/ConfigMap: centralConfig can be disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-config-configmap.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.data["central-config.json"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------

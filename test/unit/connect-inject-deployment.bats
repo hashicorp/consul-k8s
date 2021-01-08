@@ -79,6 +79,71 @@ load _helpers
   [[ "$output" =~ "client.grpc must be true for connect injection" ]]
 }
 
+
+#--------------------------------------------------------------------
+# connectInject.centralConfig [DEPRECATED]
+
+@test "connectInject/Deployment: fails if connectInject.centralConfig.enabled is set to false" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.centralConfig.enabled cannot be set to false; to disable, set enable_central_service_config to false in server.extraConfig and client.extraConfig" ]]
+}
+
+@test "connectInject/Deployment: fails if connectInject.centralConfig.defaultProtocol is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.defaultProtocol=http' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.centralConfig.defaultProtocol is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
+}
+
+@test "connectInject/Deployment: fails if connectInject.centralConfig.proxyDefaults is used" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.proxyDefaults="{\"key\":\"value\"}"' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
+}
+
+@test "connectInject/Deployment: does not fail if connectInject.centralConfig.proxyDefaults is set to {}" {
+  cd `chart_dir`
+
+  # We have to actually create a values file for this test because the
+  # --set and --set-string flags were passing {} as a YAML object rather
+  # than a string.
+  # Previously this was the default in the values.yaml so this test is testing
+  # that if someone had copied this into their values.yaml then nothing would
+  # break. We no longer use this value, but that's okay because the default
+  # empty object had no effect.
+  temp_file=$(mktemp)
+  cat <<EOF > "$temp_file"
+connectInject:
+  enabled: true
+  centralConfig:
+    proxyDefaults: |
+      {}
+EOF
+
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      -f "$temp_file" \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  rm -f temp_file
+}
+
+#--------------------------------------------------------------------
+# healthChecks
+
 @test "connectInject/Deployment: health checks enabled by default" {
   cd `chart_dir`
   local cmd=$(helm template \
@@ -392,53 +457,6 @@ load _helpers
       --set 'connectInject.tolerations=foobar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec | .tolerations == "foobar"' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# centralConfig
-
-@test "connectInject/Deployment: centralConfig is enabled by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: centralConfig can be disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-central-config"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: defaultProtocol is disabled by default with centralConfig enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-default-protocol"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: defaultProtocol can be enabled with centralConfig enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.centralConfig.enabled=true' \
-      --set 'connectInject.centralConfig.defaultProtocol=grpc' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-default-protocol=\"grpc\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
