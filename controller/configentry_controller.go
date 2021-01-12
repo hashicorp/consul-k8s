@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -21,6 +22,7 @@ const (
 	FinalizerName                = "finalizers.consul.hashicorp.com"
 	ConsulAgentError             = "ConsulAgentError"
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
+	MigrationFailedError         = "MigrationFailedError"
 )
 
 // Controller is implemented by CRD-specific controllers. It is used by
@@ -191,11 +193,30 @@ func (r *ConfigEntryController) ReconcileEntry(
 	// Check if the config entry is managed by our datacenter.
 	// Do not process resource if the entry was not created within our datacenter
 	// as it was created in a different cluster which will be managing that config entry.
+	requiresMigration := false
 	if entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
-		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, fmt.Errorf("config entry managed in different datacenter: %q", entry.GetMeta()[common.DatacenterKey]))
+
+		// Note that there is a special case where we will migrate a config entry
+		// that wasn't created by the controller if it has the migrate-entry annotation set to true.
+		// This functionality exists to help folks who are upgrading from older helm
+		// chart versions where they had previously created config entries themselves but
+		// now want to manage them through custom resources.
+		if configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
+			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, fmt.Errorf("config entry managed in different datacenter: %q", entry.GetMeta()[common.DatacenterKey]))
+		}
+
+		requiresMigration = true
 	}
 
 	if !configEntry.MatchesConsul(entry) {
+		if requiresMigration {
+			// If we're migrating this config entry but the custom resource
+			// doesn't match what's in Consul currently we error out so that
+			// it doesn't overwrite something accidentally.
+			return r.syncFailed(ctx, logger, crdCtrl, configEntry, MigrationFailedError,
+				r.nonMatchingMigrationError(configEntry, entry))
+		}
+
 		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
 		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
 			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
@@ -205,6 +226,20 @@ func (r *ConfigEntryController) ReconcileEntry(
 				fmt.Errorf("updating config entry in consul: %w", err))
 		}
 		logger.Info("config entry updated", "request-time", writeMeta.RequestTime)
+		return r.syncSuccessful(ctx, crdCtrl, configEntry)
+	} else if requiresMigration && entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
+		// If we get here then we're doing a migration and the entry in Consul
+		// matches the entry in Kubernetes. We just need to update the metadata
+		// of the entry in Consul to say that it's now managed by Kubernetes.
+		logger.Info("migrating config entry to be managed by Kubernetes")
+		_, writeMeta, err := r.ConsulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
+			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+		})
+		if err != nil {
+			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
+				fmt.Errorf("updating config entry in consul: %w", err))
+		}
+		logger.Info("config entry migrated", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	} else if configEntry.SyncedConditionStatus() != corev1.ConditionTrue {
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
@@ -269,6 +304,23 @@ func (r *ConfigEntryController) syncUnknownWithError(ctx context.Context,
 		return ctrl.Result{}, updateErr
 	}
 	return ctrl.Result{}, err
+}
+
+// nonMatchingMigrationError returns an error that indicates the migration failed
+// because the config entries did not match.
+func (r *ConfigEntryController) nonMatchingMigrationError(kubeEntry common.ConfigEntryResource, consulEntry capi.ConfigEntry) error {
+	// We marshal into JSON to include in the error message so users will know
+	// which fields aren't matching.
+	kubeJSON, err := json.Marshal(kubeEntry.ToConsul(r.DatacenterName))
+	if err != nil {
+		return fmt.Errorf("migration failed: unable to marshal Kubernetes resource: %s", err)
+	}
+	consulJSON, err := json.Marshal(consulEntry)
+	if err != nil {
+		return fmt.Errorf("migration failed: unable to marshal Consul resource: %s", err)
+	}
+
+	return fmt.Errorf("migration failed: Kubernetes resource does not match existing Consul config entry: consul=%s, kube=%s", consulJSON, kubeJSON)
 }
 
 func isNotFoundErr(err error) bool {
