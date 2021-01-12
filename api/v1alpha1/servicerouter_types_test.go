@@ -683,7 +683,7 @@ func TestServiceRouter_Default(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
-			input.Default(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}

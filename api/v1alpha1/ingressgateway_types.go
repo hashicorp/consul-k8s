@@ -226,7 +226,7 @@ func (in *IngressGateway) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-func (in *IngressGateway) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *IngressGateway) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
 	// If namespaces are enabled we want to set the namespace fields to it's
 	// default. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors

@@ -112,7 +112,7 @@ func (v *ServiceIntentionsWebhook) defaultingPatches(err error, svcIntentions *S
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)
 	}
-	svcIntentions.Default(v.EnableConsulNamespaces, v.ConsulDestinationNamespace, v.EnableNSMirroring, v.NSMirroringPrefix)
+	svcIntentions.DefaultNamespaceFields(v.EnableConsulNamespaces, v.ConsulDestinationNamespace, v.EnableNSMirroring, v.NSMirroringPrefix)
 	afterDefaulting, err := json.Marshal(svcIntentions)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling after defaulting: %s", err)

@@ -69,13 +69,13 @@ func ValidateConfigEntry(
 
 // defaultingPatches returns the patches needed to set fields to their
 // defaults.
-func defaultingPatches(svcIntentions ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
-	beforeDefaulting, err := json.Marshal(svcIntentions)
+func defaultingPatches(cfgEntry ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
+	beforeDefaulting, err := json.Marshal(cfgEntry)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)
 	}
-	svcIntentions.Default(enableConsulNamespaces, consulDestinationNamespace, nsMirroring, nsMirroringPrefix)
-	afterDefaulting, err := json.Marshal(svcIntentions)
+	cfgEntry.DefaultNamespaceFields(enableConsulNamespaces, consulDestinationNamespace, nsMirroring, nsMirroringPrefix)
+	afterDefaulting, err := json.Marshal(cfgEntry)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
 	}

@@ -204,7 +204,7 @@ func (in *mockConfigEntry) Validate(bool) error {
 	return nil
 }
 
-func (in *mockConfigEntry) Default(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *mockConfigEntry) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
 }
 
 func (in *mockConfigEntry) MatchesConsul(_ capi.ConfigEntry) bool {
