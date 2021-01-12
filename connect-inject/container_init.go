@@ -48,23 +48,10 @@ type initContainerCommandUpstreamData struct {
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
-	protocol := h.DefaultProtocol
-	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
-		protocol = annoProtocol
-	}
-	// We only write a service-defaults config if central config is enabled
-	// and a protocol is specified. Previously, we would write a config when
-	// the protocol was empty. This is the same as setting it to tcp. This
-	// would then override any global proxy-defaults config. Now, we only
-	// write the config if a protocol is explicitly set.
-	writeServiceDefaults := h.WriteServiceDefaults && protocol != ""
-
 	data := initContainerCommandData{
 		ServiceName:               pod.Annotations[annotationService],
 		ProxyServiceName:          fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),
-		ServiceProtocol:           protocol,
 		AuthMethod:                h.AuthMethod,
-		WriteServiceDefaults:      writeServiceDefaults,
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
@@ -342,18 +329,6 @@ services {
 }
 EOF
 
-{{- if .WriteServiceDefaults }}
-# Create the service-defaults config for the service
-cat <<EOF >/consul/connect-inject/service-defaults.hcl
-kind = "service-defaults"
-name = "{{ .ServiceName }}"
-protocol = "{{ .ServiceProtocol }}"
-{{- if .ConsulNamespace }}
-namespace = "{{ .ConsulNamespace }}"
-{{- end }}
-EOF
-{{- end }}
-
 {{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
@@ -371,19 +346,6 @@ EOF
 {{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
        as non-root user consul-k8s. */}}
 chmod 444 /consul/connect-inject/acl-token
-{{- end }}
-
-{{- if .WriteServiceDefaults }}
-{{- /* We use -cas and -modify-index 0 so that if a service-defaults config
-       already exists for this service, we don't override it */}}
-/bin/consul config write -cas -modify-index 0 \
-  {{- if .AuthMethod }}
-  -token-file="/consul/connect-inject/acl-token" \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  -namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  /consul/connect-inject/service-defaults.hcl || true
 {{- end }}
 
 /bin/consul services register \

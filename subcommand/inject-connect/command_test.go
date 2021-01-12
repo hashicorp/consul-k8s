@@ -38,6 +38,16 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-central-config", "true"},
+			expErr: "-enable-central-config is no longer supported",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-default-protocol", "http"},
+			expErr: "-default-protocol is no longer supported",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-ca-file", "bar"},
 			expErr: "Error reading Consul's CA cert file \"bar\"",
 		},

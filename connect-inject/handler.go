@@ -42,6 +42,8 @@ const (
 	// annotationProtocol contains the protocol that should be used for
 	// the service that is being injected. Valid values are "http", "http2",
 	// "grpc" and "tcp".
+	//
+	// Deprecated: This annotation is no longer supported.
 	annotationProtocol = "consul.hashicorp.com/connect-service-protocol"
 
 	// annotationUpstreams is a list of upstreams to register with the
@@ -129,15 +131,6 @@ type Handler struct {
 	// AuthMethod is the name of the Kubernetes Auth Method to
 	// use for identity with connectInjection if ACLs are enabled
 	AuthMethod string
-
-	// WriteServiceDefaults controls whether injection should write a
-	// service-defaults config entry for each service.
-	// Requires an additional `protocol` parameter.
-	WriteServiceDefaults bool
-
-	// DefaultProtocol is the default protocol to use for central config
-	// registrations. It will be overridden by a specific annotation.
-	DefaultProtocol string
 
 	// The PEM-encoded CA certificate string
 	// to use when communicating with Consul clients over HTTPS.
@@ -277,8 +270,18 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// Accumulate any patches here
 	var patches []jsonpatch.JsonPatchOperation
 
+	if err := h.validatePod(pod); err != nil {
+		h.Log.Error("Error validating pod", "err", err, "Request Name", req.Name)
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error validating pod: %s", err),
+			},
+		}
+	}
+
 	// Setup the default annotation values that are used for the container.
-	// This MUST be done before shouldInject is called since k.
+	// This MUST be done before shouldInject is called since that function
+	// uses these annotations.
 	if err := h.defaultAnnotations(&pod, &patches); err != nil {
 		h.Log.Error("Error creating default annotations", "err", err, "Request Name", req.Name)
 		return &v1beta1.AdmissionResponse{
@@ -498,22 +501,6 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 		}
 	}
 
-	if h.WriteServiceDefaults {
-		// Default protocol is specified by a flag if not explicitly annotated
-		if _, ok := pod.ObjectMeta.Annotations[annotationProtocol]; !ok && h.DefaultProtocol != "" {
-			if cs := pod.Spec.Containers; len(cs) > 0 {
-				// Create the patch for this first, so that the Annotation
-				// object will be created if necessary
-				*patches = append(*patches, updateAnnotation(
-					pod.Annotations,
-					map[string]string{annotationProtocol: h.DefaultProtocol})...)
-
-				// Set the annotation for protocol
-				pod.ObjectMeta.Annotations[annotationProtocol] = h.DefaultProtocol
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -522,6 +509,14 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 // empty string if namespaces aren't enabled.
 func (h *Handler) consulNamespace(ns string) string {
 	return namespaces.ConsulNamespace(ns, h.EnableNamespaces, h.ConsulDestinationNamespace, h.EnableK8SNSMirroring, h.K8SNSMirroringPrefix)
+}
+
+func (h *Handler) validatePod(pod corev1.Pod) error {
+	if _, ok := pod.Annotations[annotationProtocol]; ok {
+		return fmt.Errorf("the %s annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
+			annotationProtocol)
+	}
+	return nil
 }
 
 func portValue(pod *corev1.Pod, value string) (int32, error) {

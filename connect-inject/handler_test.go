@@ -257,10 +257,8 @@ func TestHandlerHandle(t *testing.T) {
 		},
 
 		{
-			"empty pod basic, no default protocol",
+			"empty pod basic",
 			Handler{
-				WriteServiceDefaults:  true,
-				DefaultProtocol:       "",
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
@@ -277,105 +275,6 @@ func TestHandlerHandle(t *testing.T) {
 			},
 			"",
 			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
-				},
-			},
-		},
-
-		{
-			"empty pod basic, protocol in annotation",
-			Handler{
-				WriteServiceDefaults:  true,
-				Log:                   hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationService:  "foo",
-							annotationProtocol: "grpc",
-						},
-					},
-				}),
-			},
-			"",
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
-				},
-			},
-		},
-
-		{
-			"empty pod basic, default protocol specified",
-			Handler{
-				WriteServiceDefaults:  true,
-				DefaultProtocol:       "http",
-				Log:                   hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-			},
-			"",
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationProtocol),
-				},
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -477,6 +376,38 @@ func TestHandlerHandle(t *testing.T) {
 			require.Equal(tt.Patches, actual)
 		})
 	}
+}
+
+// Test that we error out if the protocol annotation is set.
+func TestHandler_ErrorsOnProtocolAnnotations(t *testing.T) {
+	require := require.New(t)
+	handler := Handler{
+		Log:                   hclog.Default().Named("handler"),
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSet(),
+	}
+
+	request := v1beta1.AdmissionRequest{
+		Namespace: "default",
+		Object: encodeRaw(t, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					annotationProtocol: "http",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: "web",
+					},
+				},
+			},
+		}),
+	}
+
+	response := handler.Mutate(&request)
+	require.False(response.Allowed)
+	require.Equal(response.Result.Message, "Error validating pod: the consul.hashicorp.com/connect-service-protocol annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)")
 }
 
 // Test that an incorrect content type results in an error.
@@ -626,34 +557,6 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			map[string]string{
 				annotationService: "web",
 				annotationPort:    "8080",
-			},
-			"",
-		},
-
-		{
-			"basic pod, protocol annotated",
-			&corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						annotationProtocol: "http",
-					},
-				},
-
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						corev1.Container{
-							Name: "web",
-						},
-
-						corev1.Container{
-							Name: "web-side",
-						},
-					},
-				},
-			},
-			map[string]string{
-				annotationService:  "web",
-				annotationProtocol: "http",
 			},
 			"",
 		},

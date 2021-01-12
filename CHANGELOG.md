@@ -14,6 +14,34 @@ IMPROVEMENTS:
 FEATURES:
 * TLS: add `tls-init` command that is responsible for creating and updating Server TLS certificates. [[GH-410](https://github.com/hashicorp/consul-k8s/pull/410)]
 
+BREAKING CHANGES
+* Connect: the `-default-protocol` and `-enable-central-config` flags are no longer supported.
+  The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is also
+  no longer supported. [[GH-418](https://github.com/hashicorp/consul-k8s/pull/418)]
+
+  Current deployments that have the annotation should remove it, otherwise they
+  will get an error if a pod from that deployment is rescheduled.
+
+  Removing the annotation will not change their protocol
+  since the config entry was already written to Consul. If you wish to change
+  the protocol you must migrate the config entry to be managed by a
+  [`ServiceDefaults`](https://www.consul.io/docs/agent/config-entries/service-defaults) resource.
+  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds) for more
+  information.
+
+  To set the protocol for __new__ services, you must use the
+  [`ServiceDefaults`](https://www.consul.io/docs/agent/config-entries/service-defaults) resource,
+  e.g.
+
+  ```yaml
+  apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceDefaults
+  metadata:
+    name: my-service-name
+  spec:
+    protocol: "http"
+  ```
+
 ## 0.22.0 (December 21, 2020)
 
 BUG FIXES:

@@ -195,6 +195,14 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-envoy-image must be set")
 		return 1
 	}
+	if c.flagWriteServiceDefaults {
+		c.UI.Error("-enable-central-config is no longer supported")
+		return 1
+	}
+	if c.flagDefaultProtocol != "" {
+		c.UI.Error("-default-protocol is no longer supported")
+		return 1
+	}
 
 	logger, err := common.Logger(c.flagLogLevel)
 	if err != nil {
@@ -330,8 +338,6 @@ func (c *Command) Run(args []string) int {
 		ImageConsulK8S:             c.flagConsulK8sImage,
 		RequireAnnotation:          !c.flagDefaultInject,
 		AuthMethod:                 c.flagACLAuthMethod,
-		WriteServiceDefaults:       c.flagWriteServiceDefaults,
-		DefaultProtocol:            c.flagDefaultProtocol,
 		ConsulCACert:               string(consulCACert),
 		DefaultProxyCPURequest:     sidecarProxyCPURequest,
 		DefaultProxyCPULimit:       sidecarProxyCPULimit,
