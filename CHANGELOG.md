@@ -41,6 +41,9 @@ FEATURES:
 * CRDs: support annotation `consul.hashicorp.com/migrate-entry` on custom resources
   that will allow an existing config entry to be migrated onto a Kubernetes custom resource. [[GH-419](https://github.com/hashicorp/consul-k8s/pull/419)] 
 
+IMPROVEMENTS:
+* CRDs: give a more descriptive error when a config entry already exists in Consul. [[GH-420](https://github.com/hashicorp/consul-k8s/pull/420)]
+
 ## 0.23.0 (January 22, 2021)
 
 BUG FIXES:
