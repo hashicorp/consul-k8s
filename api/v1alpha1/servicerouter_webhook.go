@@ -26,8 +26,17 @@ type ServiceRouterWebhook struct {
 	// be created in the matching Consul namespace.
 	EnableNSMirroring bool
 
+	// ConsulDestinationNamespace is the namespace in Consul that the config entry created
+	// in k8s will get mapped into. If the Consul namespace does not already exist, it will
+	// be created.
 	ConsulDestinationNamespace string
-	NSMirroringPrefix          string
+
+	// NSMirroringPrefix works in conjunction with Namespace Mirroring.
+	// It is the prefix added to the Consul namespace to map to a specific.
+	// k8s namespace. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+	// service in the k8s `staging` namespace will be registered into the
+	// `k8s-staging` Consul namespace.
+	NSMirroringPrefix string
 
 	decoder *admission.Decoder
 	client.Client
