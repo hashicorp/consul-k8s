@@ -2,7 +2,6 @@ package serveraclinit
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -130,8 +129,13 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 
 			// This shouldn't happen, because we're looking for a policy
 			// only after we've hit a `Policy already exists` error.
+			// The only time it might happen is if a user has manually created a policy
+			// with this name but used a different description. In this case,
+			// we don't want to overwrite the policy so we just error.
 			if policy.ID == "" {
-				return errors.New("Unable to find existing ACL policy")
+				return fmt.Errorf("policy found with name %q but not with expected description %q; "+
+					"if this policy was created manually it must be renamed to something else because this name is reserved by consul-k8s",
+					policy.Name, policy.Description)
 			}
 
 			// Update the policy now that we've found its ID
