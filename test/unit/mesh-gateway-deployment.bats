@@ -1245,6 +1245,7 @@ EOF
 
   [ "${actual}" = "${exp}" ]
 }
+
 @test "meshGateway/Deployment: service-init init container consulServiceName can be changed" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1293,4 +1294,18 @@ EOF
   /consul/service/service.hcl'
 
   [ "${actual}" = "${exp}" ]
+}
+
+#--------------------------------------------------------------------
+# meshGateway.globalMode [DEPRECATED]
+
+@test "meshGateway/Deployment: fails if meshGateway.globalMode is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.globalMode=something' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
 }

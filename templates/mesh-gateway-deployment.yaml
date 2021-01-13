@@ -3,6 +3,7 @@
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true" }}{{ end -}}
 {{- if and .Values.global.acls.manageSystemACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
 {{- if .Values.meshGateway.imageEnvoy }}{{ fail "meshGateway.imageEnvoy must be specified in global.imageEnvoy" }}{{ end -}}
+{{- if .Values.meshGateway.globalMode }}{{ fail "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end -}}
 {{- /* The below test checks if clients are disabled (and if so, fails). We use the conditional from other client files and prepend 'not' */ -}}
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
 apiVersion: apps/v1
