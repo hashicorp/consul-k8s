@@ -62,6 +62,16 @@ BREAKING CHANGES:
        {"enable_central_service_config": false}
    ``` 
   [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
+* `meshGateway.globalMode` is no longer supported. Instead,
+   [`controller.enabled`](https://www.consul.io/docs/k8s/helm#v-controller-enabled) must be set to true and
+   a [`ProxyDefaults`](https://www.consul.io/docs/agent/config-entries/proxy-defaults) resource
+   must be created.
+
+  This setting is being removed because it didn't support any modifications to the
+  config after the cluster was first installed.
+
+  If you were previously setting this, see [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
+  for more information on how to upgrade. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
 * The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is
   no longer supported with this version of `consul-k8s` (0.23.0).
 
