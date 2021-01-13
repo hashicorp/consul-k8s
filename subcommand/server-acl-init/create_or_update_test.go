@@ -33,7 +33,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 		c.ACL.Tokens.Master = bootToken
 	})
 	require.NoError(err)
-	svr.WaitForServiceIntentions(t)
+	svr.WaitForLeader(t)
 
 	// Get a Consul client.
 	consul, err := api.NewClient(&api.Config{
