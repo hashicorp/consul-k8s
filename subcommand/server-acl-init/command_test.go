@@ -412,8 +412,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			tokenFile, fileCleanup := writeTempFile(t, bootToken)
-			defer fileCleanup()
+			tokenFile := writeTempFile(t, bootToken)
 
 			k8s, consul, secondaryAddr, cleanup := mockReplicatedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
@@ -548,8 +547,7 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			tokenFile, fileCleanup := writeTempFile(t, bootToken)
-			defer fileCleanup()
+			tokenFile := writeTempFile(t, bootToken)
 
 			k8s, testAgent := completeBootstrappedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
@@ -1097,6 +1095,68 @@ func TestRun_SyncPolicyUpdates(t *testing.T) {
 	}
 }
 
+// Test that we give an error if an ACL policy we were going to create
+// already exists but it has a different description than what consul-k8s
+// expected. In this case, it's likely that a user manually created an ACL
+// policy with the same name and so we want to error.
+// This test will test with the catalog sync policy but any policy
+// that we try to update will work for testing.
+func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	// Create Consul with ACLs already bootstrapped so that we can
+	// then seed it with our manually created policy.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tokenFile := writeTempFile(t, bootToken)
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	setUpK8sServiceAccount(t, k8s, ns)
+	defer testAgent.Stop()
+
+	consul, err := api.NewClient(&api.Config{
+		Address: testAgent.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+
+	// Create the policy manually.
+	description := "not the expected description"
+	policy, _, err := consul.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "catalog-sync-token",
+		Description: description,
+	}, nil)
+	require.NoError(err)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmdArgs := []string{
+		"-timeout=1s",
+		"-k8s-namespace", ns,
+		"-bootstrap-token-file", tokenFile,
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
+		"-create-sync-token",
+	}
+	responseCode := cmd.Run(cmdArgs)
+
+	// We expect the command to time out.
+	require.Equal(1, responseCode)
+	// NOTE: Since the error is logged through the logger instead of the UI
+	// there's no good way to test that we logged the expected error however
+	// we also test this directly in create_or_update_test.go.
+
+	// Check that the policy wasn't modified.
+	rereadPolicy, _, err := consul.ACL().PolicyRead(policy.ID, nil)
+	require.NoError(err)
+	require.Equal(description, rereadPolicy.Description)
+}
+
 // Test that if the servers aren't available at first that bootstrap
 // still succeeds.
 func TestRun_DelayedServers(t *testing.T) {
@@ -1497,8 +1557,7 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	tokenFile, fileCleanup := writeTempFile(t, bootToken)
-	defer fileCleanup()
+	tokenFile := writeTempFile(t, bootToken)
 
 	type APICall struct {
 		Method string
@@ -1633,8 +1692,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 
 	// completeReplicatedSetup ran the command in our primary dc so now we
 	// need to run the command in our secondary dc.
-	tokenFile, cleanup := writeTempFile(t, aclReplicationToken)
-	defer cleanup()
+	tokenFile := writeTempFile(t, aclReplicationToken)
 	secondaryUI := cli.NewMockUi()
 	secondaryCmd := Command{
 		UI:        secondaryUI,
@@ -1683,8 +1741,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 	for _, flag := range cases {
 		t.Run(flag, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-			tokenFile, fileCleanup := writeTempFile(t, bootToken)
-			defer fileCleanup()
+			tokenFile := writeTempFile(t, bootToken)
 			k8s, consul, serverAddr, cleanup := mockReplicatedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
@@ -2128,15 +2185,20 @@ func policyExists(t require.TestingT, name string, client *api.Client) *api.ACLP
 	return policy
 }
 
-func writeTempFile(t *testing.T, contents string) (string, func()) {
+// writeTempFile writes contents to a temporary file and returns the file
+// name. It will remove the file once the test completes.
+func writeTempFile(t *testing.T, contents string) string {
 	t.Helper()
 	file, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
 	_, err = file.WriteString(contents)
 	require.NoError(t, err)
-	return file.Name(), func() {
+
+	t.Cleanup(func() {
 		os.Remove(file.Name())
-	}
+	})
+
+	return file.Name()
 }
 
 var serviceAccountCACert = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDekNDQWZPZ0F3SUJBZ0lRS3pzN05qbDlIczZYYzhFWG91MjVoekFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRMU9XVTJaR00wTVMweU1EaG1MVFF3T1RVdFlUSTRPUzB4Wm1NM01EQmhZekZqWXpndwpIaGNOTVRrd05qQTNNVEF4TnpNeFdoY05NalF3TmpBMU1URXhOek14V2pBdk1TMHdLd1lEVlFRREV5UTFPV1UyClpHTTBNUzB5TURobUxUUXdPVFV0WVRJNE9TMHhabU0zTURCaFl6RmpZemd3Z2dFaU1BMEdDU3FHU0liM0RRRUIKQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURaakh6d3FvZnpUcEdwYzBNZElDUzdldXZmdWpVS0UzUEMvYXBmREFnQgo0anpFRktBNzgvOStLVUd3L2MvMFNIZVNRaE4rYThnd2xIUm5BejFOSmNmT0lYeTRkd2VVdU9rQWlGeEg4cGh0CkVDd2tlTk83ejhEb1Y4Y2VtaW5DUkhHamFSbW9NeHBaN2cycFpBSk5aZVB4aTN5MWFOa0ZBWGU5Z1NVU2RqUloKUlhZa2E3d2gyQU85azJkbEdGQVlCK3Qzdld3SjZ0d2pHMFR0S1FyaFlNOU9kMS9vTjBFMDFMekJjWnV4a04xawo4Z2ZJSHk3Yk9GQ0JNMldURURXLzBhQXZjQVByTzhETHFESis2TWpjM3I3K3psemw4YVFzcGIwUzA4cFZ6a2k1CkR6Ly84M2t5dTBwaEp1aWo1ZUI4OFY3VWZQWHhYRi9FdFY2ZnZyTDdNTjRmQWdNQkFBR2pJekFoTUE0R0ExVWQKRHdFQi93UUVBd0lDQkRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCdgpRc2FHNnFsY2FSa3RKMHpHaHh4SjUyTm5SVjJHY0lZUGVOM1p2MlZYZTNNTDNWZDZHMzJQVjdsSU9oangzS21BCi91TWg2TmhxQnpzZWtrVHowUHVDM3dKeU0yT0dvblZRaXNGbHF4OXNGUTNmVTJtSUdYQ2Ezd0M4ZS9xUDhCSFMKdzcvVmVBN2x6bWozVFFSRS9XMFUwWkdlb0F4bjliNkp0VDBpTXVjWXZQMGhYS1RQQldsbnpJaWphbVU1MHIyWQo3aWEwNjVVZzJ4VU41RkxYL3Z4T0EzeTRyanBraldvVlFjdTFwOFRaclZvTTNkc0dGV3AxMGZETVJpQUhUdk9ICloyM2pHdWs2cm45RFVIQzJ4UGozd0NUbWQ4U0dFSm9WMzFub0pWNWRWZVE5MHd1c1h6M3ZURzdmaWNLbnZIRlMKeHRyNVBTd0gxRHVzWWZWYUdIMk8KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
