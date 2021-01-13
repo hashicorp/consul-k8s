@@ -138,7 +138,7 @@ EOF
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  rm -f temp_file
+  rm -f "$temp_file"
 }
 
 #--------------------------------------------------------------------
