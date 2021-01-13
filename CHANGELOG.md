@@ -63,7 +63,7 @@ BREAKING CHANGES:
    ``` 
   [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)] 
 * The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is
-  no longer supported with the latest version of `consul-k8s`.
+  no longer supported with this version of `consul-k8s` (0.23.0).
 
   Current deployments that have the annotation should remove it, otherwise they
   will get an error if a pod from that deployment is rescheduled.
