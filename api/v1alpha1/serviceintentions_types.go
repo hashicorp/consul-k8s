@@ -271,7 +271,7 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-// Default sets the namespace field on spec.destination to their default values if namespaces are enabled.
+// DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
 func (in *ServiceIntentions) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
 	// If namespaces are enabled we want to set the destination namespace field to it's
 	// default. If namespaces are not enabled (i.e. OSS) we don't set the

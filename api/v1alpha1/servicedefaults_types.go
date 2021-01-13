@@ -185,7 +185,7 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-// Default has no behaviour here as service-defaults have no namespace specific fields.
+// DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.
 func (in *ServiceDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
 	return
 }

@@ -189,9 +189,10 @@ func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+// DefaultNamespaceFields sets the namespace field on spec.services to their default values if namespaces are enabled.
 func (in *TerminatingGateway) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
-	// If namespaces are enabled we want to set the namespace fields to it's
-	// default. If namespaces are not enabled (i.e. OSS) we don't set the
+	// If namespaces are enabled we want to set the namespace fields to their
+	// defaults. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
 	if consulNamespacesEnabled {

@@ -34,7 +34,7 @@ func ValidateConfigEntry(
 	consulDestinationNamespace string,
 	nsMirroringPrefix string) admission.Response {
 
-	defaultingPatches, err := defaultingPatches(cfgEntry, enableConsulNamespaces, nsMirroring, consulDestinationNamespace, nsMirroringPrefix)
+	defaultingPatches, err := DefaultingPatches(cfgEntry, enableConsulNamespaces, nsMirroring, consulDestinationNamespace, nsMirroringPrefix)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
@@ -67,9 +67,9 @@ func ValidateConfigEntry(
 	return admission.Patched(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()), defaultingPatches...)
 }
 
-// defaultingPatches returns the patches needed to set fields to their
+// DefaultingPatches returns the patches needed to set fields to their
 // defaults.
-func defaultingPatches(cfgEntry ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
+func DefaultingPatches(cfgEntry ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
 	beforeDefaulting, err := json.Marshal(cfgEntry)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)

@@ -2,14 +2,13 @@ package v1alpha1
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
-	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -45,7 +44,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	defaultingPatches, err := v.defaultingPatches(err, &svcIntentions)
+	defaultingPatches, err := common.DefaultingPatches(&svcIntentions, v.EnableConsulNamespaces, v.EnableNSMirroring, v.ConsulDestinationNamespace, v.NSMirroringPrefix)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
@@ -103,24 +102,4 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 func (v *ServiceIntentionsWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
-}
-
-// defaultingPatches returns the patches needed to set fields to their
-// defaults.
-func (v *ServiceIntentionsWebhook) defaultingPatches(err error, svcIntentions *ServiceIntentions) ([]jsonpatch.Operation, error) {
-	beforeDefaulting, err := json.Marshal(svcIntentions)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling input: %s", err)
-	}
-	svcIntentions.DefaultNamespaceFields(v.EnableConsulNamespaces, v.ConsulDestinationNamespace, v.EnableNSMirroring, v.NSMirroringPrefix)
-	afterDefaulting, err := json.Marshal(svcIntentions)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
-	}
-
-	defaultingPatches, err := jsonpatch.CreatePatch(beforeDefaulting, afterDefaulting)
-	if err != nil {
-		return nil, fmt.Errorf("creating patches: %s", err)
-	}
-	return defaultingPatches, nil
 }

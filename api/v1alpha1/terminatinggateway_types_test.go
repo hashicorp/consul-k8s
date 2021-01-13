@@ -281,7 +281,7 @@ func TestTerminatingGateway_Validate(t *testing.T) {
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
-func TestTerminatingGateway_Default(t *testing.T) {
+func TestTerminatingGateway_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
 		enabled              bool
 		destinationNamespace string
@@ -320,35 +320,34 @@ func TestTerminatingGateway_Default(t *testing.T) {
 	}
 
 	for name, s := range namespaceConfig {
-		input := &TerminatingGateway{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: TerminatingGatewaySpec{
-				Services: []LinkedService{
-					{
-						Name: "foo",
-					},
-				},
-			},
-		}
-		output := &TerminatingGateway{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: TerminatingGatewaySpec{
-				Services: []LinkedService{
-					{
-						Name:      "foo",
-						Namespace: s.expectedDestination,
-					},
-				},
-			},
-		}
-
 		t.Run(name, func(t *testing.T) {
+			input := &TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{
+						{
+							Name: "foo",
+						},
+					},
+				},
+			}
+			output := &TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{
+						{
+							Name:      "foo",
+							Namespace: s.expectedDestination,
+						},
+					},
+				},
+			}
 			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
 			require.True(t, cmp.Equal(input, output))
 		})

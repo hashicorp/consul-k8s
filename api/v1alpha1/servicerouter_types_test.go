@@ -601,7 +601,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
-func TestServiceRouter_Default(t *testing.T) {
+func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
 		enabled              bool
 		destinationNamespace string
@@ -640,49 +640,48 @@ func TestServiceRouter_Default(t *testing.T) {
 	}
 
 	for name, s := range namespaceConfig {
-		input := &ServiceRouter{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: ServiceRouterSpec{
-				Routes: []ServiceRoute{
-					{
-						Match: &ServiceRouteMatch{
-							HTTP: &ServiceRouteHTTPMatch{
-								PathPrefix: "/admin",
-							},
-						},
-						Destination: &ServiceRouteDestination{
-							Service: "destA",
-						},
-					},
-				},
-			},
-		}
-		output := &ServiceRouter{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: ServiceRouterSpec{
-				Routes: []ServiceRoute{
-					{
-						Match: &ServiceRouteMatch{
-							HTTP: &ServiceRouteHTTPMatch{
-								PathPrefix: "/admin",
-							},
-						},
-						Destination: &ServiceRouteDestination{
-							Service:   "destA",
-							Namespace: s.expectedDestination,
-						},
-					},
-				},
-			},
-		}
-
 		t.Run(name, func(t *testing.T) {
+			input := &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service: "destA",
+							},
+						},
+					},
+				},
+			}
+			output := &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destA",
+								Namespace: s.expectedDestination,
+							},
+						},
+					},
+				},
+			}
 			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
 			require.True(t, cmp.Equal(input, output))
 		})

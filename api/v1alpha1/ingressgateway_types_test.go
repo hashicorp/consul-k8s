@@ -461,7 +461,7 @@ func TestIngressGateway_Validate(t *testing.T) {
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
-func TestIngressGateway_Default(t *testing.T) {
+func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
 		enabled              bool
 		destinationNamespace string
@@ -500,45 +500,44 @@ func TestIngressGateway_Default(t *testing.T) {
 	}
 
 	for name, s := range namespaceConfig {
-		input := &IngressGateway{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: IngressGatewaySpec{
-				Listeners: []IngressListener{
-					{
-						Protocol: "tcp",
-						Services: []IngressService{
-							{
-								Name: "name",
-							},
-						},
-					},
-				},
-			},
-		}
-		output := &IngressGateway{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: IngressGatewaySpec{
-				Listeners: []IngressListener{
-					{
-						Protocol: "tcp",
-						Services: []IngressService{
-							{
-								Name:      "name",
-								Namespace: s.expectedDestination,
-							},
-						},
-					},
-				},
-			},
-		}
-
 		t.Run(name, func(t *testing.T) {
+			input := &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name: "name",
+								},
+							},
+						},
+					},
+				},
+			}
+			output := &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Namespace: s.expectedDestination,
+								},
+							},
+						},
+					},
+				},
+			}
 			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
 			require.True(t, cmp.Equal(input, output))
 		})

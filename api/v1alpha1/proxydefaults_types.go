@@ -176,7 +176,7 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
-// Default has no behaviour here as proxy-defaults have no namespace specific fields.
+// DefaultNamespaceFields has no behaviour here as proxy-defaults have no namespace specific fields.
 func (in *ProxyDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
 	return
 }
