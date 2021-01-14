@@ -9,6 +9,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,6 +126,25 @@ func TestValidateConfigEntry(t *testing.T) {
 	}
 }
 
+func TestDefaultingPatches(t *testing.T) {
+	cfgEntry := &mockConfigEntry{
+		MockName: "test",
+		Valid:    true,
+	}
+
+	// This test validates that DefaultingPatches invokes DefaultNamespaceFields on the Config Entry.
+	patches, err := DefaultingPatches(cfgEntry, false, false, "", "")
+	require.NoError(t, err)
+
+	require.Equal(t, []jsonpatch.Operation{
+		{
+			Operation: "replace",
+			Path:      "/MockNamespace",
+			Value:     "bar",
+		},
+	}, patches)
+}
+
 type mockConfigEntryLister struct {
 	Resources []ConfigEntryResource
 }
@@ -205,6 +225,7 @@ func (in *mockConfigEntry) Validate(bool) error {
 }
 
 func (in *mockConfigEntry) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	in.MockNamespace = "bar"
 }
 
 func (in *mockConfigEntry) MatchesConsul(_ capi.ConfigEntry) bool {

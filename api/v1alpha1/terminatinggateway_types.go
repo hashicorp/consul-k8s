@@ -196,6 +196,7 @@ func (in *TerminatingGateway) DefaultNamespaceFields(consulNamespacesEnabled boo
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
 	if consulNamespacesEnabled {
+		// Default to the current namespace (i.e. the namespace of the config entry).
 		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
 		for i, service := range in.Spec.Services {
 			if service.Namespace == "" {

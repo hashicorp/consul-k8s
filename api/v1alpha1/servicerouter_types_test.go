@@ -658,6 +658,17 @@ func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 								Service: "destA",
 							},
 						},
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/other",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destB",
+								Namespace: "other",
+							},
+						},
 					},
 				},
 			}
@@ -677,6 +688,17 @@ func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 							Destination: &ServiceRouteDestination{
 								Service:   "destA",
 								Namespace: s.expectedDestination,
+							},
+						},
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/other",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destB",
+								Namespace: "other",
 							},
 						},
 					},

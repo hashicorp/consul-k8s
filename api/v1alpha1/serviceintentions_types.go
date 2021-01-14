@@ -278,6 +278,7 @@ func (in *ServiceIntentions) DefaultNamespaceFields(consulNamespacesEnabled bool
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
 	if consulNamespacesEnabled {
+		// Default to the current namespace (i.e. the namespace of the config entry).
 		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
 		if in.Spec.Destination.Namespace == "" {
 			in.Spec.Destination.Namespace = namespace

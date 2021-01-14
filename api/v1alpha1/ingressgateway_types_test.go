@@ -514,6 +514,10 @@ func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 								{
 									Name: "name",
 								},
+								{
+									Name:      "other-name",
+									Namespace: "other",
+								},
 							},
 						},
 					},
@@ -532,6 +536,10 @@ func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 								{
 									Name:      "name",
 									Namespace: s.expectedDestination,
+								},
+								{
+									Name:      "other-name",
+									Namespace: "other",
 								},
 							},
 						},

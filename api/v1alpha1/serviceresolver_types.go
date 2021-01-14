@@ -309,6 +309,7 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 // DefaultNamespaceFields has no behaviour here as service-resolver have namespace fields
 // that do not default.
 func (in *ServiceResolver) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+	return
 }
 
 func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSubset {

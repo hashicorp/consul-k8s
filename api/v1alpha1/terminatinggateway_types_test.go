@@ -331,6 +331,10 @@ func TestTerminatingGateway_DefaultNamespaceFields(t *testing.T) {
 						{
 							Name: "foo",
 						},
+						{
+							Name:      "bar",
+							Namespace: "other",
+						},
 					},
 				},
 			}
@@ -344,6 +348,10 @@ func TestTerminatingGateway_DefaultNamespaceFields(t *testing.T) {
 						{
 							Name:      "foo",
 							Namespace: s.expectedDestination,
+						},
+						{
+							Name:      "bar",
+							Namespace: "other",
 						},
 					},
 				},
