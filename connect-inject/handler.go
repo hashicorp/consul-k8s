@@ -513,7 +513,7 @@ func (h *Handler) consulNamespace(ns string) string {
 
 func (h *Handler) validatePod(pod corev1.Pod) error {
 	if _, ok := pod.Annotations[annotationProtocol]; ok {
-		return fmt.Errorf("the %s annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
+		return fmt.Errorf("the %q annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
 			annotationProtocol)
 	}
 	return nil
