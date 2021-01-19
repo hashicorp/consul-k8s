@@ -503,7 +503,7 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
-func TestServiceIntentions_Default(t *testing.T) {
+func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
 		enabled              bool
 		destinationNamespace string
@@ -542,32 +542,31 @@ func TestServiceIntentions_Default(t *testing.T) {
 	}
 
 	for name, s := range namespaceConfig {
-		input := &ServiceIntentions{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: ServiceIntentionsSpec{
-				Destination: Destination{
-					Name: "bar",
-				},
-			},
-		}
-		output := &ServiceIntentions{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "bar",
-			},
-			Spec: ServiceIntentionsSpec{
-				Destination: Destination{
-					Name:      "bar",
-					Namespace: s.expectedDestination,
-				},
-			},
-		}
-
 		t.Run(name, func(t *testing.T) {
-			input.Default(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input := &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name: "bar",
+					},
+				},
+			}
+			output := &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "bar",
+						Namespace: s.expectedDestination,
+					},
+				},
+			}
+			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}

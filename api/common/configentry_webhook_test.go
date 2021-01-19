@@ -9,6 +9,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,12 +22,14 @@ func TestValidateConfigEntry(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
-		existingResources []ConfigEntryResource
-		newResource       ConfigEntryResource
-		enableNamespaces  bool
-		nsMirroring       bool
-		expAllow          bool
-		expErrMessage     string
+		existingResources   []ConfigEntryResource
+		newResource         ConfigEntryResource
+		enableNamespaces    bool
+		nsMirroring         bool
+		consulDestinationNS string
+		nsMirroringPrefix   string
+		expAllow            bool
+		expErrMessage       string
 	}{
 		"no duplicates, valid": {
 			existingResources: nil,
@@ -112,13 +115,34 @@ func TestValidateConfigEntry(t *testing.T) {
 				lister,
 				c.newResource,
 				c.enableNamespaces,
-				c.nsMirroring)
+				c.nsMirroring,
+				c.consulDestinationNS,
+				c.nsMirroringPrefix)
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
 			}
 		})
 	}
+}
+
+func TestDefaultingPatches(t *testing.T) {
+	cfgEntry := &mockConfigEntry{
+		MockName: "test",
+		Valid:    true,
+	}
+
+	// This test validates that DefaultingPatches invokes DefaultNamespaceFields on the Config Entry.
+	patches, err := DefaultingPatches(cfgEntry, false, false, "", "")
+	require.NoError(t, err)
+
+	require.Equal(t, []jsonpatch.Operation{
+		{
+			Operation: "replace",
+			Path:      "/MockNamespace",
+			Value:     "bar",
+		},
+	}, patches)
 }
 
 type mockConfigEntryLister struct {
@@ -198,6 +222,10 @@ func (in *mockConfigEntry) Validate(bool) error {
 		return errors.New("invalid")
 	}
 	return nil
+}
+
+func (in *mockConfigEntry) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	in.MockNamespace = "bar"
 }
 
 func (in *mockConfigEntry) MatchesConsul(_ capi.ConfigEntry) bool {

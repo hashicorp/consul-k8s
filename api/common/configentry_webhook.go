@@ -2,10 +2,12 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -28,8 +30,14 @@ func ValidateConfigEntry(
 	configEntryLister ConfigEntryLister,
 	cfgEntry ConfigEntryResource,
 	enableConsulNamespaces bool,
-	nsMirroring bool) admission.Response {
+	nsMirroring bool,
+	consulDestinationNamespace string,
+	nsMirroringPrefix string) admission.Response {
 
+	defaultingPatches, err := DefaultingPatches(cfgEntry, enableConsulNamespaces, nsMirroring, consulDestinationNamespace, nsMirroringPrefix)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
 	// On create we need to validate that there isn't already a resource with
 	// the same name in a different namespace if we're need to mapping all Kube
 	// resources to a single Consul namespace. The only case where we're not
@@ -56,5 +64,25 @@ func ValidateConfigEntry(
 	if err := cfgEntry.Validate(enableConsulNamespaces); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	return admission.Allowed(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()))
+	return admission.Patched(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()), defaultingPatches...)
+}
+
+// DefaultingPatches returns the patches needed to set fields to their
+// defaults.
+func DefaultingPatches(cfgEntry ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
+	beforeDefaulting, err := json.Marshal(cfgEntry)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling input: %s", err)
+	}
+	cfgEntry.DefaultNamespaceFields(enableConsulNamespaces, consulDestinationNamespace, nsMirroring, nsMirroringPrefix)
+	afterDefaulting, err := json.Marshal(cfgEntry)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
+	}
+
+	defaultingPatches, err := jsonpatch.CreatePatch(beforeDefaulting, afterDefaulting)
+	if err != nil {
+		return nil, fmt.Errorf("creating patches: %s", err)
+	}
+	return defaultingPatches, nil
 }

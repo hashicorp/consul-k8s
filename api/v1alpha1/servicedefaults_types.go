@@ -185,6 +185,11 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+// DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.
+func (in *ServiceDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+	return
+}
+
 // MatchesConsul returns true if entry has the same config as this struct.
 func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceConfigEntry)

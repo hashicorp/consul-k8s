@@ -57,4 +57,7 @@ type ConfigEntryResource interface {
 	DeepCopyObject() runtime.Object
 	// Validate returns an error if the resource is invalid.
 	Validate(namespacesEnabled bool) error
+	// DefaultNamespaceFields sets Consul namespace fields on the config entry
+	// spec to their default values if namespaces are enabled.
+	DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string)
 }

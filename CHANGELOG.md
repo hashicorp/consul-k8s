@@ -3,6 +3,8 @@
 BUG FIXES:
 * CRDs: Fix issue where a `ServiceIntentions` resource could be continually resynced with Consul
   because Consul's internal representation had a different order for an array than the Kubernetes resource. [[GH-416](https://github.com/hashicorp/consul-k8s/pull/416)] 
+* CRDs: **(Consul Enterprise only)** default the `namespace` fields on resources where Consul performs namespace defaulting to prevent constant re-syncing.
+  [[GH-413](https://github.com/hashicorp/consul-k8s/pull/413)]
 
 IMPROVEMENTS:
 * ACLs: give better error if policy that consul-k8s tries to update was created manually by user. [[GH-412](https://github.com/hashicorp/consul-k8s/pull/412)]

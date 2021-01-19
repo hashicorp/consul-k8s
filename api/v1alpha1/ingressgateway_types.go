@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -223,6 +224,25 @@ func (in *IngressGateway) Validate(namespacesEnabled bool) error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+// DefaultNamespaceFields sets the namespace field on spec.listeners[].services to their default values if namespaces are enabled.
+func (in *IngressGateway) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+	// If namespaces are enabled we want to set the namespace fields to their
+	// defaults. If namespaces are not enabled (i.e. OSS) we don't set the
+	// namespace fields because this would cause errors
+	// making API calls (because namespace fields can't be set in OSS).
+	if consulNamespacesEnabled {
+		// Default to the current namespace (i.e. the namespace of the config entry).
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		for i, listener := range in.Spec.Listeners {
+			for j, service := range listener.Services {
+				if service.Namespace == "" {
+					in.Spec.Listeners[i].Services[j].Namespace = namespace
+				}
+			}
+		}
+	}
 }
 
 func (in GatewayTLSConfig) toConsul() capi.GatewayTLSConfig {
