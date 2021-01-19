@@ -154,7 +154,7 @@ jobs:
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=hashicorpdev/consul-k8s:latest
+                    -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1
@@ -602,12 +602,10 @@ workflows:
               only:
                 - master
     jobs:
-      # OpenShift temporarily disabled until we get a new mirror.
-      # - acceptance-openshift
+      - acceptance-openshift
       - acceptance-gke-1-16
       - acceptance-eks-1-17
-      # AKS temporarily disabled until we get a new mirror.
-      # - acceptance-aks-1-19
+#      - acceptance-aks-1-19
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
