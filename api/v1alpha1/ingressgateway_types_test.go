@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -455,6 +456,98 @@ func TestIngressGateway_Validate(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// Test defaulting behavior when namespaces are enabled as well as disabled.
+func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
+	namespaceConfig := map[string]struct {
+		enabled              bool
+		destinationNamespace string
+		mirroring            bool
+		prefix               string
+		expectedDestination  string
+	}{
+		"disabled": {
+			enabled:              false,
+			destinationNamespace: "",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "",
+		},
+		"destinationNS": {
+			enabled:              true,
+			destinationNamespace: "foo",
+			mirroring:            false,
+			prefix:               "",
+			expectedDestination:  "foo",
+		},
+		"mirroringEnabledWithoutPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "",
+			expectedDestination:  "bar",
+		},
+		"mirroringWithPrefix": {
+			enabled:              true,
+			destinationNamespace: "",
+			mirroring:            true,
+			prefix:               "ns-",
+			expectedDestination:  "ns-bar",
+		},
+	}
+
+	for name, s := range namespaceConfig {
+		t.Run(name, func(t *testing.T) {
+			input := &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name: "name",
+								},
+								{
+									Name:      "other-name",
+									Namespace: "other",
+								},
+							},
+						},
+					},
+				},
+			}
+			output := &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Namespace: s.expectedDestination,
+								},
+								{
+									Name:      "other-name",
+									Namespace: "other",
+								},
+							},
+						},
+					},
+				},
+			}
+			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			require.True(t, cmp.Equal(input, output))
 		})
 	}
 }

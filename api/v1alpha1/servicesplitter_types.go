@@ -170,6 +170,12 @@ func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 	return nil
 }
 
+// DefaultNamespaceFields has no behaviour here as service-splitter have namespace fields
+// that do not default.
+func (in *ServiceSplitter) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+	return
+}
+
 func (in ServiceSplits) toConsul() []capi.ServiceSplit {
 	var consulServiceSplits []capi.ServiceSplit
 	for _, split := range in {
@@ -196,7 +202,6 @@ func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.Erro
 			if s.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("namespace"), s.Namespace, `Consul Enterprise namespaces must be enabled to set split.namespace`))
 			}
-
 		}
 	}
 	return errs
