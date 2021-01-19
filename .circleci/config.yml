@@ -253,7 +253,7 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-  acceptance-aks-1-19:
+  acceptance-aks-1-18:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -605,7 +605,7 @@ workflows:
       - acceptance-openshift
       - acceptance-gke-1-16
       - acceptance-eks-1-17
-#      - acceptance-aks-1-19
+      - acceptance-aks-1-18
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
