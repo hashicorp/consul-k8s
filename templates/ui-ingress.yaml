@@ -1,3 +1,4 @@
+{{- if (and (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.enabled | toString) "-") .Values.ui.enabled) (and (eq (.Values.ui.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.service.enabled | toString) "-") .Values.ui.service.enabled) (and (eq (.Values.ui.service.enabled | toString) "-") .Values.global.enabled))) }}
 {{- if (and (ne (.Values.ui.ingress.enabled | toString) "-") .Values.ui.ingress.enabled) }}
 {{- $serviceName := printf "%s-%s" (include "consul.fullname" .) "ui" -}}
 apiVersion: extensions/v1beta1
@@ -10,28 +11,44 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: ui
   {{- if .Values.ui.ingress.annotations }}
   annotations:
     {{ tpl .Values.ui.ingress.annotations . | nindent 4 | trim }}
   {{- end}}
 spec:
   rules:
-    {{- range .Values.ui.ingress.hosts }}
-    - host: {{ . }}
-      http:
-        paths:
-          - backend:
-              serviceName: {{ $serviceName }}
-              servicePort: 80
-    {{- end -}}
+  {{ $global := .Values.global }}
+  {{- range .Values.ui.ingress.hosts }}
+  - host: {{ .host | quote }}
+    http:
+      paths:
+      {{- if (or (not $global.tls.enabled) (not $global.tls.httpsOnly)) }}
+      {{- range (.paths | default (list "/")) }}
+      - backend:
+          serviceName: {{ $serviceName }}
+          servicePort: 80
+        path: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if $global.tls.enabled }}
+      {{- range (.paths | default (list "/")) }}
+      - backend:
+          serviceName: {{ $serviceName }}
+          servicePort: 443
+        path: {{ . }}
+      {{- end }}
+      {{- end }}
+  {{- end -}}
   {{- if .Values.ui.ingress.tls }}
   tls:
-    {{- range $value := .Values.ui.ingress.tls }}
-    - hosts:
-      {{- range $value.hosts }}
-      - {{ . }}
-      {{- end }}
-      secretName: {{ $value.secretName }}
+  {{- range .Values.ui.ingress.tls }}
+  - hosts:
+    {{- range .hosts }}
+    - {{ . | quote }}
     {{- end }}
+    secretName: {{ .secretName }}
   {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}

@@ -955,12 +955,16 @@ ui:
     # The value below is an array of objects, examples are shown below.
     tls: []
       # - hosts:
-      #   - sslexample.foo.com
-    #   secretName: testsecret-tls
+      #   - host: chart-example.local
+      #     paths: []
+      #   secretName: testsecret-tls
 
     # This should be a multi-line string mapping directly to the a map of
     # the annotations to configure some options depending on the Ingress controller
     annotations: null
+    # |
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
 
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
