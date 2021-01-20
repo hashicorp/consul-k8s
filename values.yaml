@@ -941,30 +941,50 @@ ui:
     # @type: string
     additionalSpec: null
 
-  ## True if you want to create an Ingress for the Consul UI.
+  # Configure Ingress for the Consul UI.
   ingress:
+    # This will create an Ingress resource for the Consul UI.
+    # @type: boolean
     enabled: false
 
     # hosts is a list of host name to create Ingress rules.
     # The value below is an array of objects, examples are shown below.
+    #
+    # ```yaml
+    # hosts:
+    #   - host: foo.bar
+    #     paths:
+    #       - /example
+    #       - /test
+    # ```
+    #
+    # @type: array<map>
     hosts: []
-    # - sslexample.foo.com
 
     # tls is a list of hosts and secret name in an Ingress
     # which tells the Ingress controller to secure the channel.
     # The value below is an array of objects, examples are shown below.
+    #
+    # ```yaml
+    # tls:
+    #   - hosts:
+    #     - host: chart-example.local
+    #       paths: []
+    #     secretName: testsecret-tls
+    # ```
+    # @type: array<map>
     tls: []
-      # - hosts:
-      #   - host: chart-example.local
-      #     paths: []
-      #   secretName: testsecret-tls
 
-    # This should be a multi-line string mapping directly to the a map of
-    # the annotations to configure some options depending on the Ingress controller
+    # Annotations to apply to the UI ingress.
+    #
+    # Example:
+    #
+    # ```yaml
+    # annotations: |
+    #   'annotation-key': annotation-value
+    # ```
+    # @type: string
     annotations: null
-    # |
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
 
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
