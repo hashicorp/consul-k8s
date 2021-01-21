@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -132,6 +133,24 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 				// parse the optional datacenter
 				if len(parts) > 2 {
 					datacenter = strings.TrimSpace(parts[2])
+
+					// Check if there's a proxy defaults config with mesh gateway
+					// mode set to local or remote. This helps users from
+					// accidentally forgetting to set a mesh gateway mode
+					// and then being confused as to why their traffic isn't
+					// routing.
+					entry, _, err := h.ConsulClient.ConfigEntries().Get(capi.ProxyDefaults, capi.ProxyConfigGlobal, nil)
+					if err != nil && strings.Contains(err.Error(), "Unexpected response code: 404") {
+						return corev1.Container{}, fmt.Errorf("upstream %q is invalid: there is no ProxyDefaults config to set mesh gateway mode", raw)
+					} else if err == nil {
+						mode := entry.(*capi.ProxyConfigEntry).MeshGateway.Mode
+						if mode != capi.MeshGatewayModeLocal && mode != capi.MeshGatewayModeRemote {
+							return corev1.Container{}, fmt.Errorf("upstream %q is invalid: ProxyDefaults mesh gateway mode is neither %q nor %q", raw, capi.MeshGatewayModeLocal, capi.MeshGatewayModeRemote)
+						}
+					}
+					// NOTE: If we can't reach Consul we don't error out because
+					// that would fail the pod scheduling and this is a nice-to-have
+					// check, not something that should block during a Consul hiccup.
 				}
 			}
 
