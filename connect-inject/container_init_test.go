@@ -591,7 +591,29 @@ services {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			var h Handler
+			// Create a Consul server/client and proxy-defaults config because
+			// the handler will call out to Consul if the upstream uses a datacenter.
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(err)
+			written, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			}, nil)
+			require.NoError(err)
+			require.True(written)
+
+			h := Handler{
+				ConsulClient: consulClient,
+			}
 			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
@@ -1013,6 +1035,28 @@ cp /bin/consul /consul/connect-inject/consul`,
 			require := require.New(t)
 
 			h := tt.Handler
+
+			// Create a Consul server/client and proxy-defaults config because
+			// the handler will call out to Consul if the upstream uses a datacenter.
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(err)
+			written, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			}, nil)
+			require.NoError(err)
+			require.True(written)
+			h.ConsulClient = consulClient
+
 			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
