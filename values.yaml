@@ -942,13 +942,16 @@ ui:
     additionalSpec: null
 
   # Configure Ingress for the Consul UI.
+  # If `global.tls.enabled` is set to `true`, the Ingress will expose
+  # the port 443 on the UI service. Please ensure the Ingress Controller
+  # supports SSL pass-through and it is enabled to ensure traffic forwarded
+  # to port 443 has not been TLS terminated.
   ingress:
     # This will create an Ingress resource for the Consul UI.
     # @type: boolean
     enabled: false
 
     # hosts is a list of host name to create Ingress rules.
-    # The value below is an array of objects, examples are shown below.
     #
     # ```yaml
     # hosts:
@@ -963,13 +966,11 @@ ui:
 
     # tls is a list of hosts and secret name in an Ingress
     # which tells the Ingress controller to secure the channel.
-    # The value below is an array of objects, examples are shown below.
     #
     # ```yaml
     # tls:
     #   - hosts:
-    #     - host: chart-example.local
-    #       paths: []
+    #     - chart-example.local
     #     secretName: testsecret-tls
     # ```
     # @type: array<map>
