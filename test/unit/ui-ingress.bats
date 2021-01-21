@@ -59,7 +59,7 @@ load _helpers
   [ "${actual}" = "foo.com" ]
 }
 
-@test "ui/Ingress: port 80 when global.tls.enabled=false enables http port" {
+@test "ui/Ingress: exposes single port 80 when global.tls.enabled=false" {
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -70,7 +70,7 @@ load _helpers
   [ "${actual}" = "80" ]
 }
 
-@test "ui/Ingress: port 80 when global.tls.enabled=true and global.tls.httpsOnly=true enables https port" {
+@test "ui/Ingress: exposes single port 443 when global.tls.enabled=true and global.tls.httpsOnly=true" {
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -81,7 +81,7 @@ load _helpers
   [ "${actual}" = "443" ]
 }
 
-@test "ui/Ingress: port 80 when global.tls.enabled=true and global.tls.httpsOnly=false enables http port" {
+@test "ui/Ingress: exposes the port 80 when global.tls.enabled=true and global.tls.httpsOnly=false" {
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -93,7 +93,7 @@ load _helpers
   [ "${actual}" = "80" ]
 }
 
-@test "ui/Ingress: port 80 when global.tls.enabled=true and global.tls.httpsOnly=false enables https port" {
+@test "ui/Ingress: exposes the port 443 when global.tls.enabled=true and global.tls.httpsOnly=false" {
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
