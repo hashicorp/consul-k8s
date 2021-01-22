@@ -1,9 +1,13 @@
 ## Unreleased
 
+## 0.29.0 (Jan 22, 2021)
+
 IMPROVEMENTS:
 * Use `consul-k8s` subcommand to perform `tls-init` job. This allows for server certificates to get rotated on subsequent runs.
-  Consul servers have to be restarted in order for them to update their server certificates [[GH-749](https://github.com/hashicorp/consul-helm/pull/721)]
-* Add support for Ingress resource for Consul UI [[GH-774](https://github.com/hashicorp/consul-helm/pull/774)]
+  Consul servers have to be restarted in order for them to update their server certificates. [[GH-749](https://github.com/hashicorp/consul-helm/pull/721)]
+* Add support for Ingress resource for Consul UI. [[GH-774](https://github.com/hashicorp/consul-helm/pull/774)]
+* Updated the default Consul image to `hashicorp/consul:1.9.2`.
+* Updated the default consul-k8s image to `hashicorp/consul-k8s:0.23.0`.
 
 BUG FIXES:
 * Consul servers no longer call `consul leave` command when restarted or deleted.
@@ -12,6 +16,9 @@ BUG FIXES:
   [[GH-764](https://github.com/hashicorp/consul-helm/pull/764)]
 
 ## 0.28.0 (Dec 21, 2020)
+⚠️  This release defaults the Consul image to 1.9.1, which panics on upgrades
+([Issue](https://github.com/hashicorp/consul/issues/9566)). We recommend using
+Consul-helm 0.29.0+ or updating the Consul image to 1.9.2+. ⚠️
 
 BREAKING CHANGES:
 * Setting `server.bootstrapExpect` to a value less than `server.replicas` will now
@@ -56,6 +63,9 @@ BUG FIXES:
 * Remove unused ports `8302` and `8300` from the client daemonset pods. [[GH-737](https://github.com/hashicorp/consul-helm/pull/737)]
 
 ## 0.27.0 (Nov 25, 2020)
+⚠️  This release defaults the Consul image to 1.9.0, which panics on upgrades
+([Issue](https://github.com/hashicorp/consul/issues/9566)). We recommend using
+Consul-helm 0.29.0+ or updating the Consul image to 1.9.2+. ⚠️
 
 IMPROVEMENTS:
 * Connect: support `connectInject.logLevel` setting. [[GH-699](https://github.com/hashicorp/consul-helm/pull/699)]
