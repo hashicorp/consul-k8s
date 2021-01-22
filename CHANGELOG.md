@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.23.0 (January 22, 2021)
 
 BUG FIXES:
 * CRDs: Fix issue where a `ServiceIntentions` resource could be continually resynced with Consul
