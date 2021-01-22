@@ -1205,6 +1205,65 @@ cp /bin/consul /consul/connect-inject/consul`,
 	}
 }
 
+// Test that we can override the command template
+func TestHandlerContainerInit_CommandTpl(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		InitContainerCommandTpl: `
+# Specific template
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${SERVICE_ID}"
+  name = "{{ .ServiceName }}-specific"
+  address = "${POD_IP}"
+  port = {{ .ServicePort }}
+  {{- if .ConsulNamespace }}
+  namespace = "{{ .ConsulNamespace }}"
+  {{- end }}
+  {{- if .Tags}}
+  tags = {{.Tags}}
+  {{- end}}
+  meta = {
+    {{- if .Meta}}
+    {{- range $key, $value := .Meta }}
+    {{$key}} = "{{$value}}"
+    {{- end }}
+    {{- end }}
+    pod-name = "${POD_NAME}"
+  }
+}`,
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(pod, k8sNamespace)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `# Specific template
+cat <<EOF >/consul/connect-inject/service.hcl
+services {
+  id   = "${SERVICE_ID}"
+  name = "foo-specific"
+  address = "${POD_IP}"
+  port = 0
+  meta = {
+    pod-name = "${POD_NAME}"
+  }
+}`)
+}
+
 // Test that we write service-defaults config and use the default protocol.
 func TestHandlerContainerInit_writeServiceDefaultsDefaultProtocol(t *testing.T) {
 	require := require.New(t)

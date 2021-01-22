@@ -185,6 +185,12 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		volMounts = append(volMounts, saTokenVolumeMount)
 	}
 
+	// Get the command template
+	initContainerCommandTpl := defaultInitContainerCommandTpl
+	if h.InitContainerCommandTpl != "" {
+		initContainerCommandTpl = h.InitContainerCommandTpl
+	}
+
 	// Render the command
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
@@ -242,7 +248,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 // Note: the order of the services in the service.hcl file is important,
 // and the connect-proxy service should come after the "main" service
 // because its alias health check depends on the main service to exist.
-const initContainerCommandTpl = `
+const defaultInitContainerCommandTpl = `
 {{- if .ConsulCACert}}
 export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
 export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
