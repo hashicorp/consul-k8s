@@ -16,7 +16,7 @@ BUG FIXES:
   [[GH-764](https://github.com/hashicorp/consul-helm/pull/764)]
 
 BREAKING CHANGES:
-* The follow Helm settings are no longer supported and will cause errors on `helm upgrade`.
+* The following Helm settings are no longer supported and will cause errors on `helm upgrade`.
   See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
   for more information on how to upgrade. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)]
   * `connectInject.centralConfig.defaultProtocol`
