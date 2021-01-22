@@ -226,13 +226,6 @@ spec:
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
             {{- end }}
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - /bin/sh
-                - -c
-                - consul leave
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - containerPort: 8500
