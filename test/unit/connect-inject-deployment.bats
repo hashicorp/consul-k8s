@@ -113,6 +113,17 @@ load _helpers
   [[ "$output" =~ "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
 }
 
+@test "connectInject/Deployment: does not fail if connectInject.centralConfig.enabled is set to true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.centralConfig.enabled=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "connectInject/Deployment: does not fail if connectInject.centralConfig.proxyDefaults is set to {}" {
   cd `chart_dir`
 
