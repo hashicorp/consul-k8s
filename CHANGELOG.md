@@ -4,6 +4,12 @@ IMPROVEMENTS:
 * Use `consul-k8s` subcommand to perform `tls-init` job. This allows for server certificates to get rotated on subsequent runs.
   Consul servers have to be restarted in order for them to update their server certificates [[GH-749](https://github.com/hashicorp/consul-helm/pull/721)]
 
+BUG FIXES:
+* Consul servers no longer call `consul leave` command when restarted or deleted.
+  This is because `consul leave` reduces the quorum size, but we want to maintain the quorum size.
+  For example, for a server with 3 replicas the quorum size should always be 2.
+  [[GH-764](https://github.com/hashicorp/consul-helm/pull/764)]
+
 ## 0.28.0 (Dec 21, 2020)
 
 BREAKING CHANGES:
