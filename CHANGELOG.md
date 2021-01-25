@@ -1,19 +1,5 @@
 ## UNRELEASED
 
-## 0.23.0 (January 22, 2021)
-
-BUG FIXES:
-* CRDs: Fix issue where a `ServiceIntentions` resource could be continually resynced with Consul
-  because Consul's internal representation had a different order for an array than the Kubernetes resource. [[GH-416](https://github.com/hashicorp/consul-k8s/pull/416)] 
-* CRDs: **(Consul Enterprise only)** default the `namespace` fields on resources where Consul performs namespace defaulting to prevent constant re-syncing.
-  [[GH-413](https://github.com/hashicorp/consul-k8s/pull/413)]
-
-IMPROVEMENTS:
-* ACLs: give better error if policy that consul-k8s tries to update was created manually by user. [[GH-412](https://github.com/hashicorp/consul-k8s/pull/412)]
-
-FEATURES:
-* TLS: add `tls-init` command that is responsible for creating and updating Server TLS certificates. [[GH-410](https://github.com/hashicorp/consul-k8s/pull/410)]
-
 BREAKING CHANGES
 * Connect: the `-default-protocol` and `-enable-central-config` flags are no longer supported.
   The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is also
@@ -41,6 +27,20 @@ BREAKING CHANGES
   spec:
     protocol: "http"
   ```
+
+## 0.23.0 (January 22, 2021)
+
+BUG FIXES:
+* CRDs: Fix issue where a `ServiceIntentions` resource could be continually resynced with Consul
+  because Consul's internal representation had a different order for an array than the Kubernetes resource. [[GH-416](https://github.com/hashicorp/consul-k8s/pull/416)] 
+* CRDs: **(Consul Enterprise only)** default the `namespace` fields on resources where Consul performs namespace defaulting to prevent constant re-syncing.
+  [[GH-413](https://github.com/hashicorp/consul-k8s/pull/413)]
+
+IMPROVEMENTS:
+* ACLs: give better error if policy that consul-k8s tries to update was created manually by user. [[GH-412](https://github.com/hashicorp/consul-k8s/pull/412)]
+
+FEATURES:
+* TLS: add `tls-init` command that is responsible for creating and updating Server TLS certificates. [[GH-410](https://github.com/hashicorp/consul-k8s/pull/410)]
 
 ## 0.22.0 (December 21, 2020)
 
