@@ -27,6 +27,15 @@ BREAKING CHANGES
   spec:
     protocol: "http"
   ```
+* Connect: pods using an upstream that references a datacenter, e.g.
+  `consul.hashicorp.com/connect-service-upstreams: service:8080:dc2` will
+  error during injection if Consul does not have a `proxy-defaults` config entry
+  with a [mesh gateway mode](https://www.consul.io/docs/connect/config-entries/proxy-defaults#mode)
+  set to `local` or `remote`. [[GH-421](https://github.com/hashicorp/consul-k8s/pull/421)]
+
+  In practice, this would have already been causing issues since without that
+  config setting, traffic wouldn't have been routed through mesh gateways and
+  so would not be actually making it to the other service.
 
 FEATURES:
 * CRDs: support annotation `consul.hashicorp.com/migrate-entry` on custom resources

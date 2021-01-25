@@ -1906,6 +1906,7 @@ func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientse
 		c.ACL.Tokens.Master = masterToken
 	})
 	require.NoError(t, err)
+	svr.WaitForActiveCARoot(t)
 
 	return k8s, svr
 }
