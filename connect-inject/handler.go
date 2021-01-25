@@ -26,10 +26,10 @@ const (
 	// a pod after an injection is done.
 	annotationStatus = "consul.hashicorp.com/connect-inject-status"
 
-	// annotationInject is the key of the annotation that controls whether
+	// AnnotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
-	annotationInject = "consul.hashicorp.com/connect-inject"
+	AnnotationInject = "consul.hashicorp.com/connect-inject"
 
 	// annotationService is the name of the service to proxy. This defaults
 	// to the name of the first container.
@@ -496,7 +496,7 @@ func (h *Handler) shouldInject(pod *corev1.Pod, namespace string) (bool, error) 
 	// If the explicit true/false is on, then take that value. Note that
 	// this has to be the last check since it sets a default value after
 	// all other checks.
-	if raw, ok := pod.Annotations[annotationInject]; ok {
+	if raw, ok := pod.Annotations[AnnotationInject]; ok {
 		return strconv.ParseBool(raw)
 	}
 

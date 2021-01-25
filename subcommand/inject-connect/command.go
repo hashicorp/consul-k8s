@@ -25,12 +25,20 @@ import (
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
+	"go.uber.org/zap/zapcore"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type Command struct {
@@ -104,6 +112,18 @@ type Command struct {
 	once  sync.Once
 	help  string
 	cert  atomic.Value
+}
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	//+kubebuilder:scaffold:scheme
 }
 
 func (c *Command) init() {
@@ -422,6 +442,45 @@ func (c *Command) Run(args []string) int {
 			serverErrors <- err
 		}
 	}()
+
+	// Start the endpoints controller
+	{
+		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+		ctrl.SetLogger(zapLogger)
+		klog.SetLogger(zapLogger)
+		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+			Scheme:             scheme,
+			LeaderElection:     false,
+			Logger:             zapLogger,
+			MetricsBindAddress: "0.0.0.0:9444",
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to start manager")
+			return 1
+		}
+
+		if err = (&connectinject.EndpointsController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("service-controller"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+			return 1
+		}
+
+		// todo: figure out proper signal handling
+		go func() {
+			if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+				setupLog.Error(err, "problem running manager")
+			}
+			// If ctl.Run() exits before ctx is cancelled, then our health checks
+			// controller isn't running. In that case we need to shutdown since
+			// this is unrecoverable.
+			//if ctx.Err() == nil {
+			//	ctrlExitCh <- fmt.Errorf("health checks controller exited unexpectedly")
+			//}
+		}()
+	}
 
 	// Start the cleanup controller that cleans up Consul service instances
 	// still registered after the pod has been deleted (usually due to a force delete).

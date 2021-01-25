@@ -194,7 +194,7 @@ func TestHandlerHandle(t *testing.T) {
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
-							annotationInject: "false",
+							AnnotationInject: "false",
 						},
 					},
 
@@ -216,7 +216,7 @@ func TestHandlerHandle(t *testing.T) {
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
-							annotationInject: "t",
+							AnnotationInject: "t",
 						},
 					},
 
