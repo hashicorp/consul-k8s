@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -589,7 +591,29 @@ services {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			var h Handler
+			// Create a Consul server/client and proxy-defaults config because
+			// the handler will call out to Consul if the upstream uses a datacenter.
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(err)
+			written, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			}, nil)
+			require.NoError(err)
+			require.True(written)
+
+			h := Handler{
+				ConsulClient: consulClient,
+			}
 			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
@@ -1011,6 +1035,28 @@ cp /bin/consul /consul/connect-inject/consul`,
 			require := require.New(t)
 
 			h := tt.Handler
+
+			// Create a Consul server/client and proxy-defaults config because
+			// the handler will call out to Consul if the upstream uses a datacenter.
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(err)
+			written, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			}, nil)
+			require.NoError(err)
+			require.True(written)
+			h.ConsulClient = consulClient
+
 			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
@@ -1198,4 +1244,136 @@ func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsDis
 
 	_, err := h.containerInit(pod, k8sNamespace)
 	require.NoError(err)
+}
+
+// Test errors for when the mesh gateway mode isn't local or remote and an
+// upstream is using a datacenter.
+func TestHandlerContainerInit_MeshGatewayModeErrors(t *testing.T) {
+	cases := map[string]struct {
+		ConsulDown         bool
+		UpstreamAnnotation string
+		ProxyDefaults      *capi.ProxyConfigEntry
+		ExpError           string
+	}{
+		"no upstreams": {
+			UpstreamAnnotation: "",
+			ProxyDefaults:      nil,
+			ExpError:           "",
+		},
+		"upstreams without datacenter": {
+			UpstreamAnnotation: "foo:1234,bar:4567",
+			ProxyDefaults:      nil,
+			ExpError:           "",
+		},
+		"no proxy defaults": {
+			UpstreamAnnotation: "foo:1234:dc2",
+			ProxyDefaults:      nil,
+			ExpError:           "upstream \"foo:1234:dc2\" is invalid: there is no ProxyDefaults config to set mesh gateway mode",
+		},
+		"consul is down but upstream does not have datacenter": {
+			ConsulDown:         true,
+			UpstreamAnnotation: "foo:1234",
+			ExpError:           "",
+		},
+		"consul is down": {
+			ConsulDown:         true,
+			UpstreamAnnotation: "foo:1234:dc2",
+			ExpError:           "",
+		},
+		"mesh gateway mode is empty": {
+			UpstreamAnnotation: "foo:1234:dc2",
+			ProxyDefaults: &capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: "",
+				},
+			},
+			ExpError: "upstream \"foo:1234:dc2\" is invalid: ProxyDefaults mesh gateway mode is neither \"local\" nor \"remote\"",
+		},
+		"mesh gateway mode is none": {
+			UpstreamAnnotation: "foo:1234:dc2",
+			ProxyDefaults: &capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeNone,
+				},
+			},
+			ExpError: "upstream \"foo:1234:dc2\" is invalid: ProxyDefaults mesh gateway mode is neither \"local\" nor \"remote\"",
+		},
+		"mesh gateway mode is local": {
+			UpstreamAnnotation: "foo:1234:dc2",
+			ProxyDefaults: &capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeLocal,
+				},
+			},
+			ExpError: "",
+		},
+		"mesh gateway mode is remote": {
+			UpstreamAnnotation: "foo:1234:dc2",
+			ProxyDefaults: &capi.ProxyConfigEntry{
+				Kind: capi.ProxyDefaults,
+				Name: capi.ProxyConfigGlobal,
+				MeshGateway: capi.MeshGatewayConfig{
+					Mode: capi.MeshGatewayModeRemote,
+				},
+			},
+			ExpError: "",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+
+			httpAddr := consul.HTTPAddr
+			if c.ConsulDown {
+				httpAddr = "hostname.does.not.exist"
+			}
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: httpAddr,
+			})
+			require.NoError(err)
+
+			if c.ProxyDefaults != nil {
+				written, _, err := consulClient.ConfigEntries().Set(c.ProxyDefaults, nil)
+				require.NoError(err)
+				require.True(written)
+			}
+
+			h := Handler{
+				ConsulClient: consulClient,
+			}
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService:   "foo",
+						annotationUpstreams: c.UpstreamAnnotation,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "foo",
+						},
+					},
+				},
+			}
+			_, err = h.containerInit(pod, k8sNamespace)
+			if c.ExpError == "" {
+				require.NoError(err)
+			} else {
+				require.EqualError(err, c.ExpError)
+			}
+		})
+	}
+
 }
