@@ -2701,3 +2701,139 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	}
 	require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
 }
+
+// Test that if the resource already exists in Consul but the Kube resource
+// has the "migrate-entry" annotation then we let the Kube resource sync to Consul.
+func TestConfigEntryController_Migration(t *testing.T) {
+	kubeNS := "default"
+	protocol := "http"
+	cfgEntryName := "service"
+
+	cases := map[string]struct {
+		KubeResource   v1alpha1.ServiceDefaults
+		ConsulResource capi.ServiceConfigEntry
+		ExpErr         string
+	}{
+		"identical resources should be migrated successfully": {
+			KubeResource: v1alpha1.ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cfgEntryName,
+					Namespace: kubeNS,
+					Annotations: map[string]string{
+						common.MigrateEntryKey: "true",
+					},
+				},
+				Spec: v1alpha1.ServiceDefaultsSpec{
+					Protocol: protocol,
+				},
+			},
+			ConsulResource: capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     cfgEntryName,
+				Protocol: protocol,
+			},
+		},
+		"different resources (protocol) should not be migrated": {
+			KubeResource: v1alpha1.ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cfgEntryName,
+					Namespace: kubeNS,
+					Annotations: map[string]string{
+						common.MigrateEntryKey: "true",
+					},
+				},
+				Spec: v1alpha1.ServiceDefaultsSpec{
+					Protocol: "tcp",
+				},
+			},
+			ConsulResource: capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     cfgEntryName,
+				Protocol: protocol,
+			},
+			ExpErr: "migration failed: Kubernetes resource does not match existing Consul config entry",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
+
+			client := fake.NewFakeClientWithScheme(s, &c.KubeResource)
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(t, err)
+
+			// Create the service-defaults in Consul.
+			success, _, err := consulClient.ConfigEntries().Set(&c.ConsulResource, nil)
+			require.NoError(t, err)
+			require.True(t, success, "config entry was not created")
+
+			// Set up the reconciler.
+			logger := logrtest.TestLogger{T: t}
+			svcDefaultsReconciler := ServiceDefaultsController{
+				Client: client,
+				Log:    logger,
+				ConfigEntryController: &ConfigEntryController{
+					ConsulClient:   consulClient,
+					DatacenterName: datacenterName,
+				},
+			}
+
+			defaultsNamespacedName := types.NamespacedName{
+				Namespace: kubeNS,
+				Name:      cfgEntryName,
+			}
+
+			// Trigger the reconciler.
+			resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+			if c.ExpErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), c.ExpErr)
+			} else {
+				require.NoError(t, err)
+				require.False(t, resp.Requeue)
+			}
+
+			entryAfterReconcile := &v1alpha1.ServiceDefaults{}
+			err = client.Get(ctx, defaultsNamespacedName, entryAfterReconcile)
+			require.NoError(t, err)
+
+			syncCondition := entryAfterReconcile.GetCondition(v1alpha1.ConditionSynced)
+			if c.ExpErr != "" {
+				// Ensure the status of the resource is migration failed.
+				require.Equal(t, corev1.ConditionFalse, syncCondition.Status)
+				require.Equal(t, MigrationFailedError, syncCondition.Reason)
+				require.Contains(t, syncCondition.Message, c.ExpErr)
+
+				// Check that the Consul resource hasn't changed.
+				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, cfgEntryName, nil)
+				require.NoError(t, err)
+				require.NotContains(t, entry.GetMeta(), common.DatacenterKey)
+				require.Equal(t, protocol, entry.(*capi.ServiceConfigEntry).Protocol)
+			} else {
+				// Ensure the status of the resource is synced.
+				expectedCondition := &v1alpha1.Condition{
+					Type:   v1alpha1.ConditionSynced,
+					Status: corev1.ConditionTrue,
+				}
+				require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
+
+				// Ensure the Consul resource has the expected metadata.
+				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, cfgEntryName, nil)
+				require.NoError(t, err)
+				require.Contains(t, entry.GetMeta(), common.DatacenterKey)
+				require.Equal(t, "datacenter", entry.GetMeta()[common.DatacenterKey])
+			}
+		})
+	}
+}

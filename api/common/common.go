@@ -15,7 +15,9 @@ const (
 	DefaultConsulNamespace string = "default"
 	WildcardNamespace      string = "*"
 
-	SourceKey     string = "external-source"
-	DatacenterKey string = "consul.hashicorp.com/source-datacenter"
-	SourceValue   string = "kubernetes"
+	SourceKey        string = "external-source"
+	DatacenterKey    string = "consul.hashicorp.com/source-datacenter"
+	MigrateEntryKey  string = "consul.hashicorp.com/migrate-entry"
+	MigrateEntryTrue string = "true"
+	SourceValue      string = "kubernetes"
 )
