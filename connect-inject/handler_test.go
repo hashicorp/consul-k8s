@@ -407,7 +407,7 @@ func TestHandler_ErrorsOnProtocolAnnotations(t *testing.T) {
 
 	response := handler.Mutate(&request)
 	require.False(response.Allowed)
-	require.Equal(response.Result.Message, "Error validating pod: the consul.hashicorp.com/connect-service-protocol annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)")
+	require.Equal(response.Result.Message, "Error validating pod: the \"consul.hashicorp.com/connect-service-protocol\" annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)")
 }
 
 // Test that an incorrect content type results in an error.
