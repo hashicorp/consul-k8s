@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/testutil"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
+	ctestutil "github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
@@ -193,17 +194,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-
-			// Set up consul server
-			a, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(err)
-			defer a.Stop()
-
-			// Set up consul client
-			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-			})
-			require.NoError(err)
+			client := testutil.NewConsulTestServer(t, nil)
 
 			// Add the client to the test's handler
 			tt.Handler.ConsulClient = client
@@ -419,7 +410,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			// Set up consul server
-			a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			a, err := ctestutil.NewTestServerConfigT(t, func(c *ctestutil.TestServerConfig) {
 				c.ACL.Enabled = true
 			})
 			defer a.Stop()
@@ -544,17 +535,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
-
-			// Set up consul server
-			a, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(err)
-			defer a.Stop()
-
-			// Set up consul client
-			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPAddr,
-			})
-			require.NoError(err)
+			client := testutil.NewConsulTestServer(t, nil)
 
 			handler := Handler{
 				Log:                        hclog.Default().Named("handler"),
