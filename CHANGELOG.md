@@ -1,5 +1,22 @@
 ## Unreleased
 
+BREAKING CHANGES:
+* The following Helm settings are no longer supported and will cause errors on `helm upgrade`.
+  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
+  for more information on how to upgrade. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)]
+  * `connectInject.centralConfig.defaultProtocol`
+  * `connectInject.centralConfig.proxyDefaults`
+  * `connectInject.centralConfig.enabled`
+  * `meshGateway.globalMode`
+* The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is
+  no longer supported with this version of `consul-k8s` (0.23.0).
+
+  Current deployments that have the annotation should remove it, otherwise they
+  will get an error if a pod from that deployment is rescheduled.
+
+  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
+  for more information on how to upgrade.
+
 ## 0.29.0 (Jan 22, 2021)
 
 IMPROVEMENTS:
@@ -14,23 +31,6 @@ BUG FIXES:
   This is because `consul leave` reduces the quorum size, but we want to maintain the quorum size.
   For example, for a server with 3 replicas the quorum size should always be 2.
   [[GH-764](https://github.com/hashicorp/consul-helm/pull/764)]
-
-BREAKING CHANGES:
-* The following Helm settings are no longer supported and will cause errors on `helm upgrade`.
-  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
-  for more information on how to upgrade. [[GH-763](https://github.com/hashicorp/consul-helm/pull/763)]
-  * `connectInject.centralConfig.defaultProtocol`
-  * `connectInject.centralConfig.proxyDefaults`
-  * `connectInject.centralConfig.enabled`
-  * `meshGateway.globalMode`
-* The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is
-  no longer supported with this version of `consul-k8s` (0.23.0).
-
-  Current deployments that have the annotation should remove it, otherwise they
-  will get an error if a pod from that deployment is rescheduled.
-  
-  See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
-  for more information on how to upgrade.
 
 ## 0.28.0 (Dec 21, 2020)
 ⚠️  This release defaults the Consul image to 1.9.1, which panics on upgrades
