@@ -17,6 +17,9 @@ BREAKING CHANGES:
   See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
   for more information on how to upgrade.
 
+BUG FIXES:
+* Fix API version of Ingress resource for Consul UI. [[GH-786](https://github.com/hashicorp/consul-helm/pull/786)]
+
 ## 0.29.0 (Jan 22, 2021)
 
 IMPROVEMENTS:

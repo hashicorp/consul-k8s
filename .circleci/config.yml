@@ -22,7 +22,7 @@ jobs:
           command: bats ./test/unit
   unit-helm3:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.8.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
 
     steps:
       - checkout
@@ -174,7 +174,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.8.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
 
     steps:
       - run:
@@ -258,7 +258,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.8.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
 
     steps:
       - checkout
@@ -329,7 +329,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.8.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
 
     steps:
       - checkout
@@ -419,7 +419,7 @@ jobs:
       - OC_SECONDARY_NAME: consul-helm-test-3737660519
     docker:
       # This image is build from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.8.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
 
     steps:
       - checkout
