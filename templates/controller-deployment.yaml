@@ -83,6 +83,13 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        {{- if (and .Values.controller.aclToken.secretName .Values.controller.aclToken.secretKey) }}
+        - name: CONSUL_HTTP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.controller.aclToken.secretName }}
+              key: {{ .Values.controller.aclToken.secretKey }}
+        {{- end }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN
           valueFrom:
