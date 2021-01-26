@@ -1470,6 +1470,28 @@ controller:
   # Optional priorityClassName.
   priorityClassName: ""
 
+  # Refers to a Kubernetes secret that you have created that contains
+  # an ACL token for your Consul cluster which grants the controller process the correct
+  # permissions. This is only needed if you are managing ACLs yourself (i.e. not using
+  # `global.acls.manageSystemACLs`).
+  #
+  # If running Consul OSS, requires permissions:
+  # ```hcl
+  # operator = "write"
+  # service_prefix "" {
+  #   policy = "write"
+  #   intentions = "write"
+  # }
+  # ```
+  # If running Consul Enterprise, talk to your account manager for assistance.
+  aclToken:
+    # The name of the Kubernetes secret.
+    # @type: string
+    secretName: null
+    # The key of the Kubernetes secret.
+    # @type: string
+    secretKey: null
+
 # Mesh Gateways enable Consul Connect to work across Consul datacenters.
 meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
