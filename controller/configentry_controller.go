@@ -190,11 +190,13 @@ func (r *ConfigEntryController) ReconcileEntry(
 		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 	}
 
+	requiresMigration := false
+	sourceDatacenter := entry.GetMeta()[common.DatacenterKey]
+
 	// Check if the config entry is managed by our datacenter.
 	// Do not process resource if the entry was not created within our datacenter
 	// as it was created in a different cluster which will be managing that config entry.
-	requiresMigration := false
-	if entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
+	if sourceDatacenter != r.DatacenterName {
 
 		// Note that there is a special case where we will migrate a config entry
 		// that wasn't created by the controller if it has the migrate-entry annotation set to true.
@@ -202,7 +204,8 @@ func (r *ConfigEntryController) ReconcileEntry(
 		// chart versions where they had previously created config entries themselves but
 		// now want to manage them through custom resources.
 		if configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
-			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError, fmt.Errorf("config entry managed in different datacenter: %q", entry.GetMeta()[common.DatacenterKey]))
+			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
+				sourceDatacenterMismatchErr(sourceDatacenter))
 		}
 
 		requiresMigration = true
@@ -335,4 +338,17 @@ func containsString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// sourceDatacenterMismatchErr returns an error for when the source datacenter
+// meta key does not match our datacenter. This could be because the config
+// entry was created directly in Consul or because it was created by another
+// controller in another Consul datacenter.
+func sourceDatacenterMismatchErr(sourceDatacenter string) error {
+	// If the datacenter is empty, then they likely created it in Consul
+	// directly (vs. another controller in another DC creating it).
+	if sourceDatacenter == "" {
+		return fmt.Errorf("config entry already exists in Consul")
+	}
+	return fmt.Errorf("config entry managed in different datacenter: %q", sourceDatacenter)
 }
