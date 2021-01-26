@@ -57,9 +57,21 @@ In our CI/CD the tests are run against both Helm 2 and Helm 3.
 ### Running The Tests
 
 #### Unit Tests
-To run the unit tests:
+To run all the unit tests:
 
     bats ./test/unit
+
+To run tests in a specific file:
+
+    bats ./test/unit/<filename>.bats
+
+To run tests in parallel use the `--jobs` flag (requires parallel `brew install parallel`):
+
+    bats ./test/unit/<filename>.bats --jobs 8
+
+To run a specific test by name use the `--filter` flag:
+
+    bats ./test/unit/<filename>.bats --filter "my test name"
 
 #### Acceptance Tests
 
