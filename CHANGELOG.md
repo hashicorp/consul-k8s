@@ -24,6 +24,8 @@ BUG FIXES:
 * Use `rbac.authorization.k8s.io/v1` instead of `rbac.authorization.k8s.io/v1beta1` API version for the `roles` and `rolebindings` used by the `tls-init`
   and `tls-init-cleanup` jobs. [[GH-789](https://github.com/hashicorp/consul-helm/issues/789)]
 * Fix API version of Ingress resource for Consul UI. [[GH-786](https://github.com/hashicorp/consul-helm/pull/786)]
+* Provide a deterministic host-based node ID for the Consul clients to fix an error when a client is terminated without a graceful shutdown.
+  [[GH-791](https://github.com/hashicorp/consul-helm/pull/791)]
 
 ## 0.29.0 (Jan 22, 2021)
 
