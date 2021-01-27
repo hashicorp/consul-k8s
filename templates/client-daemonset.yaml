@@ -30,6 +30,9 @@ spec:
         release: {{ .Release.Name }}
         component: client
         hasDNS: "true"
+        {{- if .Values.client.extraLabels }}
+          {{- toYaml .Values.client.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
