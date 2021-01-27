@@ -180,6 +180,7 @@ spec:
                 -client=0.0.0.0 \
                 -node-meta=pod-name:${HOSTNAME} \
                 -hcl='leave_on_terminate = true' \
+                -disable-host-node-id=false \
                 {{- if .Values.global.tls.enabled }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 {{- if .Values.global.tls.enableAutoEncrypt }}
