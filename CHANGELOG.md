@@ -18,6 +18,8 @@ BREAKING CHANGES:
   for more information on how to upgrade.
 
 BUG FIXES:
+* Use `rbac.authorization.k8s.io/v1` instead of `rbac.authorization.k8s.io/v1beta1` API version for the `roles` and `rolebindings` used by the `tls-init`
+  and `tls-init-cleanup` jobs. [[GH-789](https://github.com/hashicorp/consul-helm/issues/789)]
 * Fix API version of Ingress resource for Consul UI. [[GH-786](https://github.com/hashicorp/consul-helm/pull/786)]
 
 ## 0.29.0 (Jan 22, 2021)
