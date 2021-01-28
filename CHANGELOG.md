@@ -36,6 +36,9 @@ BREAKING CHANGES
   In practice, this would have already been causing issues since without that
   config setting, traffic wouldn't have been routed through mesh gateways and
   so would not be actually making it to the other service.
+* Connect: change meta key for the pod name in the service instance registered with Consul
+  from `pod-name` to `pod_name` so that it can be used with Consul's [filtering](https://www.consul.io/api/features/filtering) APIs.
+  [[GH-427](https://github.com/hashicorp/consul-k8s/pull/427)]
 
 FEATURES:
 * CRDs: support annotation `consul.hashicorp.com/migrate-entry` on custom resources
