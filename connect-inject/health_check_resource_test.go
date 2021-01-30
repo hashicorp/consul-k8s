@@ -554,7 +554,7 @@ func TestReconcile_IgnoreStatuses(t *testing.T) {
 			},
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "consul-connect-envoy-sidecar",
+					Name: "envoy-sidecar",
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode:   0,
@@ -566,7 +566,7 @@ func TestReconcile_IgnoreStatuses(t *testing.T) {
 					Ready: false,
 				},
 				{
-					Name: "consul-connect-lifecycle-sidecar",
+					Name: "consul-sidecar",
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode:   2,
@@ -783,7 +783,7 @@ func testServerAgentResourceAndControllerWithConsulNS(t *testing.T, pod *corev1.
 // non-init containers when init containers are still running.
 var unreadyAppContainers = []corev1.ContainerStatus{
 	{
-		Name: "consul-connect-envoy-sidecar",
+		Name: "envoy-sidecar",
 		State: corev1.ContainerState{
 			Waiting: &corev1.ContainerStateWaiting{
 				Reason: "PodInitializing",
@@ -792,7 +792,7 @@ var unreadyAppContainers = []corev1.ContainerStatus{
 		Ready: false,
 	},
 	{
-		Name: "consul-connect-lifecycle-sidecar",
+		Name: "consul-sidecar",
 		State: corev1.ContainerState{
 			Waiting: &corev1.ContainerStateWaiting{
 				Reason: "PodInitializing",

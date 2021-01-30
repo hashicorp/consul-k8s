@@ -121,37 +121,37 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-cpu-limit=unparseable"},
-			expErr: "-lifecycle-sidecar-cpu-limit 'unparseable' is invalid",
+				"-consul-sidecar-cpu-limit=unparseable"},
+			expErr: "-consul-sidecar-cpu-limit 'unparseable' is invalid",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-cpu-request=unparseable"},
-			expErr: "-lifecycle-sidecar-cpu-request 'unparseable' is invalid",
+				"-consul-sidecar-cpu-request=unparseable"},
+			expErr: "-consul-sidecar-cpu-request 'unparseable' is invalid",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-memory-limit=unparseable"},
-			expErr: "-lifecycle-sidecar-memory-limit 'unparseable' is invalid",
+				"-consul-sidecar-memory-limit=unparseable"},
+			expErr: "-consul-sidecar-memory-limit 'unparseable' is invalid",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-memory-request=unparseable"},
-			expErr: "-lifecycle-sidecar-memory-request 'unparseable' is invalid",
+				"-consul-sidecar-memory-request=unparseable"},
+			expErr: "-consul-sidecar-memory-request 'unparseable' is invalid",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-memory-request=50Mi",
-				"-lifecycle-sidecar-memory-limit=25Mi",
+				"-consul-sidecar-memory-request=50Mi",
+				"-consul-sidecar-memory-limit=25Mi",
 			},
-			expErr: "request must be <= limit: -lifecycle-sidecar-memory-request value of \"50Mi\" is greater than the -lifecycle-sidecar-memory-limit value of \"25Mi\"",
+			expErr: "request must be <= limit: -consul-sidecar-memory-request value of \"50Mi\" is greater than the -consul-sidecar-memory-limit value of \"25Mi\"",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-lifecycle-sidecar-cpu-request=50m",
-				"-lifecycle-sidecar-cpu-limit=25m",
+				"-consul-sidecar-cpu-request=50m",
+				"-consul-sidecar-cpu-limit=25m",
 			},
-			expErr: "request must be <= limit: -lifecycle-sidecar-cpu-request value of \"50m\" is greater than the -lifecycle-sidecar-cpu-limit value of \"25m\"",
+			expErr: "request must be <= limit: -consul-sidecar-cpu-request value of \"50m\" is greater than the -consul-sidecar-cpu-limit value of \"25m\"",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "hashicorpdev/consul-k8s:latest", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
@@ -185,11 +185,11 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagInitContainerMemoryRequest, "25Mi")
 	require.Equal(t, cmd.flagInitContainerMemoryLimit, "150Mi")
 
-	// Lifecycle sidecar container defaults
-	require.Equal(t, cmd.flagLifecycleSidecarCPURequest, "20m")
-	require.Equal(t, cmd.flagLifecycleSidecarCPULimit, "20m")
-	require.Equal(t, cmd.flagLifecycleSidecarMemoryRequest, "25Mi")
-	require.Equal(t, cmd.flagLifecycleSidecarMemoryLimit, "50Mi")
+	// Consul sidecar container defaults
+	require.Equal(t, cmd.flagConsulSidecarCPURequest, "20m")
+	require.Equal(t, cmd.flagConsulSidecarCPULimit, "20m")
+	require.Equal(t, cmd.flagConsulSidecarMemoryRequest, "25Mi")
+	require.Equal(t, cmd.flagConsulSidecarMemoryLimit, "50Mi")
 }
 
 func TestRun_ValidationHealthCheckEnv(t *testing.T) {

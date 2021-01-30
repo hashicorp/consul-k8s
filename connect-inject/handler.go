@@ -72,7 +72,7 @@ const (
 	annotationMeta = "consul.hashicorp.com/service-meta-"
 
 	// annotationSyncPeriod controls the -sync-period flag passed to the
-	// consul-k8s lifecycle-sidecar command. This flag controls how often the
+	// consul-k8s consul-sidecar command. This flag controls how often the
 	// service is synced (i.e. re-registered) with the local agent.
 	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
 
@@ -117,7 +117,7 @@ type Handler struct {
 	ImageEnvoy  string
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
-	// This image is used for the lifecycle-sidecar container.
+	// This image is used for the consul-sidecar container.
 	ImageConsulK8S string
 
 	// Optional: set when you need extra options to be set when running envoy
@@ -187,9 +187,9 @@ type Handler struct {
 	// will be populated by the defaults provided in the initial flags.
 	InitContainerResources corev1.ResourceRequirements
 
-	// Resource settings for lifecycle sidecar. All of these fields
+	// Resource settings for Consul sidecar. All of these fields
 	// will be populated by the defaults provided in the initial flags.
-	LifecycleSidecarResources corev1.ResourceRequirements
+	ConsulSidecarResources corev1.ResourceRequirements
 
 	// Log
 	Log hclog.Logger
@@ -342,7 +342,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		[]corev1.Container{container},
 		"/spec/initContainers")...)
 
-	// Add the Envoy and lifecycle sidecars.
+	// Add the Envoy and Consul sidecars.
 	esContainer, err := h.envoySidecar(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection sidecar container", "err", err, "Request Name", req.Name)
@@ -352,7 +352,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			},
 		}
 	}
-	connectContainer := h.lifecycleSidecar(&pod)
+	connectContainer := h.consulSidecar(&pod)
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
 		[]corev1.Container{esContainer, connectContainer},
