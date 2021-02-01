@@ -330,8 +330,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// the sidecar for passing data in the pod.
 	patches = append(patches, addVolume(
 		pod.Spec.Volumes,
-		[]corev1.Volume{h.containerVolume()},
-		"/spec/volumes")...)
+		[]corev1.Volume{h.containerVolume()}, "/spec/volumes")...)
 
 	// Add the upstream services as environment variables for easy
 	// service discovery.
@@ -341,6 +340,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			h.containerEnvVars(&pod),
 			fmt.Sprintf("/spec/initContainers/%d/env", i))...)
 	}
+
 	for i, container := range pod.Spec.Containers {
 		patches = append(patches, addEnvVar(
 			container.Env,
@@ -348,6 +348,17 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			fmt.Sprintf("/spec/containers/%d/env", i))...)
 	}
 
+	// TODO: rename both of these initcontainers appropriately
+	// Add the consul-init container
+	consulInitContainer, err := h.getConsulInitContainer(&pod, req.Namespace)
+	if err != nil {
+		h.Log.Error("Error configuring consul init container", "err", err, "Request Name", req.Name)
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring consul init container: %s", err),
+			},
+		}
+	}
 	// Add the init container that registers the service and sets up
 	// the Envoy configuration.
 	container, err := h.containerInit(&pod, req.Namespace)
@@ -361,7 +372,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	}
 	patches = append(patches, addContainer(
 		pod.Spec.InitContainers,
-		[]corev1.Container{container},
+		[]corev1.Container{consulInitContainer, container},
 		"/spec/initContainers")...)
 
 	// Add the Envoy and Consul sidecars.
@@ -374,18 +385,21 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			},
 		}
 	}
-	connectContainer, err := h.consulSidecar(&pod)
-	if err != nil {
-		h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error configuring consul sidecar container: %s", err),
-			},
-		}
-	}
+	// todo: we need to run consul sidecar in case of metrics
+	//Disable lifecycle sidecar until we figure out how to support it.
+	// connectContainer := h.consulSidecar(&pod)
+	//if err != nil {
+	//	h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
+	//	return &v1beta1.AdmissionResponse{
+	//		Result: &metav1.Status{
+	//			Message: fmt.Sprintf("Error configuring consul sidecar container: %s", err),
+	//		},
+	//	}
+	//}
+
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
-		[]corev1.Container{esContainer, connectContainer},
+		[]corev1.Container{esContainer},
 		"/spec/containers")...)
 
 	// Add annotations so that we know we're injected

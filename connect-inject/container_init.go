@@ -282,14 +282,6 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
-			{
-				Name:  "SERVICE_ID",
-				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ServiceName),
-			},
-			{
-				Name:  "PROXY_SERVICE_ID",
-				Value: fmt.Sprintf("$(POD_NAME)-%s", data.ProxyServiceName),
-			},
 		},
 		Resources:    h.InitContainerResources,
 		VolumeMounts: volMounts,
@@ -315,100 +307,6 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 {{- end}}
 
-# Register the service. The HCL is stored in the volume so that
-# the preStop hook can access it to deregister the service.
-cat <<EOF >/consul/connect-inject/service.hcl
-services {
-  id   = "${SERVICE_ID}"
-  name = "{{ .ServiceName }}"
-  address = "${POD_IP}"
-  port = {{ .ServicePort }}
-  {{- if .ConsulNamespace }}
-  namespace = "{{ .ConsulNamespace }}"
-  {{- end }}
-  {{- if .Tags}}
-  tags = {{.Tags}}
-  {{- end}}
-  meta = {
-    {{- if .Meta}}
-    {{- range $key, $value := .Meta }}
-    {{$key}} = "{{$value}}"
-    {{- end }}
-    {{- end }}
-    {{ .MetaKeyPodName }} = "${POD_NAME}"
-    {{ .MetaKeyKubeNS }} = "${POD_NAMESPACE}"
-  }
-}
-
-services {
-  id   = "${PROXY_SERVICE_ID}"
-  name = "{{ .ProxyServiceName }}"
-  kind = "connect-proxy"
-  address = "${POD_IP}"
-  port = 20000
-  {{- if .ConsulNamespace }}
-  namespace = "{{ .ConsulNamespace }}"
-  {{- end }}
-  {{- if .Tags}}
-  tags = {{.Tags}}
-  {{- end}}
-  meta = {
-    {{- if .Meta}}
-    {{- range $key, $value := .Meta }}
-    {{$key}} = "{{$value}}"
-    {{- end }}
-    {{- end }}
-    {{ .MetaKeyPodName }} = "${POD_NAME}"
-    {{ .MetaKeyKubeNS }} = "${POD_NAMESPACE}"
-  }
-
-  proxy {
-	{{- if .EnableMetrics }}
-	config {
-	  envoy_prometheus_bind_addr = "{{ .PrometheusScrapeListener }}"
-	}
-	{{- end }}
-    destination_service_name = "{{ .ServiceName }}"
-    destination_service_id = "${SERVICE_ID}"
-    {{- if (gt .ServicePort 0) }}
-    local_service_address = "127.0.0.1"
-    local_service_port = {{ .ServicePort }}
-    {{- end }}
-    {{- range .Upstreams }}
-    upstreams {
-      {{- if .Name }}
-      destination_type = "service" 
-      destination_name = "{{ .Name }}"
-      {{- end}}
-      {{- if .Query }}
-      destination_type = "prepared_query" 
-      destination_name = "{{ .Query}}"
-      {{- end}}
-      {{- if .ConsulUpstreamNamespace }}
-      destination_namespace = "{{ .ConsulUpstreamNamespace }}"
-      {{- end}}
-      local_bind_port = {{ .LocalPort }}
-      {{- if .Datacenter }}
-      datacenter = "{{ .Datacenter }}"
-      {{- end}}
-    }
-    {{- end }}
-  }
-
-  checks {
-    name = "Proxy Public Listener"
-    tcp = "${POD_IP}:20000"
-    interval = "10s"
-    deregister_critical_service_after = "10m"
-  }
-
-  checks {
-    name = "Destination Alias"
-    alias_service = "${SERVICE_ID}"
-  }
-}
-EOF
-
 {{- if .AuthMethod }}
 /bin/consul login -method="{{ .AuthMethod }}" \
   -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
@@ -428,18 +326,11 @@ EOF
 chmod 444 /consul/connect-inject/acl-token
 {{- end }}
 
-/bin/consul services register \
-  {{- if .AuthMethod }}
-  -token-file="/consul/connect-inject/acl-token" \
-  {{- end }}
-  {{- if .ConsulNamespace }}
-  -namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  /consul/connect-inject/service.hcl
+export PROXY_ID=$(cat /consul/connect-inject/proxyid)
 
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
-  -proxy-id="${PROXY_SERVICE_ID}" \
+  -proxy-id=${PROXY_ID} \
   {{- if .PrometheusScrapePath }}
   -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
   {{- end }}
