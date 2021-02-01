@@ -283,6 +283,8 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		}
 	}
 
+	h.Log.Info("received pod", "pod", pod)
+
 	// Build the basic response
 	resp := &v1beta1.AdmissionResponse{
 		Allowed: true,

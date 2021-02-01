@@ -122,11 +122,10 @@ func (c *Command) Run(args []string) int {
 			continue
 		}
 		for _, y := range serviceList {
-			if y.Meta["pod-name"] == podName {
+			if y.Meta["pod-name"] == podName && y.Proxy != nil && y.Proxy.DestinationServiceID != "" {
 				c.UI.Info(fmt.Sprintf("Registered pod has been detected: %s", y.Meta["pod-name"]))
 				// write the proxyid to a file in the emptydir vol
-				data := fmt.Sprintf("%s-%s-%s", podName, y.ID, "sidecar-proxy")
-				err = ioutil.WriteFile("/consul/connect-inject/proxyid", []byte(data), 0777)
+				err = ioutil.WriteFile("/consul/connect-inject/proxyid", []byte(y.ID), 0777)
 				if err != nil {
 					c.UI.Error(fmt.Sprintf("unable to write proxyid out: %s", err))
 					return 1
