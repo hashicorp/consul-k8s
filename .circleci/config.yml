@@ -474,7 +474,6 @@ jobs:
     machine:
       image: ubuntu-2004:202010-01
     resource_class: xlarge
-    parallelism: 6
     steps:
       - checkout
       - run:
@@ -517,7 +516,7 @@ jobs:
           working_directory: test/acceptance/tests
           no_output_timeout: 1h
           command: |
-            gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- ./... -p 1 -timeout 30m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 30m -failfast \
               -use-kind \
               -enable-multi-cluster \
               -enable-enterprise \
