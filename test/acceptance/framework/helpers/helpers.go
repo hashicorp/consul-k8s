@@ -34,8 +34,10 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 	logger.Log(t, "Waiting for pods to be ready.")
 
-	// Wait up to 5m.
-	counter := &retry.Counter{Count: 60, Wait: 5 * time.Second}
+	// Wait up to 15m.
+	// On Azure, volume provisioning can sometimes take close to 5 min,
+	// so we need to give a bit more time for pods to become healthy.
+	counter := &retry.Counter{Count: 180, Wait: 5 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
