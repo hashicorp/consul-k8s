@@ -281,7 +281,7 @@ services {
     {{$key}} = "{{$value}}"
     {{- end }}
     {{- end }}
-    pod_name = "${POD_NAME}"
+    pod-name = "${POD_NAME}"
   }
 }
 
@@ -303,7 +303,7 @@ services {
     {{$key}} = "{{$value}}"
     {{- end }}
     {{- end }}
-    pod_name = "${POD_NAME}"
+    pod-name = "${POD_NAME}"
   }
 
   proxy {
