@@ -76,7 +76,7 @@ func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
 
 // Delete is not implemented because it is handled by the preStop phase whereby all services
 // related to the pod are deregistered which also deregisters health checks.
-func (h *HealthCheckResource) Delete(string) error {
+func (h *HealthCheckResource) Delete(string, interface{}) error {
 	return nil
 }
 

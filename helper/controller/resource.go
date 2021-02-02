@@ -7,7 +7,7 @@ import (
 // ResourceUpsertFunc and ResourceDeleteFunc are the callback types for
 // when a resource is inserted, updated, or deleted.
 type ResourceUpsertFunc func(string, interface{}) error
-type ResourceDeleteFunc func(string) error
+type ResourceDeleteFunc func(string, interface{}) error
 
 // Resource should be implemented by anything that should be watchable
 // by Controller. The Resource needs to be aware of how to create the Informer
@@ -23,7 +23,7 @@ type Resource interface {
 	// of changes from the Informer. If an error is returned, the given item
 	// will be retried.
 	Upsert(string, interface{}) error
-	Delete(string) error
+	Delete(string, interface{}) error
 }
 
 // Backgrounder should be implemented by a Resource that requires additional
@@ -60,4 +60,4 @@ type basicResource struct {
 
 func (r *basicResource) Informer() cache.SharedIndexInformer  { return r.informer }
 func (r *basicResource) Upsert(k string, v interface{}) error { return r.upsert(k, v) }
-func (r *basicResource) Delete(k string) error                { return r.delete(k) }
+func (r *basicResource) Delete(k string, v interface{}) error { return r.delete(k, v) }

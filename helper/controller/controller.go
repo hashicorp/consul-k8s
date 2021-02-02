@@ -25,6 +25,20 @@ type Controller struct {
 	informer cache.SharedIndexInformer
 }
 
+// Event is something that occurred to the resources we're watching.
+type Event struct {
+	// Key is in the form of <namespace>/<name>, e.g. default/pod-abc123,
+	// and corresponds to the resource modified.
+	Key string
+	// Obj holds the resource that was modified at the time of the event
+	// occurring. If possible, the resource should be retrieved from the informer
+	// cache, instead of using this field because the cache will be more up to
+	// date at the time the event is processed.
+	// In some cases, such as a delete event, the resource will no longer exist
+	// in the cache and then it is useful to have the resource here.
+	Obj interface{}
+}
+
 // Run starts the Controller and blocks until stopCh is closed.
 //
 // Important: Callers must ensure that Run is only called once at a time.
@@ -52,21 +66,21 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			c.Log.Debug("queue", "op", "add", "key", key)
 			if err == nil {
-				queue.Add(key)
+				queue.Add(Event{Key: key, Obj: obj})
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			c.Log.Debug("queue", "op", "update", "key", key)
 			if err == nil {
-				queue.Add(key)
+				queue.Add(Event{Key: key, Obj: newObj})
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			c.Log.Debug("queue", "op", "delete", "key", key)
 			if err == nil {
-				queue.Add(key)
+				queue.Add(Event{Key: key, Obj: obj})
 			}
 		},
 	})
@@ -149,44 +163,47 @@ func (c *Controller) processSingle(
 	informer cache.SharedIndexInformer,
 ) bool {
 	// Fetch the next item
-	key, quit := queue.Get()
+	rawEvent, quit := queue.Get()
 	if quit {
 		return false
 	}
-	defer queue.Done(key)
+	defer queue.Done(rawEvent)
 
-	// The key should be a string. If it isn't, just ignore it.
-	keyRaw, ok := key.(string)
+	event, ok := rawEvent.(Event)
 	if !ok {
-		c.Log.Warn("processSingle: dropping non-string key", "key", key)
+		c.Log.Warn("processSingle: dropping event with unexpected type", "event", rawEvent)
 		return true
 	}
 
-	// Get the item
-	item, exists, err := informer.GetIndexer().GetByKey(keyRaw)
+	// Get the item from the informer to ensure we have the most up-to-date
+	// copy.
+	key := event.Key
+	item, exists, err := informer.GetIndexer().GetByKey(key)
 
 	// If we got the item successfully, call the proper method
 	if err == nil {
-		c.Log.Debug("processing object", "key", keyRaw, "exists", exists)
+		c.Log.Debug("processing object", "key", key, "exists", exists)
 		c.Log.Trace("processing object", "object", item)
 		if !exists {
-			err = c.Resource.Delete(keyRaw)
+			// In the case of deletes, the item is no longer in the cache so
+			// we use the copy we got at the time of the event (event.Obj).
+			err = c.Resource.Delete(key, event.Obj)
 		} else {
-			err = c.Resource.Upsert(keyRaw, item)
+			err = c.Resource.Upsert(key, item)
 		}
 
 		if err == nil {
-			queue.Forget(key)
+			queue.Forget(rawEvent)
 		}
 	}
 
 	if err != nil {
-		if queue.NumRequeues(key) < 5 {
-			c.Log.Error("failed processing item, retrying", "key", keyRaw, "error", err)
-			queue.AddRateLimited(key)
+		if queue.NumRequeues(event) < 5 {
+			c.Log.Error("failed processing item, retrying", "key", key, "error", err)
+			queue.AddRateLimited(rawEvent)
 		} else {
-			c.Log.Error("failed processing item, no more retries", "key", keyRaw, "error", err)
-			queue.Forget(key)
+			c.Log.Error("failed processing item, no more retries", "key", key, "error", err)
+			queue.Forget(rawEvent)
 			utilruntime.HandleError(err)
 		}
 	}

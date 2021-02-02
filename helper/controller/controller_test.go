@@ -26,7 +26,7 @@ func TestController_initialData(t *testing.T) {
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, _ := testResource(client)
+	resource, data, deleted, _ := testResource(client)
 
 	// Add some initial data before the controller starts
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
@@ -41,6 +41,7 @@ func TestController_initialData(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	closer()
 	require.Len(data, 2)
+	require.Len(deleted, 0)
 }
 
 // Test that created data after starting is loaded
@@ -49,7 +50,7 @@ func TestController_create(t *testing.T) {
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, _ := testResource(client)
+	resource, data, deleted, _ := testResource(client)
 
 	// Start the controller
 	closer := TestControllerRun(resource)
@@ -68,6 +69,7 @@ func TestController_create(t *testing.T) {
 	closer()
 
 	require.Len(data, 2)
+	require.Len(deleted, 0)
 }
 
 // Test that data that is created and deleted is properly removed.
@@ -76,7 +78,7 @@ func TestController_createDelete(t *testing.T) {
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, _ := testResource(client)
+	resource, data, deleted, _ := testResource(client)
 
 	// Start the controller
 	closer := TestControllerRun(resource)
@@ -87,7 +89,8 @@ func TestController_createDelete(t *testing.T) {
 	// Add some initial data before the controller starts
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("bar"), metav1.CreateOptions{})
+	barSvc := testService("bar")
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), barSvc, metav1.CreateOptions{})
 	require.NoError(err)
 
 	// Wait a bit so that the create hopefully propagates
@@ -99,6 +102,11 @@ func TestController_createDelete(t *testing.T) {
 	closer()
 
 	require.Len(data, 1)
+	require.Len(deleted, 1)
+	require.Contains(deleted, "default/bar")
+	deletedSvc, ok := deleted["default/bar"].(*apiv1.Service)
+	require.True(ok, "object was not of type Service")
+	require.Equal("bar", deletedSvc.Name)
 }
 
 // Test that data is properly updated.
@@ -107,7 +115,7 @@ func TestController_update(t *testing.T) {
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, dataLock := testResource(client)
+	resource, data, _, dataLock := testResource(client)
 
 	// Start the controller
 	closer := TestControllerRun(resource)
@@ -152,7 +160,7 @@ func TestController_backgrounder(t *testing.T) {
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, _, _ := testResource(client)
+	resource, _, _, _ := testResource(client)
 	bgresource := &testBackgrounder{Resource: resource}
 
 	// Start the controller
@@ -228,11 +236,14 @@ func testInformer(client kubernetes.Interface) cache.SharedIndexInformer {
 }
 
 // testResource creates a Resource implementation that keeps track of the
-// callback data in the given map. To access the data safely, the lock
-// should be held.
-func testResource(client kubernetes.Interface) (Resource, map[string]interface{}, *sync.Mutex) {
+// callback data. It returns two maps. The first is a map from resource keys to resources
+// based on the callbacks that have occurred. The second is a map of the resources
+// that have been deleted.
+// To access the data safely, the lock should be held.
+func testResource(client kubernetes.Interface) (Resource, map[string]interface{}, map[string]interface{}, *sync.Mutex) {
 	var lock sync.Mutex
 	m := make(map[string]interface{})
+	deleted := make(map[string]interface{})
 
 	return NewResource(testInformer(client),
 		func(key string, v interface{}) error {
@@ -241,11 +252,12 @@ func testResource(client kubernetes.Interface) (Resource, map[string]interface{}
 			lock.Unlock()
 			return nil
 		},
-		func(key string) error {
+		func(key string, v interface{}) error {
 			lock.Lock()
 			delete(m, key)
+			deleted[key] = v
 			lock.Unlock()
 			return nil
 		},
-	), m, &lock
+	), m, deleted, &lock
 }
