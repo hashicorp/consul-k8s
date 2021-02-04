@@ -268,6 +268,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"anothergw-ingress-gateway-token",
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
+				"connect-inject-token",
 				"controller-token",
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)

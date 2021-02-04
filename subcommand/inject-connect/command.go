@@ -65,6 +65,10 @@ type Command struct {
 	flagEnableHealthChecks          bool          // Start the health check controller.
 	flagHealthChecksReconcilePeriod time.Duration // Period for health check reconcile.
 
+	// Flags for cleanup controller.
+	flagEnableCleanupController          bool          // Start the cleanup controller.
+	flagCleanupControllerReconcilePeriod time.Duration // Period for cleanup controller reconcile.
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -129,7 +133,10 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", false,
 		"Enables health checks controller.")
+	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
+		"Enables cleanup controller that cleans up stale Consul service instances.")
 	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
+	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -385,8 +392,32 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Start the health checks controller.
+	// Start the cleanup controller that cleans up Consul service instances
+	// still registered after the pod has been deleted (usually due to a force delete).
 	ctrlExitCh := make(chan error)
+
+	if c.flagEnableCleanupController {
+		cleanupResource := connectinject.CleanupResource{
+			Log:              logger.Named("cleanupResource"),
+			KubernetesClient: c.clientset,
+			Ctx:              ctx,
+			ReconcilePeriod:  c.flagCleanupControllerReconcilePeriod,
+			ConsulClient:     c.consulClient,
+			ConsulScheme:     consulURL.Scheme,
+			ConsulPort:       consulURL.Port(),
+		}
+		cleanupCtrl := &controller.Controller{
+			Log:      logger.Named("cleanupController"),
+			Resource: &cleanupResource,
+		}
+		go func() {
+			cleanupCtrl.Run(ctx.Done())
+			if ctx.Err() == nil {
+				ctrlExitCh <- fmt.Errorf("cleanup controller exited unexpectedly")
+			}
+		}()
+	}
+
 	if c.flagEnableHealthChecks {
 		healthResource := connectinject.HealthCheckResource{
 			Log:                 logger.Named("healthCheckResource"),
