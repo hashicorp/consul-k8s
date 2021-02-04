@@ -813,7 +813,7 @@ load _helpers
   [ "${actual}" == "true" ]
 
   # sets IP SANs to contain the HOST IP of the client
-  actual=$(echo $command | jq -r '. | contains("auto_encrypt = {ip_san = [\\\"$HOST_IP\\\"]}")' | tee /dev/stderr)
+  actual=$(echo $command | jq -r '. | contains("auto_encrypt = {ip_san = [\\\"$HOST_IP\\\",\\\"$POD_IP\\\"]}")' | tee /dev/stderr)
   [ "${actual}" == "true" ]
 
   # doesn't set verify_incoming_rpc and verify_server_hostname

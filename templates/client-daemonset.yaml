@@ -148,6 +148,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
             - name: GOSSIP_KEY
               valueFrom:
@@ -179,13 +183,14 @@ spec:
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
                 -node-meta=pod-name:${HOSTNAME} \
+                -node-meta=host-ip:${HOST_IP} \
                 -hcl='leave_on_terminate = true' \
                 -disable-host-node-id=false \
                 {{- if .Values.global.tls.enabled }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 {{- if .Values.global.tls.enableAutoEncrypt }}
                 -hcl='auto_encrypt = {tls = true}' \
-                -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\"]}" \
+                -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\",\"$POD_IP\"]}" \
                 {{- else }}
                 -hcl='cert_file = "/consul/tls/client/tls.crt"' \
                 -hcl='key_file = "/consul/tls/client/tls.key"' \
@@ -347,6 +352,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         command:
           - "/bin/sh"
           - "-ec"
@@ -354,6 +363,7 @@ spec:
             cd /consul/tls/client
             consul tls cert create -client \
               -additional-ipaddress=${HOST_IP} \
+              -additional-ipaddress=${POD_IP} \
               -dc={{ .Values.global.datacenter }} \
               -domain={{ .Values.global.domain }} \
               -ca=/consul/tls/ca/cert/tls.crt \

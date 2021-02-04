@@ -20,6 +20,8 @@ BREAKING CHANGES:
 IMPROVEMENTS:
 * Add ability to set extra labels on Consul client pods. [[GH-612](https://github.com/hashicorp/consul-helm/pull/612)]
 * CRDs: add value `controller.aclToken` to support manually passing in an ACL token to the CRD controller if independently managing ACLs. [[GH-783](https://github.com/hashicorp/consul-helm/pull/783)]
+* TLS: Consul client certificates now include their pod IPs in the IP SANs. This applies to auto-encrypt enabled and disabled. [[GH-805](https://github.com/hashicorp/consul-helm/pull/805)]
+* Consul client nodes have a new meta key called "host-ip" set to the IP of the Kubernetes node they're running on. [[GH-805](https://github.com/hashicorp/consul-helm/pull/805)]
 
 BUG FIXES:
 * Use `rbac.authorization.k8s.io/v1` instead of `rbac.authorization.k8s.io/v1beta1` API version for the `roles` and `rolebindings` used by the `tls-init`
