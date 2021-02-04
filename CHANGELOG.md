@@ -43,6 +43,8 @@ FEATURES:
 
 IMPROVEMENTS:
 * CRDs: give a more descriptive error when a config entry already exists in Consul. [[GH-420](https://github.com/hashicorp/consul-k8s/pull/420)]
+* Set `User-Agent: consul-k8s/<version>` header on calls to Consul where `<version>` is the current
+  version of `consul-k8s`. [[GH-434](https://github.com/hashicorp/consul-k8s/pull/434)]
 
 ## 0.23.0 (January 22, 2021)
 
