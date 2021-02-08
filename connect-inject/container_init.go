@@ -42,6 +42,17 @@ type initContainerCommandData struct {
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
 	ConsulCACert string
+	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
+	// metrics from.
+	EnableMetrics bool
+	// PrometheusScrapeListener configures the listener on Envoy where
+	// Prometheus will scrape metrics from.
+	PrometheusScrapeListener string
+	// PrometheusScrapePath configures the path on the listener on Envoy where
+	// Prometheus will scrape metrics from.
+	PrometheusScrapePath string
+	// PrometheusBackendPort configures where the listener on Envoy will point to.
+	PrometheusBackendPort string
 }
 
 type initContainerCommandUpstreamData struct {
@@ -83,6 +94,41 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		if port, _ := portValue(pod, raw); port > 0 {
 			data.ServicePort = port
 		}
+	}
+
+	// If metrics are enabled, the init container should set up
+	// envoy_prometheus_bind_addr so there's a listener on 0.0.0.0 that points
+	// to a metrics backend. The metrics backend is determined by the call to
+	// h.shouldRunMergedMetricsServer(). If there is a merged metrics server,
+	// the backend would be that server. If we are not running the merged
+	// metrics server, the backend should just be the Envoy metrics endpoint.
+	enableMetrics, err := h.enableMetrics(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	data.EnableMetrics = enableMetrics
+
+	prometheusScrapePort, err := h.prometheusScrapePort(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	data.PrometheusScrapeListener = fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+
+	// This determines how to configure the consul connect envoy command: what
+	// metrics backend to use and what path to expose on the
+	// envoy_prometheus_bind_addr listener for scraping.
+	run, err := h.shouldRunMergedMetricsServer(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if run {
+		prometheusScrapePath := h.prometheusScrapePath(pod)
+		mergedMetricsPort, err := h.mergedMetricsPort(pod)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		data.PrometheusScrapePath = prometheusScrapePath
+		data.PrometheusBackendPort = mergedMetricsPort
 	}
 
 	var tags []string
@@ -203,7 +249,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
 		initContainerCommandTpl)))
-	err := tpl.Execute(&buf, &data)
+	err = tpl.Execute(&buf, &data)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -317,6 +363,11 @@ services {
   }
 
   proxy {
+	{{- if .EnableMetrics }}
+	config {
+	  envoy_prometheus_bind_addr = "{{ .PrometheusScrapeListener }}"
+	}
+	{{- end }}
     destination_service_name = "{{ .ServiceName }}"
     destination_service_id = "${SERVICE_ID}"
     {{- if (gt .ServicePort 0) }}
@@ -389,6 +440,12 @@ chmod 444 /consul/connect-inject/acl-token
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
+  {{- if .PrometheusScrapePath }}
+  -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
+  {{- end }}
+  {{- if .PrometheusBackendPort }}
+  -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
+  {{- end }}
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
