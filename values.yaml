@@ -1932,6 +1932,17 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
+# Configures a demo Prometheus installation.
+prometheus:
+  # When true, the Helm chart will install a demo Prometheus server instance
+  # alongside Consul.
+  enabled: false
+# Configures a demo Grafana installation.
+grafana:
+  # When true, the Helm chart will install a demo Grafana instance
+  # alongside Consul.
+  enabled: false
+
 # Control whether a test Pod manifest is generated when running helm template.
 # When using helm install, the test Pod is not submitted to the cluster so this
 # is only useful when running helm template.
