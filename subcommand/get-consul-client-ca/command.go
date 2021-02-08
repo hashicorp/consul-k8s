@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/hashicorp/consul-k8s/consul"
 	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -150,7 +151,7 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 		cfg.TLSConfig.Address = c.flagTLSServerName
 	}
 
-	return api.NewClient(cfg)
+	return consul.NewClient(cfg)
 }
 
 // consulServerAddr returns the consul server address

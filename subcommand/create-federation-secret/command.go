@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -202,7 +203,7 @@ func (c *Command) Run(args []string) int {
 		c.http.MergeOntoConfig(consulCfg)
 
 		var err error
-		c.consulClient, err = api.NewClient(consulCfg)
+		c.consulClient, err = consul.NewClient(consulCfg)
 		if err != nil {
 			logger.Error("Error creating consul client", "err", err)
 			return 1

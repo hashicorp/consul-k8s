@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"golang.org/x/net/context"
@@ -278,7 +279,7 @@ func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, err
 	if pod.Annotations[annotationConsulNamespace] != "" {
 		localConfig.Namespace = pod.Annotations[annotationConsulNamespace]
 	}
-	localClient, err := api.NewClient(localConfig)
+	localClient, err := consul.NewClient(localConfig)
 	if err != nil {
 		h.Log.Error("unable to get Consul API Client", "addr", newAddr, "err", err)
 		return nil, err
