@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/consul"
 	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
 	"github.com/hashicorp/consul-k8s/subcommand"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
@@ -352,7 +353,7 @@ func (c *Command) Run(args []string) int {
 
 	// For all of the next operations we'll need a Consul client.
 	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	consulClient, err := api.NewClient(&api.Config{
+	consulClient, err := consul.NewClient(&api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
 		Token:   bootstrapToken,

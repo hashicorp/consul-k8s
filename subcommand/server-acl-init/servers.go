@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
@@ -16,7 +17,7 @@ import (
 func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName, scheme string) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
 	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	consulClient, err := api.NewClient(&api.Config{
+	consulClient, err := consul.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  scheme,
 		TLSConfig: api.TLSConfig{
@@ -81,7 +82,7 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName
 
 	// Override our original client with a new one that has the bootstrap token
 	// set.
-	consulClient, err = api.NewClient(&api.Config{
+	consulClient, err = consul.NewClient(&api.Config{
 		Address: firstServerAddr,
 		Scheme:  scheme,
 		Token:   string(bootstrapToken),
@@ -115,7 +116,7 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 
 		// We create a new client for each server because we need to call each
 		// server specifically.
-		serverClient, err := api.NewClient(&api.Config{
+		serverClient, err := consul.NewClient(&api.Config{
 			Address: fmt.Sprintf("%s:%d", host, c.flagServerPort),
 			Scheme:  scheme,
 			Token:   bootstrapToken,

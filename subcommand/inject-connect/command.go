@@ -18,6 +18,7 @@ import (
 	"time"
 
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
@@ -296,7 +297,7 @@ func (c *Command) Run(args []string) int {
 	// Set up Consul client
 	if c.consulClient == nil {
 		var err error
-		c.consulClient, err = api.NewClient(cfg)
+		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 			return 1

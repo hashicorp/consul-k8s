@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -97,7 +98,7 @@ func (f *HTTPFlags) APIClient() (*api.Client, error) {
 
 	f.MergeOntoConfig(c)
 
-	return api.NewClient(c)
+	return consul.NewClient(c)
 }
 
 func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {

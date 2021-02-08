@@ -107,6 +107,7 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 			})
 			req.NoError(err)
 			defer consul.Stop()
+			consul.WaitForLeader(t)
 
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
