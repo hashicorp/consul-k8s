@@ -16,6 +16,12 @@ BREAKING CHANGES:
 
   See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
   for more information on how to upgrade.
+* The lifecycle-sidecar command and container has been renamed to
+  consul-sidecar. The Helm value `global.lifecycleSidecarContainer` has been
+  renamed to `global.consulSidecarContainer`.
+  `global.lifecycleSidecarContainer` is no longer supported and will cause
+  errors on `helm upgrade`. Please use `global.consulSidecarContainer` instead.
+  [[GH-810](https://github.com/hashicorp/consul-helm/pull/810)]
 
 IMPROVEMENTS:
 * Add ability to set extra labels on Consul client pods. [[GH-612](https://github.com/hashicorp/consul-helm/pull/612)]

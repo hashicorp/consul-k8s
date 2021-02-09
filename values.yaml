@@ -228,12 +228,12 @@ global:
     # `<helm-release-name>-consul-federation`. Requires consul-k8s 0.15.0+.
     createFederationSecret: false
 
-  # The lifecycle sidecar ensures the Consul services
+  # The consul sidecar ensures the Consul services
   # are always registered with their local Consul clients and is used by the
   # ingress/terminating/mesh gateways as well as with every Connect-injected service.
   # @recurse: false
   # @type: map
-  lifecycleSidecarContainer:
+  consulSidecarContainer:
     resources:
       requests:
         memory: "25Mi"

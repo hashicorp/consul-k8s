@@ -58,12 +58,12 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 		for _, mpod := range meshGatewayPods.Items {
 			// Get configdump from mesh gateway, passing the discard logger since we only need these logs written to the file (below).
-			configDump, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "lifecycle-sidecar", "--", "curl", "-s", "localhost:19000/config_dump?format=json")
+			configDump, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "consul-sidecar", "--", "curl", "-s", "localhost:19000/config_dump?format=json")
 			if err != nil {
 				configDump = fmt.Sprintf("Error getting config_dump: %s: %s", err, configDump)
 			}
 			// Get cluster config from mesh gateway, passing the discard logger since we only need these logs written to the file (below).
-			clusters, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "lifecycle-sidecar", "--", "curl", "-s", "localhost:19000/clusters?format=json")
+			clusters, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", mpod.Name, "-c", "consul-sidecar", "--", "curl", "-s", "localhost:19000/clusters?format=json")
 			if err != nil {
 				clusters = fmt.Sprintf("Error getting clusters: %s: %s", err, clusters)
 			}

@@ -4,6 +4,7 @@
 {{- if and .Values.global.acls.manageSystemACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
 {{- if .Values.meshGateway.imageEnvoy }}{{ fail "meshGateway.imageEnvoy must be specified in global.imageEnvoy" }}{{ end -}}
 {{- if .Values.meshGateway.globalMode }}{{ fail "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end -}}
+{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
 {{- /* The below test checks if clients are disabled (and if so, fails). We use the conditional from other client files and prepend 'not' */ -}}
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
 apiVersion: apps/v1
@@ -311,9 +312,9 @@ spec:
               exec:
                 command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""]
 
-        # lifecycle-sidecar ensures the mesh gateway is always registered with
+        # consul-sidecar ensures the mesh gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
-        - name: lifecycle-sidecar
+        - name: consul-sidecar
           image: {{ .Values.global.imageK8S }}
           volumeMounts:
             - name: consul-service
@@ -330,9 +331,9 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
-          {{- if .Values.global.lifecycleSidecarContainer }}
-          {{- if .Values.global.lifecycleSidecarContainer.resources }}
-          resources: {{ toYaml .Values.global.lifecycleSidecarContainer.resources | nindent 12 }}
+          {{- if .Values.global.consulSidecarContainer }}
+          {{- if .Values.global.consulSidecarContainer.resources }}
+          resources: {{ toYaml .Values.global.consulSidecarContainer.resources | nindent 12 }}
           {{- end }}
           {{- end }}
           env:
@@ -355,7 +356,7 @@ spec:
             {{- end }}
           command:
             - consul-k8s
-            - lifecycle-sidecar
+            - consul-sidecar
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
             {{- if .Values.global.acls.manageSystemACLs }}

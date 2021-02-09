@@ -6,6 +6,7 @@
 {{- if .Values.connectInject.centralConfig }}{{- if .Values.connectInject.centralConfig.defaultProtocol }}{{ fail "connectInject.centralConfig.defaultProtocol is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.centralConfig }}{{ if .Values.connectInject.centralConfig.proxyDefaults }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.imageEnvoy }}{{ fail "connectInject.imageEnvoy must be specified in global.imageEnvoy" }}{{ end }}
+{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -163,19 +164,19 @@ spec:
                 {{- end }}
                 {{- end }}
 
-                {{- if .Values.global.lifecycleSidecarContainer }}
-                {{- $lifecycleResources := .Values.global.lifecycleSidecarContainer.resources }}
-                {{- if not (kindIs "invalid" $lifecycleResources.limits.memory) }}
-                -lifecycle-sidecar-memory-limit={{ $lifecycleResources.limits.memory }} \
+                {{- if .Values.global.consulSidecarContainer }}
+                {{- $consulSidecarResources := .Values.global.consulSidecarContainer.resources }}
+                {{- if not (kindIs "invalid" $consulSidecarResources.limits.memory) }}
+                -consul-sidecar-memory-limit={{ $consulSidecarResources.limits.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $lifecycleResources.requests.memory) }}
-                -lifecycle-sidecar-memory-request={{ $lifecycleResources.requests.memory }} \
+                {{- if not (kindIs "invalid" $consulSidecarResources.requests.memory) }}
+                -consul-sidecar-memory-request={{ $consulSidecarResources.requests.memory }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $lifecycleResources.limits.cpu) }}
-                -lifecycle-sidecar-cpu-limit={{ $lifecycleResources.limits.cpu }} \
+                {{- if not (kindIs "invalid" $consulSidecarResources.limits.cpu) }}
+                -consul-sidecar-cpu-limit={{ $consulSidecarResources.limits.cpu }} \
                 {{- end }}
-                {{- if not (kindIs "invalid" $lifecycleResources.requests.cpu) }}
-                -lifecycle-sidecar-cpu-request={{ $lifecycleResources.requests.cpu }} \
+                {{- if not (kindIs "invalid" $consulSidecarResources.requests.cpu) }}
+                -consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
           livenessProbe:

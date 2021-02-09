@@ -121,7 +121,7 @@ load _helpers
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
-@test "terminatingGateways/Deployment: sets TLS env variables in lifecycle sidecar when global.tls.enabled" {
+@test "terminatingGateways/Deployment: sets TLS env variables in consul sidecar when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
@@ -246,7 +246,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "terminatingGateways/Deployment: lifecycle-sidecar uses -token-file flag when global.acls.manageSystemACLs=true" {
+@test "terminatingGateways/Deployment: consul-sidecar uses -token-file flag when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
@@ -601,9 +601,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# lifecycle sidecar resources
+# consul sidecar resources
 
-@test "terminatingGateways/Deployment: lifecycle sidecar has default resources" {
+@test "terminatingGateways/Deployment: consul sidecar has default resources" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
@@ -625,16 +625,16 @@ load _helpers
   [ "${actual}" = "20m" ]
 }
 
-@test "terminatingGateways/Deployment: lifecycle sidecar resources can be set" {
+@test "terminatingGateways/Deployment: consul sidecar resources can be set" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=memory' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=cpu' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.memory=memory2' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=cpu2' \
+      --set 'global.consulSidecarContainer.resources.requests.memory=memory' \
+      --set 'global.consulSidecarContainer.resources.requests.cpu=cpu' \
+      --set 'global.consulSidecarContainer.resources.limits.memory=memory2' \
+      --set 'global.consulSidecarContainer.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[1].resources' | tee /dev/stderr)
 
@@ -649,6 +649,17 @@ load _helpers
 
   local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
   [ "${actual}" = "cpu2" ]
+}
+
+@test "terminatingGateways/Deployment: fails if global.lifecycleSidecarContainer is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." ]]
 }
 
 #--------------------------------------------------------------------
