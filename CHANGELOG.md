@@ -1,6 +1,9 @@
 ## UNRELEASED
 
 BREAKING CHANGES
+* Connect: the `lifecycle-sidecar` command has been renamed to `consul-sidecar`. [[GH-428](https://github.com/hashicorp/consul-k8s/pull/428)]
+* Connect: the `consul-connect-lifecycle-sidecar` container name has been changed to `consul-sidecar` and the `consul-connect-envoy-sidecar` container name has been changed to `envoy-sidecar`. 
+[[GH-428](https://github.com/hashicorp/consul-k8s/pull/428)]
 * Connect: the `-default-protocol` and `-enable-central-config` flags are no longer supported.
   The `consul.hashicorp.com/connect-service-protocol` annotation on Connect pods is also
   no longer supported. [[GH-418](https://github.com/hashicorp/consul-k8s/pull/418)]

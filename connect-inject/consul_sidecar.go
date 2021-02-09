@@ -6,10 +6,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
+func (h *Handler) consulSidecar(pod *corev1.Pod) corev1.Container {
 	command := []string{
 		"consul-k8s",
-		"lifecycle-sidecar",
+		"consul-sidecar",
 		"-service-config", "/consul/connect-inject/service.hcl",
 		"-consul-binary", "/consul/connect-inject/consul",
 	}
@@ -54,7 +54,7 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 	}
 
 	return corev1.Container{
-		Name:  "consul-connect-lifecycle-sidecar",
+		Name:  "consul-sidecar",
 		Image: h.ImageConsulK8S,
 		Env:   envVariables,
 		VolumeMounts: []corev1.VolumeMount{
@@ -64,6 +64,6 @@ func (h *Handler) lifecycleSidecar(pod *corev1.Pod) corev1.Container {
 			},
 		},
 		Command:   command,
-		Resources: h.LifecycleSidecarResources,
+		Resources: h.ConsulSidecarResources,
 	}
 }

@@ -362,7 +362,7 @@ EOF
   {{- end }}
   {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- /* The acl token file needs to be read by the lifecycle-sidecar which runs
+{{- /* The acl token file needs to be read by the consul-sidecar which runs
        as non-root user consul-k8s. */}}
 chmod 444 /consul/connect-inject/acl-token
 {{- end }}
