@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	lifecycleResources = corev1.ResourceRequirements{
+	consulSidecarResources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("10m"),
 			corev1.ResourceMemory: resource.MustParse("25Mi"),
@@ -27,14 +27,14 @@ var (
 // would require a lot of boilerplate to get at the underlying patches that would
 // complicate understanding the tests (which are simple).
 
-// Test that the lifecycle sidecar is as expected.
-func TestLifecycleSidecar_Default(t *testing.T) {
+// Test that the Consul sidecar is as expected.
+func TestConsulSidecar_Default(t *testing.T) {
 	handler := Handler{
-		Log:                       hclog.Default().Named("handler"),
-		ImageConsulK8S:            "hashicorp/consul-k8s:9.9.9",
-		LifecycleSidecarResources: lifecycleResources,
+		Log:                    hclog.Default().Named("handler"),
+		ImageConsulK8S:         "hashicorp/consul-k8s:9.9.9",
+		ConsulSidecarResources: consulSidecarResources,
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+	container := handler.consulSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -44,7 +44,7 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 		},
 	})
 	require.Equal(t, corev1.Container{
-		Name:  "consul-connect-lifecycle-sidecar",
+		Name:  "consul-sidecar",
 		Image: "hashicorp/consul-k8s:9.9.9",
 		Env: []corev1.EnvVar{
 			{
@@ -65,17 +65,17 @@ func TestLifecycleSidecar_Default(t *testing.T) {
 			},
 		},
 		Command: []string{
-			"consul-k8s", "lifecycle-sidecar",
+			"consul-k8s", "consul-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
 		},
-		Resources: lifecycleResources,
+		Resources: consulSidecarResources,
 	}, container)
 }
 
 // Test that if there's an auth method we set the -token-file flag
 // and if there isn't we don't.
-func TestLifecycleSidecar_AuthMethod(t *testing.T) {
+func TestConsulSidecar_AuthMethod(t *testing.T) {
 	for _, authMethod := range []string{"", "auth-method"} {
 		t.Run("authmethod: "+authMethod, func(t *testing.T) {
 			handler := Handler{
@@ -83,7 +83,7 @@ func TestLifecycleSidecar_AuthMethod(t *testing.T) {
 				AuthMethod:     authMethod,
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 			}
-			container := handler.lifecycleSidecar(&corev1.Pod{
+			container := handler.consulSidecar(&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -107,12 +107,12 @@ func TestLifecycleSidecar_AuthMethod(t *testing.T) {
 
 // Test that if there's an annotation on the original pod that changes the sync
 // period we use that value.
-func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
+func TestConsulSidecar_SyncPeriodAnnotation(t *testing.T) {
 	handler := Handler{
 		Log:            hclog.Default().Named("handler"),
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+	container := handler.consulSidecar(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"consul.hashicorp.com/connect-sync-period": "55s",
@@ -132,14 +132,14 @@ func TestLifecycleSidecar_SyncPeriodAnnotation(t *testing.T) {
 
 // Test that the Consul address uses HTTPS
 // and that the CA is provided
-func TestLifecycleSidecar_TLS(t *testing.T) {
+func TestConsulSidecar_TLS(t *testing.T) {
 	handler := Handler{
-		Log:                       hclog.Default().Named("handler"),
-		ImageConsulK8S:            "hashicorp/consul-k8s:9.9.9",
-		ConsulCACert:              "consul-ca-cert",
-		LifecycleSidecarResources: lifecycleResources,
+		Log:                    hclog.Default().Named("handler"),
+		ImageConsulK8S:         "hashicorp/consul-k8s:9.9.9",
+		ConsulCACert:           "consul-ca-cert",
+		ConsulSidecarResources: consulSidecarResources,
 	}
-	container := handler.lifecycleSidecar(&corev1.Pod{
+	container := handler.consulSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -149,7 +149,7 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 		},
 	})
 	require.Equal(t, corev1.Container{
-		Name:  "consul-connect-lifecycle-sidecar",
+		Name:  "consul-sidecar",
 		Image: "hashicorp/consul-k8s:9.9.9",
 		Env: []corev1.EnvVar{
 			{
@@ -174,10 +174,10 @@ func TestLifecycleSidecar_TLS(t *testing.T) {
 			},
 		},
 		Command: []string{
-			"consul-k8s", "lifecycle-sidecar",
+			"consul-k8s", "consul-sidecar",
 			"-service-config", "/consul/connect-inject/service.hcl",
 			"-consul-binary", "/consul/connect-inject/consul",
 		},
-		Resources: lifecycleResources,
+		Resources: consulSidecarResources,
 	}, container)
 }

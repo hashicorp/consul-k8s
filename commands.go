@@ -4,12 +4,12 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	cmdConsulSidecar "github.com/hashicorp/consul-k8s/subcommand/consul-sidecar"
 	cmdController "github.com/hashicorp/consul-k8s/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
-	cmdLifecycleSidecar "github.com/hashicorp/consul-k8s/subcommand/lifecycle-sidecar"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
@@ -35,8 +35,8 @@ func init() {
 			return &cmdInjectConnect.Command{UI: ui}, nil
 		},
 
-		"lifecycle-sidecar": func() (cli.Command, error) {
-			return &cmdLifecycleSidecar.Command{UI: ui}, nil
+		"consul-sidecar": func() (cli.Command, error) {
+			return &cmdConsulSidecar.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {

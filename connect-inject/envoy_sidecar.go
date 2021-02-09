@@ -43,7 +43,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 
 	container := corev1.Container{
-		Name:  "consul-connect-envoy-sidecar",
+		Name:  "envoy-sidecar",
 		Image: h.ImageEnvoy,
 		Env: []corev1.EnvVar{
 			{
