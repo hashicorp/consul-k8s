@@ -2,6 +2,7 @@
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true" }}{{ end -}}
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
+{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
 
 {{- $root := . }}
 {{- $defaults := .Values.ingressGateways.defaults }}
@@ -366,9 +367,9 @@ spec:
                       {{- end }}
                       -id="${POD_NAME}"
 
-        # lifecycle-sidecar ensures the ingress gateway is always registered with
+        # consul-sidecar ensures the ingress gateway is always registered with
         # the local Consul agent, even if it loses the initial registration.
-        - name: lifecycle-sidecar
+        - name: consul-sidecar
           image: {{ $root.Values.global.imageK8S }}
           volumeMounts:
             - name: consul-service
@@ -385,9 +386,9 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
-          {{- if  $root.Values.global.lifecycleSidecarContainer }}
-          {{- if $root.Values.global.lifecycleSidecarContainer.resources }}
-          resources: {{ toYaml $root.Values.global.lifecycleSidecarContainer.resources | nindent 12 }}
+          {{- if  $root.Values.global.consulSidecarContainer }}
+          {{- if $root.Values.global.consulSidecarContainer.resources }}
+          resources: {{ toYaml $root.Values.global.consulSidecarContainer.resources | nindent 12 }}
           {{- end }}
           {{- end }}
           env:
@@ -410,7 +411,7 @@ spec:
             {{- end }}
           command:
             - consul-k8s
-            - lifecycle-sidecar
+            - consul-sidecar
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
             {{- if $root.Values.global.acls.manageSystemACLs }}

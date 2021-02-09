@@ -339,9 +339,9 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
-# lifecycle sidecar resources
+# consul sidecar resources
 
-@test "meshGateway/Deployment: lifecycle sidecar has default resources" {
+@test "meshGateway/Deployment: consul sidecar has default resources" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
@@ -356,16 +356,16 @@ key2: value2' \
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "20m" ]
 }
 
-@test "meshGateway/Deployment: lifecycle sidecar resources can be set" {
+@test "meshGateway/Deployment: consul sidecar resources can be set" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/mesh-gateway-deployment.yaml \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=memory' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=cpu' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.memory=memory2' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=cpu2' \
+      --set 'global.consulSidecarContainer.resources.requests.memory=memory' \
+      --set 'global.consulSidecarContainer.resources.requests.cpu=cpu' \
+      --set 'global.consulSidecarContainer.resources.limits.memory=memory2' \
+      --set 'global.consulSidecarContainer.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.containers[1].resources' | tee /dev/stderr)
 
@@ -380,6 +380,17 @@ key2: value2' \
 
   local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
   [ "${actual}" = "cpu2" ]
+}
+
+@test "meshGateway/Deployment: fails if global.lifecycleSidecarContainer is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/mesh-gateway-deployment.yaml \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." ]]
 }
 
 #--------------------------------------------------------------------
@@ -582,7 +593,7 @@ key2: value2' \
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
-@test "meshGateway/Deployment: sets TLS env variables in lifecycle sidecar when global.tls.enabled" {
+@test "meshGateway/Deployment: sets TLS env variables in consul sidecar when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \

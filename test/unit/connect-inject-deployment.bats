@@ -1230,9 +1230,9 @@ EOF
 }
 
 #--------------------------------------------------------------------
-# lifecycle sidecar resources
+# consul sidecar resources
 
-@test "connectInject/Deployment: default lifecycle sidecar container resources" {
+@test "connectInject/Deployment: default consul sidecar container resources" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -1241,133 +1241,143 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request=20m"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-request=20m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit=50Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-limit=50Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: lifecycle sidecar container resources can be set" {
+@test "connectInject/Deployment: consul sidecar container resources can be set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=100m' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.memory=200Mi' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=200m' \
+      --set 'global.consulSidecarContainer.resources.requests.memory=100Mi' \
+      --set 'global.consulSidecarContainer.resources.requests.cpu=100m' \
+      --set 'global.consulSidecarContainer.resources.limits.memory=200Mi' \
+      --set 'global.consulSidecarContainer.resources.limits.cpu=200m' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request=100Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-request=100Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request=100m"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-request=100m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit=200Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-limit=200Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: lifecycle sidecar container resources can be set explicitly to 0" {
+@test "connectInject/Deployment: consul sidecar container resources can be set explicitly to 0" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=0' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=0' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.memory=0' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=0' \
+      --set 'global.consulSidecarContainer.resources.requests.memory=0' \
+      --set 'global.consulSidecarContainer.resources.requests.cpu=0' \
+      --set 'global.consulSidecarContainer.resources.limits.memory=0' \
+      --set 'global.consulSidecarContainer.resources.limits.cpu=0' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request=0"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-request=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request=0"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-request=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit=0"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-limit=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit=0"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-limit=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: lifecycle sidecar container resources can be individually set to null" {
+@test "connectInject/Deployment: consul sidecar container resources can be individually set to null" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.memory=null' \
-      --set 'global.lifecycleSidecarContainer.resources.requests.cpu=null' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.memory=null' \
-      --set 'global.lifecycleSidecarContainer.resources.limits.cpu=null' \
+      --set 'global.consulSidecarContainer.resources.requests.memory=null' \
+      --set 'global.consulSidecarContainer.resources.requests.cpu=null' \
+      --set 'global.consulSidecarContainer.resources.limits.memory=null' \
+      --set 'global.consulSidecarContainer.resources.limits.cpu=null' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: lifecycle sidecar container resources can be set to null" {
+@test "connectInject/Deployment: consul sidecar container resources can be set to null" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.lifecycleSidecarContainer.resources=null' \
+      --set 'global.consulSidecarContainer.resources=null' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-request"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-request"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-memory-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-memory-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-lifecycle-sidecar-cpu-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: fails if global.lifecycleSidecarContainer is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.lifecycleSidecarContainer.resources.requests.memory=100Mi' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." ]]
 }
 
 #--------------------------------------------------------------------
