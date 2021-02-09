@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 func TestController_impl(t *testing.T) {
@@ -175,6 +177,54 @@ func TestController_backgrounder(t *testing.T) {
 	require.False(bgresource.Running(), "running")
 }
 
+func TestController_informerDeleteHandler(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		Input interface{}
+		Exp   *Event
+	}{
+		"nil obj": {
+			Input: nil,
+			Exp:   nil,
+		},
+		"service delete": {
+			Input: testService("foo"),
+			Exp: &Event{
+				Key: "default/foo",
+				Obj: testService("foo"),
+			},
+		},
+		// Test that we unwrap DeletedFinalStateUnknown objects.
+		"DeletedFinalStateUnknown": {
+			Input: cache.DeletedFinalStateUnknown{
+				Key: "default/foo",
+				Obj: testService("foo"),
+			},
+			Exp: &Event{
+				Key: "default/foo",
+				Obj: testService("foo"),
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctrl := &Controller{Log: hclog.Default()}
+			queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			defer queue.ShutDown()
+			ctrl.informerDeleteHandler(queue)(c.Input)
+
+			if c.Exp == nil {
+				require.Equal(t, queue.Len(), 0)
+			} else {
+				rawEvent, quit := queue.Get()
+				require.False(t, quit)
+				require.Equal(t, *c.Exp, rawEvent)
+			}
+		})
+	}
+}
+
 // testBackgrounder implements Backgrounder and has a simple func to check
 // if its running.
 type testBackgrounder struct {
@@ -207,7 +257,8 @@ func (r *testBackgrounder) Run(ch <-chan struct{}) {
 func testService(name string) *apiv1.Service {
 	return &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: "default",
 		},
 
 		Spec: apiv1.ServiceSpec{

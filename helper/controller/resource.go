@@ -19,11 +19,15 @@ type Resource interface {
 	// holds blocking queries to K8S and stores data in a local store.
 	Informer() cache.SharedIndexInformer
 
-	// Upsert and Delete are the callbacks called when processing the queue
+	// Upsert is the callback called when processing the queue
 	// of changes from the Informer. If an error is returned, the given item
 	// will be retried.
-	Upsert(string, interface{}) error
-	Delete(string, interface{}) error
+	Upsert(key string, obj interface{}) error
+	// Delete is called on object deletion.
+	// obj is the last known state of the object before deletion. In some
+	// cases, it may not be up to date with the latest state of the object.
+	// If an error is returned, the given item will be retried.
+	Delete(key string, obj interface{}) error
 }
 
 // Backgrounder should be implemented by a Resource that requires additional

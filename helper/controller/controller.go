@@ -76,13 +76,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 				queue.Add(Event{Key: key, Obj: newObj})
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			c.Log.Debug("queue", "op", "delete", "key", key)
-			if err == nil {
-				queue.Add(Event{Key: key, Obj: obj})
-			}
-		},
+		DeleteFunc: c.informerDeleteHandler(queue),
 	})
 
 	// If the type is a background syncer, then we startup the background
@@ -209,4 +203,24 @@ func (c *Controller) processSingle(
 	}
 
 	return true
+}
+
+// informerDeleteHandler returns a function that implements
+// `DeleteFunc` from the `ResourceEventHandlerFuncs` interface.
+// It is split out as its own method to aid in testing.
+func (c *Controller) informerDeleteHandler(queue workqueue.RateLimitingInterface) func(obj interface{}) {
+	return func(obj interface{}) {
+		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+		c.Log.Debug("queue", "op", "delete", "key", key)
+		if err == nil {
+			// obj might be of type `cache.DeletedFinalStateUnknown`
+			// in which case we need to extract the object from
+			// within that struct.
+			if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				queue.Add(Event{Key: key, Obj: d.Obj})
+			} else {
+				queue.Add(Event{Key: key, Obj: obj})
+			}
+		}
+	}
 }
