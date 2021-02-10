@@ -282,6 +282,16 @@ func (c *Command) Run(args []string) int {
 	if cfg.TLSConfig.CAFile == "" && c.flagConsulCACert != "" {
 		cfg.TLSConfig.CAFile = c.flagConsulCACert
 	}
+	consulURLRaw := cfg.Address
+	// cfg.Address may or may not be prefixed with scheme.
+	if !strings.Contains(cfg.Address, "://") {
+		consulURLRaw = fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)
+	}
+	consulURL, err := url.Parse(consulURLRaw)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing consul address %q: %s", consulURLRaw, err))
+		return 1
+	}
 
 	// load CA file contents
 	var consulCACert []byte
@@ -359,53 +369,42 @@ func (c *Command) Run(args []string) int {
 	mux.HandleFunc("/mutate", injector.Handle)
 	mux.HandleFunc("/health/ready", c.handleReady)
 	var handler http.Handler = mux
+	serverErrors := make(chan error)
 	server := &http.Server{
 		Addr:      c.flagListen,
 		Handler:   handler,
 		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
 	}
 
+	// Start the mutating webhook server.
+	go func() {
+		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+			serverErrors <- err
+		}
+	}()
+
+	// Start the health checks controller.
+	ctrlExitCh := make(chan error)
 	if c.flagEnableHealthChecks {
-		// Channel used for health checks
-		// also check to see if we should enable TLS.
-		consulAddr := os.Getenv(api.HTTPAddrEnvName)
-		if consulAddr == "" {
-			c.UI.Error(fmt.Sprintf("%s is not specified", api.HTTPAddrEnvName))
-			return 1
-		}
-		consulUrl, err := url.Parse(consulAddr)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error parsing %s: %s", api.HTTPAddrEnvName, err))
-			return 1
-		}
-
-		serverErrors := make(chan error)
-		go func() {
-			c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
-			if err := server.ListenAndServeTLS("", ""); err != nil {
-				c.UI.Error(fmt.Sprintf("Error listening: %s", err))
-				serverErrors <- err
-			}
-		}()
-
 		healthResource := connectinject.HealthCheckResource{
 			Log:                 logger.Named("healthCheckResource"),
 			KubernetesClientset: c.clientset,
-			ConsulUrl:           consulUrl,
+			ConsulUrl:           consulURL,
 			Ctx:                 ctx,
 			ReconcilePeriod:     c.flagHealthChecksReconcilePeriod,
 		}
 
-		ctl := &controller.Controller{
+		healthChecksCtrl := &controller.Controller{
 			Log:      logger.Named("healthCheckController"),
 			Resource: &healthResource,
 		}
 
 		// Start the health check controller, reconcile is started at the same time
 		// and new events will queue in the informer.
-		ctrlExitCh := make(chan error)
 		go func() {
-			ctl.Run(ctx.Done())
+			healthChecksCtrl.Run(ctx.Done())
 			// If ctl.Run() exits before ctx is cancelled, then our health checks
 			// controller isn't running. In that case we need to shutdown since
 			// this is unrecoverable.
@@ -413,33 +412,25 @@ func (c *Command) Run(args []string) int {
 				ctrlExitCh <- fmt.Errorf("health checks controller exited unexpectedly")
 			}
 		}()
-
-		select {
-		// Interrupted/terminated, gracefully exit.
-		case sig := <-c.sigCh:
-			c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-			if err := server.Close(); err != nil {
-				c.UI.Error(fmt.Sprintf("shutting down server: %v", err))
-				return 1
-			}
-			return 0
-
-		case <-serverErrors:
-			return 1
-
-		case err := <-ctrlExitCh:
-			c.UI.Error(fmt.Sprintf("controller error: %v", err))
-			return 1
-		}
-
-	} else {
-		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
-		if err := server.ListenAndServeTLS("", ""); err != nil {
-			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
-			return 1
-		}
 	}
-	return 0
+
+	// Block until we get a signal or something errors.
+	select {
+	case sig := <-c.sigCh:
+		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
+		if err := server.Close(); err != nil {
+			c.UI.Error(fmt.Sprintf("shutting down server: %v", err))
+			return 1
+		}
+		return 0
+
+	case <-serverErrors:
+		return 1
+
+	case err := <-ctrlExitCh:
+		c.UI.Error(fmt.Sprintf("controller error: %v", err))
+		return 1
+	}
 }
 
 func (c *Command) interrupt() {
