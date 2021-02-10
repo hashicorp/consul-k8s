@@ -153,11 +153,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "request must be <= limit: -consul-sidecar-cpu-request value of \"50m\" is greater than the -consul-sidecar-cpu-limit value of \"25m\"",
 		},
-		{
-			flags: []string{"-consul-k8s-image", "hashicorpdev/consul-k8s:latest", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true"},
-			expErr: "CONSUL_HTTP_ADDR is not specified",
-		},
 	}
 
 	for _, c := range cases {
@@ -192,7 +187,7 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagConsulSidecarMemoryLimit, "50Mi")
 }
 
-func TestRun_ValidationHealthCheckEnv(t *testing.T) {
+func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
 	cases := []struct {
 		name    string
 		envVars []string
@@ -200,10 +195,10 @@ func TestRun_ValidationHealthCheckEnv(t *testing.T) {
 		expErr  string
 	}{
 		{
-			envVars: []string{api.HTTPAddrEnvName, "0.0.0.0:999999"},
+			envVars: []string{api.HTTPAddrEnvName, "%"},
 			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-enable-health-checks-controller=true"},
-			expErr: "Error parsing CONSUL_HTTP_ADDR: parse \"0.0.0.0:999999\": first path segment in URL cannot contain colon",
+			expErr: "Error parsing consul address \"http://%\": parse \"http://%\": invalid URL escape \"%",
 		},
 	}
 	for _, c := range cases {
@@ -246,7 +241,6 @@ func TestRun_CommandFailsWithInvalidListener(t *testing.T) {
 // Test that when healthchecks are enabled that SIGINT/SIGTERM exits the
 // command cleanly.
 func TestRun_CommandExitsCleanlyAfterSignal(t *testing.T) {
-
 	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
 }
