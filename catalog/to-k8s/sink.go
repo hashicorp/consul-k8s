@@ -159,7 +159,7 @@ func (s *K8SSink) Upsert(key string, raw interface{}) error {
 }
 
 // Delete implements the controller.Resource interface.
-func (s *K8SSink) Delete(key string) error {
+func (s *K8SSink) Delete(key string, _ interface{}) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
