@@ -213,7 +213,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 }
 
 // Delete implements the controller.Resource interface.
-func (t *ServiceResource) Delete(key string) error {
+func (t *ServiceResource) Delete(key string, _ interface{}) error {
 	t.serviceLock.Lock()
 	defer t.serviceLock.Unlock()
 	t.doDelete(key)
@@ -727,7 +727,7 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	return nil
 }
 
-func (t *serviceEndpointsResource) Delete(key string) error {
+func (t *serviceEndpointsResource) Delete(key string, _ interface{}) error {
 	t.Service.serviceLock.Lock()
 	defer t.Service.serviceLock.Unlock()
 
