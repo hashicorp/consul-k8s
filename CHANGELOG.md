@@ -42,7 +42,11 @@ BREAKING CHANGES
 
 FEATURES:
 * CRDs: support annotation `consul.hashicorp.com/migrate-entry` on custom resources
-  that will allow an existing config entry to be migrated onto a Kubernetes custom resource. [[GH-419](https://github.com/hashicorp/consul-k8s/pull/419)] 
+  that will allow an existing config entry to be migrated onto a Kubernetes custom resource. [[GH-419](https://github.com/hashicorp/consul-k8s/pull/419)]
+* Connect: add new cleanup controller that runs in the connect-inject deployment. This
+  controller cleans up Consul service instances that remain registered despite their
+  pods being deleted. This could happen if the pod's `preStop` hook failed to execute
+  for some reason. [[GH-433](https://github.com/hashicorp/consul-k8s/pull/433)]
 
 IMPROVEMENTS:
 * CRDs: give a more descriptive error when a config entry already exists in Consul. [[GH-420](https://github.com/hashicorp/consul-k8s/pull/420)]

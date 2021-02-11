@@ -227,13 +227,12 @@ func TestRun_CommandFailsWithInvalidListener(t *testing.T) {
 		UI:        ui,
 		clientset: k8sClient,
 	}
-	os.Setenv(api.HTTPAddrEnvName, "http://0.0.0.0:9999")
 	code := cmd.Run([]string{
 		"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 		"-enable-health-checks-controller=true",
+		"-http-addr=http://0.0.0.0:9999",
 		"-listen", "999999",
 	})
-	os.Unsetenv(api.HTTPAddrEnvName)
 	require.Equal(t, 1, code)
 	require.Contains(t, ui.ErrorWriter.String(), "Error listening: listen tcp: address 999999: missing port in address")
 }

@@ -65,6 +65,7 @@ services {
   port = 0
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -76,6 +77,7 @@ services {
   port = 20000
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -124,6 +126,7 @@ cp /bin/consul /consul/connect-inject/consul`,
   port = 1234
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -135,6 +138,7 @@ services {
   port = 20000
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -303,6 +307,7 @@ services {
   tags = ["abc"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -315,6 +320,7 @@ services {
   tags = ["abc"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -355,6 +361,7 @@ services {
   tags = ["abc","123"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -367,6 +374,7 @@ services {
   tags = ["abc","123"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -407,6 +415,7 @@ services {
   tags = ["abc","123"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -419,6 +428,7 @@ services {
   tags = ["abc","123"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -460,6 +470,7 @@ services {
   tags = ["abc","123","abc","123","def","456"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -472,6 +483,7 @@ services {
   tags = ["abc","123","abc","123","def","456"]
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -523,6 +535,7 @@ services {
     name = "abc"
     version = "2"
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -536,6 +549,7 @@ services {
     name = "abc"
     version = "2"
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -568,6 +582,7 @@ services {
 			},
 			`  meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 `,
 			"",
@@ -581,6 +596,7 @@ services {
 			},
 			`  meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 `,
 			"",
@@ -691,6 +707,7 @@ services {
   namespace = "default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -703,6 +720,7 @@ services {
   namespace = "default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -765,6 +783,7 @@ services {
   namespace = "non-default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -777,6 +796,7 @@ services {
   namespace = "non-default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -840,6 +860,7 @@ services {
   namespace = "non-default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -852,6 +873,7 @@ services {
   namespace = "non-default"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
@@ -924,6 +946,7 @@ services {
   namespace = "k8snamespace"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 }
 
@@ -936,6 +959,7 @@ services {
   namespace = "k8snamespace"
   meta = {
     pod-name = "${POD_NAME}"
+    k8s-namespace = "${POD_NAMESPACE}"
   }
 
   proxy {
