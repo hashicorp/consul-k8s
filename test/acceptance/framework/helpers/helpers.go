@@ -44,7 +44,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 		var notReadyPods []string
 		for _, pod := range pods.Items {
-			if !isReady(pod) {
+			if !IsReady(pod) {
 				notReadyPods = append(notReadyPods, pod.Name)
 			}
 		}
@@ -126,8 +126,8 @@ func KubernetesContextFromOptions(t *testing.T, options *terratestk8s.KubectlOpt
 	return rawConfig.CurrentContext
 }
 
-// isReady returns true if pod is ready.
-func isReady(pod corev1.Pod) bool {
+// IsReady returns true if pod is ready.
+func IsReady(pod corev1.Pod) bool {
 	if len(pod.Status.ContainerStatuses) == 0 {
 		return false
 	}

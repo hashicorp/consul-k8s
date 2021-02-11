@@ -215,6 +215,35 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# cleanup controller
+@test "connectInject/Deployment: cleanup controller reconcile period set by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-cleanup-controller-reconcile-period=5m"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: cleanup controller reconcile period can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cleanupController.reconcilePeriod=10h' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-cleanup-controller-reconcile-period=10h"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # consul and envoy images
 
 @test "connectInject/Deployment: container image is global default" {
@@ -830,24 +859,12 @@ EOF
 }
 
 #--------------------------------------------------------------------
-# namespaces + acl token
-
-@test "connectInject/Deployment: aclInjectToken disabled when namespaces not enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.aclInjectToken.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
+# acl tokens
 
 @test "connectInject/Deployment: aclInjectToken disabled when secretName is missing" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretKey=bar' \
       . | tee /dev/stderr |
@@ -859,7 +876,6 @@ EOF
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretName=foo' \
       . | tee /dev/stderr |
@@ -871,7 +887,6 @@ EOF
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enableConsulNamespaces=true' \
       --set 'connectInject.enabled=true' \
       --set 'connectInject.aclInjectToken.secretName=foo' \
       --set 'connectInject.aclInjectToken.secretKey=bar' \
@@ -888,14 +903,13 @@ EOF
 }
 
 #--------------------------------------------------------------------
-# namespaces + global.acls.manageSystemACLs
+# global.acls.manageSystemACLs
 
 @test "connectInject/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] ' | tee /dev/stderr)
@@ -914,26 +928,6 @@ EOF
   local object=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "injector-acl-init" ]
-
-  local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: init container is created when global.acls.manageSystemACLs=true and healthChecks.enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
@@ -967,97 +961,6 @@ EOF
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-consul-cross-namespace-acl-policy"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# namespaces + http address
-
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable not set when namespaces and health checks are disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable set when namespaces are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR and CONSUL_CACERT env variables set when namespaces are enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] ' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-    yq 'any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-    yq 'any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable not set when health checks are disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: CONSUL_HTTP_ADDR env variable set when health checks are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# namespaces + host ip
-
-@test "connectInject/Deployment: HOST_IP env variable not set when namespaces and health checks are disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.healthChecks.enabled=false' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: HOST_IP env variable set when namespaces are enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("HOST_IP"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
