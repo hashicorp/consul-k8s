@@ -1076,7 +1076,6 @@ key2: value2' \
   exp='consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-ingress-gateway \
-  -resolve-hostnames \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1143,7 +1142,6 @@ EOF
 consul-k8s service-address \
   -k8s-namespace=default \
   -name=release-name-consul-ingress-gateway \
-  -resolve-hostnames \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
