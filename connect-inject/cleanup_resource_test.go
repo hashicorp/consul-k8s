@@ -32,11 +32,11 @@ func TestReconcile(t *testing.T) {
 		},
 		"instance does not have pod-name meta key": {
 			ConsulServices:      []capi.AgentServiceRegistration{consulNoPodNameMetaSvc},
-			ExpConsulServiceIDs: []string{"no-pod-name-meta"},
+			ExpConsulServiceIDs: []string{"foo-abc123-foo"},
 		},
 		"instance does not have k8s-namespace meta key": {
 			ConsulServices:      []capi.AgentServiceRegistration{consulNoK8sNSMetaSvc},
-			ExpConsulServiceIDs: []string{"no-k8s-ns-meta"},
+			ExpConsulServiceIDs: []string{"foo-abc123-foo"},
 		},
 		"out of cluster node": {
 			ConsulServices:      []capi.AgentServiceRegistration{consulFooSvc, consulFooSvcSidecar},
@@ -136,15 +136,20 @@ func TestReconcile(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
+	var nilPod *corev1.Pod
 	cases := map[string]struct {
-		Pod                 *corev1.Pod
+		Pod                 interface{}
 		ConsulServices      []capi.AgentServiceRegistration
 		ExpConsulServiceIDs []string
 		ExpErr              string
 	}{
 		"pod is nil": {
-			Pod:    nil,
+			Pod:    nilPod,
 			ExpErr: "object for key default/foo was nil",
+		},
+		"not expected type": {
+			Pod:    &corev1.Service{},
+			ExpErr: "expected pod, got: &v1.Service",
 		},
 		"pod does not have service-name annotation": {
 			Pod: &corev1.Pod{
@@ -157,6 +162,16 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			ExpErr: "pod did not have consul.hashicorp.com/connect-service annotation",
+		},
+		"instance does not have pod-name meta": {
+			Pod:                 fooPod,
+			ConsulServices:      []capi.AgentServiceRegistration{consulNoPodNameMetaSvc},
+			ExpConsulServiceIDs: []string{"foo-abc123-foo"},
+		},
+		"instance does not have k8s-namespace meta": {
+			Pod:                 fooPod,
+			ConsulServices:      []capi.AgentServiceRegistration{consulNoK8sNSMetaSvc},
+			ExpConsulServiceIDs: []string{"foo-abc123-foo"},
 		},
 		"no instances still registered": {
 			Pod:                 fooPod,
@@ -223,7 +238,8 @@ func TestDelete(t *testing.T) {
 			// Run Delete.
 			err = cleanupResource.Delete("default/foo", c.Pod)
 			if c.ExpErr != "" {
-				require.EqualError(err, c.ExpErr)
+				require.Error(err)
+				require.Contains(err.Error(), c.ExpErr)
 			} else {
 				require.NoError(err)
 
@@ -288,19 +304,19 @@ var (
 		},
 	}
 	consulNoPodNameMetaSvc = capi.AgentServiceRegistration{
-		ID:      "no-pod-name-meta",
-		Name:    "no-pod-name-meta",
+		ID:      "foo-abc123-foo",
+		Name:    "foo",
 		Address: "127.0.0.1",
 		Meta: map[string]string{
 			MetaKeyKubeNS: "default",
 		},
 	}
 	consulNoK8sNSMetaSvc = capi.AgentServiceRegistration{
-		ID:      "no-k8s-ns-meta",
-		Name:    "no-k8s-ns-meta",
+		ID:      "foo-abc123-foo",
+		Name:    "foo",
 		Address: "127.0.0.1",
 		Meta: map[string]string{
-			MetaKeyPodName: "no-k8s-ns-meta",
+			MetaKeyPodName: "foo-abc123",
 		},
 	}
 	fooPod = &corev1.Pod{

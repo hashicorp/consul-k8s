@@ -134,7 +134,7 @@ func (c *CleanupResource) reconcile() {
 func (c *CleanupResource) Delete(key string, obj interface{}) error {
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
-		return fmt.Errorf("expected pod, got: #%v", obj)
+		return fmt.Errorf("expected pod, got: %#v", obj)
 	}
 	if pod == nil {
 		return fmt.Errorf("object for key %s was nil", key)
@@ -206,6 +206,8 @@ func (c *CleanupResource) Informer() cache.SharedIndexInformer {
 	)
 }
 
+// deregisterInstance deregisters instance from Consul by calling the agent at
+// hostIP's deregister service API.
 func (c *CleanupResource) deregisterInstance(instance *capi.CatalogService, hostIP string) error {
 	fullAddr := fmt.Sprintf("%s://%s:%s", c.ConsulScheme, hostIP, c.ConsulPort)
 	localConfig := capi.DefaultConfig()
@@ -218,10 +220,14 @@ func (c *CleanupResource) deregisterInstance(instance *capi.CatalogService, host
 	return client.Agent().ServiceDeregister(instance.ServiceID)
 }
 
+// currentPodsKey should be used to construct the key to access the
+// currentPods map.
 func currentPodsKey(podName, k8sNamespace string) string {
 	return fmt.Sprintf("%s/%s", k8sNamespace, podName)
 }
 
+// nodeInCluster returns whether nodeName is the name of a node in nodes, i.e.
+// it's the name of a node in this cluster.
 func nodeInCluster(nodes *corev1.NodeList, nodeName string) bool {
 	for _, n := range nodes.Items {
 		if n.Name == nodeName {

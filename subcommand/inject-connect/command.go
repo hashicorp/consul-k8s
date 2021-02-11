@@ -133,9 +133,9 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", false,
 		"Enables health checks controller.")
+	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
 		"Enables cleanup controller that cleans up stale Consul service instances.")
-	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
