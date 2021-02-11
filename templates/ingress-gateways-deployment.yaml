@@ -163,7 +163,6 @@ spec:
                 consul-k8s service-address \
                   -k8s-namespace={{ $root.Release.Namespace }} \
                   -name={{ template "consul.fullname" $root }}-{{ .name }} \
-                  -resolve-hostnames \
                   -output-file=/tmp/address.txt
                 WAN_ADDR="$(cat /tmp/address.txt)"
                 {{- else }}
