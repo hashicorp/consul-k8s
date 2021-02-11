@@ -19,3 +19,4 @@ spec:
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]
       serviceAccountName: static-client
+      terminationGracePeriodSeconds: 0 # so deletion is quick

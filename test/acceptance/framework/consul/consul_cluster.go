@@ -287,6 +287,21 @@ func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 	for _, r := range installedReleases {
 		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
 	}
+
+	// Wait for all pods in the "default" namespace to exit. A previous
+	// release may not be listed by Helm but its pods may still be terminating.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
+		consulPods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		require.NoError(r, err)
+		if len(consulPods.Items) > 0 {
+			var podNames []string
+			for _, p := range consulPods.Items {
+				podNames = append(podNames, p.Name)
+			}
+			r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
+		}
+	})
+
 }
 
 // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
