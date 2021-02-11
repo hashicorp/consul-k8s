@@ -17,14 +17,12 @@ rules:
     - "list"
     - "watch"
     - "patch"
-{{- if .Values.connectInject.healthChecks.enabled }}
 - apiGroups: [""]
-  resources: ["pods"]
+  resources: ["pods", "nodes"]
   verbs:
     - "get"
     - "list"
     - "watch"
-{{- end}}
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
@@ -33,7 +31,7 @@ rules:
   verbs:
   - use
 {{- end }}
-{{- if and .Values.global.acls.manageSystemACLs (or .Values.global.enableConsulNamespaces .Values.connectInject.healthChecks.enabled) }}
+{{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [""]
   resources:
     - secrets

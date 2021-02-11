@@ -1227,6 +1227,17 @@ connectInject:
     # reconcile is done after the initial reconcile at startup is completed.
     reconcilePeriod: "1m"
 
+  # Cleanup controller cleans up Consul service instances that remain registered
+  # despite their pods no longer running. This could happen if the pod's `preStop`
+  # hook failed to execute for some reason.
+  cleanupController:
+    # How often to do a full reconcile where the controller looks at all pods
+    # and service instances and ensure the state is correct.
+    # The controller reacts to each delete event immediately but if it misses
+    # an event due to being down or a network issue, the reconcile loop will
+    # handle cleaning up any missed deleted pods.
+    reconcilePeriod: "5m"
+
   # Used to pass arguments to the injected envoy sidecar.
   # Valid arguments to pass to envoy can be found here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
   # e.g "--log-level debug --disable-hot-restart"
