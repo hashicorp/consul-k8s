@@ -11,7 +11,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const InjectInitContainerName = "consul-connect-inject-init"
+const (
+	InjectInitContainerName = "consul-connect-inject-init"
+	MetaKeyPodName          = "pod-name"
+	MetaKeyKubeNS           = "k8s-namespace"
+)
 
 type initContainerCommandData struct {
 	ServiceName      string
@@ -32,6 +36,8 @@ type initContainerCommandData struct {
 	Upstreams                 []initContainerCommandUpstreamData
 	Tags                      string
 	Meta                      map[string]string
+	MetaKeyPodName            string
+	MetaKeyKubeNS             string
 
 	// The PEM-encoded CA certificate to use when
 	// communicating with Consul clients
@@ -56,6 +62,8 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
+		MetaKeyPodName:            MetaKeyPodName,
+		MetaKeyKubeNS:             MetaKeyKubeNS,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
@@ -281,7 +289,8 @@ services {
     {{$key}} = "{{$value}}"
     {{- end }}
     {{- end }}
-    pod-name = "${POD_NAME}"
+    {{ .MetaKeyPodName }} = "${POD_NAME}"
+    {{ .MetaKeyKubeNS }} = "${POD_NAMESPACE}"
   }
 }
 
@@ -303,7 +312,8 @@ services {
     {{$key}} = "{{$value}}"
     {{- end }}
     {{- end }}
-    pod-name = "${POD_NAME}"
+    {{ .MetaKeyPodName }} = "${POD_NAME}"
+    {{ .MetaKeyKubeNS }} = "${POD_NAMESPACE}"
   }
 
   proxy {

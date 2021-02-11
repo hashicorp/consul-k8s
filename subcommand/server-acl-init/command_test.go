@@ -245,6 +245,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Cleanup controller token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-cleanup-controller"},
+			PolicyNames: []string{"connect-inject-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -401,6 +409,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
+			TestName:    "Cleanup controller ACL token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-cleanup-controller"},
+			PolicyNames: []string{"connect-inject-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			LocalToken:  true,
+		},
+		{
 			TestName:    "Controller token",
 			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token-dc2"},
@@ -534,6 +550,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		{
 			TestName:    "Health Checks ACL token",
 			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			PolicyNames: []string{"connect-inject-token"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+		},
+		{
+			TestName:    "Cleanup controller ACL token",
+			TokenFlags:  []string{"-create-inject-token", "-enable-cleanup-controller"},
 			PolicyNames: []string{"connect-inject-token"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},
@@ -1892,6 +1914,7 @@ func completeSetup(t *testing.T) (*fake.Clientset, *testutil.TestServer) {
 		c.ACL.Enabled = true
 	})
 	require.NoError(t, err)
+	svr.WaitForLeader(t)
 
 	return k8s, svr
 }
@@ -1952,6 +1975,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 	})
 	require.NoError(t, err)
+	primarySvr.WaitForLeader(t)
 
 	var aclReplicationToken string
 	if bootToken == "" {
@@ -1999,6 +2023,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 	})
 	require.NoError(t, err)
+	secondarySvr.WaitForLeader(t)
 
 	// Our consul client will use the secondary dc.
 	clientToken := bootToken

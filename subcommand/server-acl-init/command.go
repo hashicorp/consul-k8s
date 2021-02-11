@@ -83,6 +83,8 @@ type Command struct {
 	// Flag to indicate that the health checks controller is enabled.
 	flagEnableHealthChecks bool
 
+	flagEnableCleanupController bool
+
 	flagLogLevel string
 	flagTimeout  time.Duration
 
@@ -197,6 +199,9 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", false,
 		"Toggle for adding ACL rules for the health check controller to the connect ACL token. Requires -create-inject-token to be also be set.")
+
+	c.flags.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
+		"Toggle for adding ACL rules for the cleanup controller to the connect ACL token. Requires -create-inject-token to be also be set.")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
@@ -481,7 +486,7 @@ func (c *Command) Run(args []string) int {
 
 		// If health checks or namespaces are enabled,
 		// then the connect injector needs an ACL token.
-		if c.flagEnableNamespaces || c.flagEnableHealthChecks {
+		if c.flagEnableNamespaces || c.flagEnableHealthChecks || c.flagEnableCleanupController {
 			injectRules, err := c.injectRules()
 			if err != nil {
 				c.log.Error("Error templating inject rules", "err", err)
