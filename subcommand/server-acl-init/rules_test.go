@@ -1,6 +1,7 @@
 package serveraclinit
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -493,31 +494,32 @@ namespace_prefix "prefix-" {
 	}
 }
 
+// There are three true/false settings so 8 permutations to test.
 func TestInjectRules(t *testing.T) {
 	cases := []struct {
-		Name               string
-		EnableNamespaces   bool
-		EnableHealthChecks bool
-		Expected           string
+		EnableNamespaces        bool
+		EnableHealthChecks      bool
+		EnableCleanupController bool
+		Expected                string
 	}{
 		{
-			"Namespaces are disabled, health checks controller disabled",
-			false,
-			false,
-			"",
+			EnableNamespaces:        false,
+			EnableHealthChecks:      false,
+			EnableCleanupController: false,
+			Expected:                "",
 		},
 		{
-			"Namespaces are enabled, health checks controller disabled",
-			true,
-			false,
-			`
+			EnableNamespaces:        true,
+			EnableHealthChecks:      false,
+			EnableCleanupController: false,
+			Expected: `
 operator = "write"`,
 		},
 		{
-			"Namespaces are disabled, health checks controller enabled",
-			false,
-			true,
-			`
+			EnableNamespaces:        false,
+			EnableHealthChecks:      true,
+			EnableCleanupController: false,
+			Expected: `
 node_prefix "" {
   policy = "write"
 }
@@ -526,10 +528,22 @@ node_prefix "" {
   }`,
 		},
 		{
-			"Namespaces are enabled, health checks controller enabled",
-			true,
-			true,
-			`
+			EnableNamespaces:        false,
+			EnableHealthChecks:      false,
+			EnableCleanupController: true,
+			Expected: `
+node_prefix "" {
+  policy = "write"
+}
+  service_prefix "" {
+    policy = "write"
+  }`,
+		},
+		{
+			EnableNamespaces:        true,
+			EnableHealthChecks:      true,
+			EnableCleanupController: false,
+			Expected: `
 operator = "write"
 node_prefix "" {
   policy = "write"
@@ -540,15 +554,60 @@ namespace_prefix "" {
   }
 }`,
 		},
+		{
+			EnableNamespaces:        true,
+			EnableHealthChecks:      false,
+			EnableCleanupController: true,
+			Expected: `
+operator = "write"
+node_prefix "" {
+  policy = "write"
+}
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			EnableNamespaces:        true,
+			EnableHealthChecks:      true,
+			EnableCleanupController: true,
+			Expected: `
+operator = "write"
+node_prefix "" {
+  policy = "write"
+}
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "write"
+  }
+}`,
+		},
+		{
+			EnableNamespaces:        false,
+			EnableHealthChecks:      true,
+			EnableCleanupController: true,
+			Expected: `
+node_prefix "" {
+  policy = "write"
+}
+  service_prefix "" {
+    policy = "write"
+  }`,
+		},
 	}
 
 	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
+		caseName := fmt.Sprintf("ns=%t health=%t cleanup=%t",
+			tt.EnableNamespaces, tt.EnableHealthChecks, tt.EnableCleanupController)
+		t.Run(caseName, func(t *testing.T) {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:   tt.EnableNamespaces,
-				flagEnableHealthChecks: tt.EnableHealthChecks,
+				flagEnableNamespaces:        tt.EnableNamespaces,
+				flagEnableHealthChecks:      tt.EnableHealthChecks,
+				flagEnableCleanupController: tt.EnableCleanupController,
 			}
 
 			injectorRules, err := cmd.injectRules()
