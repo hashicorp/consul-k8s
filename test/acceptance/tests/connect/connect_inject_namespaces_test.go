@@ -1,7 +1,9 @@
 package connect
 
 import (
+	"context"
 	"strconv"
+	"strings"
 	"testing"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
@@ -10,7 +12,9 @@ import (
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticServerNamespace = "ns1"
@@ -175,6 +179,124 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				staticClientName,
 				[]string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"},
 				"http://localhost:1234")
+		})
+	}
+}
+
+// Test the cleanup controller that cleans up force-killed pods.
+// These tests currently only test non-secure and secure without auto-encrypt installations
+// because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
+// and non-auto-encrypt secure installations, so testing just one is enough.
+func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
+	consulDestNS := "consul-dest"
+	cases := []struct {
+		name                 string
+		destinationNamespace string
+		mirrorK8S            bool
+		secure               bool
+	}{
+		{
+			"single destination namespace",
+			consulDestNS,
+			false,
+			false,
+		},
+		{
+			"single destination namespace; secure",
+			consulDestNS,
+			false,
+			true,
+		},
+		{
+			"mirror k8s namespaces",
+			consulDestNS,
+			true,
+			false,
+		},
+		{
+			"mirror k8s namespaces; secure",
+			consulDestNS,
+			true,
+			true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := suite.Config()
+			ctx := suite.Environment().DefaultContext(t)
+
+			helmValues := map[string]string{
+				"global.enableConsulNamespaces": "true",
+				"connectInject.enabled":         "true",
+				// When mirroringK8S is set, this setting is ignored.
+				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
+				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
+
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+			}
+
+			releaseName := helpers.RandomName()
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+
+			consulCluster.Create(t)
+
+			logger.Logf(t, "creating namespace %s", staticClientNamespace)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+			})
+
+			logger.Log(t, "creating static-client deployment")
+			staticClientOpts := &terratestk8s.KubectlOptions{
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+				Namespace:   staticClientNamespace,
+			}
+			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+
+			logger.Log(t, "waiting for static-client to be registered with Consul")
+			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+			expectedConsulNS := staticClientNamespace
+			if !c.mirrorK8S {
+				expectedConsulNS = c.destinationNamespace
+			}
+			consulQueryOpts := &api.QueryOptions{Namespace: expectedConsulNS}
+			retry.Run(t, func(r *retry.R) {
+				for _, name := range []string{"static-client", "static-client-sidecar-proxy"} {
+					instances, _, err := consulClient.Catalog().Service(name, "", consulQueryOpts)
+					r.Check(err)
+
+					if len(instances) != 1 {
+						r.Errorf("expected 1 instance of %s", name)
+					}
+				}
+			})
+
+			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(staticClientNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
+			require.NoError(t, err)
+			require.Len(t, pods.Items, 1)
+			podName := pods.Items[0].Name
+
+			logger.Logf(t, "force killing the static-client pod %q", podName)
+			var gracePeriod int64 = 0
+			err = ctx.KubernetesClient(t).CoreV1().Pods(staticClientNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			require.NoError(t, err)
+
+			logger.Log(t, "ensuring pod is deregistered")
+			retry.Run(t, func(r *retry.R) {
+				for _, name := range []string{"static-client", "static-client-sidecar-proxy"} {
+					instances, _, err := consulClient.Catalog().Service(name, "", consulQueryOpts)
+					r.Check(err)
+
+					for _, instance := range instances {
+						if strings.Contains(instance.ServiceID, podName) {
+							r.Errorf("%s is still registered", instance.ServiceID)
+						}
+					}
+				}
+			})
 		})
 	}
 }
