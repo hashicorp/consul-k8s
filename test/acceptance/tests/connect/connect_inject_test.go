@@ -141,20 +141,8 @@ func TestConnectInject_CleanupController(t *testing.T) {
 			ns := ctx.KubectlOptions(t).Namespace
 			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
 			require.NoError(t, err)
-
-			// There should only be one pod because we set replicas to 1 but
-			// in some cases, the previous test's static-client pod is still
-			// terminating so we filter by ready pods.
-			var podName string
-			for _, pod := range pods.Items {
-				if helpers.IsReady(pod) {
-					podName = pod.Name
-					break
-				}
-			}
-			if podName == "" {
-				t.Errorf("no ready static-client pods: pods=%#v", pods)
-			}
+			require.Len(t, pods.Items, 1)
+			podName := pods.Items[0].Name
 
 			logger.Logf(t, "force killing the static-client pod %q", podName)
 			var gracePeriod int64 = 0
