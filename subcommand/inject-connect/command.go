@@ -398,13 +398,14 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagEnableCleanupController {
 		cleanupResource := connectinject.CleanupResource{
-			Log:              logger.Named("cleanupResource"),
-			KubernetesClient: c.clientset,
-			Ctx:              ctx,
-			ReconcilePeriod:  c.flagCleanupControllerReconcilePeriod,
-			ConsulClient:     c.consulClient,
-			ConsulScheme:     consulURL.Scheme,
-			ConsulPort:       consulURL.Port(),
+			Log:                    logger.Named("cleanupResource"),
+			KubernetesClient:       c.clientset,
+			Ctx:                    ctx,
+			ReconcilePeriod:        c.flagCleanupControllerReconcilePeriod,
+			ConsulClient:           c.consulClient,
+			ConsulScheme:           consulURL.Scheme,
+			ConsulPort:             consulURL.Port(),
+			EnableConsulNamespaces: c.flagEnableNamespaces,
 		}
 		cleanupCtrl := &controller.Controller{
 			Log:      logger.Named("cleanupController"),
