@@ -391,7 +391,8 @@ func (c *Command) Run(args []string) int {
 		healthResource := connectinject.HealthCheckResource{
 			Log:                 logger.Named("healthCheckResource"),
 			KubernetesClientset: c.clientset,
-			ConsulUrl:           consulURL,
+			ConsulScheme:        consulURL.Scheme,
+			ConsulPort:          consulURL.Port(),
 			Ctx:                 ctx,
 			ReconcilePeriod:     c.flagHealthChecksReconcilePeriod,
 		}

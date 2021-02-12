@@ -3,7 +3,6 @@ package connectinject
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -38,8 +37,11 @@ type HealthCheckResource struct {
 	Log                 hclog.Logger
 	KubernetesClientset kubernetes.Interface
 
-	// ConsulUrl holds the url information for client connections.
-	ConsulUrl *url.URL
+	// ConsulScheme is the scheme to use when making API calls to Consul,
+	// i.e. "http" or "https".
+	ConsulScheme string
+	// ConsulPort is the port to make HTTP API calls to Consul agents on.
+	ConsulPort string
 	// ReconcilePeriod is the period by which reconcile gets called.
 	// default to 1 minute.
 	ReconcilePeriod time.Duration
@@ -52,25 +54,20 @@ type HealthCheckResource struct {
 // It initially reconciles at startup and is then invoked after every
 // ReconcilePeriod expires.
 func (h *HealthCheckResource) Run(stopCh <-chan struct{}) {
-	err := h.Reconcile()
-	if err != nil {
-		h.Log.Error("reconcile returned an error", "err", err)
-	}
-
 	reconcileTimer := time.NewTimer(h.ReconcilePeriod)
 	defer reconcileTimer.Stop()
 
 	for {
+		h.reconcile()
+		reconcileTimer.Reset(h.ReconcilePeriod)
+
 		select {
 		case <-stopCh:
 			h.Log.Info("received stop signal, shutting down")
 			return
 
 		case <-reconcileTimer.C:
-			if err := h.Reconcile(); err != nil {
-				h.Log.Error("reconcile returned an error", "err", err)
-			}
-			reconcileTimer.Reset(h.ReconcilePeriod)
+			// Fall through and continue the loop.
 		}
 	}
 }
@@ -106,7 +103,7 @@ func (h *HealthCheckResource) Informer() cache.SharedIndexInformer {
 // Two primary use cases are handled, new pods will get a new consul TTL health check
 // registered against their respective agent and service, and updates to pods will have
 // this TTL health check updated to reflect the pod's readiness status.
-func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
+func (h *HealthCheckResource) Upsert(_ string, raw interface{}) error {
 	pod, ok := raw.(*corev1.Pod)
 	if !ok {
 		return fmt.Errorf("failed to cast to a pod object")
@@ -119,10 +116,10 @@ func (h *HealthCheckResource) Upsert(key string, raw interface{}) error {
 	return nil
 }
 
-// Reconcile iterates through all Pods with the appropriate label and compares the
+// reconcile iterates through all Pods with the appropriate label and compares the
 // current health check status against that which is stored in Consul and updates
 // the consul health check accordingly. If the health check doesn't yet exist it will create it.
-func (h *HealthCheckResource) Reconcile() error {
+func (h *HealthCheckResource) reconcile() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.Log.Debug("starting reconcile")
@@ -131,7 +128,7 @@ func (h *HealthCheckResource) Reconcile() error {
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
 		h.Log.Error("unable to get pods", "err", err)
-		return err
+		return
 	}
 	// Reconcile the state of each pod in the podList.
 	for _, pod := range podList.Items {
@@ -141,7 +138,6 @@ func (h *HealthCheckResource) Reconcile() error {
 		}
 	}
 	h.Log.Debug("finished reconcile")
-	return nil
 }
 
 // reconcilePod will reconcile a pod. This is the common work for both Upsert and Reconcile.
@@ -273,7 +269,7 @@ func (h *HealthCheckResource) getReadyStatusAndReason(pod *corev1.Pod) (string, 
 
 // getConsulClient returns an *api.Client that points at the consul agent local to the pod.
 func (h *HealthCheckResource) getConsulClient(pod *corev1.Pod) (*api.Client, error) {
-	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulUrl.Scheme, pod.Status.HostIP, h.ConsulUrl.Port())
+	newAddr := fmt.Sprintf("%s://%s:%s", h.ConsulScheme, pod.Status.HostIP, h.ConsulPort)
 	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
 	if pod.Annotations[annotationConsulNamespace] != "" {
