@@ -32,7 +32,8 @@ type CleanupResource struct {
 	// i.e. "http" or "https".
 	ConsulScheme string
 	// ConsulPort is the port to make HTTP API calls to Consul agents on.
-	ConsulPort string
+	ConsulPort             string
+	EnableConsulNamespaces bool
 
 	lock sync.Mutex
 }
@@ -75,11 +76,36 @@ func (c *CleanupResource) reconcile() {
 		c.Log.Error("unable to get nodes", "error", err)
 		return
 	}
-	serviceNames, _, err := c.ConsulClient.Catalog().Services(nil)
-	if err != nil {
-		c.Log.Error("unable to get Consul services", "error", err)
-		return
+
+	// namespacesToServiceNames maps from Consul namespace to the list of service
+	// names registered in that namespace.
+	// If Consul namespaces are disabled, there will be only one key with value
+	// "", i.e. the empty string.
+	namespacesToServiceNames := make(map[string][]string)
+	if c.EnableConsulNamespaces {
+		namespaces, _, err := c.ConsulClient.Namespaces().List(nil)
+		if err != nil {
+			c.Log.Error("unable to get Consul namespaces", "error", err)
+			return
+		}
+		for _, ns := range namespaces {
+			namespacesToServiceNames[ns.Name] = nil
+		}
+	} else {
+		// This allows us to treat OSS the same as enterprise for the rest of
+		// the code path.
+		namespacesToServiceNames[""] = nil
 	}
+
+	for ns := range namespacesToServiceNames {
+		serviceNames, _, err := c.ConsulClient.Catalog().Services(&capi.QueryOptions{Namespace: ns})
+		if err != nil {
+			c.Log.Error("unable to get Consul services", "error", err)
+			return
+		}
+		namespacesToServiceNames[ns] = keys(serviceNames)
+	}
+
 	podList, err := c.KubernetesClient.CoreV1().Pods(corev1.NamespaceAll).List(c.Ctx,
 		metav1.ListOptions{LabelSelector: labelInject})
 	if err != nil {
@@ -93,32 +119,34 @@ func (c *CleanupResource) reconcile() {
 	}
 
 	// For each registered service, find the associated pod.
-	for serviceName := range serviceNames {
-		serviceInstances, _, err := c.ConsulClient.Catalog().Service(serviceName, "", nil)
-		if err != nil {
-			c.Log.Error("unable to get Consul service", "name", serviceName, "error", err)
-			return
-		}
-		for _, instance := range serviceInstances {
-			podName, hasPodMeta := instance.ServiceMeta[MetaKeyPodName]
-			k8sNamespace, hasNSMeta := instance.ServiceMeta[MetaKeyKubeNS]
-			if hasPodMeta && hasNSMeta {
+	for ns, serviceNames := range namespacesToServiceNames {
+		for _, serviceName := range serviceNames {
+			serviceInstances, _, err := c.ConsulClient.Catalog().Service(serviceName, "", &capi.QueryOptions{Namespace: ns})
+			if err != nil {
+				c.Log.Error("unable to get Consul service", "name", serviceName, "error", err)
+				return
+			}
+			for _, instance := range serviceInstances {
+				podName, hasPodMeta := instance.ServiceMeta[MetaKeyPodName]
+				k8sNamespace, hasNSMeta := instance.ServiceMeta[MetaKeyKubeNS]
+				if hasPodMeta && hasNSMeta {
 
-				// Check if the instance matches a running pod. If not, deregister it.
-				if _, podExists := currentPods[currentPodsKey(podName, k8sNamespace)]; !podExists {
-					if !nodeInCluster(kubeNodes, instance.Node) {
-						c.Log.Debug("skipping deregistration because instance is from node not in this cluster",
-							"pod", podName, "id", instance.ServiceID, "node", instance.Node)
-						continue
-					}
+					// Check if the instance matches a running pod. If not, deregister it.
+					if _, podExists := currentPods[currentPodsKey(podName, k8sNamespace)]; !podExists {
+						if !nodeInCluster(kubeNodes, instance.Node) {
+							c.Log.Debug("skipping deregistration because instance is from node not in this cluster",
+								"pod", podName, "id", instance.ServiceID, "ns", ns, "node", instance.Node)
+							continue
+						}
 
-					c.Log.Info("found service instance from terminated pod still registered", "pod", podName, "id", instance.ServiceID)
-					err := c.deregisterInstance(instance, instance.Address)
-					if err != nil {
-						c.Log.Error("unable to deregister service instance", "id", instance.ServiceID, "error", err)
-						continue
+						c.Log.Info("found service instance from terminated pod still registered", "pod", podName, "id", instance.ServiceID, "ns", ns)
+						err := c.deregisterInstance(instance, instance.Address)
+						if err != nil {
+							c.Log.Error("unable to deregister service instance", "id", instance.ServiceID, "ns", ns, "error", err)
+							continue
+						}
+						c.Log.Info("service instance deregistered", "id", instance.ServiceID, "ns", ns)
 					}
-					c.Log.Info("service instance deregistered", "id", instance.ServiceID)
 				}
 			}
 		}
@@ -145,20 +173,23 @@ func (c *CleanupResource) Delete(key string, obj interface{}) error {
 	}
 	kubeNS := pod.Namespace
 	podName := pod.Name
+	// NOTE: This will be an empty string with Consul OSS.
+	consulNS := pod.ObjectMeta.Annotations[annotationConsulNamespace]
 
 	// Look for both the service and its sidecar proxy.
 	consulServiceNames := []string{serviceName, fmt.Sprintf("%s-sidecar-proxy", serviceName)}
 
 	for _, consulServiceName := range consulServiceNames {
 		instances, _, err := c.ConsulClient.Catalog().Service(consulServiceName, "", &capi.QueryOptions{
-			Filter: fmt.Sprintf(`ServiceMeta[%q] == %q and ServiceMeta[%q] == %q`, MetaKeyPodName, podName, MetaKeyKubeNS, kubeNS),
+			Filter:    fmt.Sprintf(`ServiceMeta[%q] == %q and ServiceMeta[%q] == %q`, MetaKeyPodName, podName, MetaKeyKubeNS, kubeNS),
+			Namespace: consulNS,
 		})
 		if err != nil {
 			c.Log.Error("unable to get Consul Services", "error", err)
 			return err
 		}
 		if len(instances) == 0 {
-			c.Log.Debug("terminated pod had no still-registered instances", "service", consulServiceName, "pod", podName)
+			c.Log.Debug("terminated pod had no still-registered instances", "service", consulServiceName, "pod", podName, "ns", consulNS)
 			continue
 		}
 
@@ -170,13 +201,13 @@ func (c *CleanupResource) Delete(key string, obj interface{}) error {
 			// get the delete event if a pod in this cluster is deleted so
 			// we know this is one of our instances.
 
-			c.Log.Info("found service instance from terminated pod still registered", "pod", podName, "id", instance.ServiceID)
+			c.Log.Info("found service instance from terminated pod still registered", "pod", podName, "id", instance.ServiceID, "ns", consulNS)
 			err := c.deregisterInstance(instance, pod.Status.HostIP)
 			if err != nil {
 				c.Log.Error("unable to deregister service instance", "id", instance.ServiceID, "error", err)
 				return err
 			}
-			c.Log.Info("service instance deregistered", "id", instance.ServiceID)
+			c.Log.Info("service instance deregistered", "id", instance.ServiceID, "ns", consulNS)
 		}
 	}
 	return nil
@@ -211,6 +242,9 @@ func (c *CleanupResource) Informer() cache.SharedIndexInformer {
 func (c *CleanupResource) deregisterInstance(instance *capi.CatalogService, hostIP string) error {
 	fullAddr := fmt.Sprintf("%s://%s:%s", c.ConsulScheme, hostIP, c.ConsulPort)
 	localConfig := capi.DefaultConfig()
+	if instance.Namespace != "" {
+		localConfig.Namespace = instance.Namespace
+	}
 	localConfig.Address = fullAddr
 	client, err := consul.NewClient(localConfig)
 	if err != nil {
@@ -235,4 +269,13 @@ func nodeInCluster(nodes *corev1.NodeList, nodeName string) bool {
 		}
 	}
 	return false
+}
+
+// keys returns the keys of m.
+func keys(m map[string][]string) []string {
+	var ks []string
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
 }
