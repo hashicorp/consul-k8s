@@ -435,8 +435,7 @@ func TestReconcile_IgnorePodsWithoutInjectLabel(t *testing.T) {
 	server, client, resource := testServerAgentResourceAndController(t, pod)
 	defer server.Stop()
 	// Start the reconciler, it should not create a health check.
-	err := resource.Reconcile()
-	require.NoError(err)
+	resource.reconcile()
 	actual := getConsulAgentChecks(t, client, testHealthCheckID)
 	require.Nil(actual)
 }
@@ -626,7 +625,6 @@ func TestReconcilerShutdown(t *testing.T) {
 	healthResource := HealthCheckResource{
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: k8sclientset,
-		ConsulUrl:           nil,
 		ReconcilePeriod:     5 * time.Second,
 	}
 
@@ -691,13 +689,14 @@ func TestReconcileRun(t *testing.T) {
 	require.NoError(err)
 	client, err := api.NewClient(clientConfig)
 	require.NoError(err)
-	consulUrl, err := url.Parse(serverAddress)
+	consulURL, err := url.Parse(serverAddress)
 	require.NoError(err)
 
 	healthResource := HealthCheckResource{
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: k8sclientset,
-		ConsulUrl:           consulUrl,
+		ConsulScheme:        consulURL.Scheme,
+		ConsulPort:          consulURL.Port(),
 		ReconcilePeriod:     100 * time.Millisecond,
 	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -767,13 +766,14 @@ func testServerAgentResourceAndControllerWithConsulNS(t *testing.T, pod *corev1.
 	require.NoError(err)
 
 	schema := "http://"
-	consulUrl, err := url.Parse(schema + s.HTTPAddr)
+	consulURL, err := url.Parse(schema + s.HTTPAddr)
 	require.NoError(err)
 
 	healthResource := HealthCheckResource{
 		Log:                 hclog.Default().Named("healthCheckResource"),
 		KubernetesClientset: fake.NewSimpleClientset(pod),
-		ConsulUrl:           consulUrl,
+		ConsulScheme:        consulURL.Scheme,
+		ConsulPort:          consulURL.Port(),
 		ReconcilePeriod:     0,
 	}
 	return s, client, &healthResource
