@@ -245,6 +245,11 @@ global:
     # Only applicable if global.metrics.enabled is true.
     agentMetricsRetentionTime: 1m
 
+    # If true, mesh, terminating, and ingress gateways will expose their
+    # Envoy metrics on port 20200 at the /metrics path and all gateway pods
+    # will have Prometheus scrape annotations. Only applicable if global.metrics.enabled is true.
+    enableGatewayMetrics: true
+
   # The consul sidecar ensures the Consul services
   # are always registered with their local Consul clients and is used by the
   # ingress/terminating/mesh gateways as well as with every Connect-injected service.

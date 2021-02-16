@@ -35,6 +35,11 @@ spec:
         component: mesh-gateway
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/metrics"
+        "prometheus.io/port": "20200"
+        {{- end }}
         {{- if .Values.meshGateway.annotations }}
         {{- tpl .Values.meshGateway.annotations . | nindent 8 }}
         {{- end }}
@@ -172,6 +177,9 @@ spec:
                   meta {
                     consul-wan-federation = "1"
                   }
+                  {{- end }}
+                  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+                  proxy { config { envoy_prometheus_bind_addr = "${POD_IP}:20200" } }
                   {{- end }}
                   port = {{ .Values.meshGateway.containerPort }}
                   address = "${POD_IP}"
