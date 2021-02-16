@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.30.0 (Feb 16, 2021)
+
 BREAKING CHANGES:
 * The following Helm settings are no longer supported and will cause errors on `helm upgrade`.
   See [Upgrade to CRDs](https://www.consul.io/docs/k8s/crds/upgrade-to-crds)
