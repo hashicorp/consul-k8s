@@ -34,6 +34,8 @@ IMPROVEMENTS:
 * Consul client nodes have a new meta key called "host-ip" set to the IP of the Kubernetes node they're running on. [[GH-805](https://github.com/hashicorp/consul-helm/pull/805)]
 * Connect: the latest version of consul-k8s cleans up Consul connect service mesh instances whose pods are no longer running.
   This could happen if the pod's `preStop` hook failed to execute for some reason. [[GH-806](https://github.com/hashicorp/consul-helm/pull/806)]
+* Updated the default Consul image to `hashicorp/consul:1.9.3`.
+* Updated the default consul-k8s image to `hashicorp/consul-k8s:0.24.0`.
 
 BUG FIXES:
 * Use `rbac.authorization.k8s.io/v1` instead of `rbac.authorization.k8s.io/v1beta1` API version for the `roles` and `rolebindings` used by the `tls-init`
