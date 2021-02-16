@@ -9,27 +9,16 @@ executors:
       - TEST_RESULTS: /tmp/test-results
 
 jobs:
-  unit-helm2:
+  unit-helm:
     docker:
-      # This image is built from test/docker/Test.dockerfile
-      # helm2 must use 0.3.0 version of the image
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.3.0
-
-    steps:
-      - checkout
-      - run:
-          name: Run Unit Tests
-          command: bats ./test/unit
-  unit-helm3:
-    docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.1
 
     steps:
       - checkout
 
       - run:
           name: Run Unit Tests
-          command: bats ./test/unit
+          command: bats --jobs 4 ./test/unit
 
   go-fmt-and-vet-acceptance:
     executor: go
@@ -652,12 +641,10 @@ workflows:
           requires:
             - go-fmt-and-vet-helm-gen
       - test-helm-gen
-      - unit-helm2
-      - unit-helm3
+      - unit-helm
       - acceptance:
           requires:
-            - unit-helm2
-            - unit-helm3
+            - unit-helm
             - unit-acceptance-framework
   nightly-acceptance-tests:
     triggers:

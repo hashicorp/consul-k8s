@@ -54,6 +54,6 @@ load _helpers
       --set 'controller.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.rules | map(select(.resourceNames[0] == "release-name-consul-controller-acl-token")) | length' | tee /dev/stderr)
+      yq -r '.rules | map(select(.resourceNames[0] == "RELEASE-NAME-consul-controller-acl-token")) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }

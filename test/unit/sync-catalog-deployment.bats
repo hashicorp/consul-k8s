@@ -342,7 +342,7 @@ load _helpers
 @test "syncCatalog/Deployment: affinity not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.affinity == null' | tee /dev/stderr)
@@ -352,7 +352,7 @@ load _helpers
 @test "syncCatalog/Deployment: affinity can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.affinity=foobar' \
       . | tee /dev/stderr |
@@ -400,7 +400,7 @@ load _helpers
 @test "syncCatalog/Deployment: tolerations not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.tolerations == null' | tee /dev/stderr)
@@ -410,7 +410,7 @@ load _helpers
 @test "syncCatalog/Deployment: tolerations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.tolerations=foobar' \
       . | tee /dev/stderr |
@@ -777,7 +777,7 @@ load _helpers
 @test "syncCatalog/Deployment: default resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
@@ -787,7 +787,7 @@ load _helpers
 @test "syncCatalog/Deployment: can set resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/sync-catalog-deployment.yaml  \
+      -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.resources.requests.memory=100Mi' \
       --set 'syncCatalog.resources.requests.cpu=100m' \
@@ -845,7 +845,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'http://release-name-consul-server:8500' ]
+  [ "${actual}" = 'http://RELEASE-NAME-consul-server:8500' ]
 }
 
 @test "syncCatalog/Deployment: consul service is used when client.enabled=false and global.tls.enabled=true" {
@@ -860,7 +860,7 @@ load _helpers
 
   local actual
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
-  [ "${actual}" = 'https://release-name-consul-server:8501' ]
+  [ "${actual}" = 'https://RELEASE-NAME-consul-server:8501' ]
 
   actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
     [ "${actual}" = "/consul/tls/ca/tls.crt" ]

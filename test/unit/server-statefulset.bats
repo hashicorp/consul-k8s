@@ -91,7 +91,7 @@ load _helpers
 @test "server/StatefulSet: resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-statefulset.yaml  \
+      -s templates/server-statefulset.yaml  \
       --set 'server.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
@@ -102,7 +102,7 @@ load _helpers
 @test "server/StatefulSet: resources can be overridden with string" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-statefulset.yaml  \
+      -s templates/server-statefulset.yaml  \
       --set 'server.resources=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
@@ -532,11 +532,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  if [[ $(v2) ]]; then
-    [ "${actual}" = 4167c468ed8a709addb845f9ae4e3815a660d2ac63948e79e245e51dcbf42f82 ]
-  else
-    [ "${actual}" = dace10a37eb68bd57cf173422f8c4d567f94cae7270a752ca5bc4b573ec51fc8 ]
-  fi
+  [ "${actual}" = c67246d1e00625e07698939e328524019e0016f828b0d46fb62704a480ba9931 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -546,11 +542,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  if [[ $(v2) ]]; then
-    [ "${actual}" = 4d553d72dfbce63d407c6437bbf627b76d4c17f4238f938f2d21f57a2817e0fb ]
-  else
-    [ "${actual}" = 84bd2eb79ecec0fa8307474ce9e3ffd7f4643aa92fef5103fe4df406f90ee3d4 ]
-  fi
+  [ "${actual}" = faad7e9a87aa09fc7106bcfc81397409b036bcf4f4c4449c49484c901fc271a7 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -560,11 +552,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  if [[ $(v2) ]]; then
-    [ "${actual}" = 7c92326ad718ca8ad680a9d28ae81242beb8749530be468a9f6688e2a6671864 ]
-  else
-    [ "${actual}" = 41b6109630815e481179da6170435b0f996d37c854e1f7f160673ec44157767a ]
-  fi
+  [ "${actual}" = 7c922d7bf5e1a7e599ac6ec65ce45af6efc3f112749ffd556755748e3c6fb3ec ]
 }
 
 #--------------------------------------------------------------------

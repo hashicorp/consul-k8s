@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-ingress-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-ingress-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -1075,7 +1075,7 @@ key2: value2' \
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1135,13 +1135,13 @@ EOF
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s acl-init \
-  -secret-name="release-name-consul-ingress-gateway-ingress-gateway-acl-token" \
+  -secret-name="RELEASE-NAME-consul-ingress-gateway-ingress-gateway-acl-token" \
   -k8s-namespace=default \
   -token-sink-file=/consul/service/acl-token
 
 consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-ingress-gateway \
+  -name=RELEASE-NAME-consul-ingress-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT=8080
@@ -1317,10 +1317,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-gateway1" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-gateway2" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

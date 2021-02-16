@@ -718,7 +718,7 @@ key2: value2' \
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -767,13 +767,13 @@ EOF
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s acl-init \
-  -secret-name="release-name-consul-mesh-gateway-acl-token" \
+  -secret-name="RELEASE-NAME-consul-mesh-gateway-acl-token" \
   -k8s-namespace=default \
   -token-sink-file=/consul/service/acl-token
 
 consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -825,7 +825,7 @@ EOF
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1102,7 +1102,7 @@ EOF
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1219,7 +1219,7 @@ EOF
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
@@ -1269,7 +1269,7 @@ EOF
 
   exp='consul-k8s service-address \
   -k8s-namespace=default \
-  -name=release-name-consul-mesh-gateway \
+  -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
 WAN_ADDR="$(cat /tmp/address.txt)"
 WAN_PORT="443"
