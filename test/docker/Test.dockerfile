@@ -11,7 +11,7 @@ FROM circleci/golang:1.14
 # change the user to root so we can install stuff
 USER root
 
-ENV BATS_VERSION "1.1.0"
+ENV BATS_VERSION "1.2.1"
 ENV TERRAFORM_VERSION "0.13.5"
 
 # base packages

@@ -28,6 +28,6 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.subjects[0].name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-mesh-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-mesh-gateway" ]
 }
 

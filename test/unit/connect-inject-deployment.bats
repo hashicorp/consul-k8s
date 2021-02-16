@@ -520,7 +520,7 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"release-name-consul-k8s-auth-method\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"RELEASE-NAME-consul-k8s-auth-method\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

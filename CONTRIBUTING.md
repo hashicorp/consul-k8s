@@ -29,7 +29,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [helm](https://helm.sh)
+* [Helm 3](https://helm.sh) (Helm 2 is not supported)
   ```bash
   brew install kubernetes-helm
   ```
@@ -37,22 +37,6 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install golang
   ```
-
-### Helm 2/3
-These tests will work with both Helm 2 and 3 if run through `bats`, e.g. `bats ./test/unit`. If copying the
-test command and running yourself, e.g.
-```sh
-helm template \
-  -s templates/sync-catalog-deployment.yaml  \
-  --set 'syncCatalog.enabled=true' \
-  --set 'syncCatalog.toConsul=false' \
-  .
-```
-It's expected that the version of `helm` in your path is Helm 3.
-
-In our CI/CD the tests are run against both Helm 2 and Helm 3.
-
-**Note:** Acceptance tests require Helm 3.
 
 ### Running The Tests
 
@@ -245,7 +229,7 @@ Here are some examples of common test patterns:
           . 
     }
     ```
-    Here we are using the `assert_empty` helper command that works with both Helm 2 and 3.
+    Here we are using the `assert_empty` helper command.
     
 ### Writing Acceptance Tests
 

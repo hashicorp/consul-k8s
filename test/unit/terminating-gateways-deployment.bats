@@ -22,7 +22,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-terminating-gateway" ]
+  [ "${actual}" = "RELEASE-NAME-consul-terminating-gateway" ]
 }
 
 #--------------------------------------------------------------------
@@ -953,7 +953,7 @@ EOF
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s acl-init \
-  -secret-name="release-name-consul-terminating-gateway-terminating-gateway-acl-token" \
+  -secret-name="RELEASE-NAME-consul-terminating-gateway-terminating-gateway-acl-token" \
   -k8s-namespace=default \
   -token-sink-file=/consul/service/acl-token
 
@@ -1131,10 +1131,10 @@ EOF
       yq -s -r '.' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-gateway1" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway1" ]
 
   local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-gateway2" ]
+  [ "${actual}" = "RELEASE-NAME-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

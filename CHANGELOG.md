@@ -25,6 +25,7 @@ BREAKING CHANGES:
 * Ingress Gateways: when running on platforms that use hostnames instead of IPs for LoadBalancers (e.g. EKS)
   the hostname will now be used as the address of the ingress gateway. Previously the first IP was
   used, however, the IP could be recycled or go stale whereas the hostname will always work. [[GH-813](https://github.com/hashicorp/consul-helm/pull/813]
+* Helm 2 is no longer supported. It may still work, however the chart is no longer unit tested against Helm 2. [[GH-807](https://github.com/hashicorp/consul-helm/pull/807)]
 
 IMPROVEMENTS:
 * Add ability to set extra labels on Consul client pods. [[GH-612](https://github.com/hashicorp/consul-helm/pull/612)]

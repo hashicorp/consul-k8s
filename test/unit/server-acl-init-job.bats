@@ -93,7 +93,7 @@ load _helpers
 @test "serverACLInit/Job: fails if global.bootstrapACLs is true" {
   cd `chart_dir`
   run helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.bootstrapACLs=true' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" ]]
@@ -268,7 +268,7 @@ load _helpers
 @test "serverACLInit/Job: sync catalog acl option disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-sync-token"))' | tee /dev/stderr)
@@ -315,7 +315,7 @@ load _helpers
 @test "serverACLInit/Job: mesh gateway acl option disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -341,7 +341,7 @@ load _helpers
 @test "serverACLInit/Job: ingress gateways acl options disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -352,7 +352,7 @@ load _helpers
 @test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true (single default gateway)" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -364,7 +364,7 @@ load _helpers
 @test "serverACLInit/Job: able to define multiple ingress gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -389,7 +389,7 @@ load _helpers
 @test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true, namespaces enabled, default namespace" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -402,7 +402,7 @@ load _helpers
 @test "serverACLInit/Job: ingress gateways acl option enabled with .ingressGateways.enabled=true, namespaces enabled, no default namespace set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -416,7 +416,7 @@ load _helpers
 @test "serverACLInit/Job: multiple ingress gateways with namespaces enabled provides the correct flag format" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -447,7 +447,7 @@ load _helpers
 @test "serverACLInit/Job: terminating gateways acl options disabled by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
@@ -458,7 +458,7 @@ load _helpers
 @test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true (single default gateway)" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -470,7 +470,7 @@ load _helpers
 @test "serverACLInit/Job: able to define multiple terminating gateways" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -495,7 +495,7 @@ load _helpers
 @test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, default namespace" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -508,7 +508,7 @@ load _helpers
 @test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, no default namespace set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -522,7 +522,7 @@ load _helpers
 @test "serverACLInit/Job: multiple terminating gateways with namespaces enabled provides the correct flag format" {
   cd `chart_dir`
   local object=$(helm template \
-      -x templates/server-acl-init-job.yaml  \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
