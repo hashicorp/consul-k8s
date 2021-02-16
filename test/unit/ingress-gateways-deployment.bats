@@ -161,7 +161,7 @@ load _helpers
   [ "${actual}" = "key" ]
 }
 
-@test "ingressGateway/Deployment: CA cert volume present when TLS is enabled" {
+@test "ingressGateways/Deployment: CA cert volume present when TLS is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -256,6 +256,105 @@ load _helpers
       . | tee /dev/stderr |
       yq -s '.[0].spec.template.spec.containers[1].command | any(contains("-token-file=/consul/service/acl-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# metrics
+
+@test "ingressGateways/Deployment: when global.metrics.enabled=true, adds prometheus scrape=true annotations" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: when global.metrics.enabled=true, adds prometheus port=20200 annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  [ "${actual}" = "20200" ]
+}
+
+@test "ingressGateways/Deployment: when global.metrics.enabled=true, adds prometheus path=/metrics annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/metrics" ]
+}
+
+@test "ingressGateways/Deployment: when global.metrics.enabled=true, sets proxy setting" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set proxy setting" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableGatewayMetrics=false'  \
+      . | tee /dev/stderr |
+      yq '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ingressGateways/Deployment: when global.metrics.enabled=false, does not set proxy setting" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=false'  \
+      . | tee /dev/stderr |
+      yq '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.spec.initContainers[1].command | join(" ") | contains("envoy_prometheus_bind_addr = \"${POD_IP}:20200\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
 }
 
 #--------------------------------------------------------------------
