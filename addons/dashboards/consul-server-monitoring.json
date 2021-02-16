@@ -1,34 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "7.1.5"
-    },
-    {
-      "type": "panel",
-      "id": "graph",
-      "name": "Graph",
-      "version": ""
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -51,7 +21,7 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -68,7 +38,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "consul_raft_commitTime should remain stable throughout the life of a healthy Consul cluster. p99 slowdowns typically mean that transient issues have occurred, while consistently higher-than-normal averages typically mean that one or more nodes lacks critical resources like memory, CPU, or disk space. ",
       "fieldConfig": {
         "defaults": {
@@ -163,7 +133,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "TODO Interrogate the rate interval more\n\nRate of raft commits per server cluster. The commit count is emitted by the leader and can be considered authoritative across a datacenter.",
       "fieldConfig": {
         "defaults": {
@@ -256,7 +226,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -273,7 +243,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Shows the duration since an agent had last seen the leader. Spikes here may indicate network issues or a leader slowing or becoming unavailable.",
       "fieldConfig": {
         "defaults": {
@@ -369,7 +339,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "This panel should show \"No data\" in a stable cluster. Some leadership transition events are expected, such as during cluster upgrades. Unexpected events may indicate an issue with cluster stability. ",
       "fieldConfig": {
         "defaults": {
@@ -470,7 +440,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "A boolean value that will show 1 if there are no issues, and 0 if autopilot has detected an issue. First, ensure that the cluster has an operational leader. If so, ensure that all nodes have sufficient IO throughput and memory.",
       "fieldConfig": {
         "defaults": {
@@ -560,7 +530,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -577,7 +547,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -669,7 +639,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -750,7 +720,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -767,7 +737,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Shows the rate of domain queries per node, bucketed into 5 minute intervals.",
       "fieldConfig": {
         "defaults": {
@@ -862,7 +832,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Shows the time spent handling a domain queries for each node. A spike here may indicate that there are too many concurrent domain queries, or the catalog is under high contention.",
       "fieldConfig": {
         "defaults": {
@@ -956,7 +926,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Show the time spent handling a reverse DNS query for the given node.",
       "fieldConfig": {
         "defaults": {
@@ -1047,7 +1017,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1064,7 +1034,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Shows the rate of KV operations in 5 minute buckets. ",
       "fieldConfig": {
         "defaults": {
@@ -1159,7 +1129,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "This measures the time it takes to complete an update to the KV store.\n\nNOTE: If there are too many timeseries here from clients, consider filtering down to server hosts. You can set this with a prometheus scrape target based on the node's role.",
       "fieldConfig": {
         "defaults": {
@@ -1253,7 +1223,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Measures the time spent applying transaction operations.",
       "fieldConfig": {
         "defaults": {
@@ -1344,7 +1314,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1361,7 +1331,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Counts how many ACL tokens are resolved and buckets them by 5 minute intervals. ",
       "fieldConfig": {
         "defaults": {
@@ -1456,7 +1426,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Times how long it takes to resolve an ACL Token into its policies.",
       "fieldConfig": {
         "defaults": {
@@ -1550,7 +1520,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "This counts the number of times we've updated an ACL, bucketed into 5 minute intervals.",
       "fieldConfig": {
         "defaults": {
@@ -1645,7 +1615,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "This measures the time it takes to complete an update to the ACL store.",
       "fieldConfig": {
         "defaults": {
@@ -1736,7 +1706,7 @@
     },
     {
       "collapsed": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1753,7 +1723,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "This shows the rate of increase for catalog register and deregister operations. ",
       "fieldConfig": {
         "defaults": {
@@ -1854,7 +1824,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": "Prometheus",
       "description": "Measures the time it takes to complete catalog register or deregister operations.",
       "fieldConfig": {
         "defaults": {

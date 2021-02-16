@@ -1,4 +1,5 @@
 {{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -38,6 +39,11 @@ spec:
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.client.annotations }}
           {{- tpl .Values.client.annotations . | nindent 8 }}
+        {{- end }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/v1/agent/metrics"
+        "prometheus.io/port": "8500"
         {{- end }}
     spec:
     {{- if .Values.client.affinity }}
@@ -209,6 +215,9 @@ spec:
                 {{- end }}
                 {{- if .Values.client.grpc }}
                 -hcl='ports { grpc = 8502 }' \
+                {{- end }}
+                {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+                -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
                 {{- end }}
                 -config-dir=/consul/config \
                 {{- if .Values.global.acls.manageSystemACLs }}

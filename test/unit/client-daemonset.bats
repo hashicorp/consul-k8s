@@ -425,6 +425,81 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# metrics
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, adds prometheus scrape=true annotations" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, adds prometheus port=8500 annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  [ "${actual}" = "8500" ]
+}
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, adds prometheus path=/v1/agent/metrics annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/v1/agent/metrics" ]
+}
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, sets telemetry flag" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"1m\" }")' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true and global.metrics.agentMetricsRetentionTime is set, sets telemetry flag with updated retention time" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.agentMetricsRetentionTime=5m'  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"5m\" }")' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, global.tls.enabled=true and global.tls.httpsOnly=true, fail" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.tls.enabled=true'  \
+      --set 'global.tls.httpsOnly=true'  \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" ]]
+}
+
+#--------------------------------------------------------------------
 # config-configmap
 
 @test "client/DaemonSet: adds config-checksum annotation when extraConfig is blank" {
