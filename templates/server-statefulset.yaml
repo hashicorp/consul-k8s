@@ -3,6 +3,7 @@
 {{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
 {{- if .Values.server.disableFsGroupSecurityContext }}{{ fail "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." }}{{ end }}
 {{- if .Values.server.bootstrapExpect }}{{ if lt (int .Values.server.bootstrapExpect) (int .Values.server.replicas) }}{{ fail "server.bootstrapExpect cannot be less than server.replicas" }}{{ end }}{{ end }}
+{{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -48,6 +49,11 @@ spec:
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
+        {{- end }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/v1/agent/metrics"
+        "prometheus.io/port": "8500"
         {{- end }}
     spec:
     {{- if .Values.server.affinity }}
@@ -192,6 +198,9 @@ spec:
                 {{- end }}
                 {{- if .Values.server.connect }}
                 -hcl="connect { enabled = true }" \
+                {{- end }}
+                {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+                -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
                 {{- end }}
                 {{- if .Values.global.federation.enabled }}
                 -hcl="connect { enable_mesh_gateway_wan_federation = true }" \

@@ -228,6 +228,23 @@ global:
     # `<helm-release-name>-consul-federation`. Requires consul-k8s 0.15.0+.
     createFederationSecret: false
 
+  # Configures metrics for Consul service mesh
+  metrics:
+    # Configures the Helm chart’s components
+    # to expose Prometheus metrics for the Consul service mesh. By default
+    # this includes gateway metrics and sidecar metrics.
+    enabled: false
+
+    # Configures consul agent metrics. Only applicable if
+    # global.metrics.enabled is true.
+    enableAgentMetrics: false
+
+    # Configures the retention time for metrics in Consul clients and
+    # servers. This must be greater than 0 for Consul clients and servers
+    # to expose any metrics at all.
+    # Only applicable if global.metrics.enabled is true.
+    agentMetricsRetentionTime: 1m
+
   # The consul sidecar ensures the Consul services
   # are always registered with their local Consul clients and is used by the
   # ingress/terminating/mesh gateways as well as with every Connect-injected service.
