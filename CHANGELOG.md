@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.24.0 (February 16, 2021)
 
 BREAKING CHANGES
 * Connect: the `lifecycle-sidecar` command has been renamed to `consul-sidecar`. [[GH-428](https://github.com/hashicorp/consul-k8s/pull/428)]
