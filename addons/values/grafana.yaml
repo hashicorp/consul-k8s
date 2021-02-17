@@ -51,7 +51,7 @@ datasources:
       - name: Prometheus
         type: prometheus
         orgId: 1
-        url: http://prometheus:9090
+        url: http://prometheus-server
         access: proxy
         isDefault: true
         jsonData:

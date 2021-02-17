@@ -233,21 +233,25 @@ global:
     # Configures the Helm chart’s components
     # to expose Prometheus metrics for the Consul service mesh. By default
     # this includes gateway metrics and sidecar metrics.
+    # @type: boolean
     enabled: false
 
     # Configures consul agent metrics. Only applicable if
     # global.metrics.enabled is true.
+    # @type: boolean
     enableAgentMetrics: false
 
     # Configures the retention time for metrics in Consul clients and
     # servers. This must be greater than 0 for Consul clients and servers
     # to expose any metrics at all.
     # Only applicable if global.metrics.enabled is true.
+    # @type: string
     agentMetricsRetentionTime: 1m
 
     # If true, mesh, terminating, and ingress gateways will expose their
     # Envoy metrics on port 20200 at the /metrics path and all gateway pods
     # will have Prometheus scrape annotations. Only applicable if global.metrics.enabled is true.
+    # @type: boolean
     enableGatewayMetrics: true
 
   # The consul sidecar ensures the Consul services
@@ -1021,6 +1025,24 @@ ui:
     # ```
     # @type: string
     annotations: null
+
+  # Configurations for displaying metrics in the UI.
+  metrics:
+    # Enable displaying metrics in the UI. The default value of "-"
+    # will inherit from global.metrics.enabled value.
+    # @type: boolean
+    # @default: global.metrics.enabled
+    enabled: "-"
+    # Provider for metrics. See
+    # https://www.consul.io/docs/agent/options#ui_config_metrics_provider
+    # This value is only used if ui.enabled is set to true.
+    # @type: string
+    provider: "prometheus"
+
+    # baseURL is the URL of the prometheus server, usually the service URL.
+    # This value is only used if ui.enabled is set to true.
+    # @type: string
+    baseURL: http://prometheus-server
 
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul

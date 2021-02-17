@@ -11,7 +11,7 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
   namespace: {{ .Release.Namespace }}
   annotations:
     {}
@@ -26,7 +26,7 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
   namespace: {{ .Release.Namespace }}
 data:
   alerting_rules.yml: |
@@ -311,7 +311,7 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
 rules:
   - apiGroups:
       - ""
@@ -353,15 +353,15 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
 subjects:
   - kind: ServiceAccount
-    name: prometheus
+    name: prometheus-server
     namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: prometheus
+  name: prometheus-server
 ---
 # Source: prometheus/templates/server/service.yaml
 apiVersion: v1
@@ -373,12 +373,12 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - name: http
-      port: 9090
+      port: 80
       protocol: TCP
       targetPort: 9090
   selector:
@@ -398,7 +398,7 @@ metadata:
     release: prometheus
     chart: prometheus-13.2.1
     heritage: Helm
-  name: prometheus
+  name: prometheus-server
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
@@ -419,7 +419,7 @@ spec:
         chart: prometheus-13.2.1
         heritage: Helm
     spec:
-      serviceAccountName: prometheus
+      serviceAccountName: prometheus-server
       containers:
         - name: prometheus-server-configmap-reload
           image: "jimmidyson/configmap-reload:v0.4.0"
@@ -481,7 +481,7 @@ spec:
       volumes:
         - name: config-volume
           configMap:
-            name: prometheus
+            name: prometheus-server
         - name: storage-volume
           emptyDir:
             {}
