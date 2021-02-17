@@ -27,6 +27,18 @@ data:
       }
     }
   {{- end }}
+  {{- if (and .Values.ui.enabled (or .Values.ui.metrics.enabled (and .Values.global.metrics.enabled (eq (.Values.ui.metrics.enabled | toString) "-")))) }}
+  ui-config.json: |-
+    {
+      "ui_config": {
+        "enabled": true,
+        "metrics_provider": "{{ .Values.ui.metrics.provider }}",
+        "metrics_proxy": {
+          "base_url": "{{ .Values.ui.metrics.baseURL }}"
+        }
+      }
+    }
+  {{- end }}
   central-config.json: |-
     {
       "enable_central_service_config": true

@@ -51,7 +51,7 @@ data:
       name: Prometheus
       orgId: 1
       type: prometheus
-      url: http://prometheus:9090
+      url: http://prometheus-server
   dashboardproviders.yaml: |
     apiVersion: 1
     providers:
@@ -115,7 +115,7 @@ spec:
         app.kubernetes.io/instance: grafana
         app: grafana
       annotations:
-        checksum/config: bf2554f939bb70b6d56f2e913eeefc09fc89ae4a0500b075991d50fab5f6aa33
+        checksum/config: fe361611b10c446025dba197d3164b61849bee83c5a5984618c177dd32c056f3
         checksum/dashboards-json-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
         checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
         consul.hashicorp.com/connect-inject: "false"

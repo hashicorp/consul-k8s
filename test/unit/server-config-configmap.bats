@@ -62,6 +62,66 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# global.metrics.enabled & ui.enabled
+
+@test "server/ConfigMap: creates ui config with .ui.enabled=true and .global.metrics.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true' \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: creates ui config with .ui.enabled=true and .ui.metrics.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.metrics.enabled=true' \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .ui.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.metrics.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: updates ui config with .ui.metrics.provider" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.metrics.enabled=true' \
+      --set 'ui.metrics.provider=other' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | yq -r '.ui_config.metrics_provider' | tee /dev/stderr)
+  [ "${actual}" = "other" ]
+}
+
+@test "server/ConfigMap: updates ui config with .ui.metrics.baseURL" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.metrics.enabled=true' \
+      --set 'ui.metrics.baseURL=http://foo.bar' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | yq -r '.ui_config.metrics_proxy.base_url' | tee /dev/stderr)
+  [ "${actual}" = "http://foo.bar" ]
+}
+
+#--------------------------------------------------------------------
 # connectInject.centralConfig [DEPRECATED]
 
 @test "server/ConfigMap: centralConfig is enabled" {

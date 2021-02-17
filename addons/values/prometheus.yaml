@@ -12,10 +12,7 @@ server:
     "consul.hashicorp.com/connect-inject": "false"
   persistentVolume:
     enabled: false
-  service:
-    servicePort: 9090
   readinessProbeInitialDelay: 0
   # Speed up scraping a bit from the default
   global:
     scrape_interval: 15s
-  fullnameOverride: prometheus
