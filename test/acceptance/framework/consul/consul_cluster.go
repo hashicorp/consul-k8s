@@ -290,7 +290,7 @@ func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
 
 	// Wait for all pods in the "default" namespace to exit. A previous
 	// release may not be listed by Helm but its pods may still be terminating.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
 		consulPods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
 		if len(consulPods.Items) > 0 {
