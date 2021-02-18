@@ -1,12 +1,13 @@
 package connectinject
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) consulSidecar(pod *corev1.Pod) corev1.Container {
+func (h *Handler) consulSidecar(pod *corev1.Pod) (corev1.Container, error) {
 	command := []string{
 		"consul-k8s",
 		"consul-sidecar",
@@ -19,6 +20,32 @@ func (h *Handler) consulSidecar(pod *corev1.Pod) corev1.Container {
 
 	if period, ok := pod.Annotations[annotationSyncPeriod]; ok {
 		command = append(command, "-sync-period="+strings.TrimSpace(period))
+	}
+
+	run, err := h.shouldRunMergedMetricsServer(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	// If we need to run the merged metrics server, configure consul
+	// sidecar with the appropriate metrics flags.
+	if run {
+		mergedMetricsPort, err := h.mergedMetricsPort(pod)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		serviceMetricsPath := h.serviceMetricsPath(pod)
+
+		// Don't need to check the error since it's checked in the call to
+		// h.shouldRunMergedMetricsServer() above.
+		serviceMetricsPort, _ := h.serviceMetricsPort(pod)
+
+		command = append(command, []string{
+			"-enable-metrics-merging=true",
+			fmt.Sprintf("-merged-metrics-port=%s", mergedMetricsPort),
+			fmt.Sprintf("-service-metrics-port=%s", serviceMetricsPort),
+			fmt.Sprintf("-service-metrics-path=%s", serviceMetricsPath),
+		}...)
 	}
 
 	envVariables := []corev1.EnvVar{
@@ -65,5 +92,5 @@ func (h *Handler) consulSidecar(pod *corev1.Pod) corev1.Container {
 		},
 		Command:   command,
 		Resources: h.ConsulSidecarResources,
-	}
+	}, nil
 }
