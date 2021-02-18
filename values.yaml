@@ -314,7 +314,7 @@ server:
     # enable `server.exposeGossipAndRPCPorts` and `client.exposeGossipPorts`,
     # that will configure the LAN gossip ports on the servers and clients to be
     # hostPorts, so if you are running clients and servers on the same node the
-    # ports will conflict if they are both 8301.  When you enable
+    # ports will conflict if they are both 8301. When you enable
     # `server.exposeGossipAndRPCPorts` and `client.exposeGossipPorts`, you must
     # change this from the default to an unused port on the host, e.g. 9301. By
     # default the LAN gossip port is 8301 and configured as a containerPort on
