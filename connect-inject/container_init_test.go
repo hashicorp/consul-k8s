@@ -165,6 +165,51 @@ services {
 		},
 
 		{
+			"Metrics enabled with custom Prometheus scrape port",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[annotationPrometheusScrapePort] = "22222"
+				return pod
+			},
+			`proxy {
+	config {
+	  envoy_prometheus_bind_addr = "0.0.0.0:22222"
+	}
+    destination_service_name = "web"
+    destination_service_id = "${SERVICE_ID}"
+  }`,
+			"",
+		},
+
+		{
+			"When running the merged metrics server, configures consul connect envoy command",
+			func(pod *corev1.Pod) *corev1.Pod {
+				// The annotations to enable metrics, enable merging, and
+				// service metrics port make the condition to run the merged
+				// metrics server true. When that is the case,
+				// prometheusScrapePath and mergedMetricsPort should get
+				// rendered as -prometheus-scrape-path and
+				// -prometheus-backend-port to the consul connect envoy command.
+				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationEnableMetrics] = "true"
+				pod.Annotations[annotationEnableMetricsMerging] = "true"
+				pod.Annotations[annotationMergedMetricsPort] = "20100"
+				pod.Annotations[annotationServiceMetricsPort] = "1234"
+				pod.Annotations[annotationPrometheusScrapePort] = "22222"
+				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
+				return pod
+			},
+			`# Generate the envoy bootstrap code
+/bin/consul connect envoy \
+  -proxy-id="${PROXY_SERVICE_ID}" \
+  -prometheus-scrape-path="/scrape-path" \
+  -prometheus-backend-port="20100" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
+		},
+
+		{
 			"Upstream",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
