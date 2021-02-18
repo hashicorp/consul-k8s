@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,8 +17,12 @@ import (
 
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
+
+const metricsServerShutdownTimeout = 5 * time.Second
+const envoyMetricsAddr = "http://127.0.0.1:19000/stats/prometheus"
 
 type Command struct {
 	UI cli.Ui
@@ -28,11 +34,18 @@ type Command struct {
 	flagSet           *flag.FlagSet
 	flagLogLevel      string
 
+	// Flags to configure metrics merging
+	flagEnableMetricsMerging bool
+	flagMergedMetricsPort    string
+	flagServiceMetricsPort   string
+	flagServiceMetricsPath   string
+
 	consulCommand []string
 
-	once  sync.Once
-	help  string
-	sigCh chan os.Signal
+	logger hclog.Logger
+	once   sync.Once
+	help   string
+	sigCh  chan os.Signal
 }
 
 func (c *Command) init() {
@@ -44,6 +57,16 @@ func (c *Command) init() {
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\". Defaults to info.")
 
+	c.flagSet.BoolVar(&c.flagEnableMetricsMerging, "enable-metrics-merging", false, "Enables consul sidecar to run a merged metrics endpoint. Defaults to false.")
+	// -merged-metrics-port, -service-metrics-port, and -service-metrics-path
+	// are only used if metrics merging is enabled. -merged-metrics-port and
+	// -service-metrics-path have defaults, and -service-metrics-port is
+	// expected to be set by the connect-inject handler to a valid value. The
+	// connect-inject handler will only enable metrics merging in the consul
+	// sidecar if it finds a service metrics port greater than 0.
+	c.flagSet.StringVar(&c.flagMergedMetricsPort, "merged-metrics-port", "20100", "Port to serve merged Envoy and application metrics. Defaults to 20100.")
+	c.flagSet.StringVar(&c.flagServiceMetricsPort, "service-metrics-port", "0", "Port where application metrics are being served. Defaults to 0.")
+	c.flagSet.StringVar(&c.flagServiceMetricsPath, "service-metrics-path", "/metrics", "Path where application metrics are being served. Defaults to /metrics.")
 	c.help = flags.Usage(help, c.flagSet)
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
@@ -80,55 +103,164 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
+	c.logger = logger
 
 	// Log initial configuration
-	logger.Info("Command configuration", "service-config", c.flagServiceConfig,
+	c.logger.Info("Command configuration", "service-config", c.flagServiceConfig,
 		"consul-binary", c.flagConsulBinary,
 		"sync-period", c.flagSyncPeriod,
-		"log-level", c.flagLogLevel)
+		"log-level", c.flagLogLevel,
+		"enable-metrics-merging", c.flagEnableMetricsMerging,
+		"merged-metrics-port", c.flagMergedMetricsPort,
+		"service-metrics-port", c.flagServiceMetricsPort,
+		"service-metrics-path", c.flagServiceMetricsPath,
+	)
 
 	c.consulCommand = []string{"services", "register"}
 	c.consulCommand = append(c.consulCommand, c.parseConsulFlags()...)
 	c.consulCommand = append(c.consulCommand, c.flagServiceConfig)
 
-	// ctx that we pass in to the main work loop, signal handling is handled in another thread
+	// signalCtx that we pass in to the main work loop, signal handling is handled in another thread
 	// due to the length of time it can take for the cmd to complete causing synchronization issues
 	// on shutdown. Also passing a context in so that it can interrupt the cmd and exit cleanly.
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	signalCtx, cancelFunc := context.WithCancel(context.Background())
 	go func() {
 		select {
 		case sig := <-c.sigCh:
-			logger.Info(fmt.Sprintf("%s received, shutting down", sig))
+			c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
 			cancelFunc()
 			return
 		}
 	}()
-	// The main work loop. We continually re-register our service every
-	// syncPeriod. Consul is smart enough to know when the service hasn't changed
-	// and so won't update any indices. This means we won't be causing a lot
-	// of traffic within the cluster. We tolerate Consul Clients going down
-	// and will simply re-register once it's back up.
+
+	// If metrics merging is enabled, run a merged metrics server in a goroutine
+	// that serves Envoy sidecar metrics and Connect service metrics. The merged
+	// metrics server will be shut down when a signal is received by the main
+	// for loop using shutdownMetricsServer().
+	var server *http.Server
+	if c.flagEnableMetricsMerging {
+		c.logger.Info("Metrics is enabled, creating merged metrics server.")
+		server = c.createMergedMetricsServer()
+
+		// Run the merged metrics server
+		c.logger.Info("Running merged metrics server.")
+		go func() {
+			if err = server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				c.logger.Error(err.Error())
+			}
+		}()
+	}
+
+	// The work loop for re-registering the service. We continually re-register
+	// our service every syncPeriod. Consul is smart enough to know when the
+	// service hasn't changed and so won't update any indices. This means we
+	// won't be causing a lot of traffic within the cluster. We tolerate Consul
+	// Clients going down and will simply re-register once it's back up.
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
 	for {
 		start := time.Now()
-		cmd := exec.CommandContext(ctx, c.flagConsulBinary, c.consulCommand...)
+		cmd := exec.CommandContext(signalCtx, c.flagConsulBinary, c.consulCommand...)
 
 		// Run the command and record the stdout and stderr output
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
+			c.logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
 		} else {
-			logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
+			c.logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
 		}
 		select {
 		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
 		case <-time.After(c.flagSyncPeriod):
 			continue
-		case <-ctx.Done():
+		case <-signalCtx.Done():
+			// After the signal is received, wait for the merged metrics server
+			// to gracefully shutdown as well if it has been enabled. This can
+			// take up to metricsServerShutdownTimeout seconds.
+			if c.flagEnableMetricsMerging {
+				c.logger.Info("Attempting to shut down metrics server.")
+				c.shutdownMetricsServer(server)
+			}
 			return 0
 		}
 	}
+}
+
+// shutdownMetricsServer handles gracefully shutting down the server. This will
+// call server.Shutdown(), which will indefinitely wait for connections to turn
+// idle. To avoid potentially waiting forever, we pass a context to
+// server.Shutdown() that will timeout in metricsServerShutdownTimeout (5) seconds.
+func (c *Command) shutdownMetricsServer(server *http.Server) {
+	shutdownCtx, shutdownCancelFunc := context.WithTimeout(context.Background(), metricsServerShutdownTimeout)
+	defer shutdownCancelFunc()
+
+	// If the server hasn't started up yet before this function is called, it
+	// could be nil.
+	if server != nil {
+		c.logger.Info("Merged metrics server exists, attempting to gracefully shut down server.")
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			c.logger.Error(fmt.Sprintf("Server shutdown failed: %s", err))
+			return
+		}
+		c.logger.Info("Server has been shut down.")
+	}
+}
+
+// createMergedMetricsServer sets up the merged metrics server.
+func (c *Command) createMergedMetricsServer() *http.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/stats/prometheus", c.mergedMetricsHandler)
+
+	mergedMetricsServerAddr := fmt.Sprintf("127.0.0.1:%s", c.flagMergedMetricsPort)
+	server := &http.Server{Addr: mergedMetricsServerAddr, Handler: mux}
+
+	return server
+}
+
+// mergedMetricsHandler has the logic to append both Envoy and service metrics
+// together, logging if it's unsuccessful at either.
+func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) {
+	// The default http.Client timeout is indefinite, so adding a timeout makes
+	// sure that requests don't hang.
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	envoyMetrics, err := netClient.Get(envoyMetricsAddr)
+	if err != nil {
+		// If there is an error scraping Envoy, we want the handler to return
+		// without writing anything to the response, and log the error.
+		c.logger.Error(fmt.Sprintf("Error scraping Envoy proxy metrics: %s", err.Error()))
+		return
+	}
+
+	// Write Envoy metrics to the response.
+	defer envoyMetrics.Body.Close()
+	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
+	if err != nil {
+		c.logger.Error(fmt.Sprintf("Couldn't read Envoy proxy metrics: %s", err.Error()))
+		return
+	}
+	rw.Write(envoyMetricsBody)
+
+	appMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
+	appMetrics, err := netClient.Get(appMetricsAddr)
+	if err != nil {
+		c.logger.Warn(fmt.Sprintf("Error scraping service metrics: %s", err.Error()))
+		// Since we've already written the Envoy metrics to the response, we can
+		// return at this point if we were unable to get service metrics.
+		return
+	}
+
+	// Since appMetrics will be non-nil if there are no errors, write the
+	// app metrics to the response as well.
+	defer appMetrics.Body.Close()
+	appMetricsBody, err := ioutil.ReadAll(appMetrics.Body)
+	if err != nil {
+		c.logger.Error(fmt.Sprintf("Couldn't read service metrics: %s", err.Error()))
+		return
+	}
+	rw.Write(appMetricsBody)
 }
 
 // validateFlags validates the flags.

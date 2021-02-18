@@ -82,6 +82,17 @@ const (
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 
+	// annotations for metrics to configure where Prometheus scrapes
+	// metrics from, whether to run a merged metrics endpoint on the consul
+	// sidecar, and configure the connect service metrics.
+	annotationEnableMetrics        = "consul.hashicorp.com/enable-metrics"
+	annotationEnableMetricsMerging = "consul.hashicorp.com/enable-metrics-merging"
+	annotationMergedMetricsPort    = "consul.hashicorp.com/merged-metrics-port"
+	annotationPrometheusScrapePort = "consul.hashicorp.com/prometheus-scrape-port"
+	annotationPrometheusScrapePath = "consul.hashicorp.com/prometheus-scrape-path"
+	annotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
+	annotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
+
 	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
 	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
 	// e.g. consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"
@@ -94,6 +105,8 @@ const (
 
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
+
+	defaultServiceMetricsPath = "/metrics"
 )
 
 var (
@@ -182,6 +195,15 @@ type Handler struct {
 	DefaultProxyCPULimit      resource.Quantity
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
+
+	// Default metrics settings. These will configure where Prometheus scrapes
+	// metrics from, and whether to run a merged metrics endpoint on the consul
+	// sidecar. These can be overridden via pod annotations.
+	DefaultEnableMetrics        bool
+	DefaultEnableMetricsMerging bool
+	DefaultMergedMetricsPort    string
+	DefaultPrometheusScrapePort string
+	DefaultPrometheusScrapePath string
 
 	// Resource settings for init container. All of these fields
 	// will be populated by the defaults provided in the initial flags.
@@ -352,7 +374,15 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			},
 		}
 	}
-	connectContainer := h.consulSidecar(&pod)
+	connectContainer, err := h.consulSidecar(&pod)
+	if err != nil {
+		h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring consul sidecar container: %s", err),
+			},
+		}
+	}
 	patches = append(patches, addContainer(
 		pod.Spec.Containers,
 		[]corev1.Container{esContainer, connectContainer},
@@ -364,6 +394,22 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		map[string]string{
 			annotationStatus: injected,
 		})...)
+
+	// Add annotations for metrics
+	promAnnotations, err := h.prometheusAnnotations(&pod)
+	if err != nil {
+		h.Log.Error("Error configuring prometheus annotations", "err", err, "Request Name", req.Name)
+		return &v1beta1.AdmissionResponse{
+			Result: &metav1.Status{
+				Message: fmt.Sprintf("Error configuring prometheus annotations: %s", err),
+			},
+		}
+	}
+	if promAnnotations != nil {
+		patches = append(patches, updateAnnotation(
+			pod.Annotations,
+			promAnnotations)...)
+	}
 
 	// Add Pod label for health checks
 	patches = append(patches, updateLabels(
@@ -502,6 +548,163 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 	}
 
 	return nil
+}
+
+// enableMetrics returns the default value in the handler, or overrides that
+// with the annotation if provided.
+func (h *Handler) enableMetrics(pod *corev1.Pod) (bool, error) {
+	enabled := h.DefaultEnableMetrics
+	if raw, ok := pod.Annotations[annotationEnableMetrics]; ok && raw != "" {
+		enableMetrics, err := strconv.ParseBool(raw)
+		if err != nil {
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", annotationEnableMetrics, raw, err)
+		}
+		enabled = enableMetrics
+	}
+	return enabled, nil
+}
+
+// enableMetricsMerging returns the default value in the handler, or overrides
+// that with the annotation if provided.
+func (h *Handler) enableMetricsMerging(pod *corev1.Pod) (bool, error) {
+	enabled := h.DefaultEnableMetricsMerging
+	if raw, ok := pod.Annotations[annotationEnableMetricsMerging]; ok && raw != "" {
+		enableMetricsMerging, err := strconv.ParseBool(raw)
+		if err != nil {
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", annotationEnableMetricsMerging, raw, err)
+		}
+		enabled = enableMetricsMerging
+	}
+	return enabled, nil
+}
+
+// mergedMetricsPort returns the default value in the handler, or overrides
+// that with the annotation if provided.
+func (h *Handler) mergedMetricsPort(pod *corev1.Pod) (string, error) {
+	return determineAndValidatePort(pod, annotationMergedMetricsPort, h.DefaultMergedMetricsPort)
+}
+
+// prometheusScrapePort returns the default value in the handler, or overrides
+// that with the annotation if provided.
+func (h *Handler) prometheusScrapePort(pod *corev1.Pod) (string, error) {
+	return determineAndValidatePort(pod, annotationPrometheusScrapePort, h.DefaultPrometheusScrapePort)
+}
+
+// prometheusScrapePath returns the default value in the handler, or overrides
+// that with the annotation if provided.
+func (h *Handler) prometheusScrapePath(pod *corev1.Pod) string {
+	if raw, ok := pod.Annotations[annotationPrometheusScrapePath]; ok && raw != "" {
+		return raw
+	}
+
+	return h.DefaultPrometheusScrapePath
+}
+
+// serviceMetricsPort returns the port used to register the service with Consul,
+// or overrides that with the annotation if provided.
+func (h *Handler) serviceMetricsPort(pod *corev1.Pod) (string, error) {
+	// The annotationPort is the port used to register the service with Consul.
+	// If that has been set, it'll be used as the port for getting service
+	// metrics as well, unless overridden by the service-metrics-port annotation.
+	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
+		return determineAndValidatePort(pod, annotationServiceMetricsPort, raw)
+	}
+
+	// If the annotationPort is not set, the serviceMetrics port will be 0
+	// unless overridden by the service-metrics-port annotation. If the service
+	// metrics port is 0, the consul sidecar will not run a merged metrics
+	// server.
+	return determineAndValidatePort(pod, annotationServiceMetricsPort, "0")
+}
+
+// serviceMetricsPath returns a default of /metrics, or overrides
+// that with the annotation if provided.
+func (h *Handler) serviceMetricsPath(pod *corev1.Pod) string {
+	if raw, ok := pod.Annotations[annotationServiceMetricsPath]; ok && raw != "" {
+		return raw
+	}
+
+	return defaultServiceMetricsPath
+}
+
+// prometheusAnnotations returns the Prometheus scraping configuration
+// annotations. It returns a nil map if metrics are not enabled and annotations
+// should not be set.
+func (h *Handler) prometheusAnnotations(pod *corev1.Pod) (map[string]string, error) {
+	enableMetrics, err := h.enableMetrics(pod)
+	if err != nil {
+		return map[string]string{}, err
+	}
+	prometheusScrapePort, err := h.prometheusScrapePort(pod)
+	if err != nil {
+		return map[string]string{}, err
+	}
+	prometheusScrapePath := h.prometheusScrapePath(pod)
+
+	if enableMetrics {
+		return map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/port":   prometheusScrapePort,
+			"prometheus.io/path":   prometheusScrapePath,
+		}, nil
+	}
+	return nil, nil
+}
+
+// shouldRunMergedMetricsServer returns whether we need to run a merged metrics
+// server. This is used to configure the consul sidecar command, and the init
+// container, so it can pass appropriate arguments to the consul connect envoy
+// command.
+func (h *Handler) shouldRunMergedMetricsServer(pod *corev1.Pod) (bool, error) {
+	enableMetrics, err := h.enableMetrics(pod)
+	if err != nil {
+		return false, err
+	}
+	enableMetricsMerging, err := h.enableMetricsMerging(pod)
+	if err != nil {
+		return false, err
+	}
+	serviceMetricsPort, err := h.serviceMetricsPort(pod)
+	if err != nil {
+		return false, err
+	}
+
+	// Don't need to check error here since serviceMetricsPort has been
+	// validated by calling h.serviceMetricsPort above
+	smp, _ := strconv.Atoi(serviceMetricsPort)
+
+	if enableMetrics && enableMetricsMerging && smp > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// determineAndValidatePort behaves as follows:
+// If the annotation exists, validate the port and return it.
+// If the annotation does not exist, return the default port.
+func determineAndValidatePort(pod *corev1.Pod, annotation string, defaultPort string) (string, error) {
+	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
+		port, err := portValue(pod, raw)
+		if err != nil {
+			return "", fmt.Errorf("%s annotation value of %s is not a valid integer.", annotation, raw)
+		}
+		// This checks if the port is in the valid port range.
+		if port < 1024 || port > 65535 {
+			return "", fmt.Errorf("%s annotation value of %d is not in the port range 1024-65535.", annotation, port)
+		}
+		// if the annotation exists, return the validated port
+		return fmt.Sprint(port), nil
+	}
+
+	// if the annotation does not exist, return the default
+	if defaultPort != "" {
+		port, err := portValue(pod, defaultPort)
+		if err != nil {
+			return "", fmt.Errorf("%s is not a valid port on the pod %s.", defaultPort, pod.Name)
+		}
+		return fmt.Sprint(port), nil
+	}
+	return "", nil
 }
 
 // consulNamespace returns the namespace that a service should be

@@ -75,6 +75,13 @@ type Command struct {
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
 
+	// Metrics settings.
+	flagDefaultEnableMetrics        bool
+	flagDefaultEnableMetricsMerging bool
+	flagDefaultMergedMetricsPort    string
+	flagDefaultPrometheusScrapePort string
+	flagDefaultPrometheusScrapePath string
+
 	// Consul sidecar resource settings.
 	flagConsulSidecarCPULimit      string
 	flagConsulSidecarCPURequest    string
@@ -158,6 +165,13 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+
+	// Metrics setting flags.
+	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
+	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
+	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
+	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
+	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePath, "default-prometheus-scrape-path", "/metrics", "Default path where Prometheus scrapes connect metrics from.")
 
 	// Init container resource setting flags.
 	c.flagSet.StringVar(&c.flagInitContainerCPURequest, "init-container-cpu-request", "50m", "Init container CPU request.")
@@ -262,6 +276,18 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// Validate ports in metrics flags
+	err = common.ValidatePort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+	err = common.ValidatePort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	// Validate resource request/limit flags and parse into corev1.ResourceRequirements
 	initResources, consulSidecarResources, err := c.parseAndValidateResourceFlags()
 	if err != nil {
@@ -349,28 +375,33 @@ func (c *Command) Run(args []string) int {
 
 	// Build the HTTP handler and server
 	injector := connectinject.Handler{
-		ConsulClient:               c.consulClient,
-		ImageConsul:                c.flagConsulImage,
-		ImageEnvoy:                 c.flagEnvoyImage,
-		EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
-		ImageConsulK8S:             c.flagConsulK8sImage,
-		RequireAnnotation:          !c.flagDefaultInject,
-		AuthMethod:                 c.flagACLAuthMethod,
-		ConsulCACert:               string(consulCACert),
-		DefaultProxyCPURequest:     sidecarProxyCPURequest,
-		DefaultProxyCPULimit:       sidecarProxyCPULimit,
-		DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
-		DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
-		InitContainerResources:     initResources,
-		ConsulSidecarResources:     consulSidecarResources,
-		EnableNamespaces:           c.flagEnableNamespaces,
-		AllowK8sNamespacesSet:      allowK8sNamespaces,
-		DenyK8sNamespacesSet:       denyK8sNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-		Log:                        logger.Named("handler"),
+		ConsulClient:                c.consulClient,
+		ImageConsul:                 c.flagConsulImage,
+		ImageEnvoy:                  c.flagEnvoyImage,
+		EnvoyExtraArgs:              c.flagEnvoyExtraArgs,
+		ImageConsulK8S:              c.flagConsulK8sImage,
+		RequireAnnotation:           !c.flagDefaultInject,
+		AuthMethod:                  c.flagACLAuthMethod,
+		ConsulCACert:                string(consulCACert),
+		DefaultProxyCPURequest:      sidecarProxyCPURequest,
+		DefaultProxyCPULimit:        sidecarProxyCPULimit,
+		DefaultProxyMemoryRequest:   sidecarProxyMemoryRequest,
+		DefaultProxyMemoryLimit:     sidecarProxyMemoryLimit,
+		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+		InitContainerResources:      initResources,
+		ConsulSidecarResources:      consulSidecarResources,
+		EnableNamespaces:            c.flagEnableNamespaces,
+		AllowK8sNamespacesSet:       allowK8sNamespaces,
+		DenyK8sNamespacesSet:        denyK8sNamespaces,
+		ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:        c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:        c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:     c.flagCrossNamespaceACLPolicy,
+		Log:                         logger.Named("handler"),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate", injector.Handle)

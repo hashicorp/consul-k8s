@@ -3,6 +3,9 @@ package subcommand
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -13,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +33,8 @@ func TestRun_Defaults(t *testing.T) {
 func TestRun_ExitsCleanlyonSignals(t *testing.T) {
 	t.Run("SIGINT", testRunSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testRunSignalHandling(syscall.SIGTERM))
+	t.Run("SIGINT-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGINT))
+	t.Run("SIGTERM-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGTERM))
 }
 
 func testRunSignalHandling(sig os.Signal) func(*testing.T) {
@@ -70,6 +76,161 @@ func testRunSignalHandling(sig os.Signal) func(*testing.T) {
 		require.Error(t, err)
 		_, _, err = client.Agent().Service("service-id-sidecar-proxy", nil)
 		require.Error(t, err)
+	}
+}
+
+func testRunSignalHandlingMetricsServerShutdown(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+		defer os.RemoveAll(tmpDir)
+
+		a, err := testutil.NewTestServerConfigT(t, nil)
+		require.NoError(t, err)
+		defer a.Stop()
+
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI: ui,
+		}
+
+		require.NoError(t, err)
+		// Run async because we need to kill it when the test is over.
+		exitChan := runCommandAsynchronously(&cmd, []string{
+			"-service-config", configFile,
+			"-http-addr", a.HTTPAddr,
+			"-sync-period", "1s",
+			"-enable-metrics-merging", "true",
+			"-merged-metrics-port", "20100",
+			"-service-metrics-port", "8080",
+			"-service-metrics-path", "/metrics",
+		})
+
+		// Allow the metrics server to start up
+		time.Sleep(2 * time.Second)
+
+		// Keep an open connection to the server so it will have to be drained
+		conn, err := net.Dial("tcp", "127.0.0.1:20100")
+		if err != nil {
+			fmt.Println(err)
+		}
+		go func() {
+			for {
+				_, err := conn.Write([]byte("hello"))
+				if err != nil {
+					break
+				}
+			}
+		}()
+
+		// Send a signal to consul-sidecar. The merged metrics server can take
+		// up to metricsServerShutdownTimeout to finish cleaning up.
+		cmd.sendSignal(sig)
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitChan:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(metricsServerShutdownTimeout):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
+	}
+}
+
+// Setup mock envoy metrics server
+func newMockEnvoyMetricsServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/stats/prometheus", func(rw http.ResponseWriter, r *http.Request) {
+		rw.Write([]byte("envoy metrics\n"))
+	})
+	mockEnvoyMetricsServer := httptest.NewUnstartedServer(mux)
+	l, err := net.Listen("tcp", "127.0.0.1:19000")
+	require.NoError(t, err)
+	mockEnvoyMetricsServer.Listener = l
+	return mockEnvoyMetricsServer
+}
+
+// Setup mock service metrics server
+func newMockServiceMetricsServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/metrics", func(rw http.ResponseWriter, r *http.Request) {
+		rw.Write([]byte("service metrics\n"))
+	})
+	mockServiceMetricsServer := httptest.NewUnstartedServer(mux)
+	l, err := net.Listen("tcp", "127.0.0.1:8080")
+	require.NoError(t, err)
+	mockServiceMetricsServer.Listener = l
+	return mockServiceMetricsServer
+}
+
+func TestMergedMetricsServer(t *testing.T) {
+	cases := []struct {
+		name                    string
+		runEnvoyMetricsServer   bool
+		runServiceMetricsServer bool
+		expectedOutput          string
+	}{
+		{
+			name:                    "happy path: envoy and service metrics are merged",
+			runEnvoyMetricsServer:   true,
+			runServiceMetricsServer: true,
+			expectedOutput:          "envoy metrics\nservice metrics\n",
+		},
+		{
+			name:                    "no service metrics",
+			runEnvoyMetricsServer:   true,
+			runServiceMetricsServer: false,
+			expectedOutput:          "envoy metrics\n",
+		},
+		{
+			name:                    "no envoy metrics",
+			runEnvoyMetricsServer:   false,
+			runServiceMetricsServer: true,
+			expectedOutput:          "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                       ui,
+				flagEnableMetricsMerging: true,
+				flagMergedMetricsPort:    "20100",
+				flagServiceMetricsPort:   "8080",
+				flagServiceMetricsPath:   "/metrics",
+				logger:                   hclog.Default(),
+			}
+
+			if c.runEnvoyMetricsServer {
+				mockEnvoyMetricsServer := newMockEnvoyMetricsServer(t)
+				mockEnvoyMetricsServer.Start()
+				defer mockEnvoyMetricsServer.Close()
+			}
+			if c.runServiceMetricsServer {
+				mockServiceMetricsServer := newMockServiceMetricsServer(t)
+				mockServiceMetricsServer.Start()
+				defer mockServiceMetricsServer.Close()
+			}
+
+			server := cmd.createMergedMetricsServer()
+			go func() {
+				_ = server.ListenAndServe()
+			}()
+			defer server.Close()
+
+			// Wait for the servers to come up
+			time.Sleep(2 * time.Second)
+
+			// Call the merged metrics endpoint and make assertions on the output
+			resp, err := http.Get("http://127.0.0.1:20100/stats/prometheus")
+			require.NoError(t, err)
+			bytes, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, string(bytes), c.expectedOutput)
+		})
 	}
 }
 
