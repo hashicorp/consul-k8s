@@ -34,7 +34,7 @@ func TestConsulSidecar_Default(t *testing.T) {
 		ImageConsulK8S:         "hashicorp/consul-k8s:9.9.9",
 		ConsulSidecarResources: consulSidecarResources,
 	}
-	container := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -43,6 +43,7 @@ func TestConsulSidecar_Default(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 	require.Equal(t, corev1.Container{
 		Name:  "consul-sidecar",
 		Image: "hashicorp/consul-k8s:9.9.9",
@@ -83,7 +84,7 @@ func TestConsulSidecar_AuthMethod(t *testing.T) {
 				AuthMethod:     authMethod,
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 			}
-			container := handler.consulSidecar(&corev1.Pod{
+			container, err := handler.consulSidecar(&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -92,7 +93,7 @@ func TestConsulSidecar_AuthMethod(t *testing.T) {
 					},
 				},
 			})
-
+			require.NoError(t, err)
 			if authMethod == "" {
 				require.NotContains(t, container.Command, "-token-file=/consul/connect-inject/acl-token")
 			} else {
@@ -112,7 +113,7 @@ func TestConsulSidecar_SyncPeriodAnnotation(t *testing.T) {
 		Log:            hclog.Default().Named("handler"),
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 	}
-	container := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"consul.hashicorp.com/connect-sync-period": "55s",
@@ -127,6 +128,7 @@ func TestConsulSidecar_SyncPeriodAnnotation(t *testing.T) {
 		},
 	})
 
+	require.NoError(t, err)
 	require.Contains(t, container.Command, "-sync-period=55s")
 }
 
@@ -139,7 +141,7 @@ func TestConsulSidecar_TLS(t *testing.T) {
 		ConsulCACert:           "consul-ca-cert",
 		ConsulSidecarResources: consulSidecarResources,
 	}
-	container := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -148,6 +150,7 @@ func TestConsulSidecar_TLS(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 	require.Equal(t, corev1.Container{
 		Name:  "consul-sidecar",
 		Image: "hashicorp/consul-k8s:9.9.9",
@@ -180,4 +183,37 @@ func TestConsulSidecar_TLS(t *testing.T) {
 		},
 		Resources: consulSidecarResources,
 	}, container)
+}
+
+// Test that if the conditions for running a merged metrics server are true,
+// that we pass the metrics flags to consul sidecar.
+func TestConsulSidecar_MetricsFlags(t *testing.T) {
+	handler := Handler{
+		Log:                         hclog.Default().Named("handler"),
+		ImageConsulK8S:              "hashicorp/consul-k8s:9.9.9",
+		DefaultEnableMetrics:        true,
+		DefaultEnableMetricsMerging: true,
+	}
+	container, err := handler.consulSidecar(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationMergedMetricsPort:  "20100",
+				annotationServiceMetricsPort: "8080",
+				annotationServiceMetricsPath: "/metrics",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, container.Command, "-enable-metrics-merging=true")
+	require.Contains(t, container.Command, "-merged-metrics-port=20100")
+	require.Contains(t, container.Command, "-service-metrics-port=8080")
+	require.Contains(t, container.Command, "-service-metrics-path=/metrics")
 }

@@ -2,8 +2,10 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -29,4 +31,18 @@ func Logger(level string) (hclog.Logger, error) {
 		Level:  parsedLevel,
 		Output: os.Stderr,
 	}), nil
+}
+
+// ValidatePort converts flags representing ports into integer and validates
+// that it's in the port range.
+func ValidatePort(flagName, flagValue string) error {
+	port, err := strconv.Atoi(flagValue)
+	if err != nil {
+		return errors.New(fmt.Sprintf("%s value of %s is not a valid integer.", flagName, flagValue))
+	}
+	// This checks if the port is in the valid port range.
+	if port < 1024 || port > 65535 {
+		return errors.New(fmt.Sprintf("%s value of %d is not in the port range 1024-65535.", flagName, port))
+	}
+	return nil
 }
