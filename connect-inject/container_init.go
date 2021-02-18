@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	InjectInitContainerName = "consul-connect-inject-init"
-	MetaKeyPodName          = "pod-name"
-	MetaKeyKubeNS           = "k8s-namespace"
+	InjectInitCopyContainerName = "copy-consul-bin"
+	InjectInitContainerName     = "consul-connect-inject-init"
+	MetaKeyPodName              = "pod-name"
+	MetaKeyKubeNS               = "k8s-namespace"
 )
 
 type initContainerCommandData struct {
@@ -61,6 +62,25 @@ type initContainerCommandUpstreamData struct {
 	ConsulUpstreamNamespace string
 	Datacenter              string
 	Query                   string
+}
+
+// containerInitCopyContainer returns the init container spec for the copy container which places
+// the consul binary into the shared volume.
+func (h *Handler) containerInitCopyContainer() corev1.Container {
+	// Copy the Consul binary from the image to the shared volume.
+	cmd := "cp /bin/consul /consul/connect-inject/consul"
+	return corev1.Container{
+		Name:      InjectInitCopyContainerName,
+		Image:     h.ImageConsul,
+		Resources: h.InitContainerResources,
+		VolumeMounts: []corev1.VolumeMount{
+			corev1.VolumeMount{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			},
+		},
+		Command: []string{"/bin/sh", "-ec", cmd},
+	}
 }
 
 // containerInit returns the init container spec for registering the Consul
@@ -452,8 +472,4 @@ chmod 444 /consul/connect-inject/acl-token
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul
-`
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`

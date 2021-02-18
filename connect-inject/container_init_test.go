@@ -105,10 +105,7 @@ EOF
 # Generate the envoy bootstrap code
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul`,
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
 
@@ -795,10 +792,7 @@ EOF
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -namespace="default" \
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul`,
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
 
@@ -871,10 +865,7 @@ EOF
 /bin/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -namespace="non-default" \
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul`,
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
 
@@ -956,10 +947,7 @@ chmod 444 /consul/connect-inject/acl-token
   -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="non-default" \
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul`,
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
 
@@ -1042,10 +1030,7 @@ chmod 444 /consul/connect-inject/acl-token
   -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
-
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul`,
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
 
@@ -1445,4 +1430,13 @@ func TestHandlerContainerInit_MeshGatewayModeErrors(t *testing.T) {
 		})
 	}
 
+}
+
+// Test that the init copy container has the correct command.
+func TestHandlerContainerInitCopyContainer(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	container := h.containerInitCopyContainer()
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
 }
