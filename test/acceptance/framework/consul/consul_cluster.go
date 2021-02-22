@@ -128,6 +128,21 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// always idempotently clean up resources in the cluster.
 	helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 
+	// Force delete any pods that have h.releaseName in their name because sometimes
+	// graceful termination takes a long time and since this is an uninstall
+	// we don't care that they're stopped gracefully.
+	pods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, h.releaseName) {
+			var gracePeriod int64 = 0
+			err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			if !errors.IsNotFound(err) {
+				require.NoError(t, err)
+			}
+		}
+	}
+
 	// Delete PVCs.
 	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
 
