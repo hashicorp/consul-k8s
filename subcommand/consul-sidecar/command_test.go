@@ -1,11 +1,11 @@
-package subcommand
+package consulsidecar
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -94,25 +94,27 @@ func testRunSignalHandlingMetricsServerShutdown(sig os.Signal) func(*testing.T) 
 		}
 
 		require.NoError(t, err)
+
+		randomPorts := freeport.MustTake(1)
 		// Run async because we need to kill it when the test is over.
 		exitChan := runCommandAsynchronously(&cmd, []string{
 			"-service-config", configFile,
 			"-http-addr", a.HTTPAddr,
-			"-sync-period", "1s",
-			"-enable-metrics-merging", "true",
-			"-merged-metrics-port", "20100",
+			"-enable-metrics-merging=true",
+			"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
 			"-service-metrics-port", "8080",
 			"-service-metrics-path", "/metrics",
 		})
 
-		// Allow the metrics server to start up
-		time.Sleep(2 * time.Second)
-
-		// Keep an open connection to the server so it will have to be drained
-		conn, err := net.Dial("tcp", "127.0.0.1:20100")
-		if err != nil {
-			fmt.Println(err)
-		}
+		// Keep an open connection to the server by continuously sending bytes
+		// on the connection so it will have to be drained.
+		var conn net.Conn
+		retry.Run(t, func(r *retry.R) {
+			conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", randomPorts[0]))
+			if err != nil {
+				require.NoError(r, err)
+			}
+		})
 		go func() {
 			for {
 				_, err := conn.Write([]byte("hello"))
@@ -126,43 +128,39 @@ func testRunSignalHandlingMetricsServerShutdown(sig os.Signal) func(*testing.T) 
 		// up to metricsServerShutdownTimeout to finish cleaning up.
 		cmd.sendSignal(sig)
 
+		// Will need to wait for slightly longer than the shutdown timeout to
+		// make sure that the command has exited shortly after the timeout.
+		waitForShutdown := metricsServerShutdownTimeout + 100*time.Millisecond
+
 		// Assert that it exits cleanly or timeout.
 		select {
 		case exitCode := <-exitChan:
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-		case <-time.After(metricsServerShutdownTimeout):
+		case <-time.After(waitForShutdown):
 			// Fail if the signal was not caught.
 			require.Fail(t, "timeout waiting for command to exit")
 		}
 	}
 }
 
-// Setup mock envoy metrics server
-func newMockEnvoyMetricsServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/stats/prometheus", func(rw http.ResponseWriter, r *http.Request) {
-		rw.Write([]byte("envoy metrics\n"))
-	})
-	mockEnvoyMetricsServer := httptest.NewUnstartedServer(mux)
-	l, err := net.Listen("tcp", "127.0.0.1:19000")
-	require.NoError(t, err)
-	mockEnvoyMetricsServer.Listener = l
-	return mockEnvoyMetricsServer
+type envoyMetrics struct {
 }
 
-// Setup mock service metrics server
-func newMockServiceMetricsServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/metrics", func(rw http.ResponseWriter, r *http.Request) {
-		rw.Write([]byte("service metrics\n"))
-	})
-	mockServiceMetricsServer := httptest.NewUnstartedServer(mux)
-	l, err := net.Listen("tcp", "127.0.0.1:8080")
-	require.NoError(t, err)
-	mockServiceMetricsServer.Listener = l
-	return mockServiceMetricsServer
+func (em *envoyMetrics) Get(url string) (resp *http.Response, err error) {
+	response := &http.Response{}
+	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("envoy metrics\n")))
+	return response, nil
+}
+
+type serviceMetrics struct {
+	url string
+}
+
+func (sm *serviceMetrics) Get(url string) (resp *http.Response, err error) {
+	response := &http.Response{}
+	response.Body = ioutil.NopCloser(bytes.NewReader([]byte("service metrics\n")))
+	sm.url = url
+	return response, nil
 }
 
 func TestMergedMetricsServer(t *testing.T) {
@@ -194,42 +192,51 @@ func TestMergedMetricsServer(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			randomPorts := freeport.MustTake(2)
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                       ui,
 				flagEnableMetricsMerging: true,
-				flagMergedMetricsPort:    "20100",
-				flagServiceMetricsPort:   "8080",
+				flagMergedMetricsPort:    fmt.Sprint(randomPorts[0]),
+				flagServiceMetricsPort:   fmt.Sprint(randomPorts[1]),
 				flagServiceMetricsPath:   "/metrics",
 				logger:                   hclog.Default(),
 			}
 
+			server := cmd.createMergedMetricsServer()
+
+			// Override the cmd's envoyMetricsGetter and serviceMetricsGetter
+			// with stubs.
+			em := &envoyMetrics{}
+			sm := &serviceMetrics{}
 			if c.runEnvoyMetricsServer {
-				mockEnvoyMetricsServer := newMockEnvoyMetricsServer(t)
-				mockEnvoyMetricsServer.Start()
-				defer mockEnvoyMetricsServer.Close()
+				cmd.envoyMetricsGetter = em
 			}
 			if c.runServiceMetricsServer {
-				mockServiceMetricsServer := newMockServiceMetricsServer(t)
-				mockServiceMetricsServer.Start()
-				defer mockServiceMetricsServer.Close()
+				cmd.serviceMetricsGetter = sm
 			}
 
-			server := cmd.createMergedMetricsServer()
 			go func() {
 				_ = server.ListenAndServe()
 			}()
 			defer server.Close()
 
-			// Wait for the servers to come up
-			time.Sleep(2 * time.Second)
-
-			// Call the merged metrics endpoint and make assertions on the output
-			resp, err := http.Get("http://127.0.0.1:20100/stats/prometheus")
-			require.NoError(t, err)
-			bytes, err := ioutil.ReadAll(resp.Body)
-			require.NoError(t, err)
-			require.Equal(t, string(bytes), c.expectedOutput)
+			// Call the merged metrics endpoint and make assertions on the
+			// output. retry.Run times out in 7 seconds, which should give the
+			// merged metrics server enough time to come up.
+			retry.Run(t, func(r *retry.R) {
+				resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/stats/prometheus", randomPorts[0]))
+				require.NoError(r, err)
+				bytes, err := ioutil.ReadAll(resp.Body)
+				require.NoError(r, err)
+				require.Equal(r, c.expectedOutput, string(bytes))
+				// Verify the correct service metrics url was used. The service
+				// metrics endpoint is only called if the Envoy metrics endpoint
+				// call succeeds.
+				if c.runServiceMetricsServer && c.runEnvoyMetricsServer {
+					require.Equal(r, fmt.Sprintf("http://127.0.0.1:%d%s", randomPorts[1], "/metrics"), sm.url)
+				}
+			})
 		})
 	}
 }

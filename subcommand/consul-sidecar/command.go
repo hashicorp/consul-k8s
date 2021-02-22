@@ -1,4 +1,4 @@
-package subcommand
+package consulsidecar
 
 import (
 	"context"
@@ -40,12 +40,21 @@ type Command struct {
 	flagServiceMetricsPort   string
 	flagServiceMetricsPath   string
 
+	envoyMetricsGetter   metricsGetter
+	serviceMetricsGetter metricsGetter
+
 	consulCommand []string
 
 	logger hclog.Logger
 	once   sync.Once
 	help   string
 	sigCh  chan os.Signal
+}
+
+// metricsGetter abstracts the function of retrieving metrics. It is used to
+// enable easier unit testing.
+type metricsGetter interface {
+	Get(url string) (resp *http.Response, err error)
 }
 
 func (c *Command) init() {
@@ -214,19 +223,23 @@ func (c *Command) createMergedMetricsServer() *http.Server {
 	mergedMetricsServerAddr := fmt.Sprintf("127.0.0.1:%s", c.flagMergedMetricsPort)
 	server := &http.Server{Addr: mergedMetricsServerAddr, Handler: mux}
 
+	// The default http.Client timeout is indefinite, so adding a timeout makes
+	// sure that requests don't hang.
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	// http.Client satisfies the metricsGetter interface.
+	c.envoyMetricsGetter = client
+	c.serviceMetricsGetter = client
+
 	return server
 }
 
 // mergedMetricsHandler has the logic to append both Envoy and service metrics
 // together, logging if it's unsuccessful at either.
 func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) {
-	// The default http.Client timeout is indefinite, so adding a timeout makes
-	// sure that requests don't hang.
-	netClient := &http.Client{
-		Timeout: time.Second * 10,
-	}
 
-	envoyMetrics, err := netClient.Get(envoyMetricsAddr)
+	envoyMetrics, err := c.envoyMetricsGetter.Get(envoyMetricsAddr)
 	if err != nil {
 		// If there is an error scraping Envoy, we want the handler to return
 		// without writing anything to the response, and log the error.
@@ -243,8 +256,8 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}
 	rw.Write(envoyMetricsBody)
 
-	appMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
-	appMetrics, err := netClient.Get(appMetricsAddr)
+	serviceMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
+	serviceMetrics, err := c.serviceMetricsGetter.Get(serviceMetricsAddr)
 	if err != nil {
 		c.logger.Warn(fmt.Sprintf("Error scraping service metrics: %s", err.Error()))
 		// Since we've already written the Envoy metrics to the response, we can
@@ -252,15 +265,15 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 		return
 	}
 
-	// Since appMetrics will be non-nil if there are no errors, write the
-	// app metrics to the response as well.
-	defer appMetrics.Body.Close()
-	appMetricsBody, err := ioutil.ReadAll(appMetrics.Body)
+	// Since serviceMetrics will be non-nil if there are no errors, write the
+	// service metrics to the response as well.
+	defer serviceMetrics.Body.Close()
+	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
 	if err != nil {
 		c.logger.Error(fmt.Sprintf("Couldn't read service metrics: %s", err.Error()))
 		return
 	}
-	rw.Write(appMetricsBody)
+	rw.Write(serviceMetricsBody)
 }
 
 // validateFlags validates the flags.
