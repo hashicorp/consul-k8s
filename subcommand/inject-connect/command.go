@@ -443,7 +443,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
+	// Create a channel for all controllers' exits
+	ctrlExitCh := make(chan error)
+
 	// Start the endpoints controller
+	// TODO: figure out if we should use a different logger here
 	{
 		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
 		ctrl.SetLogger(zapLogger)
@@ -461,31 +465,30 @@ func (c *Command) Run(args []string) int {
 
 		if err = (&connectinject.EndpointsController{
 			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("service-controller"),
+			Log:    ctrl.Log.WithName("controller").WithName("endpoints-controller"),
 			Scheme: mgr.GetScheme(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 			return 1
 		}
 
-		// todo: figure out proper signal handling
+		// todo: check that this works
 		go func() {
-			if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+			// Pass existing context's done channel so that the controller
+			// will stop when this context is canceled.
+			// This could be due to an interrupt signal or if any other component did not start
+			// successfully. In those cases, we want to make sure that this controller is no longer
+			// running.
+			if err := mgr.Start(ctx.Done()); err != nil {
 				setupLog.Error(err, "problem running manager")
+				// Use an existing channel for ctrl exists in case manager failed to start properly.
+				ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
 			}
-			// If ctl.Run() exits before ctx is cancelled, then our health checks
-			// controller isn't running. In that case we need to shutdown since
-			// this is unrecoverable.
-			//if ctx.Err() == nil {
-			//	ctrlExitCh <- fmt.Errorf("health checks controller exited unexpectedly")
-			//}
 		}()
 	}
 
 	// Start the cleanup controller that cleans up Consul service instances
 	// still registered after the pod has been deleted (usually due to a force delete).
-	ctrlExitCh := make(chan error)
-
 	if c.flagEnableCleanupController {
 		cleanupResource := connectinject.CleanupResource{
 			Log:                    logger.Named("cleanupResource"),
