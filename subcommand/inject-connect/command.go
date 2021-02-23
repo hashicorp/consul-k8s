@@ -464,6 +464,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		if err = (&connectinject.EndpointsController{
+			ConsulClient: c.consulClient,
 			Client: mgr.GetClient(),
 			Log:    ctrl.Log.WithName("controller").WithName("endpoints-controller"),
 			Scheme: mgr.GetScheme(),
