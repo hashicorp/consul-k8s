@@ -1,6 +1,6 @@
 // +build enterprise
 
-package subcommand
+package consulsidecar
 
 import (
 	"os"
