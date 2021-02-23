@@ -27,12 +27,13 @@ const envoyMetricsAddr = "http://127.0.0.1:19000/stats/prometheus"
 type Command struct {
 	UI cli.Ui
 
-	http              *flags.HTTPFlags
-	flagServiceConfig string
-	flagConsulBinary  string
-	flagSyncPeriod    time.Duration
-	flagSet           *flag.FlagSet
-	flagLogLevel      string
+	http                          *flags.HTTPFlags
+	flagEnableServiceRegistration bool
+	flagServiceConfig             string
+	flagConsulBinary              string
+	flagSyncPeriod                time.Duration
+	flagSet                       *flag.FlagSet
+	flagLogLevel                  string
 
 	// Flags to configure metrics merging
 	flagEnableMetricsMerging bool
@@ -59,6 +60,7 @@ type metricsGetter interface {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
+	c.flagSet.BoolVar(&c.flagEnableServiceRegistration, "enable-service-registration", true, "Enables consul sidecar to register the service with consul every sync period. Defaults to true.")
 	c.flagSet.StringVar(&c.flagServiceConfig, "service-config", "", "Path to the service config file")
 	c.flagSet.StringVar(&c.flagConsulBinary, "consul-binary", "consul", "Path to a consul binary")
 	c.flagSet.DurationVar(&c.flagSyncPeriod, "sync-period", 10*time.Second, "Time between syncing the service registration. Defaults to 10s.")
@@ -115,7 +117,8 @@ func (c *Command) Run(args []string) int {
 	c.logger = logger
 
 	// Log initial configuration
-	c.logger.Info("Command configuration", "service-config", c.flagServiceConfig,
+	c.logger.Info("Command configuration", "enable-service-registration", c.flagEnableServiceRegistration,
+		"service-config", c.flagServiceConfig,
 		"consul-binary", c.flagConsulBinary,
 		"sync-period", c.flagSyncPeriod,
 		"log-level", c.flagLogLevel,
@@ -167,32 +170,39 @@ func (c *Command) Run(args []string) int {
 	// Clients going down and will simply re-register once it's back up.
 	//
 	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
-	for {
-		start := time.Now()
-		cmd := exec.CommandContext(signalCtx, c.flagConsulBinary, c.consulCommand...)
+	if c.flagEnableServiceRegistration {
+		go func() {
+			for {
+				start := time.Now()
+				cmd := exec.CommandContext(signalCtx, c.flagConsulBinary, c.consulCommand...)
 
-		// Run the command and record the stdout and stderr output
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			c.logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
-		} else {
-			c.logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
-		}
-		select {
-		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
-		case <-time.After(c.flagSyncPeriod):
-			continue
-		case <-signalCtx.Done():
-			// After the signal is received, wait for the merged metrics server
-			// to gracefully shutdown as well if it has been enabled. This can
-			// take up to metricsServerShutdownTimeout seconds.
-			if c.flagEnableMetricsMerging {
-				c.logger.Info("Attempting to shut down metrics server.")
-				c.shutdownMetricsServer(server)
+				// Run the command and record the stdout and stderr output
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					c.logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
+				} else {
+					c.logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
+				}
+				select {
+				// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
+				case <-time.After(c.flagSyncPeriod):
+					continue
+				case <-signalCtx.Done():
+					return
+				}
 			}
-			return 0
-		}
+		}()
 	}
+
+	<-signalCtx.Done()
+	// After the signal is received, wait for the merged metrics server
+	// to gracefully shutdown as well if it has been enabled. This can
+	// take up to metricsServerShutdownTimeout seconds.
+	if c.flagEnableMetricsMerging {
+		c.logger.Info("Attempting to shut down metrics server.")
+		c.shutdownMetricsServer(server)
+	}
+	return 0
 }
 
 // shutdownMetricsServer handles gracefully shutting down the server. This will
@@ -278,12 +288,6 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 
 // validateFlags validates the flags.
 func (c *Command) validateFlags() error {
-	if c.flagServiceConfig == "" {
-		return errors.New("-service-config must be set")
-	}
-	if c.flagConsulBinary == "" {
-		return errors.New("-consul-binary must be set")
-	}
 	if c.flagSyncPeriod == 0 {
 		// if sync period is 0, then the select loop will
 		// always pick the first case, and it'll be impossible
@@ -291,14 +295,22 @@ func (c *Command) validateFlags() error {
 		return errors.New("-sync-period must be greater than 0")
 	}
 
-	_, err := os.Stat(c.flagServiceConfig)
-	if os.IsNotExist(err) {
-		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
-		return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
-	}
-	_, err = exec.LookPath(c.flagConsulBinary)
-	if err != nil {
-		return fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
+	if c.flagEnableServiceRegistration {
+		if c.flagServiceConfig == "" {
+			return errors.New("-service-config must be set")
+		}
+		if c.flagConsulBinary == "" {
+			return errors.New("-consul-binary must be set")
+		}
+		_, err := os.Stat(c.flagServiceConfig)
+		if os.IsNotExist(err) {
+			err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
+			return fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
+		}
+		_, err = exec.LookPath(c.flagConsulBinary)
+		if err != nil {
+			return fmt.Errorf("-consul-binary %q not found: %s", c.flagConsulBinary, err)
+		}
 	}
 
 	return nil

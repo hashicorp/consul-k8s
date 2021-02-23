@@ -31,13 +31,15 @@ func TestRun_Defaults(t *testing.T) {
 }
 
 func TestRun_ExitsCleanlyonSignals(t *testing.T) {
-	t.Run("SIGINT", testRunSignalHandling(syscall.SIGINT))
-	t.Run("SIGTERM", testRunSignalHandling(syscall.SIGTERM))
-	t.Run("SIGINT-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGINT))
-	t.Run("SIGTERM-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGTERM))
+	t.Run("SIGINT-registration", testRunSignalHandlingRegistration(syscall.SIGINT))
+	t.Run("SIGTERM-registration", testRunSignalHandlingRegistration(syscall.SIGTERM))
+	t.Run("SIGINT-metrics", testRunSignalHandlingMetrics(syscall.SIGINT))
+	t.Run("SIGTERM-metrics", testRunSignalHandlingMetrics(syscall.SIGTERM))
+	t.Run("SIGINT-all", testRunSignalHandlingAllProcessesEnabled(syscall.SIGINT))
+	t.Run("SIGTERM-all", testRunSignalHandlingAllProcessesEnabled(syscall.SIGTERM))
 }
 
-func testRunSignalHandling(sig os.Signal) func(*testing.T) {
+func testRunSignalHandlingRegistration(sig os.Signal) func(*testing.T) {
 	return func(t *testing.T) {
 		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 		defer os.RemoveAll(tmpDir)
@@ -79,7 +81,62 @@ func testRunSignalHandling(sig os.Signal) func(*testing.T) {
 	}
 }
 
-func testRunSignalHandlingMetricsServerShutdown(sig os.Signal) func(*testing.T) {
+func testRunSignalHandlingMetrics(sig os.Signal) func(*testing.T) {
+	return func(t *testing.T) {
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI: ui,
+		}
+
+		randomPorts := freeport.MustTake(1)
+		// Run async because we need to kill it when the test is over.
+		exitChan := runCommandAsynchronously(&cmd, []string{
+			"-enable-service-registration=false",
+			"-enable-metrics-merging=true",
+			"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
+			"-service-metrics-port", "8080",
+			"-service-metrics-path", "/metrics",
+		})
+
+		// Keep an open connection to the server by continuously sending bytes
+		// on the connection so it will have to be drained.
+		var conn net.Conn
+		var err error
+		retry.Run(t, func(r *retry.R) {
+			conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", randomPorts[0]))
+			if err != nil {
+				require.NoError(r, err)
+			}
+		})
+		go func() {
+			for {
+				_, err := conn.Write([]byte("hello"))
+				if err != nil {
+					break
+				}
+			}
+		}()
+
+		// Send a signal to consul-sidecar. The merged metrics server can take
+		// up to metricsServerShutdownTimeout to finish cleaning up.
+		cmd.sendSignal(sig)
+
+		// Will need to wait for slightly longer than the shutdown timeout to
+		// make sure that the command has exited shortly after the timeout.
+		waitForShutdown := metricsServerShutdownTimeout + 100*time.Millisecond
+
+		// Assert that it exits cleanly or timeout.
+		select {
+		case exitCode := <-exitChan:
+			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+		case <-time.After(waitForShutdown):
+			// Fail if the signal was not caught.
+			require.Fail(t, "timeout waiting for command to exit")
+		}
+	}
+}
+
+func testRunSignalHandlingAllProcessesEnabled(sig os.Signal) func(*testing.T) {
 	return func(t *testing.T) {
 		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
 		defer os.RemoveAll(tmpDir)
