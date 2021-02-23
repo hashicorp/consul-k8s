@@ -178,6 +178,14 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serfwan-tcp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serfwan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
   # Test that hostPort is not set for rpc ports
   local actual=$(echo "$object" |
       yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "server")' | yq -r '.hostPort' | tee /dev/stderr)
@@ -204,6 +212,14 @@ load _helpers
   local actual=$(echo "$object" |
       yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serflan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
   [ "${actual}" = "8301" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serfwan-tcp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "8302" ]
+
+  local actual=$(echo "$object" |
+      yq -r '.spec.template.spec.containers[0].ports[] | select(.name == "serfwan-udp")' | yq -r '.hostPort' | tee /dev/stderr)
+  [ "${actual}" = "8302" ]
 
   # Test that hostPort is set for rpc ports
   local actual=$(echo "$object" |
