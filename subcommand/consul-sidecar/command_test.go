@@ -30,116 +30,122 @@ func TestRun_Defaults(t *testing.T) {
 	require.Equal(t, "consul", cmd.flagConsulBinary)
 }
 
-func TestRun_ExitsCleanlyonSignals(t *testing.T) {
-	t.Run("SIGINT", testRunSignalHandling(syscall.SIGINT))
-	t.Run("SIGTERM", testRunSignalHandling(syscall.SIGTERM))
-	t.Run("SIGINT-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGINT))
-	t.Run("SIGTERM-metrics", testRunSignalHandlingMetricsServerShutdown(syscall.SIGTERM))
-}
+func TestRunSignalHandlingRegistration(t *testing.T) {
+	cases := map[string]os.Signal{
+		"SIGINT":  syscall.SIGINT,
+		"SIGTERM": syscall.SIGTERM,
+	}
+	for name, signal := range cases {
+		t.Run(name, func(t *testing.T) {
 
-func testRunSignalHandling(sig os.Signal) func(*testing.T) {
-	return func(t *testing.T) {
-		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
-		defer os.RemoveAll(tmpDir)
+			tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+			defer os.RemoveAll(tmpDir)
 
-		a, err := testutil.NewTestServerConfigT(t, nil)
-		require.NoError(t, err)
-		defer a.Stop()
+			a, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer a.Stop()
 
-		ui := cli.NewMockUi()
-		cmd := Command{
-			UI: ui,
-		}
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
 
-		client, err := api.NewClient(&api.Config{
-			Address: a.HTTPAddr,
+			client, err := api.NewClient(&api.Config{
+				Address: a.HTTPAddr,
+			})
+			require.NoError(t, err)
+			// Run async because we need to kill it when the test is over.
+			exitChan := runCommandAsynchronously(&cmd, []string{
+				"-service-config", configFile,
+				"-http-addr", a.HTTPAddr,
+				"-sync-period", "1s",
+			})
+			cmd.sendSignal(signal)
+
+			// Assert that it exits cleanly or timeout.
+			select {
+			case exitCode := <-exitChan:
+				require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+			case <-time.After(time.Second * 1):
+				// Fail if the signal was not caught.
+				require.Fail(t, "timeout waiting for command to exit")
+			}
+			// Assert that the services were not created because the cmd has exited.
+			_, _, err = client.Agent().Service("service-id", nil)
+			require.Error(t, err)
+			_, _, err = client.Agent().Service("service-id-sidecar-proxy", nil)
+			require.Error(t, err)
 		})
-		require.NoError(t, err)
-		// Run async because we need to kill it when the test is over.
-		exitChan := runCommandAsynchronously(&cmd, []string{
-			"-service-config", configFile,
-			"-http-addr", a.HTTPAddr,
-			"-sync-period", "1s",
-		})
-		cmd.sendSignal(sig)
-
-		// Assert that it exits cleanly or timeout.
-		select {
-		case exitCode := <-exitChan:
-			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-		case <-time.After(time.Second * 1):
-			// Fail if the signal was not caught.
-			require.Fail(t, "timeout waiting for command to exit")
-		}
-		// Assert that the services were not created because the cmd has exited.
-		_, _, err = client.Agent().Service("service-id", nil)
-		require.Error(t, err)
-		_, _, err = client.Agent().Service("service-id-sidecar-proxy", nil)
-		require.Error(t, err)
 	}
 }
 
-func testRunSignalHandlingMetricsServerShutdown(sig os.Signal) func(*testing.T) {
-	return func(t *testing.T) {
-		tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
-		defer os.RemoveAll(tmpDir)
+func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
+	cases := map[string]os.Signal{
+		"SIGINT":  syscall.SIGINT,
+		"SIGTERM": syscall.SIGTERM,
+	}
+	for name, signal := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmpDir, configFile := createServicesTmpFile(t, servicesRegistration)
+			defer os.RemoveAll(tmpDir)
 
-		a, err := testutil.NewTestServerConfigT(t, nil)
-		require.NoError(t, err)
-		defer a.Stop()
+			a, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer a.Stop()
 
-		ui := cli.NewMockUi()
-		cmd := Command{
-			UI: ui,
-		}
-
-		require.NoError(t, err)
-
-		randomPorts := freeport.MustTake(1)
-		// Run async because we need to kill it when the test is over.
-		exitChan := runCommandAsynchronously(&cmd, []string{
-			"-service-config", configFile,
-			"-http-addr", a.HTTPAddr,
-			"-enable-metrics-merging=true",
-			"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
-			"-service-metrics-port", "8080",
-			"-service-metrics-path", "/metrics",
-		})
-
-		// Keep an open connection to the server by continuously sending bytes
-		// on the connection so it will have to be drained.
-		var conn net.Conn
-		retry.Run(t, func(r *retry.R) {
-			conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", randomPorts[0]))
-			if err != nil {
-				require.NoError(r, err)
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
 			}
-		})
-		go func() {
-			for {
-				_, err := conn.Write([]byte("hello"))
+
+			require.NoError(t, err)
+
+			randomPorts := freeport.MustTake(1)
+			// Run async because we need to kill it when the test is over.
+			exitChan := runCommandAsynchronously(&cmd, []string{
+				"-service-config", configFile,
+				"-http-addr", a.HTTPAddr,
+				"-enable-metrics-merging=true",
+				"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
+				"-service-metrics-port", "8080",
+				"-service-metrics-path", "/metrics",
+			})
+
+			// Keep an open connection to the server by continuously sending bytes
+			// on the connection so it will have to be drained.
+			var conn net.Conn
+			retry.Run(t, func(r *retry.R) {
+				conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", randomPorts[0]))
 				if err != nil {
-					break
+					require.NoError(r, err)
 				}
+			})
+			go func() {
+				for {
+					_, err := conn.Write([]byte("hello"))
+					if err != nil {
+						break
+					}
+				}
+			}()
+
+			// Send a signal to consul-sidecar. The merged metrics server can take
+			// up to metricsServerShutdownTimeout to finish cleaning up.
+			cmd.sendSignal(signal)
+
+			// Will need to wait for slightly longer than the shutdown timeout to
+			// make sure that the command has exited shortly after the timeout.
+			waitForShutdown := metricsServerShutdownTimeout + 100*time.Millisecond
+
+			// Assert that it exits cleanly or timeout.
+			select {
+			case exitCode := <-exitChan:
+				require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+			case <-time.After(waitForShutdown):
+				// Fail if the signal was not caught.
+				require.Fail(t, "timeout waiting for command to exit")
 			}
-		}()
-
-		// Send a signal to consul-sidecar. The merged metrics server can take
-		// up to metricsServerShutdownTimeout to finish cleaning up.
-		cmd.sendSignal(sig)
-
-		// Will need to wait for slightly longer than the shutdown timeout to
-		// make sure that the command has exited shortly after the timeout.
-		waitForShutdown := metricsServerShutdownTimeout + 100*time.Millisecond
-
-		// Assert that it exits cleanly or timeout.
-		select {
-		case exitCode := <-exitChan:
-			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-		case <-time.After(waitForShutdown):
-			// Fail if the signal was not caught.
-			require.Fail(t, "timeout waiting for command to exit")
-		}
+		})
 	}
 }
 

@@ -581,13 +581,13 @@ func (h *Handler) enableMetricsMerging(pod *corev1.Pod) (bool, error) {
 // mergedMetricsPort returns the default value in the handler, or overrides
 // that with the annotation if provided.
 func (h *Handler) mergedMetricsPort(pod *corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, annotationMergedMetricsPort, h.DefaultMergedMetricsPort)
+	return determineAndValidatePort(pod, annotationMergedMetricsPort, h.DefaultMergedMetricsPort, false)
 }
 
 // prometheusScrapePort returns the default value in the handler, or overrides
 // that with the annotation if provided.
 func (h *Handler) prometheusScrapePort(pod *corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, annotationPrometheusScrapePort, h.DefaultPrometheusScrapePort)
+	return determineAndValidatePort(pod, annotationPrometheusScrapePort, h.DefaultPrometheusScrapePort, false)
 }
 
 // prometheusScrapePath returns the default value in the handler, or overrides
@@ -600,21 +600,26 @@ func (h *Handler) prometheusScrapePath(pod *corev1.Pod) string {
 	return h.DefaultPrometheusScrapePath
 }
 
-// serviceMetricsPort returns the port used to register the service with Consul,
-// or overrides that with the annotation if provided.
+// serviceMetricsPort returns the port the service exposes metrics on. This will
+// default to the port used to register the service with Consul, and can be
+// overridden with the annotation if provided.
 func (h *Handler) serviceMetricsPort(pod *corev1.Pod) (string, error) {
 	// The annotationPort is the port used to register the service with Consul.
 	// If that has been set, it'll be used as the port for getting service
 	// metrics as well, unless overridden by the service-metrics-port annotation.
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-		return determineAndValidatePort(pod, annotationServiceMetricsPort, raw)
+		// The service metrics port can be privileged if the service author has
+		// written their service in such a way that it expects to be able to use
+		// privileged ports. So, the port metrics are exposed on the service can
+		// be privileged.
+		return determineAndValidatePort(pod, annotationServiceMetricsPort, raw, true)
 	}
 
 	// If the annotationPort is not set, the serviceMetrics port will be 0
 	// unless overridden by the service-metrics-port annotation. If the service
 	// metrics port is 0, the consul sidecar will not run a merged metrics
 	// server.
-	return determineAndValidatePort(pod, annotationServiceMetricsPort, "0")
+	return determineAndValidatePort(pod, annotationServiceMetricsPort, "0", true)
 }
 
 // serviceMetricsPath returns a default of /metrics, or overrides
@@ -682,16 +687,22 @@ func (h *Handler) shouldRunMergedMetricsServer(pod *corev1.Pod) (bool, error) {
 // determineAndValidatePort behaves as follows:
 // If the annotation exists, validate the port and return it.
 // If the annotation does not exist, return the default port.
-func determineAndValidatePort(pod *corev1.Pod, annotation string, defaultPort string) (string, error) {
+// If the privileged flag is true, it will allow the port to be in the
+// privileged port range of 1-1023. Otherwise, it will only allow ports in the
+// unprivileged range of 1024-65535.
+func determineAndValidatePort(pod *corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
 	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
 		port, err := portValue(pod, raw)
 		if err != nil {
-			return "", fmt.Errorf("%s annotation value of %s is not a valid integer.", annotation, raw)
+			return "", fmt.Errorf("%s annotation value of %s is not a valid integer", annotation, raw)
 		}
-		// This checks if the port is in the valid port range.
-		if port < 1024 || port > 65535 {
-			return "", fmt.Errorf("%s annotation value of %d is not in the port range 1024-65535.", annotation, port)
+
+		if privileged && (port < 1 || port > 65535) {
+			return "", fmt.Errorf("%s annotation value of %d is not in the valid port range 1-65535", annotation, port)
+		} else if !privileged && (port < 1024 || port > 65535) {
+			return "", fmt.Errorf("%s annotation value of %d is not in the unprivileged port range 1024-65535", annotation, port)
 		}
+
 		// if the annotation exists, return the validated port
 		return fmt.Sprint(port), nil
 	}
@@ -700,7 +711,7 @@ func determineAndValidatePort(pod *corev1.Pod, annotation string, defaultPort st
 	if defaultPort != "" {
 		port, err := portValue(pod, defaultPort)
 		if err != nil {
-			return "", fmt.Errorf("%s is not a valid port on the pod %s.", defaultPort, pod.Name)
+			return "", fmt.Errorf("%s is not a valid port on the pod %s", defaultPort, pod.Name)
 		}
 		return fmt.Sprint(port), nil
 	}
