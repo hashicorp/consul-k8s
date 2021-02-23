@@ -447,7 +447,6 @@ func (c *Command) Run(args []string) int {
 	ctrlExitCh := make(chan error)
 
 	// Start the endpoints controller
-	// TODO: figure out if we should use a different logger here
 	{
 		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
 		ctrl.SetLogger(zapLogger)
@@ -473,7 +472,8 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		// todo: check that this works
+		// todo: Add tests in case it's not refactored to not have any signal handling
+		// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
 		go func() {
 			// Pass existing context's done channel so that the controller
 			// will stop when this context is canceled.

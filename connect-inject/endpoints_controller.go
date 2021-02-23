@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// todo
+// todo: add docs
 type EndpointsController struct {
 	client.Client
 	ConsulClient *api.Client
@@ -23,6 +23,8 @@ type EndpointsController struct {
 	Scheme       *runtime.Scheme
 }
 
+// TODOs:
+// 1. in some error cases, we need to requeue in the result rather than returning an empty result
 func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var serviceEndpoints corev1.Endpoints
 
@@ -32,9 +34,11 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 	proxyServiceName := fmt.Sprintf("%s-sidecar-proxy", req.Name)
 	err := r.Client.Get(context.Background(), req.NamespacedName, &serviceEndpoints)
+
+	// If the endpoints object has been deleted, we need to deregister all instances for that service
 	if k8serrors.IsNotFound(err) {
-		// if not found we should deregister all instances
 		for _, name := range []string{req.Name, proxyServiceName} {
+			// todo: handle a case when the name has been overwritten by the annotation
 			serviceInstances, _, err := r.ConsulClient.Catalog().Service(name, "", nil)
 			if err != nil {
 				r.Log.Error(err, "failed to get service instances from Consul", "name", name)
@@ -53,6 +57,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					return ctrl.Result{}, err
 				}
 			}
+
+
+			return ctrl.Result{}, nil
 		}
 	} else if err != nil {
 		r.Log.Error(err, "failed to get endpoints from Kubernetes", "namespace", req.Namespace, "name", req.Name)
@@ -61,6 +68,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	r.Log.Info("retrieved service from kube", "serviceEndpoints", serviceEndpoints)
 
+	// Register all addresses with Consul
 	for _, subset := range serviceEndpoints.Subsets {
 		// Do the same thing for all addresses, regardless of whether they're ready
 		allAddresses := subset.Addresses
@@ -96,10 +104,10 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					service := &api.AgentServiceRegistration{
 						ID:        serviceID,
 						Name:      serviceEndpoints.Name,
-						Tags:      nil, // todo
+						Tags:      nil, // todo: process tags from annotations
 						Port:      servicePort,
 						Address:   pod.Status.PodIP,
-						Meta:      map[string]string{"pod-name": pod.Name}, // todo process user-provided meta tag
+						Meta:      map[string]string{"pod-name": pod.Name}, // todo process user-provided meta tag; it's missing the latest metadata for k8s-namespace
 						Namespace: "",                                      // todo deal with namespaces
 					}
 					r.Log.Info("registering service", "service", service)
@@ -113,11 +121,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					proxyConfig := &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: serviceEndpoints.Name,
 						DestinationServiceID:   serviceID,
-						Config:                 nil,
-						Upstreams:              nil, // todo: deal with upstreams
-						MeshGateway:            api.MeshGatewayConfig{},
-						Expose:                 api.ExposeConfig{},
+						Config:                 nil, // todo: add config for metrics
 					}
+
 					if servicePort > 0 {
 						proxyConfig.LocalServiceAddress = "127.0.0.1"
 						proxyConfig.LocalServicePort = servicePort
@@ -132,8 +138,8 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						Tags:            nil, // todo: same as service tags
 						Port:            20000,
 						Address:         pod.Status.PodIP,
-						TaggedAddresses: nil,                                     // todo: set cluster IP here
-						Meta:            map[string]string{"pod-name": pod.Name}, // todo: same as service meta
+						TaggedAddresses: nil,                                     // todo: set cluster IP here (will be done later)
+						Meta:            map[string]string{"pod-name": pod.Name}, // todo: same as service meta; also add k8s-namespace meta
 						Namespace:       "",                                      // todo: same as service namespace
 						Proxy:           proxyConfig,
 						Check:           nil,
@@ -159,13 +165,16 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						return ctrl.Result{}, err
 					}
 				}
-
 			}
 		}
 	}
 
 	// todo: we'd also need to reconcile existing service instances in consul to make sure they have pods in k8s
-	// if they don't we should de-register
+	// if they don't we should deregister
+	// 1. getting all service instances for this service from consul (see cleanup_resource.go line 124)
+	// 2. compare allAddresses with services instances
+	// 3. loop through all service instances
+	//      if a service instance is not in allAddresses, deregister it
 
 	return ctrl.Result{}, nil
 }
@@ -226,8 +235,9 @@ func processUpstreams(pod *corev1.Pod) []api.Upstream {
 	return upstreams
 }
 
-// todo: we don't need this actually - we can just use the connectInject label that hc contoller is using
 func (r *EndpointsController) willBeInjected(pod *corev1.Pod) bool {
+	// todo: make sure this doesn't panic if a pod has not been injected
+	// because then this annotation will not be present
 	if pod.Annotations[annotationStatus] != injected {
 		return false
 	}
