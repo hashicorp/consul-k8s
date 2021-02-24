@@ -188,6 +188,11 @@ func TestConnectInjectNamespaces(t *testing.T) {
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
+	cfg := suite.Config()
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	consulDestNS := "consul-dest"
 	cases := []struct {
 		name                 string
