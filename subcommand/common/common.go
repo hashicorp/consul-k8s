@@ -4,10 +4,15 @@ package common
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
+	"testing"
 
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -45,4 +50,49 @@ func ValidatePort(flagName, flagValue string) error {
 		return errors.New(fmt.Sprintf("%s value of %d is not in the port range 1024-65535.", flagName, port))
 	}
 	return nil
+}
+
+// ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
+func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkFile string, meta map[string]string) error {
+	data, err := ioutil.ReadFile(bearerTokenFile)
+	if err != nil {
+		return fmt.Errorf("unable to read bearerTokenFile: %v, err: %v", bearerTokenFile, err)
+	}
+	bearerToken := strings.TrimSpace(string(data))
+	if bearerToken == "" {
+		return fmt.Errorf("no bearer token found in %s", bearerTokenFile)
+	}
+	// Do the login.
+	req := &api.ACLLoginParams{
+		AuthMethod:  authMethodName, // "consul-k8s-auth-method"
+		BearerToken: bearerToken,    // /var/run/secrets/kubernetes.io/serviceaccount/token
+		Meta:        meta,           // pod=default/podName
+	}
+	tok, _, err := client.ACL().Login(req, nil)
+	if err != nil {
+		return fmt.Errorf("error logging in: %s", err)
+	}
+
+	// Write the token out to file.
+	payload := []byte(tok.SecretID)
+	if err := ioutil.WriteFile(tokenSinkFile, payload, 444); err != nil {
+		return fmt.Errorf("error writing token to file sink: %v", err)
+	}
+	return nil
+}
+
+// WriteTempFile writes contents to a temporary file and returns the file
+// name. It will remove the file once the test completes.
+func WriteTempFile(t *testing.T, contents string) string {
+	t.Helper()
+	file, err := ioutil.TempFile("", "")
+	require.NoError(t, err)
+	_, err = file.WriteString(contents)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Remove(file.Name())
+	})
+
+	return file.Name()
 }
