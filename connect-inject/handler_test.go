@@ -99,6 +99,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/initContainers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/spec/containers/-",
 				},
 				{
@@ -163,6 +167,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers/-",
 				},
 				{
 					Operation: "add",
@@ -239,6 +247,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/spec/initContainers/-",
+				},
+				{
+					Operation: "add",
 					Path:      "/spec/containers/-",
 				},
 				{
@@ -282,6 +294,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers/-",
 				},
 				{
 					Operation: "add",
@@ -333,6 +349,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers/-",
 				},
 				{
 					Operation: "add",
