@@ -348,9 +348,12 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 			fmt.Sprintf("/spec/containers/%d/env", i))...)
 	}
 
+	// Add the init container which copies the consul binary.
+	initCopyContainer := h.containerInitCopyContainer()
+
 	// Add the init container that registers the service and sets up
 	// the Envoy configuration.
-	container, err := h.containerInit(&pod, req.Namespace)
+	initContainer, err := h.containerInit(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection init container", "err", err, "Request Name", req.Name)
 		return &v1beta1.AdmissionResponse{
@@ -361,7 +364,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	}
 	patches = append(patches, addContainer(
 		pod.Spec.InitContainers,
-		[]corev1.Container{container},
+		[]corev1.Container{initCopyContainer, initContainer},
 		"/spec/initContainers")...)
 
 	// Add the Envoy and Consul sidecars.
