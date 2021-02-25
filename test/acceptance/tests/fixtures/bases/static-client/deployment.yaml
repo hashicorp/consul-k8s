@@ -18,5 +18,10 @@ spec:
           image: docker.mirror.hashicorp.services/curlimages/curl:latest
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]
+          env:
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
       serviceAccountName: static-client
       terminationGracePeriodSeconds: 0 # so deletion is quick
