@@ -655,7 +655,7 @@ workflows:
               only:
                 - master
     jobs:
-      - acceptance-openshift
+    # - acceptance-openshift >> disabled because OpenShift 4.4 was too flaky. Can possibly re-enable when latest OpenShift version is released.
       - acceptance-gke-1-16
       - acceptance-eks-1-17
       - acceptance-aks-1-18
