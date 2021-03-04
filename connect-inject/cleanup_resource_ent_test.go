@@ -1,4 +1,4 @@
-// abcbuild enterprise
+// +build enterprise
 
 package connectinject
 
