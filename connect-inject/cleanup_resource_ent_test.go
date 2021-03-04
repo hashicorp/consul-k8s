@@ -3,6 +3,9 @@
 package connectinject
 
 import (
+	"net/url"
+	"testing"
+
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -11,8 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	"net/url"
-	"testing"
 )
 
 func TestReconcile_ConsulNamespaces(t *testing.T) {
