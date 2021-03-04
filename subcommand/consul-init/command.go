@@ -28,7 +28,7 @@ type Command struct {
 	flagMeta            string // Flag for metadata to consul login.
 	flagBearerTokenFile string // Location of the bearer token.
 	flagTokenSinkFile   string // Location to write the output token.
-	numACLLoginRetries  int    // Number of times to attempt to retry ACL().Login(), default: 3.
+	numLoginRetries  int    // Number of times to attempt to retry ACL().Login(), default: 3.
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -44,13 +44,13 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "method", "",
-		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
+		"The name of the Kubernetes Auth Method to use for consul login if ACLs are enabled.")
 	c.flagSet.StringVar(&c.flagMeta, "meta", "",
 		"Metadata to be passed to consul login api.")
 	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", bearerTokenFile,
 		"Token file to be used for consul login api.")
 	c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", tokenSinkFile,
-		"Token sink file to be used for consul login api.")
+		"ACL token will be written to this file.")
 
 	c.http = &flags.HTTPFlags{}
 

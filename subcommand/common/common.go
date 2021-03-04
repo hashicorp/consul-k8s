@@ -63,18 +63,18 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 	}
 	// Do the login.
 	req := &api.ACLLoginParams{
-		AuthMethod:  authMethodName, // "consul-k8s-auth-method"
-		BearerToken: bearerToken,    // /var/run/secrets/kubernetes.io/serviceaccount/token
-		Meta:        meta,           // pod=default/podName
+		AuthMethod:  authMethodName,
+		BearerToken: bearerToken,
+		Meta:        meta,
 	}
 	tok, _, err := client.ACL().Login(req, nil)
 	if err != nil {
 		return fmt.Errorf("error logging in: %s", err)
 	}
 
-	// Write the token out to file.
+	// Write the token out to file with permissions so consul-k8s user can read.
 	payload := []byte(tok.SecretID)
-	if err := ioutil.WriteFile(tokenSinkFile, payload, 444); err != nil {
+	if err := ioutil.WriteFile(tokenSinkFile, payload, 0444); err != nil {
 		return fmt.Errorf("error writing token to file sink: %v", err)
 	}
 	return nil
