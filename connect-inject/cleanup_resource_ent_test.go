@@ -86,10 +86,9 @@ func TestReconcile_ConsulNamespaces(t *testing.T) {
 			server, err := testutil.NewTestServerConfigT(t, nil)
 			defer server.Stop()
 			require.NoError(err)
-			server.WaitForLeader(t)
+			server.WaitForSerfCheck(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
-			server.WaitForSerfCheck(t)
 
 			// Register Consul services.
 			for _, svc := range c.ConsulServices {
@@ -200,10 +199,9 @@ func TestDelete_ConsulNamespaces(t *testing.T) {
 			server, err := testutil.NewTestServerConfigT(t, nil)
 			defer server.Stop()
 			require.NoError(err)
-			server.WaitForLeader(t)
+			server.WaitForSerfCheck(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
-			server.WaitForSerfCheck(t)
 
 			// Register Consul services.
 			for _, svc := range c.ConsulServices {
