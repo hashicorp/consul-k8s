@@ -147,6 +147,7 @@ func (c *Command) Run(args []string) int {
 	// metrics server will be shut down when a signal is received by the main
 	// for loop using shutdownMetricsServer().
 	var server *http.Server
+	srvExitCh := make(chan error)
 	if c.flagEnableMetricsMerging {
 		c.logger.Info("Metrics is enabled, creating merged metrics server.")
 		server = c.createMergedMetricsServer()
@@ -155,7 +156,7 @@ func (c *Command) Run(args []string) int {
 		c.logger.Info("Running merged metrics server.")
 		go func() {
 			if err = server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				c.logger.Error(err.Error())
+				srvExitCh <- err
 			}
 		}()
 	}
@@ -165,34 +166,44 @@ func (c *Command) Run(args []string) int {
 	// service hasn't changed and so won't update any indices. This means we
 	// won't be causing a lot of traffic within the cluster. We tolerate Consul
 	// Clients going down and will simply re-register once it's back up.
-	//
-	// The loop will only exit when the Pod is shut down and we receive a SIGINT.
-	for {
-		start := time.Now()
-		cmd := exec.CommandContext(signalCtx, c.flagConsulBinary, c.consulCommand...)
+	go func() {
+		for {
+			start := time.Now()
+			cmd := exec.CommandContext(signalCtx, c.flagConsulBinary, c.consulCommand...)
 
-		// Run the command and record the stdout and stderr output
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			c.logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
-		} else {
-			c.logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
-		}
-		select {
-		// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
-		case <-time.After(c.flagSyncPeriod):
-			continue
-		case <-signalCtx.Done():
-			// After the signal is received, wait for the merged metrics server
-			// to gracefully shutdown as well if it has been enabled. This can
-			// take up to metricsServerShutdownTimeout seconds.
-			if c.flagEnableMetricsMerging {
-				c.logger.Info("Attempting to shut down metrics server.")
-				c.shutdownMetricsServer(server)
+			// Run the command and record the stdout and stderr output
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				c.logger.Error("failed to sync service", "output", strings.TrimSpace(string(output)), "err", err, "duration", time.Since(start))
+			} else {
+				c.logger.Info("successfully synced service", "output", strings.TrimSpace(string(output)), "duration", time.Since(start))
 			}
-			return 0
+			select {
+			// Re-loop after syncPeriod or exit if we receive interrupt or terminate signals.
+			case <-time.After(c.flagSyncPeriod):
+				continue
+			case <-signalCtx.Done():
+				return
+			}
 		}
+	}()
+
+	// Block and wait for a signal or for the metrics server to exit.
+	select {
+	case <-signalCtx.Done():
+		// After the signal is received, wait for the merged metrics server
+		// to gracefully shutdown as well if it has been enabled. This can
+		// take up to metricsServerShutdownTimeout seconds.
+		if c.flagEnableMetricsMerging {
+			c.logger.Info("Attempting to shut down metrics server.")
+			c.shutdownMetricsServer(server)
+		}
+		return 0
+	case err := <-srvExitCh:
+		c.logger.Error(fmt.Sprintf("Metrics server error: %v", err))
+		return 1
 	}
+
 }
 
 // shutdownMetricsServer handles gracefully shutting down the server. This will
@@ -200,19 +211,20 @@ func (c *Command) Run(args []string) int {
 // idle. To avoid potentially waiting forever, we pass a context to
 // server.Shutdown() that will timeout in metricsServerShutdownTimeout (5) seconds.
 func (c *Command) shutdownMetricsServer(server *http.Server) {
+	// The shutdownCancelFunc will be unused since it is unnecessary to call it as we
+	// are already about to call shutdown with a timeout. We'd only need to
+	// shutdownCancelFunc if we needed to trigger something to happen when the
+	// shutdownCancelFunc is called, which we do not. The reason for not
+	// discarding it with _ is for the go vet check.
 	shutdownCtx, shutdownCancelFunc := context.WithTimeout(context.Background(), metricsServerShutdownTimeout)
 	defer shutdownCancelFunc()
 
-	// If the server hasn't started up yet before this function is called, it
-	// could be nil.
-	if server != nil {
-		c.logger.Info("Merged metrics server exists, attempting to gracefully shut down server.")
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			c.logger.Error(fmt.Sprintf("Server shutdown failed: %s", err))
-			return
-		}
-		c.logger.Info("Server has been shut down.")
+	c.logger.Info("Merged metrics server exists, attempting to gracefully shut down server")
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		c.logger.Error(fmt.Sprintf("Server shutdown failed: %s", err))
+		return
 	}
+	c.logger.Info("Server has been shut down")
 }
 
 // createMergedMetricsServer sets up the merged metrics server.
@@ -278,12 +290,6 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 
 // validateFlags validates the flags.
 func (c *Command) validateFlags() error {
-	if c.flagServiceConfig == "" {
-		return errors.New("-service-config must be set")
-	}
-	if c.flagConsulBinary == "" {
-		return errors.New("-consul-binary must be set")
-	}
 	if c.flagSyncPeriod == 0 {
 		// if sync period is 0, then the select loop will
 		// always pick the first case, and it'll be impossible
@@ -291,6 +297,12 @@ func (c *Command) validateFlags() error {
 		return errors.New("-sync-period must be greater than 0")
 	}
 
+	if c.flagServiceConfig == "" {
+		return errors.New("-service-config must be set")
+	}
+	if c.flagConsulBinary == "" {
+		return errors.New("-consul-binary must be set")
+	}
 	_, err := os.Stat(c.flagServiceConfig)
 	if os.IsNotExist(err) {
 		err = fmt.Errorf("-service-config file %q not found", c.flagServiceConfig)
