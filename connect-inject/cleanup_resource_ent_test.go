@@ -1,8 +1,11 @@
+// abcbuild enterprise
+
 package connectinject
 
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -122,7 +125,8 @@ func TestReconcile_ConsulNamespaces(t *testing.T) {
 
 			// Run Reconcile.
 			cleanupResource.reconcile()
-
+			// FIXME: timing issue here popping up also in main branch
+			time.Sleep(time.Second * 1)
 			// Test that the remaining services are what we expect.
 			for ns, expSvcs := range c.ExpConsulServiceIDs {
 				// Note: we need to use the catalog endpoints because
@@ -231,6 +235,8 @@ func TestDelete_ConsulNamespaces(t *testing.T) {
 			} else {
 				require.NoError(err)
 
+				// FIXME: timing issue here popping up also in main branch
+				time.Sleep(time.Second * 1)
 				// Test that the remaining services are what we expect.
 				for ns, expSvcs := range c.ExpConsulServiceIDs {
 					// Note: we need to use the catalog endpoints because

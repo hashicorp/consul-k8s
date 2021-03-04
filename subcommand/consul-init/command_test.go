@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -28,24 +27,12 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-meta", "pod=abcdefg"},
 			expErr: "-method must be set",
 		},
-		/*		{
-				// TODO: decide if these are going to be required and update test accordingly
-							flags:  []string{"-method", "foot", "-meta", "pod=abcdefg"},
-							expErr: "-bearer-token-file must be set",
-						},
-						{
-							flags:  []string{"-method", "foot", "-meta", "pod=abcdefg", "-bearer-token-file", "foot"},
-							expErr: "-token-sink-file must be set",
-						},
-		*/
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
-			k8sClient := fake.NewSimpleClientset()
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:        ui,
-				clientset: k8sClient,
+				UI: ui,
 			}
 			code := cmd.Run(c.flags)
 			require.Equal(t, 1, code)
