@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/consul"
@@ -98,20 +99,16 @@ func TestRun_withRetries(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			// Create a token File as input and load with some data.
-			bearerTokenFile, err := ioutil.TempFile("", "bearerTokenFile")
-			require.NoError(t, err)
-			_, err = bearerTokenFile.WriteString("foo")
-			require.NoError(t, err)
-			// Create an output file.
-			tokenFile, err := ioutil.TempFile("", "tokenFile")
-			require.NoError(t, err)
+			// Create a fake input bearer token file and an output file.
+			bearerTokenFile := writeTempFile(t, "bearerTokenFile")
+			tokenFile := writeTempFile(t, "")
 
 			// Start the mock Consul server.
 			counter := 0
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 					counter++
+					// sample response from https://consul.io/api-docs/acl#sample-response
 					b := "{\n  \"AccessorID\": \"926e2bd2-b344-d91b-0c83-ae89f372cd9b\",\n  \"SecretID\": \"b78d37c7-0ca7-5f4d-99ee-6d9975ce4586\",\n  \"Description\": \"token created via login\",\n  \"Roles\": [\n    {\n      \"ID\": \"3356c67c-5535-403a-ad79-c1d5f9df8fc7\",\n      \"Name\": \"demo\"\n    }\n  ],\n  \"ServiceIdentities\": [\n    {\n      \"ServiceName\": \"example\"\n    }\n  ],\n  \"Local\": true,\n  \"AuthMethod\": \"minikube\",\n  \"CreateTime\": \"2019-04-29T10:08:08.404370762-05:00\",\n  \"Hash\": \"nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=\",\n  \"CreateIndex\": 36,\n  \"ModifyIndex\": 36\n}"
 					if !c.TestRetry || (c.TestRetry && c.LoginAttemptsCount == counter) {
 						w.Write([]byte(b))
@@ -130,18 +127,18 @@ func TestRun_withRetries(t *testing.T) {
 			cmd := Command{
 				UI:                 ui,
 				consulClient:       client,
-				numACLLoginRetries: 3, // just here to help visualize # of retries
+				numACLLoginRetries: 3, // just here to help visualize # of internal retries
 			}
-			code := cmd.Run([]string{"-bearer-token-file", bearerTokenFile.Name(),
+			code := cmd.Run([]string{"-bearer-token-file", bearerTokenFile,
 				"-method", "consul-k8s-auth-method", "-meta", "pod=default/podname",
-				"-token-sink-file", tokenFile.Name()})
+				"-token-sink-file", tokenFile})
 			require.Equal(t, c.ExpCode, code)
 			// cmd will return 1 after cmd.numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it
 			require.Equal(t, min(c.LoginAttemptsCount, cmd.numACLLoginRetries), counter)
 			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
 			if c.ExpErr == "" {
 				// validate that the token was written to disk if we succeeded
-				data, err := ioutil.ReadFile(tokenFile.Name())
+				data, err := ioutil.ReadFile(tokenFile)
 				require.NoError(t, err)
 				require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
 			}
@@ -154,4 +151,19 @@ func min(x, y int) int {
 		return y
 	}
 	return x
+}
+
+// writeTempFile writes contents to a temporary file and returns the file
+// name. It will remove the file once the test completes.
+func writeTempFile(t *testing.T, contents string) string {
+	t.Helper()
+	file, err := ioutil.TempFile("", "")
+	require.NoError(t, err)
+	_, err = file.WriteString(contents)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Remove(file.Name())
+	})
+	return file.Name()
 }

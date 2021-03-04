@@ -1,5 +1,3 @@
-// +build enterprise
-
 package connectinject
 
 import (

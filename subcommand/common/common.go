@@ -4,15 +4,12 @@ package common
 import (
 	"errors"
 	"fmt"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-hclog"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
-	"testing"
-
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -53,6 +50,7 @@ func ValidatePort(flagName, flagValue string) error {
 }
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
+// The logic of this is taken from the `consul login` command.
 func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkFile string, meta map[string]string) error {
 	data, err := ioutil.ReadFile(bearerTokenFile)
 	if err != nil {
@@ -79,20 +77,4 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 		return fmt.Errorf("error writing token to file sink: %v", err)
 	}
 	return nil
-}
-
-// WriteTempFile writes contents to a temporary file and returns the file
-// name. It will remove the file once the test completes.
-func WriteTempFile(t *testing.T, contents string) string {
-	t.Helper()
-	file, err := ioutil.TempFile("", "")
-	require.NoError(t, err)
-	_, err = file.WriteString(contents)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		os.Remove(file.Name())
-	})
-
-	return file.Name()
 }
