@@ -5,6 +5,8 @@ BREAKING CHANGES:
 FEATURES:
 
 IMPROVEMENTS:
+* CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
+  resource was last successfully synced with Consul. [[GH-849](https://github.com/hashicorp/consul-helm/pull/849)]
 
 BUG FIXES:
 * Increase Consul client daemonset's memory from `25Mi` to `50Mi` for its `client-tls-init`
