@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
@@ -51,8 +53,6 @@ func TestRun_RetryACLLoginFails(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, ui.ErrorWriter.String(), "unable to do consul login")
 }
-
-// Test that SIGINT/SIGTERM exits the command
 
 func TestRun_withRetries(t *testing.T) {
 	cases := []struct {
@@ -153,4 +153,49 @@ func writeTempFile(t *testing.T, contents string) string {
 		os.Remove(file.Name())
 	})
 	return file.Name()
+}
+
+func TestSignalHandling(t *testing.T) {
+	// Create a fake input bearer token file and an output file.
+	bearerTokenFile := writeTempFile(t, "bearerTokenFile")
+	tokenFile := writeTempFile(t, "")
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI: ui,
+	}
+	// Start the command asynchronously and then we'll send an interrupt.
+	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-bearer-token-file", bearerTokenFile,
+		"-method", "consul-k8s-auth-method", "-meta", "pod=default/podname",
+		"-token-sink-file", tokenFile,
+	})
+
+	// Send the signal
+	cmd.sendSignal(syscall.SIGTERM)
+
+	// Assert that it exits cleanly or timeout.
+	select {
+	case exitCode := <-exitChan:
+		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+	case <-time.After(time.Second * 1):
+		// Fail if the stopCh was not caught.
+		require.Fail(t, "timeout waiting for command to exit")
+	}
+}
+
+// This function starts the command asynchronously and returns a non-blocking chan.
+// When finished, the command will send its exit code to the channel.
+// Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
+// otherwise it can run forever.
+func runCommandAsynchronously(cmd *Command, args []string) chan int {
+	// We have to run cmd.init() to ensure that the channel the command is
+	// using to watch for os interrupts is initialized. If we don't do this,
+	// then if stopCommand is called immediately, it will block forever
+	// because it calls interrupt() which will attempt to send on a nil channel.
+	cmd.init()
+	exitChan := make(chan int, 1)
+	go func() {
+		exitChan <- cmd.Run(args)
+	}()
+	return exitChan
 }

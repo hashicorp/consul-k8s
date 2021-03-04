@@ -4,12 +4,13 @@ package common
 import (
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-hclog"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (

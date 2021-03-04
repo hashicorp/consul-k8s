@@ -3,10 +3,6 @@
 package connectinject
 
 import (
-	"net/url"
-	"testing"
-	"time"
-
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -15,6 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	"net/url"
+	"testing"
 )
 
 func TestReconcile_ConsulNamespaces(t *testing.T) {
@@ -87,7 +85,7 @@ func TestReconcile_ConsulNamespaces(t *testing.T) {
 			server, err := testutil.NewTestServerConfigT(t, nil)
 			defer server.Stop()
 			require.NoError(err)
-			server.WaitForLeader(t)
+			server.WaitForSerfCheck(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
 
@@ -125,8 +123,7 @@ func TestReconcile_ConsulNamespaces(t *testing.T) {
 
 			// Run Reconcile.
 			cleanupResource.reconcile()
-			// FIXME: timing issue here popping up also in main branch
-			time.Sleep(time.Second * 1)
+
 			// Test that the remaining services are what we expect.
 			for ns, expSvcs := range c.ExpConsulServiceIDs {
 				// Note: we need to use the catalog endpoints because
@@ -201,7 +198,7 @@ func TestDelete_ConsulNamespaces(t *testing.T) {
 			server, err := testutil.NewTestServerConfigT(t, nil)
 			defer server.Stop()
 			require.NoError(err)
-			server.WaitForLeader(t)
+			server.WaitForSerfCheck(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
 
@@ -235,8 +232,6 @@ func TestDelete_ConsulNamespaces(t *testing.T) {
 			} else {
 				require.NoError(err)
 
-				// FIXME: timing issue here popping up also in main branch
-				time.Sleep(time.Second * 1)
 				// Test that the remaining services are what we expect.
 				for ns, expSvcs := range c.ExpConsulServiceIDs {
 					// Note: we need to use the catalog endpoints because

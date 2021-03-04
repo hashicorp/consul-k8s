@@ -103,23 +103,39 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-
-	// This is hardcoded because we hardcode it in the init container.
+	ErrCh := make(chan error)
+	ExitCh := make(chan bool)
 	meta := map[string]string{"pod": strings.Split(c.flagMeta, "=")[1]}
-	retries := 0
-	for {
-		err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, meta)
-		if err != nil {
-			retries++
-			time.Sleep(time.Second * 1)
-			if retries == c.numACLLoginRetries {
-				c.UI.Error(fmt.Sprintf("unable to do consul login"))
-				return 1
+	go func() {
+		retries := 0
+		// This is hardcoded because we hardcode it in the init container.
+		for {
+			err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, meta)
+			if err != nil {
+				retries++
+				time.Sleep(time.Second * 1)
+				if retries == c.numACLLoginRetries {
+					ErrCh <- fmt.Errorf("unable to do consul login")
+				}
+			} else {
+				c.UI.Info("consul login complete")
+				ExitCh <- true
 			}
-		} else {
-			c.UI.Info("consul login complete")
-			return 0
 		}
+	}()
+
+	// Block until we get a signal or something errors.
+	select {
+	case sig := <-c.sigCh:
+		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
+		return 0
+
+	case err := <-ErrCh:
+		c.UI.Error(fmt.Sprintf("%v", err))
+		return 1
+
+	case <-ExitCh:
+		return 0
 	}
 }
 
