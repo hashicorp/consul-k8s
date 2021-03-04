@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: static-metrics-app
+  name: static-metrics-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-metrics-app
+  template:
+    metadata:
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'true'
+        'consul.hashicorp.com/connect-service': 'server'
+      labels:
+        app: static-metrics-app
+    spec:
+      containers:
+      - name: static-metrics-app
+        image: ishustava/fake-service:0.7.0
+        env:
+        - name: METRICS_ENABLE_PROMETHEUS
+          value: "true"
+        ports:
+        - containerPort: 9090

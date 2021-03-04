@@ -18,7 +18,7 @@ const staticClientName = "static-client"
 
 // Test that prometheus metrics, when enabled, are accessible from the
 // endpoints that have been exposed on the server, client and gateways.
-func TestMetrics(t *testing.T) {
+func TestComponentMetrics(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -28,6 +28,7 @@ func TestMetrics(t *testing.T) {
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
+		"global.imageK8S":                   "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:4adf933",
 
 		"connectInject.enabled": "true",
 		"controller.enabled":    "true",
@@ -79,6 +80,55 @@ func TestMetrics(t *testing.T) {
 
 	// Mesh Gateway Metrics
 	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+}
+
+// Test that merged service and envoy metrics are accessible from the
+// endpoints that have been exposed on the service.
+func TestAppMetrics(t *testing.T) {
+	env := suite.Environment()
+	cfg := suite.Config()
+	ctx := env.DefaultContext(t)
+	ns := ctx.KubectlOptions(t).Namespace
+
+	helmValues := map[string]string{
+		"global.datacenter":      "dc1",
+		"global.metrics.enabled": "true",
+
+		// These are images that are required until https://github.com/hashicorp/consul/pull/9768 and https://github.com/hashicorp/consul-k8s/pull/443
+		"global.imageK8S": "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:4adf933",
+		"global.image":    "gcr.io/nitya-293720/consul-dev:metrics11",
+
+		"connectInject.enabled":                      "true",
+		"connectInject.metrics.defaultEnableMerging": "true",
+	}
+
+	releaseName := helpers.RandomName()
+
+	// Install the consul cluster in the default kubernetes ctx.
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	// Deploy service that will emit app and envoy metrics at merged metrics endpoint
+	logger.Log(t, "creating static-metrics-app")
+	k8s.Deploy(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-metrics-app/deployment.yaml")
+
+	// Create the static-client deployment so we can use it for in-cluster calls to metrics endpoints.
+	// This simulates queries that would be made by a prometheus server that runs externally to the consul
+	// components in the cluster.
+	logger.Log(t, "creating static-client")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+
+	// Merged App Metrics
+	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-metrics-app"})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, 1)
+	podIP := podList.Items[0].Status.PodIP
+	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", fmt.Sprintf("http://%s:20200/metrics", podIP))
+	require.NoError(t, err)
+	// This assertion represents the metrics from the envoy sidecar.
+	require.Contains(t, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+	// This assertion represents the metrics from the application.
+	require.Contains(t, metricsOutput, `service_started_total 1`)
 }
 
 func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
