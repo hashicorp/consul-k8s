@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
@@ -205,9 +206,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			resolver, ok := act.(*capi.ProxyConfigEntry)
+			proxyDefaults, ok := act.(*capi.ProxyConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, resolver)
+			require.Equal(t, c.Exp, proxyDefaults)
 		})
 	}
 }
@@ -260,30 +261,38 @@ func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
 }
 
 func TestProxyDefaults_AddFinalizer(t *testing.T) {
-	resolver := &ProxyDefaults{}
-	resolver.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resolver.ObjectMeta.Finalizers)
+	proxyDefaults := &ProxyDefaults{}
+	proxyDefaults.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, proxyDefaults.ObjectMeta.Finalizers)
 }
 
 func TestProxyDefaults_RemoveFinalizer(t *testing.T) {
-	resolver := &ProxyDefaults{
+	proxyDefaults := &ProxyDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resolver.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resolver.ObjectMeta.Finalizers)
+	proxyDefaults.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, proxyDefaults.ObjectMeta.Finalizers)
 }
 
 func TestProxyDefaults_SetSyncedCondition(t *testing.T) {
-	resolver := &ProxyDefaults{}
-	resolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	proxyDefaults := &ProxyDefaults{}
+	proxyDefaults.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resolver.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resolver.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resolver.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, proxyDefaults.Status.Conditions[0].Status)
+	require.Equal(t, "reason", proxyDefaults.Status.Conditions[0].Reason)
+	require.Equal(t, "message", proxyDefaults.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resolver.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, proxyDefaults.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestProxyDefaults_SetLastSyncedTime(t *testing.T) {
+	proxyDefaults := &ProxyDefaults{}
+	syncedTime := metav1.NewTime(time.Now())
+	proxyDefaults.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, proxyDefaults.Status.LastSyncedTime)
 }
 
 func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {
@@ -294,7 +303,7 @@ func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resolver := &ProxyDefaults{
+			proxyDefaults := &ProxyDefaults{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -303,7 +312,7 @@ func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resolver.SyncedConditionStatus())
+			require.Equal(t, status, proxyDefaults.SyncedConditionStatus())
 		})
 	}
 }

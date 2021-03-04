@@ -291,30 +291,38 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 }
 
 func TestServiceRouter_AddFinalizer(t *testing.T) {
-	ServiceRouter := &ServiceRouter{}
-	ServiceRouter.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, ServiceRouter.ObjectMeta.Finalizers)
+	serviceRouter := &ServiceRouter{}
+	serviceRouter.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceRouter.ObjectMeta.Finalizers)
 }
 
 func TestServiceRouter_RemoveFinalizer(t *testing.T) {
-	ServiceRouter := &ServiceRouter{
+	serviceRouter := &ServiceRouter{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	ServiceRouter.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, ServiceRouter.ObjectMeta.Finalizers)
+	serviceRouter.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceRouter.ObjectMeta.Finalizers)
 }
 
 func TestServiceRouter_SetSyncedCondition(t *testing.T) {
-	ServiceRouter := &ServiceRouter{}
-	ServiceRouter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceRouter := &ServiceRouter{}
+	serviceRouter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, ServiceRouter.Status.Conditions[0].Status)
-	require.Equal(t, "reason", ServiceRouter.Status.Conditions[0].Reason)
-	require.Equal(t, "message", ServiceRouter.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceRouter.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceRouter.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceRouter.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, ServiceRouter.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceRouter.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceRouter_SetLastSyncedTime(t *testing.T) {
+	serviceRouter := &ServiceRouter{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceRouter.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, serviceRouter.Status.LastSyncedTime)
 }
 
 func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
@@ -325,7 +333,7 @@ func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			ServiceRouter := &ServiceRouter{
+			serviceRouter := &ServiceRouter{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -334,7 +342,7 @@ func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, ServiceRouter.SyncedConditionStatus())
+			require.Equal(t, status, serviceRouter.SyncedConditionStatus())
 		})
 	}
 }
