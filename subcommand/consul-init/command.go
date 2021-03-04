@@ -87,10 +87,6 @@ func (c *Command) init() {
 		"Token file to be used for consul login api.")
 	c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", tokenSinkFile,
 		"Token sink file to be used for consul login api.")
-	//c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", "",
-	//	"Token file to be used for consul login api.")
-	//c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", "",
-	//	"Token sink file to be used for consul login api.")
 
 	c.http = &flags.HTTPFlags{}
 

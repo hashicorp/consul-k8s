@@ -32,8 +32,8 @@ func TestValidatePort(t *testing.T) {
 	require.EqualError(t, err, "-test-flag-name value of 22 is not in the port range 1024-65535.")
 }
 
-// TestConsulAclLogin ensures that our implementation of consul login hits `/v1/acl/login`.
-func TestConsulAclLogin(t *testing.T) {
+// TestConsulLogin ensures that our implementation of consul login hits `/v1/acl/login`.
+func TestConsulLogin(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
