@@ -89,6 +89,7 @@ func TestReconcile_ConsulNamespaces(t *testing.T) {
 			server.WaitForLeader(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
+			server.WaitForSerfCheck(t)
 
 			// Register Consul services.
 			for _, svc := range c.ConsulServices {
@@ -202,6 +203,7 @@ func TestDelete_ConsulNamespaces(t *testing.T) {
 			server.WaitForLeader(t)
 			consulClient, err := capi.NewClient(&capi.Config{Address: server.HTTPAddr})
 			require.NoError(err)
+			server.WaitForSerfCheck(t)
 
 			// Register Consul services.
 			for _, svc := range c.ConsulServices {
