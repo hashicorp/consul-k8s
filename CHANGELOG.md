@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS
+* CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
+  resource was last successfully synced with Consul. [[GH-448](https://github.com/hashicorp/consul-k8s/pull/448)]
+
 ## 0.24.0 (February 16, 2021)
 
 BREAKING CHANGES

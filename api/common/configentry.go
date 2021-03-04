@@ -40,6 +40,8 @@ type ConfigEntryResource interface {
 	KubernetesName() string
 	// SetSyncedCondition updates the synced condition.
 	SetSyncedCondition(status corev1.ConditionStatus, reason, message string)
+	// SetLastSyncedTime updates the last synced time.
+	SetLastSyncedTime(time metav1.Time)
 	// SyncedCondition gets the synced condition.
 	SyncedCondition() (status corev1.ConditionStatus, reason, message string)
 	// SyncedConditionStatus returns the status of the synced condition.

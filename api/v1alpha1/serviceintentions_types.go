@@ -27,6 +27,7 @@ func init() {
 
 // ServiceIntentions is the Schema for the serviceintentions API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type ServiceIntentions struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -186,6 +187,10 @@ func (in *ServiceIntentions) SetSyncedCondition(status corev1.ConditionStatus, r
 			Message:            message,
 		},
 	}
+}
+
+func (in *ServiceIntentions) SetLastSyncedTime(time metav1.Time) {
+	in.Status.LastSyncedTime = time
 }
 
 func (in *ServiceIntentions) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {

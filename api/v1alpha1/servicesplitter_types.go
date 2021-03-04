@@ -24,6 +24,7 @@ func init() {
 
 // ServiceSplitter is the Schema for the servicesplitters API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type ServiceSplitter struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -113,6 +114,10 @@ func (in *ServiceSplitter) SetSyncedCondition(status corev1.ConditionStatus, rea
 			Message:            message,
 		},
 	}
+}
+
+func (in *ServiceSplitter) SetLastSyncedTime(time metav1.Time) {
+	in.Status.LastSyncedTime = time
 }
 
 func (in *ServiceSplitter) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {

@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
@@ -347,6 +348,14 @@ func TestServiceDefaults_SetSyncedCondition(t *testing.T) {
 	require.Equal(t, "message", serviceDefaults.Status.Conditions[0].Message)
 	now := metav1.Now()
 	require.True(t, serviceDefaults.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceDefaults_SetLastSyncedTime(t *testing.T) {
+	serviceDefaults := &ServiceDefaults{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceDefaults.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, serviceDefaults.Status.LastSyncedTime)
 }
 
 func TestServiceDefaults_GetSyncedConditionStatus(t *testing.T) {
