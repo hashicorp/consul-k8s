@@ -19,6 +19,10 @@ spec:
     description: The sync status of the resource with Consul
     name: Synced
     type: string
+  - JSONPath: .status.lastSyncedTime
+    description: The last successful synced time of the resource with Consul
+    name: Last Synced
+    type: date
   - JSONPath: .metadata.creationTimestamp
     description: The age of the resource
     name: Age
@@ -111,6 +115,10 @@ spec:
                 - type
                 type: object
               type: array
+            lastSyncedTime:
+              description: LastSyncedTime is the last time the resource successfully synced with Consul.
+              format: date-time
+              type: string
           type: object
       type: object
   version: v1alpha1
