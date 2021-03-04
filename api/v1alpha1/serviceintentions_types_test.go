@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
@@ -348,38 +349,46 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			serviceResolver, ok := act.(*capi.ServiceIntentionsConfigEntry)
+			serviceIntentions, ok := act.(*capi.ServiceIntentionsConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, serviceResolver)
+			require.Equal(t, c.Exp, serviceIntentions)
 		})
 	}
 }
 
 func TestServiceIntentions_AddFinalizer(t *testing.T) {
-	serviceResolver := &ServiceIntentions{}
-	serviceResolver.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, serviceResolver.ObjectMeta.Finalizers)
+	serviceIntentions := &ServiceIntentions{}
+	serviceIntentions.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceIntentions.ObjectMeta.Finalizers)
 }
 
 func TestServiceIntentions_RemoveFinalizer(t *testing.T) {
-	serviceResolver := &ServiceIntentions{
+	serviceIntentions := &ServiceIntentions{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	serviceResolver.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, serviceResolver.ObjectMeta.Finalizers)
+	serviceIntentions.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceIntentions.ObjectMeta.Finalizers)
 }
 
 func TestServiceIntentions_SetSyncedCondition(t *testing.T) {
-	serviceResolver := &ServiceIntentions{}
-	serviceResolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceIntentions := &ServiceIntentions{}
+	serviceIntentions.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, serviceResolver.Status.Conditions[0].Status)
-	require.Equal(t, "reason", serviceResolver.Status.Conditions[0].Reason)
-	require.Equal(t, "message", serviceResolver.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceIntentions.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceIntentions.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceIntentions.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, serviceResolver.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceIntentions.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceIntentions_SetLastSyncedTime(t *testing.T) {
+	serviceIntentions := &ServiceIntentions{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceIntentions.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, serviceIntentions.Status.LastSyncedTime)
 }
 
 func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
@@ -390,7 +399,7 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			serviceResolver := &ServiceIntentions{
+			serviceIntentions := &ServiceIntentions{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -399,7 +408,7 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, serviceResolver.SyncedConditionStatus())
+			require.Equal(t, status, serviceIntentions.SyncedConditionStatus())
 		})
 	}
 }
@@ -496,10 +505,10 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	serviceResolver := &ServiceIntentions{
+	serviceIntentions := &ServiceIntentions{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, serviceResolver.GetObjectMeta())
+	require.Equal(t, meta, serviceIntentions.GetObjectMeta())
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.

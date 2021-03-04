@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/common"
@@ -12,6 +13,7 @@ import (
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -284,6 +286,7 @@ func (r *ConfigEntryController) syncFailed(ctx context.Context, logger logr.Logg
 
 func (r *ConfigEntryController) syncSuccessful(ctx context.Context, updater Controller, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
 	configEntry.SetSyncedCondition(corev1.ConditionTrue, "", "")
+	configEntry.SetLastSyncedTime(metav1.NewTime(time.Now()))
 	return ctrl.Result{}, updater.UpdateStatus(ctx, configEntry)
 }
 

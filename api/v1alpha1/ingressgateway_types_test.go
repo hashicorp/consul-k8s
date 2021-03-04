@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
@@ -246,9 +247,9 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			resource, ok := act.(*capi.IngressGatewayConfigEntry)
+			ingressGateway, ok := act.(*capi.IngressGatewayConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, resource)
+			require.Equal(t, c.Exp, ingressGateway)
 		})
 	}
 }
@@ -553,30 +554,38 @@ func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 }
 
 func TestIngressGateway_AddFinalizer(t *testing.T) {
-	resource := &IngressGateway{}
-	resource.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resource.ObjectMeta.Finalizers)
+	ingressGateway := &IngressGateway{}
+	ingressGateway.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, ingressGateway.ObjectMeta.Finalizers)
 }
 
 func TestIngressGateway_RemoveFinalizer(t *testing.T) {
-	resource := &IngressGateway{
+	ingressGateway := &IngressGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resource.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resource.ObjectMeta.Finalizers)
+	ingressGateway.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, ingressGateway.ObjectMeta.Finalizers)
 }
 
 func TestIngressGateway_SetSyncedCondition(t *testing.T) {
-	resource := &IngressGateway{}
-	resource.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	ingressGateway := &IngressGateway{}
+	ingressGateway.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resource.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resource.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resource.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, ingressGateway.Status.Conditions[0].Status)
+	require.Equal(t, "reason", ingressGateway.Status.Conditions[0].Reason)
+	require.Equal(t, "message", ingressGateway.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resource.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, ingressGateway.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestIngressGateway_SetLastSyncedTime(t *testing.T) {
+	ingressGateway := &IngressGateway{}
+	syncedTime := metav1.NewTime(time.Now())
+	ingressGateway.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, ingressGateway.Status.LastSyncedTime)
 }
 
 func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
@@ -587,7 +596,7 @@ func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resource := &IngressGateway{
+			ingressGateway := &IngressGateway{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -596,7 +605,7 @@ func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resource.SyncedConditionStatus())
+			require.Equal(t, status, ingressGateway.SyncedConditionStatus())
 		})
 	}
 }
@@ -645,8 +654,8 @@ func TestIngressGateway_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	resource := &IngressGateway{
+	ingressGateway := &IngressGateway{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, resource.GetObjectMeta())
+	require.Equal(t, meta, ingressGateway.GetObjectMeta())
 }

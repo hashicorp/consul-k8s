@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
@@ -157,30 +158,38 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 }
 
 func TestServiceSplitter_AddFinalizer(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{}
-	ServiceSplitter.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, ServiceSplitter.ObjectMeta.Finalizers)
+	serviceSplitter := &ServiceSplitter{}
+	serviceSplitter.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceSplitter.ObjectMeta.Finalizers)
 }
 
 func TestServiceSplitter_RemoveFinalizer(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{
+	serviceSplitter := &ServiceSplitter{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	ServiceSplitter.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, ServiceSplitter.ObjectMeta.Finalizers)
+	serviceSplitter.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceSplitter.ObjectMeta.Finalizers)
 }
 
 func TestServiceSplitter_SetSyncedCondition(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{}
-	ServiceSplitter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceSplitter := &ServiceSplitter{}
+	serviceSplitter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, ServiceSplitter.Status.Conditions[0].Status)
-	require.Equal(t, "reason", ServiceSplitter.Status.Conditions[0].Reason)
-	require.Equal(t, "message", ServiceSplitter.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceSplitter.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceSplitter.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceSplitter.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, ServiceSplitter.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceSplitter.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceSplitter_SetLastSyncedTime(t *testing.T) {
+	serviceSplitter := &ServiceSplitter{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceSplitter.SetLastSyncedTime(syncedTime)
+
+	require.Equal(t, syncedTime, serviceSplitter.Status.LastSyncedTime)
 }
 
 func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
@@ -191,7 +200,7 @@ func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			ServiceSplitter := &ServiceSplitter{
+			serviceSplitter := &ServiceSplitter{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -200,7 +209,7 @@ func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, ServiceSplitter.SyncedConditionStatus())
+			require.Equal(t, status, serviceSplitter.SyncedConditionStatus())
 		})
 	}
 }
@@ -248,10 +257,10 @@ func TestServiceSplitter_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	ServiceSplitter := &ServiceSplitter{
+	serviceSplitter := &ServiceSplitter{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, ServiceSplitter.GetObjectMeta())
+	require.Equal(t, meta, serviceSplitter.GetObjectMeta())
 }
 
 func TestServiceSplitter_Validate(t *testing.T) {

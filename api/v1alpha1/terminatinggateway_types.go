@@ -27,6 +27,7 @@ func init() {
 
 // TerminatingGateway is the Schema for the terminatinggateways API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type TerminatingGateway struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -131,6 +132,10 @@ func (in *TerminatingGateway) SetSyncedCondition(status corev1.ConditionStatus, 
 			Message:            message,
 		},
 	}
+}
+
+func (in *TerminatingGateway) SetLastSyncedTime(time metav1.Time) {
+	in.Status.LastSyncedTime = time
 }
 
 func (in *TerminatingGateway) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
