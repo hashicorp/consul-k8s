@@ -33,16 +33,16 @@ func Logger(level string) (hclog.Logger, error) {
 	}), nil
 }
 
-// ValidatePort converts flags representing ports into integer and validates
-// that it's in the port range.
-func ValidatePort(flagName, flagValue string) error {
+// ValidateUnprivilegedPort converts flags representing ports into integer and validates
+// that it's in the unprivileged port range.
+func ValidateUnprivilegedPort(flagName, flagValue string) error {
 	port, err := strconv.Atoi(flagValue)
 	if err != nil {
-		return errors.New(fmt.Sprintf("%s value of %s is not a valid integer.", flagName, flagValue))
+		return errors.New(fmt.Sprintf("%s value of %s is not a valid integer", flagName, flagValue))
 	}
-	// This checks if the port is in the valid port range.
+	// This checks if the port is in the unprivileged port range.
 	if port < 1024 || port > 65535 {
-		return errors.New(fmt.Sprintf("%s value of %d is not in the port range 1024-65535.", flagName, port))
+		return errors.New(fmt.Sprintf("%s value of %d is not in the unprivileged port range 1024-65535", flagName, port))
 	}
 	return nil
 }

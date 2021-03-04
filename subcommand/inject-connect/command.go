@@ -277,12 +277,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Validate ports in metrics flags
-	err = common.ValidatePort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
+	err = common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	err = common.ValidatePort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
+	err = common.ValidateUnprivilegedPort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

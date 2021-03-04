@@ -18,11 +18,11 @@ func TestLogger(t *testing.T) {
 	require.True(t, lgr.IsDebug())
 }
 
-func TestValidatePort(t *testing.T) {
-	err := ValidatePort("-test-flag-name", "1234")
+func TestValidateUnprivilegedPort(t *testing.T) {
+	err := ValidateUnprivilegedPort("-test-flag-name", "1234")
 	require.NoError(t, err)
-	err = ValidatePort("-test-flag-name", "invalid-port")
-	require.EqualError(t, err, "-test-flag-name value of invalid-port is not a valid integer.")
-	err = ValidatePort("-test-flag-name", "22")
-	require.EqualError(t, err, "-test-flag-name value of 22 is not in the port range 1024-65535.")
+	err = ValidateUnprivilegedPort("-test-flag-name", "invalid-port")
+	require.EqualError(t, err, "-test-flag-name value of invalid-port is not a valid integer")
+	err = ValidateUnprivilegedPort("-test-flag-name", "22")
+	require.EqualError(t, err, "-test-flag-name value of 22 is not in the unprivileged port range 1024-65535")
 }

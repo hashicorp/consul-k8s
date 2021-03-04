@@ -960,6 +960,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 		Name        string
 		Pod         func(*corev1.Pod) *corev1.Pod
 		Annotation  string
+		Privileged  bool
 		DefaultPort string
 		Expected    string
 		Err         string
@@ -971,6 +972,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation: "consul.hashicorp.com/test-annotation-port",
+			Privileged: false,
 			Expected:   "1234",
 			Err:        "",
 		},
@@ -980,6 +982,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation:  "consul.hashicorp.com/test-annotation-port",
+			Privileged:  false,
 			DefaultPort: "4321",
 			Expected:    "4321",
 			Err:         "",
@@ -996,6 +999,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation:  "consul.hashicorp.com/test-annotation-port",
+			Privileged:  false,
 			DefaultPort: "web-port",
 			Expected:    "2222",
 			Err:         "",
@@ -1006,9 +1010,10 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation:  "consul.hashicorp.com/test-annotation-port",
+			Privileged:  false,
 			DefaultPort: "web-port",
 			Expected:    "",
-			Err:         "web-port is not a valid port on the pod minimal.",
+			Err:         "web-port is not a valid port on the pod minimal",
 		},
 		{
 			Name: "Gets the value of the named port",
@@ -1023,6 +1028,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation:  "consul.hashicorp.com/test-annotation-port",
+			Privileged:  false,
 			DefaultPort: "4321",
 			Expected:    "2222",
 			Err:         "",
@@ -1034,8 +1040,9 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation: "consul.hashicorp.com/test-annotation-port",
+			Privileged: false,
 			Expected:   "",
-			Err:        "consul.hashicorp.com/test-annotation-port annotation value of not-an-int is not a valid integer.",
+			Err:        "consul.hashicorp.com/test-annotation-port annotation value of not-an-int is not a valid integer",
 		},
 		{
 			Name: "Invalid annotation (integer not in port range)",
@@ -1044,8 +1051,31 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 				return pod
 			},
 			Annotation: "consul.hashicorp.com/test-annotation-port",
+			Privileged: true,
 			Expected:   "",
-			Err:        "consul.hashicorp.com/test-annotation-port annotation value of 100000 is not in the port range 1024-65535.",
+			Err:        "consul.hashicorp.com/test-annotation-port annotation value of 100000 is not in the valid port range 1-65535",
+		},
+		{
+			Name: "Invalid annotation (integer not in unprivileged port range)",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "22"
+				return pod
+			},
+			Annotation: "consul.hashicorp.com/test-annotation-port",
+			Privileged: false,
+			Expected:   "",
+			Err:        "consul.hashicorp.com/test-annotation-port annotation value of 22 is not in the unprivileged port range 1024-65535",
+		},
+		{
+			Name: "Privileged ports allowed",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "22"
+				return pod
+			},
+			Annotation: "consul.hashicorp.com/test-annotation-port",
+			Privileged: true,
+			Expected:   "22",
+			Err:        "",
 		},
 	}
 
@@ -1053,11 +1083,11 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := determineAndValidatePort(tt.Pod(minimal()), tt.Annotation, tt.DefaultPort)
+			actual, err := determineAndValidatePort(tt.Pod(minimal()), tt.Annotation, tt.DefaultPort, tt.Privileged)
 
 			if tt.Err == "" {
-				require.Equal(tt.Expected, actual)
 				require.NoError(err)
+				require.Equal(tt.Expected, actual)
 			} else {
 				require.EqualError(err, tt.Err)
 			}
