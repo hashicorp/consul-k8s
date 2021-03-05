@@ -1,13 +1,11 @@
-package consulinit
+package connectinit
 
 import (
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -24,11 +22,11 @@ const tokenSinkFile = "/consul/connect-inject/acl-token"
 type Command struct {
 	UI cli.Ui
 
-	flagACLAuthMethod   string // Auth Method to use for ACLs, if enabled
-	flagMeta            string // Flag for metadata to consul login.
-	flagBearerTokenFile string // Location of the bearer token.
-	flagTokenSinkFile   string // Location to write the output token.
-	numLoginRetries  int    // Number of times to attempt to retry ACL().Login(), default: 3.
+	flagACLAuthMethod   string            // Auth Method to use for ACLs, if enabled
+	flagMeta            map[string]string // Flag for metadata to consul login.
+	flagBearerTokenFile string            // Location of the bearer token.
+	flagTokenSinkFile   string            // Location to write the output token.
+	numLoginRetries     int               // Number of times to attempt to retry ACL().Login(), default: 3.
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -38,19 +36,19 @@ type Command struct {
 	sigCh chan os.Signal
 	once  sync.Once
 	help  string
-	cert  atomic.Value
 }
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "method", "",
-		"The name of the Kubernetes Auth Method to use for consul login if ACLs are enabled.")
-	c.flagSet.StringVar(&c.flagMeta, "meta", "",
-		"Metadata to be passed to consul login api.")
+		"Name of the auth method to login to.")
+	c.flagSet.Var((*flags.FlagMapValue)(&c.flagMeta), "meta",
+		"Metadata to set on the token, formatted as key=value. This flag may be specified multiple"+
+			"times to set multiple meta fields.")
 	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", bearerTokenFile,
-		"Token file to be used for consul login api.")
+		"Path to a file containing a secret bearer token to use with this auth method.")
 	c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", tokenSinkFile,
-		"ACL token will be written to this file.")
+		"The most recent token's SecretID is kept up to date in this file.")
 
 	c.http = &flags.HTTPFlags{}
 
@@ -58,7 +56,7 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flagSet)
 
 	// Default number of times to attempt ACL().Login()
-	c.numACLLoginRetries = 3
+	c.numLoginRetries = 3
 
 	// Wait on an interrupt or terminate for exit, be sure to init it before running
 	// the controller so that we don't receive an interrupt before it's ready.
@@ -80,7 +78,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-method must be set")
 		return 1
 	}
-	if c.flagMeta == "" {
+	if c.flagMeta == nil {
 		c.UI.Error("-meta must be set")
 		return 1
 	}
@@ -103,40 +101,29 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-	ErrCh := make(chan error)
-	ExitCh := make(chan bool)
-	meta := map[string]string{"pod": strings.Split(c.flagMeta, "=")[1]}
-	go func() {
-		retries := 0
-		// This is hardcoded because we hardcode it in the init container.
-		for {
-			err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, meta)
-			if err != nil {
-				retries++
-				time.Sleep(time.Second * 1)
-				if retries == c.numACLLoginRetries {
-					ErrCh <- fmt.Errorf("unable to do consul login")
-				}
-			} else {
-				c.UI.Info("consul login complete")
-				ExitCh <- true
-			}
+	retries := 0
+	for {
+		err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
+		if err == nil {
+			break
 		}
-	}()
+		retries++
+		if retries == c.numLoginRetries {
+			c.UI.Error("hit maximum retries for consul login")
+			return 1
+		}
+		c.UI.Error(fmt.Sprintf("consul login failed; retrying: %s", err))
 
-	// Block until we get a signal or something errors.
-	select {
-	case sig := <-c.sigCh:
-		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-		return 0
-
-	case err := <-ErrCh:
-		c.UI.Error(fmt.Sprintf("%v", err))
-		return 1
-
-	case <-ExitCh:
-		return 0
+		select {
+		case <-time.After(1 * time.Second):
+			// retry loop
+		case sig := <-c.sigCh:
+			c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
+			return 0
+		}
 	}
+	c.UI.Info("consul login complete")
+	return 0
 }
 
 func (c *Command) interrupt() {

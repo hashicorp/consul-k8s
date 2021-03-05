@@ -324,7 +324,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 // because its alias health check depends on the main service to exist.
 const initContainerCommandTpl = `
 {{- if .AuthMethod }}
-consul-k8s consul-init -method="{{ .AuthMethod }}" \
+consul-k8s connect-init -method="{{ .AuthMethod }}" \
   {{- if.ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
@@ -335,8 +335,6 @@ consul-k8s consul-init -method="{{ .AuthMethod }}" \
   {{- end }}
   {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- /* The acl token file needs to be read by the consul-sidecar which runs
-       as non-root user consul-k8s. TODO: will this be necessary anymore? */}}
 {{- end }}
 {{- if .ConsulCACert}}
 export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
