@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -101,26 +102,23 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+
 	retries := 0
-	for {
+	backoff.Retry(func() error {
 		err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
 		if err == nil {
-			break
+			return nil
 		}
 		retries++
 		if retries == c.numLoginRetries {
-			c.UI.Error("hit maximum retries for consul login")
-			return 1
+			return err //fmt.Errorf("hit maximum retries for consul login")
 		}
 		c.UI.Error(fmt.Sprintf("consul login failed; retrying: %s", err))
-
-		select {
-		case <-time.After(1 * time.Second):
-			// retry loop
-		case sig := <-c.sigCh:
-			c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-			return 0
-		}
+		return err
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), 3))
+	if err != nil {
+		c.UI.Error("hit maximum retries for consul login")
+		return 1
 	}
 	c.UI.Info("consul login complete")
 	return 0
@@ -142,7 +140,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Inject connect init command."
 const help = `
-Usage: consul-k8s consul-init [options]
+Usage: consul-k8s connect-init [options]
 
   Bootstraps connect-injected pod components.
   Not intended for stand-alone use.

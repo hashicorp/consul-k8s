@@ -1,19 +1,16 @@
 package connectinit
 
 import (
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"syscall"
-	"testing"
-	"time"
-
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
 )
 
 const testAuthMethod = "consul-k8s-auth-method"
@@ -147,7 +144,7 @@ func TestRun_withRetries(t *testing.T) {
 				"-method", testAuthMethod, "-meta", testPodMeta})
 			require.Equal(t, c.ExpCode, code)
 			// cmd will return 1 after cmd.numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it
-			require.Equal(t, min(c.LoginAttemptsCount, cmd.numLoginRetries), counter)
+			require.Equal(t, min(c.LoginAttemptsCount, cmd.numLoginRetries+1), counter)
 			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
 			if c.ExpErr == "" {
 				// validate that the token was written to disk if we succeeded
@@ -156,34 +153,6 @@ func TestRun_withRetries(t *testing.T) {
 				require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
 			}
 		})
-	}
-}
-
-func TestSignalHandling(t *testing.T) {
-	// Create a fake input bearer token file and an output file.
-	bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
-	tokenFile := common.WriteTempFile(t, "")
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
-	}
-	// Start the command asynchronously and then we'll send an interrupt.
-	exitChan := runCommandAsynchronously(&cmd, []string{
-		"-bearer-token-file", bearerTokenFile,
-		"-method", testAuthMethod, "-meta", testPodMeta,
-		"-token-sink-file", tokenFile,
-	})
-
-	// Send the signal
-	cmd.sendSignal(syscall.SIGTERM)
-
-	// Assert that it exits cleanly or timeout.
-	select {
-	case exitCode := <-exitChan:
-		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-	case <-time.After(time.Second * 1):
-		// Fail if the stopCh was not caught.
-		require.Fail(t, "timeout waiting for command to exit")
 	}
 }
 
