@@ -13,32 +13,6 @@ import (
 	"testing"
 )
 
-const testAuthMethod = "consul-k8s-auth-method"
-const loginResponse = `{
-  "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
-  "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
-  "Description": "token created via login",
-  "Roles": [
-    {
-      "ID": "3356c67c-5535-403a-ad79-c1d5f9df8fc7",
-      "Name": "demo"
-    }
-  ],
-  "ServiceIdentities": [
-    {
-      "ServiceName": "example"
-    }
-  ],
-  "Local": true,
-  "AuthMethod": "minikube",
-  "CreateTime": "2019-04-29T10:08:08.404370762-05:00",
-  "Hash": "nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=",
-  "CreateIndex": 36,
-  "ModifyIndex": 36
-}`
-
-const testPodMeta = "pod=default/podName"
-
 func TestRun_FlagValidation(t *testing.T) {
 	cases := []struct {
 		flags  []string
@@ -66,7 +40,7 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-/// TestRun_RetryACLLoginFails tests that after retries the command fails
+// TestRun_RetryACLLoginFails tests that after retries the command fails
 func TestRun_RetryACLLoginFails(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -134,17 +108,16 @@ func TestRun_withRetries(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:              ui,
-				consulClient:    client,
-				numLoginRetries: 3, // just here to help visualize # of internal retries
+				UI:           ui,
+				consulClient: client,
 			}
 			code := cmd.Run([]string{"-bearer-token-file", bearerTokenFile,
 				"-token-sink-file", tokenFile,
 				"-meta", "host=foo",
 				"-method", testAuthMethod, "-meta", testPodMeta})
 			require.Equal(t, c.ExpCode, code)
-			// cmd will return 1 after cmd.numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it
-			require.Equal(t, min(c.LoginAttemptsCount, cmd.numLoginRetries+1), counter)
+			// cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it
+			require.Equal(t, min(c.LoginAttemptsCount, numLoginRetries+1), counter)
 			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
 			if c.ExpErr == "" {
 				// validate that the token was written to disk if we succeeded
@@ -162,3 +135,29 @@ func min(x, y int) int {
 	}
 	return x
 }
+
+const testAuthMethod = "consul-k8s-auth-method"
+const loginResponse = `{
+  "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
+  "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
+  "Description": "token created via login",
+  "Roles": [
+    {
+      "ID": "3356c67c-5535-403a-ad79-c1d5f9df8fc7",
+      "Name": "demo"
+    }
+  ],
+  "ServiceIdentities": [
+    {
+      "ServiceName": "example"
+    }
+  ],
+  "Local": true,
+  "AuthMethod": "minikube",
+  "CreateTime": "2019-04-29T10:08:08.404370762-05:00",
+  "Hash": "nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=",
+  "CreateIndex": 36,
+  "ModifyIndex": 36
+}`
+
+const testPodMeta = "pod=default/podName"

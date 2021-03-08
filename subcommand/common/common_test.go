@@ -13,32 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testAuthMethod = "consul-k8s-auth-method"
-const loginResponse = `{
-  "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
-  "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
-  "Description": "token created via login",
-  "Roles": [
-    {
-      "ID": "3356c67c-5535-403a-ad79-c1d5f9df8fc7",
-      "Name": "demo"
-    }
-  ],
-  "ServiceIdentities": [
-    {
-      "ServiceName": "example"
-    }
-  ],
-  "Local": true,
-  "AuthMethod": "minikube",
-  "CreateTime": "2019-04-29T10:08:08.404370762-05:00",
-  "Hash": "nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=",
-  "CreateIndex": 36,
-  "ModifyIndex": 36
-}`
-
-var testPodMeta = map[string]string{"pod": "default/podName"}
-
 func TestLogger_InvalidLogLevel(t *testing.T) {
 	_, err := Logger("invalid")
 	require.EqualError(t, err, "unknown log level: invalid")
@@ -66,8 +40,7 @@ func TestConsulLogin(t *testing.T) {
 	require := require.New(t)
 
 	counter := 0
-	consulServer, client, bearerTokenFile, tokenFile := startMockServer(t, "foo", &counter)
-	defer consulServer.Close()
+	client, bearerTokenFile, tokenFile := startMockServer(t, "foo", &counter)
 	err := ConsulLogin(
 		client,
 		bearerTokenFile,
@@ -87,8 +60,7 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	counter := 0
-	consulServer, client, bearerTokenFile, tokenFile := startMockServer(t, "", &counter)
-	defer consulServer.Close()
+	client, bearerTokenFile, tokenFile := startMockServer(t, "", &counter)
 	err := ConsulLogin(
 		client,
 		bearerTokenFile,
@@ -96,16 +68,15 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 		tokenFile,
 		testPodMeta,
 	)
-	require.Error(err, "unable to read bearerTokenFile")
+	require.EqualError(err, fmt.Sprintf("no bearer token found in %s", bearerTokenFile))
 }
 
 func TestConsulLogin_NoBearerTokenFile(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	counter := 0
-	consulServer, client, _, tokenFile := startMockServer(t, "foo", &counter)
+	client, _, tokenFile := startMockServer(t, "foo", &counter)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-	defer consulServer.Close()
 	err := ConsulLogin(
 		client,
 		randFileName,
@@ -113,15 +84,15 @@ func TestConsulLogin_NoBearerTokenFile(t *testing.T) {
 		tokenFile,
 		testPodMeta,
 	)
-	require.Error(err, "unable to read bearerTokenFile")
+	require.Error(err)
+	require.Contains(err.Error(), "unable to read bearerTokenFile")
 }
 
-func TestConsulLogin_TokenFileDoesntExist(t *testing.T) {
+func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	counter := 0
-	consulServer, client, bearerTokenFile, _ := startMockServer(t, "foo", &counter)
-	defer consulServer.Close()
+	client, bearerTokenFile, _ := startMockServer(t, "foo", &counter)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	err := ConsulLogin(
 		client,
@@ -130,10 +101,16 @@ func TestConsulLogin_TokenFileDoesntExist(t *testing.T) {
 		randFileName,
 		testPodMeta,
 	)
-	require.Error(err, "error writing token to file sink")
+	require.Error(err)
+	require.Contains(err.Error(), "error writing token to file sink")
 }
 
-func startMockServer(t *testing.T, bearerTokenContents string, apiCallCounter *int) (*httptest.Server, *api.Client, string, string) {
+// startMockServer starts an httptest server used to mock a Consul server's
+// /v1/acl/login endpoint. It also writes bearerTokenContents to a temp file.
+// apiCallCounter will be incremented on each call to /v1/acl/login.
+// It returns a consul client pointing at the server, the filepath of the bearer
+// token file, and the file path of the token sink file.
+func startMockServer(t *testing.T, bearerTokenContents string, apiCallCounter *int) (*api.Client, string, string) {
 	bearerTokenFile := WriteTempFile(t, bearerTokenContents)
 	tokenFile := WriteTempFile(t, "")
 
@@ -143,13 +120,41 @@ func startMockServer(t *testing.T, bearerTokenContents string, apiCallCounter *i
 		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 			*apiCallCounter++
 		}
-		w.Write([]byte(loginResponse))
+		w.Write([]byte(testLoginResponse))
 	}))
+	t.Cleanup(consulServer.Close)
+
 	serverURL, err := url.Parse(consulServer.URL)
 	require.NoError(t, err)
 	clientConfig := &api.Config{Address: serverURL.String()}
 	client, err := api.NewClient(clientConfig)
 	require.NoError(t, err)
 
-	return consulServer, client, bearerTokenFile, tokenFile
+	return client, bearerTokenFile, tokenFile
 }
+
+const testAuthMethod = "consul-k8s-auth-method"
+const testLoginResponse = `{
+  "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
+  "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
+  "Description": "token created via login",
+  "Roles": [
+    {
+      "ID": "3356c67c-5535-403a-ad79-c1d5f9df8fc7",
+      "Name": "demo"
+    }
+  ],
+  "ServiceIdentities": [
+    {
+      "ServiceName": "example"
+    }
+  ],
+  "Local": true,
+  "AuthMethod": "minikube",
+  "CreateTime": "2019-04-29T10:08:08.404370762-05:00",
+  "Hash": "nLimyD+7l6miiHEBmN/tvCelAmE/SbIXxcnTzG3pbGY=",
+  "CreateIndex": 36,
+  "ModifyIndex": 36
+}`
+
+var testPodMeta = map[string]string{"pod": "default/podName"}
