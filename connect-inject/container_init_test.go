@@ -879,11 +879,11 @@ EOF
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -method="auth-method" \
   -namespace="non-default" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -958,11 +958,11 @@ EOF
 			},
 			k8sNamespace,
 			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -method="auth-method" \
   -namespace="default" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.

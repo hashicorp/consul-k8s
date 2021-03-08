@@ -162,20 +162,3 @@ func min(x, y int) int {
 	}
 	return x
 }
-
-// This function starts the command asynchronously and returns a non-blocking chan.
-// When finished, the command will send its exit code to the channel.
-// Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
-// otherwise it can run forever.
-func runCommandAsynchronously(cmd *Command, args []string) chan int {
-	// We have to run cmd.init() to ensure that the channel the command is
-	// using to watch for os interrupts is initialized. If we don't do this,
-	// then if stopCommand is called immediately, it will block forever
-	// because it calls interrupt() which will attempt to send on a nil channel.
-	cmd.init()
-	exitChan := make(chan int, 1)
-	go func() {
-		exitChan <- cmd.Run(args)
-	}()
-	return exitChan
-}
