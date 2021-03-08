@@ -19,12 +19,12 @@ func TestRun_FlagValidation(t *testing.T) {
 		expErr string
 	}{
 		{
-			flags:  []string{"-method", testAuthMethod},
+			flags:  []string{"-acl-auth-method", testAuthMethod},
 			expErr: "-meta must be set",
 		},
 		{
-			flags:  []string{"-meta", "pod=abcdefg"},
-			expErr: "-method must be set",
+			flags:  []string{"-meta", "pod=default/foo"},
+			expErr: "-acl-auth-method must be set",
 		},
 	}
 	for _, c := range cases {
@@ -46,9 +46,9 @@ func TestRun_RetryACLLoginFails(t *testing.T) {
 	cmd := Command{
 		UI: ui,
 	}
-	code := cmd.Run([]string{"-method", testAuthMethod, "-meta", testPodMeta})
+	code := cmd.Run([]string{"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
 	require.Equal(t, 1, code)
-	require.Contains(t, ui.ErrorWriter.String(), "hit maximum retries for consul login")
+	require.Contains(t, ui.ErrorWriter.String(), "Hit maximum retries for consul login")
 }
 
 func TestRun_withRetries(t *testing.T) {
@@ -73,13 +73,6 @@ func TestRun_withRetries(t *testing.T) {
 			ExpCode:            0,
 			ExpErr:             "",
 		},
-		{
-			Description:        "Login fails after 5 retries",
-			TestRetry:          true,
-			LoginAttemptsCount: 5,
-			ExpCode:            1,
-			ExpErr:             "hit maximum retries for consul login",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -92,7 +85,6 @@ func TestRun_withRetries(t *testing.T) {
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 					counter++
-					// sample response from https://consul.io/api-docs/acl#sample-response
 					if !c.TestRetry || (c.TestRetry && c.LoginAttemptsCount == counter) {
 						w.Write([]byte(loginResponse))
 					}
@@ -114,13 +106,13 @@ func TestRun_withRetries(t *testing.T) {
 			code := cmd.Run([]string{"-bearer-token-file", bearerTokenFile,
 				"-token-sink-file", tokenFile,
 				"-meta", "host=foo",
-				"-method", testAuthMethod, "-meta", testPodMeta})
+				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
 			require.Equal(t, c.ExpCode, code)
-			// cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it
+			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, min(c.LoginAttemptsCount, numLoginRetries+1), counter)
 			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
 			if c.ExpErr == "" {
-				// validate that the token was written to disk if we succeeded
+				// Validate that the token was written to disk if we succeeded.
 				data, err := ioutil.ReadFile(tokenFile)
 				require.NoError(t, err)
 				require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
@@ -137,6 +129,8 @@ func min(x, y int) int {
 }
 
 const testAuthMethod = "consul-k8s-auth-method"
+
+// sample response from https://consul.io/api-docs/acl#sample-response
 const loginResponse = `{
   "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
   "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",

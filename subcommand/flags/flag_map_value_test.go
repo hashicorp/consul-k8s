@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// Taken from https://github.com/hashicorp/consul/blob/35daee45bc3bf9fdce5845f2219576e861b23f40/command/flags/flag_map_value_test.go
+// This was done so we don't depend on internal Consul implementation.
+
 func TestFlagMapValueSet(t *testing.T) {
 	t.Parallel()
 

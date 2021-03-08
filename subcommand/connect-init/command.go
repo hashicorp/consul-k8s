@@ -37,15 +37,16 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flagSet.StringVar(&c.flagACLAuthMethod, "method", "",
+	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"Name of the auth method to login to.")
 	c.flagSet.Var((*flags.FlagMapValue)(&c.flagMeta), "meta",
-		"Metadata to set on the token, formatted as key=value. This flag may be specified multiple"+
+		"Metadata to set on the token, formatted as key=value. This flag may be specified multiple "+
 			"times to set multiple meta fields.")
 	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", bearerTokenFile,
-		"Path to a file containing a secret bearer token to use with this auth method.")
+		"Path to a file containing a secret bearer token to use with this auth method. "+
+			"Default is /var/run/secrets/kubernetes.io/serviceaccount/token.")
 	c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", tokenSinkFile,
-		"The most recent token's SecretID is kept up to date in this file.")
+		"The most recent token's SecretID is kept up to date in this file. Default is /consul/connect-inject/acl-token.")
 
 	c.http = &flags.HTTPFlags{}
 
@@ -62,19 +63,11 @@ func (c *Command) Run(args []string) int {
 
 	// Validate flags.
 	if c.flagACLAuthMethod == "" {
-		c.UI.Error("-method must be set")
+		c.UI.Error("-acl-auth-method must be set")
 		return 1
 	}
 	if c.flagMeta == nil {
 		c.UI.Error("-meta must be set")
-		return 1
-	}
-	if c.flagBearerTokenFile == "" {
-		c.UI.Error("-bearer-token-file must be set")
-		return 1
-	}
-	if c.flagTokenSinkFile == "" {
-		c.UI.Error("-token-sink-file must be set")
 		return 1
 	}
 
@@ -84,29 +77,23 @@ func (c *Command) Run(args []string) int {
 		c.http.MergeOntoConfig(cfg)
 		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("unable to get client connection: %s", err))
+			c.UI.Error(fmt.Sprintf("Unable to get client connection: %s", err))
 			return 1
 		}
 	}
 
-	retries := 0
 	backoff.Retry(func() error {
 		err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
-		if err == nil {
-			return nil
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 		}
-		retries++
-		if retries == numLoginRetries {
-			return err
-		}
-		c.UI.Error(fmt.Sprintf("consul login failed; retrying: %s", err))
 		return err
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("hit maximum retries for consul login: %s", err))
+		c.UI.Error(fmt.Sprintf("Hit maximum retries for consul login: %s", err))
 		return 1
 	}
-	c.UI.Info("consul login complete")
+	c.UI.Info("Consul login complete")
 	return 0
 }
 

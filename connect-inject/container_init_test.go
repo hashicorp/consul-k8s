@@ -881,7 +881,7 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -method="auth-method" \
+consul-k8s connect-init -acl-auth-method="auth-method" \
   -namespace="non-default" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 
@@ -960,7 +960,7 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -method="auth-method" \
+consul-k8s connect-init -acl-auth-method="auth-method" \
   -namespace="default" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 
@@ -1143,7 +1143,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-consul-k8s connect-init -method="release-name-consul-k8s-auth-method" \
+consul-k8s connect-init -acl-auth-method="release-name-consul-k8s-auth-method" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"`)
 	require.Contains(actual, `
 /consul/connect-inject/consul services register \

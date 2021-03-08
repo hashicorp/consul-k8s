@@ -40,7 +40,10 @@ func TestConsulLogin(t *testing.T) {
 	require := require.New(t)
 
 	counter := 0
-	client, bearerTokenFile, tokenFile := startMockServer(t, "foo", &counter)
+	bearerTokenFile := WriteTempFile(t, "foo")
+	tokenFile := WriteTempFile(t, "")
+
+	client := startMockServer(t, &counter)
 	err := ConsulLogin(
 		client,
 		bearerTokenFile,
@@ -59,29 +62,27 @@ func TestConsulLogin(t *testing.T) {
 func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	counter := 0
-	client, bearerTokenFile, tokenFile := startMockServer(t, "", &counter)
+
+	bearerTokenFile := WriteTempFile(t, "")
 	err := ConsulLogin(
-		client,
+		nil,
 		bearerTokenFile,
 		testAuthMethod,
-		tokenFile,
+		"",
 		testPodMeta,
 	)
 	require.EqualError(err, fmt.Sprintf("no bearer token found in %s", bearerTokenFile))
 }
 
-func TestConsulLogin_NoBearerTokenFile(t *testing.T) {
+func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	counter := 0
-	client, _, tokenFile := startMockServer(t, "foo", &counter)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	err := ConsulLogin(
-		client,
+		nil,
 		randFileName,
 		testAuthMethod,
-		tokenFile,
+		"",
 		testPodMeta,
 	)
 	require.Error(err)
@@ -92,7 +93,8 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 	counter := 0
-	client, bearerTokenFile, _ := startMockServer(t, "foo", &counter)
+	bearerTokenFile := WriteTempFile(t, "foo")
+	client := startMockServer(t, &counter)
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 	err := ConsulLogin(
 		client,
@@ -108,11 +110,8 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 // startMockServer starts an httptest server used to mock a Consul server's
 // /v1/acl/login endpoint. It also writes bearerTokenContents to a temp file.
 // apiCallCounter will be incremented on each call to /v1/acl/login.
-// It returns a consul client pointing at the server, the filepath of the bearer
-// token file, and the file path of the token sink file.
-func startMockServer(t *testing.T, bearerTokenContents string, apiCallCounter *int) (*api.Client, string, string) {
-	bearerTokenFile := WriteTempFile(t, bearerTokenContents)
-	tokenFile := WriteTempFile(t, "")
+// It returns a consul client pointing at the server.
+func startMockServer(t *testing.T, apiCallCounter *int) *api.Client {
 
 	// Start the Consul server.
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +129,7 @@ func startMockServer(t *testing.T, bearerTokenContents string, apiCallCounter *i
 	client, err := api.NewClient(clientConfig)
 	require.NoError(t, err)
 
-	return client, bearerTokenFile, tokenFile
+	return client
 }
 
 const testAuthMethod = "consul-k8s-auth-method"

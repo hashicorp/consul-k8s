@@ -335,7 +335,7 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 {{- end}}
 {{- if .AuthMethod }}
-consul-k8s connect-init -method="{{ .AuthMethod }}" \
+consul-k8s connect-init -acl-auth-method="{{ .AuthMethod }}" \
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
