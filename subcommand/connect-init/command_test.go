@@ -109,7 +109,7 @@ func TestRun_withRetries(t *testing.T) {
 				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
-			require.Equal(t, min(c.LoginAttemptsCount, numLoginRetries+1), counter)
+			require.Equal(t, c.LoginAttemptsCount, counter)
 			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
 			if c.ExpErr == "" {
 				// Validate that the token was written to disk if we succeeded.
@@ -119,13 +119,6 @@ func TestRun_withRetries(t *testing.T) {
 			}
 		})
 	}
-}
-
-func min(x, y int) int {
-	if x > y {
-		return y
-	}
-	return x
 }
 
 const testAuthMethod = "consul-k8s-auth-method"
