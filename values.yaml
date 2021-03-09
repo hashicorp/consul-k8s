@@ -768,7 +768,7 @@ client:
   #           operator: DoesNotExist
   # ```
   # @type: string
-  affinity: {}
+  affinity: null
 
   # This value references an existing
   # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
