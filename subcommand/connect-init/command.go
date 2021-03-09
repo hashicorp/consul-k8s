@@ -55,6 +55,7 @@ func (c *Command) init() {
 }
 
 func (c *Command) Run(args []string) int {
+	var err error
 	c.once.Do(c.init)
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
@@ -81,8 +82,8 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	err := backoff.Retry(func() error {
-		err = common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
+	err = backoff.Retry(func() error {
+		err := common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 		}
