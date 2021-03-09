@@ -243,6 +243,10 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
+      - slack/status:
+          fail_only: true
+          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-aks-1-18:
     environment:
       - TEST_RESULTS: /tmp/test-results
