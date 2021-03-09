@@ -108,8 +108,7 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 }
 
 // startMockServer starts an httptest server used to mock a Consul server's
-// /v1/acl/login endpoint. It also writes bearerTokenContents to a temp file.
-// apiCallCounter will be incremented on each call to /v1/acl/login.
+// /v1/acl/login endpoint. apiCallCounter will be incremented on each call to /v1/acl/login.
 // It returns a consul client pointing at the server.
 func startMockServer(t *testing.T, apiCallCounter *int) *api.Client {
 

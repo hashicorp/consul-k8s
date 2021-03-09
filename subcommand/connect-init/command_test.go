@@ -57,21 +57,18 @@ func TestRun_withRetries(t *testing.T) {
 		TestRetry          bool
 		LoginAttemptsCount int
 		ExpCode            int
-		ExpErr             string
 	}{
 		{
 			Description:        "Login succeeds without retries",
 			TestRetry:          false,
 			LoginAttemptsCount: 1, // 1 because we dont actually retry
 			ExpCode:            0,
-			ExpErr:             "",
 		},
 		{
 			Description:        "Login succeeds after 1 retry",
 			TestRetry:          true,
 			LoginAttemptsCount: 2,
 			ExpCode:            0,
-			ExpErr:             "",
 		},
 	}
 	for _, c := range cases {
@@ -110,13 +107,10 @@ func TestRun_withRetries(t *testing.T) {
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
-			require.Contains(t, ui.ErrorWriter.String(), c.ExpErr)
-			if c.ExpErr == "" {
-				// Validate that the token was written to disk if we succeeded.
-				data, err := ioutil.ReadFile(tokenFile)
-				require.NoError(t, err)
-				require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
-			}
+			// Validate that the token was written to disk if we succeeded.
+			data, err := ioutil.ReadFile(tokenFile)
+			require.NoError(t, err)
+			require.Contains(t, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586", string(data))
 		})
 	}
 }
