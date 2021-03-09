@@ -276,7 +276,7 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 
 	return corev1.Container{
 		Name:  InjectInitContainerName,
-		Image: h.ImageConsul,
+		Image: h.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
@@ -334,6 +334,19 @@ EOF
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 {{- end}}
+{{- if .AuthMethod }}
+consul-k8s connect-init -acl-auth-method="{{ .AuthMethod }}" \
+  {{- if .ConsulNamespace }}
+  {{- if .NamespaceMirroringEnabled }}
+  {{- /* If namespace mirroring is enabled, the auth method is
+         defined in the default namespace */}}
+  -namespace="default" \
+  {{- else }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- end }}
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+{{- end }}
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -428,27 +441,7 @@ services {
   }
 }
 EOF
-
-{{- if .AuthMethod }}
-/bin/consul login -method="{{ .AuthMethod }}" \
-  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
-  -token-sink-file="/consul/connect-inject/acl-token" \
-  {{- if.ConsulNamespace }}
-  {{- if .NamespaceMirroringEnabled }}
-  {{- /* If namespace mirroring is enabled, the auth method is
-         defined in the default namespace */}}
-  -namespace="default" \
-  {{- else }}
-  -namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  {{- end }}
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- /* The acl token file needs to be read by the consul-sidecar which runs
-       as non-root user consul-k8s. */}}
-chmod 444 /consul/connect-inject/acl-token
-{{- end }}
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
@@ -458,7 +451,7 @@ chmod 444 /consul/connect-inject/acl-token
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   {{- if .PrometheusScrapePath }}
   -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
