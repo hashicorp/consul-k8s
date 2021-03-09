@@ -98,12 +98,11 @@ services {
   }
 }
 EOF
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
@@ -198,7 +197,7 @@ services {
 				return pod
 			},
 			`# Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -prometheus-scrape-path="/scrape-path" \
   -prometheus-backend-port="20100" \
@@ -783,13 +782,12 @@ services {
   }
 }
 EOF
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   -namespace="default" \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
@@ -856,13 +854,12 @@ services {
   }
 }
 EOF
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   -namespace="non-default" \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
@@ -884,6 +881,9 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -acl-auth-method="auth-method" \
+  -namespace="non-default" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -930,20 +930,13 @@ services {
   }
 }
 EOF
-/bin/consul login -method="auth-method" \
-  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
-  -token-sink-file="/consul/connect-inject/acl-token" \
-  -namespace="non-default" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-chmod 444 /consul/connect-inject/acl-token
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="non-default" \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="non-default" \
@@ -967,6 +960,9 @@ chmod 444 /consul/connect-inject/acl-token
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -acl-auth-method="auth-method" \
+  -namespace="default" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -1013,20 +1009,13 @@ services {
   }
 }
 EOF
-/bin/consul login -method="auth-method" \
-  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
-  -token-sink-file="/consul/connect-inject/acl-token" \
-  -namespace="default" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-chmod 444 /consul/connect-inject/acl-token
-
-/bin/consul services register \
+/consul/connect-inject/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
@@ -1154,18 +1143,15 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-/bin/consul login -method="release-name-consul-k8s-auth-method" \
-  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
-  -token-sink-file="/consul/connect-inject/acl-token" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-chmod 444 /consul/connect-inject/acl-token
-
-/bin/consul services register \
+consul-k8s connect-init -acl-auth-method="release-name-consul-k8s-auth-method" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"`)
+	require.Contains(actual, `
+/consul/connect-inject/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
   /consul/connect-inject/service.hcl
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
+/consul/connect-inject/consul connect envoy \
   -proxy-id="${PROXY_SERVICE_ID}" \
   -token-file="/consul/connect-inject/acl-token" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`)
