@@ -4,9 +4,12 @@ package common
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -43,6 +46,39 @@ func ValidateUnprivilegedPort(flagName, flagValue string) error {
 	// This checks if the port is in the unprivileged port range.
 	if port < 1024 || port > 65535 {
 		return errors.New(fmt.Sprintf("%s value of %d is not in the unprivileged port range 1024-65535", flagName, port))
+	}
+	return nil
+}
+
+// ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
+// The logic of this is taken from the `consul login` command.
+func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkFile string, meta map[string]string) error {
+	if meta == nil {
+		return fmt.Errorf("invalid meta")
+	}
+	data, err := ioutil.ReadFile(bearerTokenFile)
+	if err != nil {
+		return fmt.Errorf("unable to read bearerTokenFile: %v, err: %v", bearerTokenFile, err)
+	}
+	bearerToken := strings.TrimSpace(string(data))
+	if bearerToken == "" {
+		return fmt.Errorf("no bearer token found in %s", bearerTokenFile)
+	}
+	// Do the login.
+	req := &api.ACLLoginParams{
+		AuthMethod:  authMethodName,
+		BearerToken: bearerToken,
+		Meta:        meta,
+	}
+	tok, _, err := client.ACL().Login(req, nil)
+	if err != nil {
+		return fmt.Errorf("error logging in: %s", err)
+	}
+
+	// Write the token out to file with permissions so consul-k8s user can read.
+	payload := []byte(tok.SecretID)
+	if err := ioutil.WriteFile(tokenSinkFile, payload, 0444); err != nil {
+		return fmt.Errorf("error writing token to file sink: %v", err)
 	}
 	return nil
 }
