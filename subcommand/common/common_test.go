@@ -53,7 +53,7 @@ func TestConsulLogin(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(counter, 1)
-	// validate that the token file was written to disk
+	// Validate that the token file was written to disk.
 	data, err := ioutil.ReadFile(tokenFile)
 	require.NoError(err)
 	require.Equal(string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
