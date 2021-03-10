@@ -325,23 +325,6 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 // and the connect-proxy service should come after the "main" service
 // because its alias health check depends on the main service to exist.
 const initContainerCommandTpl = `
-<<<<<<< Updated upstream
-=======
-{{- if .AuthMethod }}
-consul-k8s connect-init -method="{{ .AuthMethod }}" \
-  -service-account-name="{{ .ServiceAccountName }}" \
-  {{- if.ConsulNamespace }}
-  {{- if .NamespaceMirroringEnabled }}
-  {{- /* If namespace mirroring is enabled, the auth method is
-         defined in the default namespace */}}
-  -namespace="default" \
-  {{- else }}
-  -namespace="{{ .ConsulNamespace }}" \
-  {{- end }}
-  {{- end }}
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- end }}
->>>>>>> Stashed changes
 {{- if .ConsulCACert}}
 export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
 export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
