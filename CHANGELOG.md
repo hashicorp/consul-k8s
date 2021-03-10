@@ -3,6 +3,11 @@
 BREAKING CHANGES:
 
 FEATURES:
+* Metrics: add support for metrics in Consul. This enables support for Consul Agent metrics,
+  Consul Gateway metrics, metrics merging to serve both application and sidecar metrics and support to configure a metrics provider for the Consul UI.
+  Additionally, adds templates for a demo installation of Prometheus and Grafana.
+
+*Note* Metrics merging is supported in Consul version 1.10+
 
 IMPROVEMENTS:
 * CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
