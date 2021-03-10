@@ -128,11 +128,10 @@ func (c *Command) Run(args []string) int {
 	data := ""
 	err = backoff.Retry(func() error {
 		if c.flagACLAuthMethod == "" {
-			// TODO: can we filter this request somehow?
 			filter := fmt.Sprintf("Kind != `%s` and Meta.pod-name == %s and Meta.k8s-namespace == %s", "connect-proxy", c.flagPodName, c.flagPodNamespace)
 			serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
 			if err != nil {
-				c.UI.Error(fmt.Sprintf("Unable to get agent services: %s", err))
+				c.UI.Error(fmt.Sprintf("Unable to get agent service: %s", err))
 				return err
 			}
 			for _, y := range serviceList {
