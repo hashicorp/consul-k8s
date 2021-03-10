@@ -237,7 +237,7 @@ global:
     enabled: false
 
     # Configures consul agent metrics. Only applicable if
-    # global.metrics.enabled is true.
+    # `global.metrics.enabled` is true.
     # @type: boolean
     enableAgentMetrics: false
 
@@ -249,8 +249,8 @@ global:
     agentMetricsRetentionTime: 1m
 
     # If true, mesh, terminating, and ingress gateways will expose their
-    # Envoy metrics on port 20200 at the /metrics path and all gateway pods
-    # will have Prometheus scrape annotations. Only applicable if global.metrics.enabled is true.
+    # Envoy metrics on port `20200` at the `/metrics` path and all gateway pods
+    # will have Prometheus scrape annotations. Only applicable if `global.metrics.enabled` is true.
     # @type: boolean
     enableGatewayMetrics: true
 
@@ -1029,18 +1029,18 @@ ui:
   # Configurations for displaying metrics in the UI.
   metrics:
     # Enable displaying metrics in the UI. The default value of "-"
-    # will inherit from global.metrics.enabled value.
+    # will inherit from `global.metrics.enabled` value.
     # @type: boolean
     # @default: global.metrics.enabled
     enabled: "-"
     # Provider for metrics. See
     # https://www.consul.io/docs/agent/options#ui_config_metrics_provider
-    # This value is only used if ui.enabled is set to true.
+    # This value is only used if `ui.enabled` is set to true.
     # @type: string
     provider: "prometheus"
 
     # baseURL is the URL of the prometheus server, usually the service URL.
-    # This value is only used if ui.enabled is set to true.
+    # This value is only used if `ui.enabled` is set to true.
     # @type: string
     baseURL: http://prometheus-server
 
@@ -1301,7 +1301,7 @@ connectInject:
     # `consul.hashicorp.com/service-metrics-port` annotation.
     defaultPrometheusScrapePort: 20200
     # Configures the path Prometheus will scrape metrics from, by configuring the pod
-    # annotation prometheus.io/path and the corresponding handler in the Envoy
+    # annotation `prometheus.io/path` and the corresponding handler in the Envoy
     # sidecar.
     # NOTE: This is *not* the path that your application exposes metrics on.
     # That can be configured with the
