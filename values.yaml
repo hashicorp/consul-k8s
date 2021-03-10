@@ -244,7 +244,7 @@ global:
     # Configures the retention time for metrics in Consul clients and
     # servers. This must be greater than 0 for Consul clients and servers
     # to expose any metrics at all.
-    # Only applicable if global.metrics.enabled is true.
+    # Only applicable if `global.metrics.enabled` is true.
     # @type: string
     agentMetricsRetentionTime: 1m
 

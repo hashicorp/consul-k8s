@@ -28,7 +28,6 @@ func TestComponentMetrics(t *testing.T) {
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
 		"global.metrics.enableAgentMetrics": "true",
-		"global.imageK8S":                   "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:4adf933",
 
 		"connectInject.enabled": "true",
 		"controller.enabled":    "true",
@@ -94,9 +93,8 @@ func TestAppMetrics(t *testing.T) {
 		"global.datacenter":      "dc1",
 		"global.metrics.enabled": "true",
 
-		// These are images that are required until https://github.com/hashicorp/consul/pull/9768 and https://github.com/hashicorp/consul-k8s/pull/443
-		"global.imageK8S": "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:4adf933",
-		"global.image":    "gcr.io/nitya-293720/consul-dev:metrics11",
+		// This image is required till Consul 1.10 is released and the CI config is updated.
+		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
 
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
