@@ -6,6 +6,10 @@ FEATURES:
 * Metrics: add support for metrics in Consul. This enables support for Consul Agent metrics,
   Consul Gateway metrics, metrics merging to serve both application and sidecar metrics and support to configure a metrics provider for the Consul UI.
   Additionally, adds templates for a demo installation of Prometheus and Grafana.
+	* If you have these Prometheus annotations on your Connect-inject Pods and enable Connect-Inject metrics (via `connectInject.metrics.defaultEnabled` or `consul.hashicorp.com/enable-metrics`), they will be overridden:
+		* `prometheus.io/scrape`
+		* `prometheus.io/port`
+		* `prometheus.io/path`
 
 *Note* Metrics merging is supported in Consul version 1.10+
 
