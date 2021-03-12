@@ -59,7 +59,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "The service account name for this service.")
 
-	// TODO: we dont need this if we can mock the login bits
+	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
 	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
 		"The service account name for this service.")
 

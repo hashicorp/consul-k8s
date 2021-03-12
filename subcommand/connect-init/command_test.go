@@ -16,12 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Tests:
-//  ACLS disabled (polling on/off)
-//  ACLS enabled (polling on/off)
-// TODO: when endpoints controller is ready "polling" as a flag will be removed and this will just be a test of the command
+// TODO: when endpoints controller is ready the polling flag will be removed and this will just be a test of the command
 // passing with ACLs enabled or disabled.
-// TestRun_LoginAndPolling tests basic happy path of combinations of ACL/Polling
+// TestRun_LoginAndPolling tests basic happy path of combinations of ACLs/RegistrationPolling.
 func TestRun_LoginAndPolling(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -64,11 +61,11 @@ func TestRun_LoginAndPolling(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			extraFlags := []string{}
 			bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
 			proxyFile := common.WriteTempFile(t, "")
 			tokenFile := common.WriteTempFile(t, "")
-			extraFlags = append(extraFlags, "-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile, "-proxyid-file", proxyFile)
+			extraFlags := []string{"-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile,
+				"-proxyid-file", proxyFile, fmt.Sprintf("-skip-service-registration-polling=%t", !c.polling)}
 
 			// Start the mock Consul server.
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,42 +97,40 @@ func TestRun_LoginAndPolling(t *testing.T) {
 				consulClient: client,
 			}
 			c.flags = append(c.flags, extraFlags...)
-			c.flags = append(c.flags, fmt.Sprintf("-skip-service-registration-polling=%t", !c.polling))
 			code := cmd.Run(c.flags)
 			require.Equal(t, 0, code)
-			// TODO: parse cmd.writer() and require.Contains() it
 		})
 	}
 }
 
-// TestRun_ServiceRegistrationFailsWithBadTproxyIDFile passes in an invalid output file for the proxyid
+// TestRun_ServiceRegistrationFailsWithBadServerResponses tests error handling with invalid error responses.
 func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 	cases := []struct {
-		name               string
-		secure             bool
-		loginresponse      string
-		getlistresponse    string
-		getserviceresponse string
-		expErr             string
+		name                    string
+		secure                  bool
+		loginResponse           string
+		getServicesListResponse string
+		getServiceResponse      string
+		expErr                  string
 	}{
 		{
-			name:          "acls enabled, acl response invalid",
+			name:          "acls enabled, acl login response invalid",
 			secure:        true,
-			loginresponse: "",
+			loginResponse: "",
 			expErr:        "Hit maximum retries for consul login",
 		},
 		{
 			name:               "acls enabled, get service response invalid",
 			secure:             true,
-			loginresponse:      testLoginResponse,
-			getserviceresponse: "",
+			loginResponse:      testLoginResponse,
+			getServiceResponse: "",
 			expErr:             "Timed out waiting for service registration",
 		},
 		{
-			name:            "acls disabled, get list response invalid",
-			secure:          false,
-			getlistresponse: "",
-			expErr:          "Timed out waiting for service registration",
+			name:                    "acls disabled, get list response invalid",
+			secure:                  false,
+			getServicesListResponse: "",
+			expErr:                  "Timed out waiting for service registration",
 		},
 	}
 	for _, c := range cases {
@@ -149,22 +144,21 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 				tokenFile := common.WriteTempFile(t, "")
 				flags = append(flags, []string{"-acl-auth-method", testAuthMethod, "-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile, "-service-account-name", testServiceAccountName}...)
 			}
-
 			// Start the mock Consul server.
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if c.secure {
-					// ACL login request
+					// ACL login request.
 					if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-						w.Write([]byte(c.loginresponse))
+						w.Write([]byte(c.loginResponse))
 					}
-					// Agent service get, this is used when ACLs are enabled
+					// Agent service get.
 					if r != nil && r.URL.Path == fmt.Sprintf("/v1/agent/service/%s", testServiceAccountName) && r.Method == "GET" {
-						w.Write([]byte(c.getserviceresponse))
+						w.Write([]byte(c.getServiceResponse))
 					}
 				} else {
-					// Agent services list request, used when ACLs are disabled
+					// Agent services list request, used when ACLs are disabled.
 					if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-						w.Write([]byte(c.getlistresponse))
+						w.Write([]byte(c.getServicesListResponse))
 					}
 				}
 			}))
@@ -180,15 +174,13 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 				consulClient: client,
 			}
 			code := cmd.Run(flags)
-			fmt.Printf("========== here: %v\n", ui.ErrorWriter.String())
-			fmt.Printf("========== here: %v\n", ui.OutputWriter.String())
 			require.Equal(t, 1, code)
 			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
 		})
 	}
 }
 
-// TestRun_ServiceRegistrationFailsWithBadTproxyIDFile passes in an invalid output file for the proxyid
+// TestRun_ServiceRegistrationFailsWithBadTproxyIDFile passes in an invalid output file for the proxyid.
 func TestRun_ServiceRegistrationFailsWithBadTproxyIDFile(t *testing.T) {
 	cases := []struct {
 		secure bool
@@ -211,16 +203,16 @@ func TestRun_ServiceRegistrationFailsWithBadTproxyIDFile(t *testing.T) {
 			// Start the mock Consul server.
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if c.secure {
-					// ACL login request
+					// ACL login request.
 					if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 						w.Write([]byte(testLoginResponse))
 					}
-					// Agent service get, this is used when ACLs are enabled
+					// Agent service get.
 					if r != nil && r.URL.Path == fmt.Sprintf("/v1/agent/service/%s", testServiceAccountName) && r.Method == "GET" {
 						w.Write([]byte(testServiceGetResponse))
 					}
 				} else {
-					// Agent services list request, used when ACLs are disabled
+					// Agent services list request, used when ACLs are disabled.
 					if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
 						w.Write([]byte(testServiceListResponse))
 					}
@@ -280,7 +272,7 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// TestRun_RetryACLLoginFails tests that after retries the command fails
+// TestRun_RetryACLLoginFails tests that after retries the command fails.
 func TestRun_RetryACLLoginFails(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
