@@ -14,6 +14,8 @@ resource "azurerm_resource_group" "default" {
   count    = var.cluster_count
   name     = "consul-k8s-${random_id.suffix[count.index].dec}"
   location = var.location
+
+  tags = var.tags
 }
 
 resource "azurerm_kubernetes_cluster" "default" {
@@ -39,6 +41,8 @@ resource "azurerm_kubernetes_cluster" "default" {
   role_based_access_control {
     enabled = true
   }
+
+  tags = var.tags
 }
 
 resource "local_file" "kubeconfigs" {

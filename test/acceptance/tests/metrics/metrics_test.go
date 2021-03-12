@@ -94,7 +94,12 @@ func TestAppMetrics(t *testing.T) {
 		"global.metrics.enabled": "true",
 
 		// This image is required till Consul 1.10 is released and the CI config is updated.
-		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
+		// Note we need to set ent license to empty explicitly so that if tests have ent license
+		// globally provided this test won't try to apply it because this image is not an enterprise image.
+		// TODO: Remove this setting and ent license settings once Consul alpha is released.
+		"global.image":                        "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
+		"server.enterpriseLicense.secretName": "",
+		"server.enterpriseLicense.secretKey":  "",
 
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",

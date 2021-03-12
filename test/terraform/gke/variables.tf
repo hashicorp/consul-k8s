@@ -20,3 +20,9 @@ variable "cluster_count" {
   default     = 1
   description = "The number of Kubernetes clusters to create."
 }
+
+variable "labels" {
+  type = map
+  default = {}
+  description = "Labels to attach to the created resources."
+}
