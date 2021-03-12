@@ -61,7 +61,7 @@ func (c *Command) init() {
 
 	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
 	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
-		"The service account name for this service.")
+		"Flag to preserve backward compatibility with service registration.")
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
