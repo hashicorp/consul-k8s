@@ -43,6 +43,8 @@ module "vpc" {
     "kubernetes.io/cluster/consul-k8s-${random_id.suffix[count.index].dec}" = "shared"
     "kubernetes.io/role/internal-elb"                                       = "1"
   }
+
+  tags = var.tags
 }
 
 module "eks" {
@@ -70,6 +72,8 @@ module "eks" {
   manage_aws_auth    = false
   write_kubeconfig   = true
   config_output_path = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
+
+  tags = var.tags
 }
 
 data "aws_eks_cluster" "cluster" {

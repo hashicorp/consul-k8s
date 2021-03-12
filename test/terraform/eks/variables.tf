@@ -12,3 +12,9 @@ variable "role_arn" {
   default     = ""
   description = "AWS role for the AWS provider to assume when running these templates."
 }
+
+variable "tags" {
+  type = map
+  default = {}
+  description = "Tags to attach to the created resources."
+}

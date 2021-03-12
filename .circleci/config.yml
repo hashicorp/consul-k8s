@@ -184,7 +184,14 @@ jobs:
             terraform init
             echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
 
-            terraform apply -var project=${CLOUDSDK_CORE_PROJECT} -var init_cli=true -var cluster_count=2 -auto-approve
+            # On GKE, we're setting the build number instead of build URL because label values
+            # cannot contain '/'.
+            terraform apply \
+              -var project=${CLOUDSDK_CORE_PROJECT} \
+              -var init_cli=true \
+              -var cluster_count=2 \
+              -var labels="{\"build_number\": \"$CIRCLE_BUILD_NUM\"}" \
+              -auto-approve
 
       # Restore go module cache if there is one
       - restore_cache:
@@ -206,30 +213,16 @@ jobs:
             # The license expires 15-Oct-2025.
             KUBECONFIG=$primary_kubeconfig kubectl create secret generic ent-license --from-literal=key="${CONSUL_ENT_LICENSE}"
 
-            # We have to run the tests for each package separately so that we can
-            # exit early if any test fails (-failfast only works within a single
-            # package).
-            exit_code=0
-            for pkg in $(go list ./...)
-            do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 30m -failfast \
-                    -enable-enterprise \
-                    -enterprise-license-secret-name=ent-license \
-                    -enterprise-license-secret-key=key \
-                    -enable-pod-security-policies \
-                    -enable-multi-cluster \
-                    -kubeconfig="$primary_kubeconfig" \
-                    -secondary-kubeconfig="$secondary_kubeconfig" \
-                    -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
-              then
-                echo "Tests in ${pkg} failed, aborting early"
-                exit_code=1
-                break
-              fi
-            done
-            gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
-            exit $exit_code
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+              -enable-enterprise \
+              -enterprise-license-secret-name=ent-license \
+              -enterprise-license-secret-key=key \
+              -enable-pod-security-policies \
+              -enable-multi-cluster \
+              -kubeconfig="$primary_kubeconfig" \
+              -secondary-kubeconfig="$secondary_kubeconfig" \
+              -debug-directory="$TEST_RESULTS/debug" \
+              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
 
       - store_test_results:
           path: /tmp/test-results
@@ -263,7 +256,12 @@ jobs:
           command: |
             terraform init
 
-            terraform apply -var client_id="$ARM_CLIENT_ID" -var client_secret="$ARM_CLIENT_SECRET" -var cluster_count=2 -auto-approve
+            terraform apply \
+              -var client_id="$ARM_CLIENT_ID" \
+              -var client_secret="$ARM_CLIENT_SECRET" \
+              -var cluster_count=2 \
+              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+              -auto-approve
 
       # Restore go module cache if there is one
       - restore_cache:
@@ -280,27 +278,13 @@ jobs:
             export primary_kubeconfig=$(terraform output -state ../../terraform/aks/terraform.tfstate -json | jq -r .kubeconfigs.value[0])
             export secondary_kubeconfig=$(terraform output -state ../../terraform/aks/terraform.tfstate -json | jq -r .kubeconfigs.value[1])
 
-            # We have to run the tests for each package separately so that we can
-            # exit early if any test fails (-failfast only works within a single
-            # package).
-            exit_code=0
-            for pkg in $(go list ./...)
-            do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 40m -failfast \
-                    -enable-enterprise \
-                    -enable-multi-cluster \
-                    -kubeconfig="$primary_kubeconfig" \
-                    -secondary-kubeconfig="$secondary_kubeconfig" \
-                    -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
-              then
-                echo "Tests in ${pkg} failed, aborting early"
-                exit_code=1
-                break
-              fi
-            done
-            gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
-            exit $exit_code
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+              -enable-enterprise \
+              -enable-multi-cluster \
+              -kubeconfig="$primary_kubeconfig" \
+              -secondary-kubeconfig="$secondary_kubeconfig" \
+              -debug-directory="$TEST_RESULTS/debug" \
+              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
 
       - store_test_results:
           path: /tmp/test-results
@@ -345,7 +329,7 @@ jobs:
           command: |
             terraform init
 
-            terraform apply -var cluster_count=2 -auto-approve
+            terraform apply -var cluster_count=2 -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" -auto-approve
 
       # Restore go module cache if there is one
       - restore_cache:
@@ -367,27 +351,13 @@ jobs:
             chmod 600 "$primary_kubeconfig"
             chmod 600 "$secondary_kubeconfig"
 
-            # We have to run the tests for each package separately so that we can
-            # exit early if any test fails (-failfast only works within a single
-            # package).
-            exit_code=0
-            for pkg in $(go list ./...)
-            do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 40m -failfast \
-                    -enable-enterprise \
-                    -enable-multi-cluster \
-                    -kubeconfig="$primary_kubeconfig" \
-                    -secondary-kubeconfig="$secondary_kubeconfig" \
-                    -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
-              then
-                echo "Tests in ${pkg} failed, aborting early"
-                exit_code=1
-                break
-              fi
-            done
-            gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
-            exit $exit_code
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+              -enable-enterprise \
+              -enable-multi-cluster \
+              -kubeconfig="$primary_kubeconfig" \
+              -secondary-kubeconfig="$secondary_kubeconfig" \
+              -debug-directory="$TEST_RESULTS/debug" \
+              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
 
       - store_test_results:
           path: /tmp/test-results

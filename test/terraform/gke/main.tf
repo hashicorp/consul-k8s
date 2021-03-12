@@ -28,6 +28,8 @@ resource "google_container_cluster" "cluster" {
   pod_security_policy_config {
     enabled = true
   }
+
+  resource_labels = var.labels
 }
 
 resource "null_resource" "kubectl" {
