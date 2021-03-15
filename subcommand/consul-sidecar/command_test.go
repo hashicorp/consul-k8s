@@ -30,7 +30,7 @@ func TestRun_Defaults(t *testing.T) {
 	require.Equal(t, "consul", cmd.flagConsulBinary)
 }
 
-func TestRunSignalHandlingRegistration(t *testing.T) {
+func TestRunSignalHandlingRegistrationOnly(t *testing.T) {
 	cases := map[string]os.Signal{
 		"SIGINT":  syscall.SIGINT,
 		"SIGTERM": syscall.SIGTERM,
@@ -79,6 +79,69 @@ func TestRunSignalHandlingRegistration(t *testing.T) {
 	}
 }
 
+func TestRunSignalHandlingMetricsOnly(t *testing.T) {
+	cases := map[string]os.Signal{
+		"SIGINT":  syscall.SIGINT,
+		"SIGTERM": syscall.SIGTERM,
+	}
+	for name, signal := range cases {
+		t.Run(name, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+
+			randomPorts := freeport.MustTake(1)
+			// Run async because we need to kill it when the test is over.
+			exitChan := runCommandAsynchronously(&cmd, []string{
+				"-enable-service-registration=false",
+				"-enable-metrics-merging=true",
+				"-merged-metrics-port", fmt.Sprint(randomPorts[0]),
+				"-service-metrics-port", "8080",
+				"-service-metrics-path", "/metrics",
+			})
+
+			// Keep an open connection to the server by continuously sending bytes
+			// on the connection so it will have to be drained.
+			var conn net.Conn
+			var err error
+			retry.Run(t, func(r *retry.R) {
+				conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", randomPorts[0]))
+				if err != nil {
+					require.NoError(r, err)
+				}
+			})
+			go func() {
+				for {
+					_, err := conn.Write([]byte("hello"))
+					// Once the server has been shut down there will be an error writing to that connection. So, this
+					// will break out of the for loop and the goroutine will exit (and be cleaned up).
+					if err != nil {
+						break
+					}
+				}
+			}()
+
+			// Send a signal to consul-sidecar. The merged metrics server can take
+			// up to metricsServerShutdownTimeout to finish cleaning up.
+			cmd.sendSignal(signal)
+
+			// Will need to wait for slightly longer than the shutdown timeout to
+			// make sure that the command has exited shortly after the timeout.
+			waitForShutdown := metricsServerShutdownTimeout + 100*time.Millisecond
+
+			// Assert that it exits cleanly or timeout.
+			select {
+			case exitCode := <-exitChan:
+				require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
+			case <-time.After(waitForShutdown):
+				// Fail if the signal was not caught.
+				require.Fail(t, "timeout waiting for command to exit")
+			}
+		})
+	}
+}
+
 func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 	cases := map[string]os.Signal{
 		"SIGINT":  syscall.SIGINT,
@@ -123,6 +186,8 @@ func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 			go func() {
 				for {
 					_, err := conn.Write([]byte("hello"))
+					// Once the server has been shut down there will be an error writing to that connection. So, this
+					// will break out of the for loop and the goroutine will exit (and be cleaned up).
 					if err != nil {
 						break
 					}
@@ -271,6 +336,13 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-sync-period=0s",
 			},
 			ExpErr: "-sync-period must be greater than 0",
+		},
+		{
+			Flags: []string{
+				"-enable-service-registration=false",
+				"-enable-metrics-merging=false",
+			},
+			ExpErr: " at least one of -enable-service-registration or -enable-metrics-merging must be true",
 		},
 	}
 
