@@ -478,16 +478,21 @@ func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
 
 func (in HashPolicy) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
-	validFields := []string{"header", "cookie", "query_parameter"}
-	if !sliceContains(validFields, in.Field) {
-		errs = append(errs, field.Invalid(path.Child("field"), in.Field,
-			notInSliceMessage(validFields)))
-	}
+	if in.Field != "" {
+		validFields := []string{"header", "cookie", "query_parameter"}
+		if !sliceContains(validFields, in.Field) {
+			errs = append(errs, field.Invalid(path.Child("field"), in.Field,
+				notInSliceMessage(validFields)))
+		}
 
-	if in.Field != "" && in.SourceIP {
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON),
-			"cannot set both field and sourceIP"))
+		if in.SourceIP {
+			asJSON, _ := json.Marshal(in)
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"cannot set both field and sourceIP"))
+		} else if in.FieldValue == "" {
+			errs = append(errs, field.Invalid(path.Child("fieldValue"), in.FieldValue,
+				"fieldValue cannot be empty if field is set"))
+		}
 	}
 
 	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {
