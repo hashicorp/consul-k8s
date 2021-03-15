@@ -484,15 +484,15 @@ func (in HashPolicy) validate(path *field.Path) field.ErrorList {
 			errs = append(errs, field.Invalid(path.Child("field"), in.Field,
 				notInSliceMessage(validFields)))
 		}
-	}
 
-	if in.Field != "" && in.SourceIP {
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON),
-			"cannot set both field and sourceIP"))
-	} else if in.Field != "" && in.FieldValue == "" {
-		errs = append(errs, field.Invalid(path.Child("fieldValue"), in.FieldValue,
-			"fieldValue cannot be empty if field is set"))
+		if in.SourceIP {
+			asJSON, _ := json.Marshal(in)
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"cannot set both field and sourceIP"))
+		} else if in.FieldValue == "" {
+			errs = append(errs, field.Invalid(path.Child("fieldValue"), in.FieldValue,
+				"fieldValue cannot be empty if field is set"))
+		}
 	}
 
 	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {

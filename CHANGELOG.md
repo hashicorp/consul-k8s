@@ -3,17 +3,20 @@
 FEATURES:
 * Metrics: add metrics configuration to inject-connect and metrics-merging capability to consul-sidecar. When metrics and metrics merging are enabled, the consul-sidecar will expose an endpoint that merges the app and proxy metrics.
 
-The flags `-merged-metrics-port`, `-service-metrics-port` and `-service-metrics-path` can be used to configure the merged metrics server, and the application service metrics endpoint on the consul sidecar.
+  The flags `-merged-metrics-port`, `-service-metrics-port` and `-service-metrics-path` can be used to configure the merged metrics server, and the application service metrics endpoint on the consul sidecar.
 
-The flags `-default-enable-metrics`, `-default-enable-metrics-merging`, `-default-merged-metrics-port`, `-default-prometheus-scrape-port` and `-default-prometheus-scrape-path` configure the inject-connect command.
+  The flags `-default-enable-metrics`, `-default-enable-metrics-merging`, `-default-merged-metrics-port`, `-default-prometheus-scrape-port` and `-default-prometheus-scrape-path` configure the inject-connect command.
 
-IMPROVEMENTS
+IMPROVEMENTS:
 * CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
   resource was last successfully synced with Consul. [[GH-448](https://github.com/hashicorp/consul-k8s/pull/448)]
+  
+BUG FIXES:
+* CRDs: fix incorrect validation for `ServiceResolver`. [[GH-456](https://github.com/hashicorp/consul-k8s/pull/456)]
 
 ## 0.24.0 (February 16, 2021)
 
-BREAKING CHANGES
+BREAKING CHANGES:
 * Connect: the `lifecycle-sidecar` command has been renamed to `consul-sidecar`. [[GH-428](https://github.com/hashicorp/consul-k8s/pull/428)]
 * Connect: the `consul-connect-lifecycle-sidecar` container name has been changed to `consul-sidecar` and the `consul-connect-envoy-sidecar` container name has been changed to `envoy-sidecar`. 
 [[GH-428](https://github.com/hashicorp/consul-k8s/pull/428)]
