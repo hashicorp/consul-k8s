@@ -336,10 +336,9 @@ EOF
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 {{- end}}
-{{- if .AuthMethod }}
 consul-k8s connect-init -acl-auth-method="{{ .AuthMethod }}" \
   -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -service-account-name={{ .ServiceAccountName }} \
+  {{- if .AuthMethod }}
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
@@ -350,10 +349,7 @@ consul-k8s connect-init -acl-auth-method="{{ .AuthMethod }}" \
   {{- end }}
   {{- end }}
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- else }}
-consul-k8s connect-init \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE}
-{{- end }}
+  {{- end }}
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.

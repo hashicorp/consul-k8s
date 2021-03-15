@@ -19,25 +19,26 @@ const bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 const tokenSinkFile = "/consul/connect-inject/acl-token"
 const proxyIDFile = "/consul/connect-inject/proxyid"
 const numLoginRetries = 3
-const serviceRegistrationPollingRetries = 6 // This maps to 60 seconds
+const serviceRegistrationPollingRetries = 60 // This maps to 60 seconds
 
 type Command struct {
 	UI cli.Ui
 
 	flagACLAuthMethod                  string            // Auth Method to use for ACLs, if enabled.
 	flagMeta                           map[string]string // Flag for metadata to consul login.
-	flagBearerTokenFile                string            // Location of the bearer token.
-	flagTokenSinkFile                  string            // Location to write the output token.
-	flagProxyIDFile                    string            // Location to write the output proxyID.
 	flagPodName                        string            // Pod name.
 	flagPodNamespace                   string            // Pod namespace.
-	flagServiceAccountName             string            // ServiceAccountName for this service.
 	flagSkipServiceRegistrationPolling bool              // Whether or not to skip service registration.
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
 
 	consulClient *api.Client
+
+	BearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
+	TokenSinkFile                      string // Location to write the output token. Default is /consul/connect-inject/acl-token.
+	ProxyIDFile                        string // Location to write the output proxyID. Default is /consul/connect-inject/proxyid.
+	ServiceRegistrationPollingAttempts int    // Number of times to attempt service registration retry
 
 	once sync.Once
 	help string
@@ -49,19 +50,25 @@ func (c *Command) init() {
 	c.flagSet.Var((*flags.FlagMapValue)(&c.flagMeta), "meta",
 		"Metadata to set on the token, formatted as key=value. This flag may be specified multiple "+
 			"times to set multiple meta fields.")
-	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", bearerTokenFile,
-		"Path to a file containing a secret bearer token to use with this auth method. "+
-			"Default is /var/run/secrets/kubernetes.io/serviceaccount/token.")
-	c.flagSet.StringVar(&c.flagTokenSinkFile, "token-sink-file", tokenSinkFile,
-		"The most recent token's SecretID is kept up to date in this file. Default is /consul/connect-inject/acl-token.")
-	c.flagSet.StringVar(&c.flagProxyIDFile, "proxyid-file", proxyIDFile, "Location to write the output proxyid file.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
-	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "The service account name for this service.")
 
 	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
 	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
 		"Flag to preserve backward compatibility with service registration.")
+
+	if c.BearerTokenFile == "" {
+		c.BearerTokenFile = bearerTokenFile
+	}
+	if c.TokenSinkFile == "" {
+		c.TokenSinkFile = tokenSinkFile
+	}
+	if c.ProxyIDFile == "" {
+		c.ProxyIDFile = proxyIDFile
+	}
+	if c.ServiceRegistrationPollingAttempts == 0 {
+		c.ServiceRegistrationPollingAttempts = serviceRegistrationPollingRetries
+	}
 
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
@@ -99,12 +106,8 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error("-meta must be set")
 			return 1
 		}
-		if c.flagServiceAccountName == "" {
-			c.UI.Error("-service-account-name must be set")
-			return 1
-		}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(c.consulClient, c.flagBearerTokenFile, c.flagACLAuthMethod, c.flagTokenSinkFile, c.flagMeta)
+			err := common.ConsulLogin(c.consulClient, c.BearerTokenFile, c.flagACLAuthMethod, c.TokenSinkFile, c.flagMeta)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 			}
@@ -121,55 +124,40 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
-	// which maps to this one.
-	// In the case of ACLs this will match the serviceAccountName, we query on this.
-	// If ACLs are disabled we query all services and search through
-	// the list for a service with `meta["pod-name"]` that matches this pod.
+	// which maps to this pod+namespace.
 	data := ""
 	err = backoff.Retry(func() error {
-		if c.flagACLAuthMethod == "" {
-			filter := fmt.Sprintf("Kind != `%s` and Meta.pod-name == %s and Meta.k8s-namespace == %s", "connect-proxy", c.flagPodName, c.flagPodNamespace)
-			serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("Unable to get agent service: %s", err))
-				return err
-			}
-			for _, y := range serviceList {
-				// TODO: in theory we've already filtered enough.. can we just return?
-				if y.Kind != "connect-proxy" && y.Meta["pod-name"] == c.flagPodName && y.Meta["k8s-namespace"] == c.flagPodNamespace {
-					c.UI.Info(fmt.Sprintf("Registered pod has been detected: %s", y.Meta["pod-name"]))
-					data = fmt.Sprintf("%s-%s-%s", c.flagPodName, y.ID, "sidecar-proxy")
-					return nil
-				}
-			}
-			return fmt.Errorf("Unable to find registered service")
-		} else {
-			// If ACLs are enabled we don't have permission to go through the list of all services
-			svc, _, err := c.consulClient.Agent().Service(c.flagServiceAccountName, &api.QueryOptions{})
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("Unable to write proxyid out: %s", err))
-				return err
-			} else {
-				if svc == nil {
-					c.UI.Info(fmt.Sprintf("unable to fetch registered service for %v", c.flagServiceAccountName))
-					return fmt.Errorf("Unable to find registered service")
-				}
-				data = fmt.Sprintf("%s-%s-%s", c.flagPodName, svc.ID, "sidecar-proxy")
-			}
-			return nil
+		filter := fmt.Sprintf("Meta[\"pod-name\"] == %s and Meta[\"k8s-namespace\"] == %s", c.flagPodName, c.flagPodNamespace)
+		serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to get agent service: %s", err))
+			return err
 		}
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), serviceRegistrationPollingRetries))
+		// Wait for the service and the connect-proxy service to be registered.
+		if len(serviceList) != 2 {
+			return fmt.Errorf("Unable to find registered service")
+		}
+		for _, y := range serviceList {
+			c.UI.Info(fmt.Sprintf("Registered pod has been detected: %s", y.Meta["pod-name"]))
+			if y.Kind == "connect-proxy" {
+				// This is the proxy service ID
+				data = y.ID
+				return nil
+			}
+		}
+		return fmt.Errorf("Unable to find registered service")
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), uint64(c.ServiceRegistrationPollingAttempts)))
 	if err != nil {
 		c.UI.Error("Timed out waiting for service registration")
 		return 1
 	}
 	// Write the proxyid to the shared volume.
-	err = ioutil.WriteFile(c.flagProxyIDFile, []byte(data), 0444)
+	err = ioutil.WriteFile(c.ProxyIDFile, []byte(data), 0444)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to write proxyid out: %s", err))
 		return 1
 	}
-	c.UI.Info("Bootstrapping completed")
+	c.UI.Info("Service registration completed")
 	return 0
 }
 

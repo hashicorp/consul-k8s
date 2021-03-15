@@ -8,233 +8,71 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: when endpoints controller is ready the polling flag will be removed and this will just be a test of the command
-// passing with ACLs enabled or disabled.
-// TestRun_LoginAndPolling tests basic happy path of combinations of ACLs/RegistrationPolling.
-func TestRun_LoginAndPolling(t *testing.T) {
-	cases := []struct {
-		name    string
-		flags   []string
-		secure  bool
-		polling bool
-	}{
-		{
-			name: "acls enabled, registration polling enabled",
-			flags: []string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
-				"-service-account-name", testServiceAccountName},
-			secure:  true,
-			polling: true,
-		},
-		{
-			name: "acls enabled, registration polling disabled",
-			flags: []string{
-				"-pod-name", testPodName,
-				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
-				"-service-account-name", testServiceAccountName},
-			secure:  true,
-			polling: false,
-		},
-		{
-			name:    "acls disabled, registration polling enabled",
-			flags:   []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace},
-			secure:  false,
-			polling: true,
-		},
-		{
-			name:    "acls disabled, registration polling disabled",
-			flags:   []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace},
-			secure:  false,
-			polling: false,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
-			proxyFile := common.WriteTempFile(t, "")
-			tokenFile := common.WriteTempFile(t, "")
-			extraFlags := []string{"-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile,
-				"-proxyid-file", proxyFile, fmt.Sprintf("-skip-service-registration-polling=%t", !c.polling)}
+// NOTES: Test coverage works as follows:
+// 1. All tests which are specific to 'login' are in subcommand/common/common_test.go
+// 2. The rest are here:
+// ACLS enabled happy path							// done
+// ACLs disabled happy path (uses a valid agent)	// done
+// ACLs disabled invalid response on service get 	// covered by ACLs enabled test bc its the same API call
+// invalid proxyid file								// done
+// ACLS enabled fails due to invalid server responses	// done
+// ACLS enabled fails due to IO (invalid bearer, tokenfile)	// covered by common_test.go
+// test that retries work for service polling
 
-			// Start the mock Consul server.
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if c.secure {
-					// ACL login request
-					if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-						w.Write([]byte(testLoginResponse))
-					}
-					// Agent service get, this is used when ACLs are enabled
-					if r != nil && r.URL.Path == fmt.Sprintf("/v1/agent/service/%s", testServiceAccountName) && r.Method == "GET" {
-						w.Write([]byte(testServiceGetResponse))
-					}
-				} else {
-					// Agent services list request, used when ACLs are disabled
-					if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-						w.Write([]byte(testServiceListResponse))
-					}
-				}
-			}))
-			defer consulServer.Close()
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			clientConfig := &api.Config{Address: serverURL.String()}
-			client, err := consul.NewClient(clientConfig)
-			require.NoError(t, err)
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:           ui,
-				consulClient: client,
-			}
-			c.flags = append(c.flags, extraFlags...)
-			code := cmd.Run(c.flags)
-			require.Equal(t, 0, code)
-		})
-	}
-}
+// TestRun_RetryServicePolling starts the command and does not register the consul services
+// for 2 seconds and then asserts that the proxyid file is written correctly.
+func TestRun_RetryServicePolling(t *testing.T) {
+	require := require.New(t)
+	proxyFile := common.WriteTempFile(t, "")
 
-// TestRun_ServiceRegistrationFailsWithBadServerResponses tests error handling with invalid error responses.
-func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
-	cases := []struct {
-		name                    string
-		secure                  bool
-		loginResponse           string
-		getServicesListResponse string
-		getServiceResponse      string
-		expErr                  string
-	}{
-		{
-			name:          "acls enabled, acl login response invalid",
-			secure:        true,
-			loginResponse: "",
-			expErr:        "Hit maximum retries for consul login",
-		},
-		{
-			name:               "acls enabled, get service response invalid",
-			secure:             true,
-			loginResponse:      testLoginResponse,
-			getServiceResponse: "",
-			expErr:             "Timed out waiting for service registration",
-		},
-		{
-			name:                    "acls disabled, get list response invalid",
-			secure:                  false,
-			getServicesListResponse: "",
-			expErr:                  "Timed out waiting for service registration",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			proxyFile := common.WriteTempFile(t, "")
-			flags := []string{
-				"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-meta",
-				testPodMeta, "-proxyid-file", proxyFile, "-skip-service-registration-polling=false"}
-			if c.secure {
-				bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
-				tokenFile := common.WriteTempFile(t, "")
-				flags = append(flags, []string{"-acl-auth-method", testAuthMethod, "-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile, "-service-account-name", testServiceAccountName}...)
-			}
-			// Start the mock Consul server.
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if c.secure {
-					// ACL login request.
-					if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-						w.Write([]byte(c.loginResponse))
-					}
-					// Agent service get.
-					if r != nil && r.URL.Path == fmt.Sprintf("/v1/agent/service/%s", testServiceAccountName) && r.Method == "GET" {
-						w.Write([]byte(c.getServiceResponse))
-					}
-				} else {
-					// Agent services list request, used when ACLs are disabled.
-					if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-						w.Write([]byte(c.getServicesListResponse))
-					}
-				}
-			}))
-			defer consulServer.Close()
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			clientConfig := &api.Config{Address: serverURL.String()}
-			client, err := consul.NewClient(clientConfig)
-			require.NoError(t, err)
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:           ui,
-				consulClient: client,
-			}
-			code := cmd.Run(flags)
-			require.Equal(t, 1, code)
-			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
-		})
-	}
-}
+	// Start Consul server.
+	server, err := testutil.NewTestServerConfigT(t, nil)
+	defer server.Stop()
+	require.NoError(err)
+	server.WaitForLeader(t)
+	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+	require.NoError(err)
 
-// TestRun_ServiceRegistrationFailsWithBadTproxyIDFile passes in an invalid output file for the proxyid.
-func TestRun_ServiceRegistrationFailsWithBadTproxyIDFile(t *testing.T) {
-	cases := []struct {
-		secure bool
-	}{
-		{secure: true},
-		{secure: false},
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                                 ui,
+		consulClient:                       consulClient,
+		ProxyIDFile:                        proxyFile,
+		ServiceRegistrationPollingAttempts: 10,
 	}
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("Secure: %t", c.secure), func(t *testing.T) {
-			randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
-			flags := []string{
-				"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-meta",
-				testPodMeta, "-proxyid-file", randFileName, "-skip-service-registration-polling=false"}
-			if c.secure {
-				bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
-				tokenFile := common.WriteTempFile(t, "")
-				flags = append(flags, []string{"-acl-auth-method", testAuthMethod, "-bearer-token-file", bearerTokenFile, "-token-sink-file", tokenFile, "-service-account-name", testServiceAccountName}...)
-			}
+	// Start the command asynchronously, later registering the services.
+	exitChan := runCommandAsynchronously(&cmd, defaultTestFlags)
+	// Wait a moment.
+	time.Sleep(time.Second * 2)
+	// Register Consul services.
+	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+	for _, svc := range testConsulServices {
+		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+	}
 
-			// Start the mock Consul server.
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if c.secure {
-					// ACL login request.
-					if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-						w.Write([]byte(testLoginResponse))
-					}
-					// Agent service get.
-					if r != nil && r.URL.Path == fmt.Sprintf("/v1/agent/service/%s", testServiceAccountName) && r.Method == "GET" {
-						w.Write([]byte(testServiceGetResponse))
-					}
-				} else {
-					// Agent services list request, used when ACLs are disabled.
-					if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-						w.Write([]byte(testServiceListResponse))
-					}
-				}
-			}))
-			defer consulServer.Close()
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			clientConfig := &api.Config{Address: serverURL.String()}
-			client, err := consul.NewClient(clientConfig)
-			require.NoError(t, err)
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:           ui,
-				consulClient: client,
-			}
-			expErr := fmt.Sprintf("Unable to write proxyid out: open %s: no such file or directory\n", randFileName)
-			code := cmd.Run(flags)
-			require.Equal(t, 1, code)
-			require.Equal(t, expErr, ui.ErrorWriter.String())
-		})
+	// Assert that it exits cleanly or timeout.
+	select {
+	case exitCode := <-exitChan:
+		require.Equal(0, exitCode)
+	case <-time.After(time.Second * 10):
+		// Fail if the stopCh was not caught.
+		require.Fail("timeout waiting for command to exit")
 	}
+
+	// Validate contents of proxyFile.
+	data, err := ioutil.ReadFile(proxyFile)
+	require.NoError(err)
+	require.Contains("counting-counting-sidecar-proxy", string(data))
 }
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -254,10 +92,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod},
 			expErr: "-meta must be set",
 		},
-		{
-			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod, "-meta", "pod=default/foo"},
-			expErr: "-service-account-name must be set",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -272,6 +106,187 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
+// This test mocks ACL login and the service list response (/v1/agent/services),
+// the later of which is also validated by an actual agent in TestRun_happyPathNoACLs().
+func TestRun_happyPathACLs(t *testing.T) {
+	require := require.New(t)
+
+	bearerFile := common.WriteTempFile(t, "bearerTokenFile")
+	proxyFile := common.WriteTempFile(t, "")
+	tokenFile := common.WriteTempFile(t, "")
+
+	// Start the mock Consul server.
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ACL login request.
+		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
+			w.Write([]byte(testLoginResponse))
+		}
+		// Get list of Agent Services.
+		if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
+			w.Write([]byte(testServiceListResponse))
+		}
+	}))
+	defer consulServer.Close()
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(err)
+	clientConfig := &api.Config{Address: serverURL.String()}
+	client, err := consul.NewClient(clientConfig)
+	require.NoError(err)
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:              ui,
+		consulClient:    client,
+		BearerTokenFile: bearerFile,
+		TokenSinkFile:   tokenFile,
+		ProxyIDFile:     proxyFile,
+	}
+	flags := []string{"-pod-name", testPodName,
+		"-pod-namespace", testPodNamespace,
+		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
+		"-skip-service-registration-polling=false"}
+	// Run the command.
+	code := cmd.Run(flags)
+	require.Equal(0, code)
+
+	// Validate contents of proxyFile.
+	data, err := ioutil.ReadFile(proxyFile)
+	require.NoError(err)
+	require.Contains("counting-counting-sidecar-proxy", string(data))
+}
+
+// This test validates happy path without ACLs : wait on proxy+service to be registered and write out proxyid file
+func TestRun_happyPathNoACLs(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+	// This is the output file for the proxyid.
+	proxyFile := common.WriteTempFile(t, "")
+
+	// Start Consul server.
+	server, err := testutil.NewTestServerConfigT(t, nil)
+	defer server.Stop()
+	require.NoError(err)
+	server.WaitForLeader(t)
+	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+	require.NoError(err)
+
+	// Register Consul services.
+	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+	for _, svc := range testConsulServices {
+		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+	}
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:           ui,
+		consulClient: consulClient,
+		ProxyIDFile:  proxyFile,
+	}
+	code := cmd.Run(defaultTestFlags)
+	require.Equal(0, code)
+
+	// Validate contents of proxyFile.
+	data, err := ioutil.ReadFile(proxyFile)
+	require.NoError(err)
+	require.Contains("counting-counting-sidecar-proxy", string(data))
+}
+
+// This functions as coverage for both ACL and non-ACL codepaths of this error case.
+func TestRun_invalidProxyFile(t *testing.T) {
+	require := require.New(t)
+	// This is the output file for the proxyid.
+	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
+
+	// Start Consul server.
+	server, err := testutil.NewTestServerConfigT(t, nil)
+	defer server.Stop()
+	require.NoError(err)
+	server.WaitForLeader(t)
+	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+	require.NoError(err)
+
+	// Register Consul services.
+	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+	for _, svc := range testConsulServices {
+		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+	}
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                                 ui,
+		consulClient:                       consulClient,
+		ProxyIDFile:                        randFileName,
+		ServiceRegistrationPollingAttempts: 3,
+	}
+	expErr := fmt.Sprintf("Unable to write proxyid out: open %s: no such file or directory\n", randFileName)
+	code := cmd.Run(defaultTestFlags)
+	require.Equal(1, code)
+	require.Equal(expErr, ui.ErrorWriter.String())
+}
+
+// TestRun_ServiceRegistrationFailsWithBadServerResponses tests error handling with invalid error responses.
+func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
+	cases := []struct {
+		name                    string
+		loginResponse           string
+		getServicesListResponse string
+		expErr                  string
+	}{
+		{
+			name:          "acls enabled, acl login response invalid",
+			loginResponse: "",
+			expErr:        "Hit maximum retries for consul login",
+		},
+		{
+			name:                    "acls enabled, get service response invalid",
+			loginResponse:           testLoginResponse,
+			getServicesListResponse: "",
+			expErr:                  "Timed out waiting for service registration",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
+			tokenFile := common.WriteTempFile(t, "")
+
+			// Start the mock Consul server.
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// ACL login request.
+				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
+					w.Write([]byte(c.loginResponse))
+				}
+				// Agent Services get.
+				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
+					w.Write([]byte(c.getServicesListResponse))
+				}
+			}))
+			defer consulServer.Close()
+			// Setup the Client.
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+			clientConfig := &api.Config{Address: serverURL.String()}
+			client, err := consul.NewClient(clientConfig)
+			require.NoError(t, err)
+
+			// Setup the Command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				consulClient:                       client,
+				BearerTokenFile:                    bearerFile,
+				TokenSinkFile:                      tokenFile,
+				ServiceRegistrationPollingAttempts: 2,
+			}
+
+			flags := []string{
+				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
+				"-meta", testPodMeta, "-acl-auth-method", testAuthMethod,
+				"-skip-service-registration-polling=false"}
+			code := cmd.Run(flags)
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
+		})
+	}
+}
+
 // TestRun_RetryACLLoginFails tests that after retries the command fails.
 func TestRun_RetryACLLoginFails(t *testing.T) {
 	ui := cli.NewMockUi()
@@ -279,12 +294,12 @@ func TestRun_RetryACLLoginFails(t *testing.T) {
 		UI: ui,
 	}
 	code := cmd.Run([]string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
-		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
-		"-skip-service-registration-polling", "-service-account-name", testServiceAccountName})
+		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
 	require.Equal(t, 1, code)
 	require.Contains(t, ui.ErrorWriter.String(), "Hit maximum retries for consul login")
 }
 
+// Tests ACL Login with Retries
 func TestRun_LoginwithRetries(t *testing.T) {
 	cases := []struct {
 		Description        string
@@ -308,17 +323,23 @@ func TestRun_LoginwithRetries(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			// Create a fake input bearer token file and an output file.
-			bearerTokenFile := common.WriteTempFile(t, "bearerTokenFile")
+			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
 			tokenFile := common.WriteTempFile(t, "")
+			proxyFile := common.WriteTempFile(t, "")
 
 			// Start the mock Consul server.
 			counter := 0
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// ACL Login
 				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 					counter++
 					if !c.TestRetry || (c.TestRetry && c.LoginAttemptsCount == counter) {
 						w.Write([]byte(testLoginResponse))
 					}
+				}
+				// Agent Services get.
+				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
+					w.Write([]byte(testServiceListResponse))
 				}
 			}))
 			defer consulServer.Close()
@@ -331,16 +352,17 @@ func TestRun_LoginwithRetries(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:           ui,
-				consulClient: client,
+				UI:              ui,
+				consulClient:    client,
+				TokenSinkFile:   tokenFile,
+				BearerTokenFile: bearerFile,
+				ProxyIDFile:     proxyFile,
 			}
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-token-sink-file", tokenFile, "-bearer-token-file", bearerTokenFile,
 				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
-				"-service-account-name", testServiceAccountName,
-				"-skip-service-registration-polling"})
+				"-skip-service-registration-polling=false"})
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
@@ -348,45 +370,18 @@ func TestRun_LoginwithRetries(t *testing.T) {
 			data, err := ioutil.ReadFile(tokenFile)
 			require.NoError(t, err)
 			require.Contains(t, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586", string(data))
+			// Validate contents of proxyFile.
+			proxydata, err := ioutil.ReadFile(proxyFile)
+			require.NoError(t, err)
+			require.Contains(t, "counting-counting-sidecar-proxy", string(proxydata))
 		})
 	}
 }
 
 const testPodNamespace = "default"
 const testPodName = "counting"
-const testServiceAccountName = "counting"
 const testPodMeta = "pod=default/counting"
 const testAuthMethod = "consul-k8s-auth-method"
-
-const testServiceGetResponse = `{
-  "ID": "counting-counting",
-  "Service": "counting",
-  "Tags": [],
-  "Meta": {
-    "k8s-namespace": "default",
-    "pod-name": "counting"
-  },
-  "Port": 9001,
-  "Address": "10.32.3.22",
-  "TaggedAddresses": {
-    "lan_ipv4": {
-      "Address": "10.32.3.22",
-      "Port": 9001
-    },
-    "wan_ipv4": {
-      "Address": "10.32.3.22",
-      "Port": 9001
-    }
-  },
-  "Weights": {
-    "Passing": 1,
-    "Warning": 1
-  },
-  "EnableTagOverride": false,
-  "ContentHash": "43efce0313d03c9",
-  "Datacenter": "dc1"
-}
-`
 
 // sample response from https://consul.io/api-docs/acl#sample-response
 const testLoginResponse = `{
@@ -477,3 +472,52 @@ const testServiceListResponse = `{
     "Datacenter": "dc1"
   }
 }`
+const metaKeyPodName = "pod-name"
+const metaKeyKubeNS = "k8s-namespace"
+
+var (
+	consulCountingSvc = api.AgentServiceRegistration{
+		ID:      "counting-counting",
+		Name:    "counting",
+		Address: "127.0.0.1",
+		Meta: map[string]string{
+			metaKeyPodName: "counting",
+			metaKeyKubeNS:  "default",
+		},
+	}
+	consulCountingSvcSidecar = api.AgentServiceRegistration{
+		ID:   "counting-counting-sidecar-proxy",
+		Name: "counting-sidecar-proxy",
+		Kind: "connect-proxy",
+		Proxy: &api.AgentServiceConnectProxyConfig{
+			DestinationServiceName: "foo",
+			DestinationServiceID:   "foo",
+			Config:                 nil,
+			Upstreams:              nil,
+		},
+		Port:    9999,
+		Address: "127.0.0.1",
+		Meta: map[string]string{
+			metaKeyPodName: "counting",
+			metaKeyKubeNS:  "default",
+		},
+	}
+	defaultTestFlags = []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-skip-service-registration-polling=false"}
+)
+
+// This function starts the command asynchronously and returns a non-blocking chan.
+// When finished, the command will send its exit code to the channel.
+// Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
+// otherwise it can run forever.
+func runCommandAsynchronously(cmd *Command, args []string) chan int {
+	// We have to run cmd.init() to ensure that the channel the command is
+	// using to watch for os interrupts is initialized. If we don't do this,
+	// then if stopCommand is called immediately, it will block forever
+	// because it calls interrupt() which will attempt to send on a nil channel.
+	cmd.init()
+	exitChan := make(chan int, 1)
+	go func() {
+		exitChan <- cmd.Run(args)
+	}()
+	return exitChan
+}
