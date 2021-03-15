@@ -19,10 +19,9 @@ const (
 )
 
 type initContainerCommandData struct {
-	ServiceName        string
-	ServiceAccountName string
-	ProxyServiceName   string
-	ServicePort        int32
+	ServiceName      string
+	ProxyServiceName string
+	ServicePort      int32
 	// ServiceProtocol is the protocol for the service-defaults config
 	// that will be written if WriteServiceDefaults is true.
 	ServiceProtocol string
@@ -96,7 +95,6 @@ func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Co
 		ConsulCACert:              h.ConsulCACert,
 		MetaKeyPodName:            MetaKeyPodName,
 		MetaKeyKubeNS:             MetaKeyKubeNS,
-		ServiceAccountName:        pod.Spec.ServiceAccountName,
 	}
 	if data.ServiceName == "" {
 		// Assertion, since we call defaultAnnotations above and do
