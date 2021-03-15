@@ -542,8 +542,47 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: [spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
 			},
+		},
+		"hashPolicy.field without fieldValue": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								Field: "header",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
+			},
+		},
+		"hashPolicy just sourceIP set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								SourceIP: true,
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
 		"hashPolicy sourceIP and field set": {
 			input: &ServiceResolver{
@@ -566,6 +605,22 @@ func TestServiceResolver_Validate(t *testing.T) {
 				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
 			},
 		},
+		"hashPolicy nothing set is valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
 		"cookieConfig session and ttl set": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -575,7 +630,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 					LoadBalancer: &LoadBalancer{
 						HashPolicies: []HashPolicy{
 							{
-								Field: "cookie",
+								Field:      "cookie",
+								FieldValue: "cookiename",
 								CookieConfig: &CookieConfig{
 									Session: true,
 									TTL:     100,
