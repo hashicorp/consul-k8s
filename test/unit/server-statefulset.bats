@@ -670,6 +670,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# tolerations
+
+@test "server/StatefulSet: topologySpreadConstraints not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | .topologySpreadConstraints? == null' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: topologySpreadConstraints can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.topologySpreadConstraints=foobar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.topologySpreadConstraints == "foobar"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # global.openshift.enabled & server.securityContext
 
 @test "server/StatefulSet: setting server.disableFsGroupSecurityContext fails" {
