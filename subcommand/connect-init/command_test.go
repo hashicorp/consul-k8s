@@ -31,7 +31,6 @@ import (
 
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	cases := []struct {
 		flags  []string
 		expErr string
@@ -56,8 +55,8 @@ func TestRun_FlagValidation(t *testing.T) {
 				UI: ui,
 			}
 			code := cmd.Run(c.flags)
-			require.Equal(1, code)
-			require.Contains(ui.ErrorWriter.String(), c.expErr)
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
 		})
 	}
 }
@@ -65,8 +64,6 @@ func TestRun_FlagValidation(t *testing.T) {
 // This test mocks ACL login and the service list response (/v1/agent/services),
 // the later of which is also validated by an actual agent in TestRun_happyPathNoACLs().
 func TestRun_happyPathACLs(t *testing.T) {
-	require := require.New(t)
-
 	bearerFile := common.WriteTempFile(t, "bearerTokenFile")
 	proxyFile := common.WriteTempFile(t, "")
 	tokenFile := common.WriteTempFile(t, "")
@@ -84,10 +81,10 @@ func TestRun_happyPathACLs(t *testing.T) {
 	}))
 	defer consulServer.Close()
 	serverURL, err := url.Parse(consulServer.URL)
-	require.NoError(err)
+	require.NoError(t, err)
 	clientConfig := &api.Config{Address: serverURL.String()}
 	client, err := consul.NewClient(clientConfig)
-	require.NoError(err)
+	require.NoError(t, err)
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:              ui,
@@ -102,32 +99,32 @@ func TestRun_happyPathACLs(t *testing.T) {
 		"-skip-service-registration-polling=false"}
 	// Run the command.
 	code := cmd.Run(flags)
-	require.Equal(0, code)
+	require.Equal(t, 0, code)
 
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
-	require.NoError(err)
-	require.Contains(string(data), "counting-counting-sidecar-proxy")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
 // This test validates happy path without ACLs : wait on proxy+service to be registered and write out proxyid file
 func TestRun_happyPathNoACLs(t *testing.T) {
-	require := require.New(t)
+	t.Parallel()
 	// This is the output file for the proxyid.
 	proxyFile := common.WriteTempFile(t, "")
 
 	// Start Consul server.
 	server, err := testutil.NewTestServerConfigT(t, nil)
 	defer server.Stop()
-	require.NoError(err)
+	require.NoError(t, err)
 	server.WaitForLeader(t)
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Register Consul services.
 	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
 	for _, svc := range testConsulServices {
-		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
 	}
 
 	ui := cli.NewMockUi()
@@ -137,27 +134,27 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 		ProxyIDFile:  proxyFile,
 	}
 	code := cmd.Run(defaultTestFlags)
-	require.Equal(0, code)
+	require.Equal(t, 0, code)
 
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
-	require.NoError(err)
-	require.Contains(string(data), "counting-counting-sidecar-proxy")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
 // TestRun_RetryServicePolling starts the command and does not register the consul service
 // for 2 seconds and then asserts that the proxyid file gets written correctly.
 func TestRun_RetryServicePolling(t *testing.T) {
-	require := require.New(t)
+	t.Parallel()
 	proxyFile := common.WriteTempFile(t, "")
 
 	// Start Consul server.
 	server, err := testutil.NewTestServerConfigT(t, nil)
 	defer server.Stop()
-	require.NoError(err)
+	require.NoError(t, err)
 	server.WaitForLeader(t)
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -173,46 +170,46 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	// Register Consul services.
 	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
 	for _, svc := range testConsulServices {
-		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
 		time.Sleep(time.Second * 2)
 	}
 
 	// Assert that it exits cleanly or timeout.
 	select {
 	case exitCode := <-exitChan:
-		require.Equal(0, exitCode)
+		require.Equal(t, 0, exitCode)
 	case <-time.After(time.Second * 10):
 		// Fail if the stopCh was not caught.
-		require.Fail("timeout waiting for command to exit")
+		require.Fail(t, "timeout waiting for command to exit")
 	}
 	// Validate that we hit the retry logic when proxy service is not registered yet.
-	require.Contains(ui.OutputWriter.String(), "Unable to find registered services; Retrying")
+	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; Retrying")
 
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
-	require.NoError(err)
-	require.Contains(string(data), "counting-counting-sidecar-proxy")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
 // TestRun_invalidProxyFile validates that we correctly fail in case the proxyid file
 // is not writable. This functions as coverage for both ACL and non-ACL codepaths.
 func TestRun_invalidProxyFile(t *testing.T) {
-	require := require.New(t)
+	t.Parallel()
 	// This is the output file for the proxyid.
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
 
 	// Start Consul server.
 	server, err := testutil.NewTestServerConfigT(t, nil)
 	defer server.Stop()
-	require.NoError(err)
+	require.NoError(t, err)
 	server.WaitForLeader(t)
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Register Consul services.
 	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
 	for _, svc := range testConsulServices {
-		require.NoError(consulClient.Agent().ServiceRegister(&svc))
+		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
 	}
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -223,13 +220,12 @@ func TestRun_invalidProxyFile(t *testing.T) {
 	}
 	expErr := fmt.Sprintf("Unable to write proxyid out: open %s: no such file or directory\n", randFileName)
 	code := cmd.Run(defaultTestFlags)
-	require.Equal(1, code)
-	require.Equal(expErr, ui.ErrorWriter.String())
+	require.Equal(t, 1, code)
+	require.Equal(t, expErr, ui.ErrorWriter.String())
 }
 
 // TestRun_ServiceRegistrationFailsWithBadServerResponses tests error handling with invalid server responses.
 func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
-	require := require.New(t)
 	cases := []struct {
 		name                    string
 		loginResponse           string
@@ -267,10 +263,10 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 			defer consulServer.Close()
 			// Setup the Client.
 			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(err)
+			require.NoError(t, err)
 			clientConfig := &api.Config{Address: serverURL.String()}
 			client, err := consul.NewClient(clientConfig)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Setup the Command.
 			ui := cli.NewMockUi()
@@ -287,8 +283,8 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 				"-meta", testPodMeta, "-acl-auth-method", testAuthMethod,
 				"-skip-service-registration-polling=false"}
 			code := cmd.Run(flags)
-			require.Equal(1, code)
-			require.Contains(ui.ErrorWriter.String(), c.expErr)
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
 		})
 	}
 }
@@ -296,20 +292,18 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 // TestRun_RetryACLLoginFails tests that after retry the command fails.
 func TestRun_RetryACLLoginFails(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
 	}
 	code := cmd.Run([]string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
 		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
-	require.Equal(1, code)
-	require.Contains(ui.ErrorWriter.String(), "Hit maximum retries for consul login")
+	require.Equal(t, 1, code)
+	require.Contains(t, ui.ErrorWriter.String(), "Hit maximum retries for consul login")
 }
 
 // Tests ACL Login with Retries.
 func TestRun_LoginwithRetries(t *testing.T) {
-	require := require.New(t)
 	cases := []struct {
 		Description        string
 		TestRetry          bool
@@ -354,10 +348,10 @@ func TestRun_LoginwithRetries(t *testing.T) {
 			defer consulServer.Close()
 
 			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(err)
+			require.NoError(t, err)
 			clientConfig := &api.Config{Address: serverURL.String()}
 			client, err := consul.NewClient(clientConfig)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
@@ -372,17 +366,17 @@ func TestRun_LoginwithRetries(t *testing.T) {
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
 				"-skip-service-registration-polling=false"})
-			require.Equal(c.ExpCode, code)
+			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
-			require.Equal(c.LoginAttemptsCount, counter)
+			require.Equal(t, c.LoginAttemptsCount, counter)
 			// Validate that the token was written to disk if we succeeded.
 			data, err := ioutil.ReadFile(tokenFile)
-			require.NoError(err)
-			require.Contains(string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+			require.NoError(t, err)
+			require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
 			// Validate contents of proxyFile.
 			proxydata, err := ioutil.ReadFile(proxyFile)
-			require.NoError(err)
-			require.Contains(string(proxydata), "counting-counting-sidecar-proxy")
+			require.NoError(t, err)
+			require.Contains(t, string(proxydata), "counting-counting-sidecar-proxy")
 		})
 	}
 }
