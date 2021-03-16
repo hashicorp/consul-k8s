@@ -519,11 +519,11 @@ server:
   # (https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
   tolerations: ""
 
-  # Pod topology spread constaints for server pods.
+  # Pod topology spread constraints for server pods.
   # This should be a multi-line YAML string matching the `topologySpreadConstraints` array
   # (https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) in a Pod Spec.
   #
-  # This requires K8S >= 1.18 (beta) or 1.19 (stable)
+  # This requires K8S >= 1.18 (beta) or 1.19 (stable).
   #
   # Example:
   #
