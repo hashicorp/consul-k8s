@@ -7,6 +7,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -81,15 +82,26 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	r.Log.Info("retrieved service from kube", "serviceEndpoints", serviceEndpoints)
 
+	// Get Consul service name for the Endpoints object
+	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints,
+	// deregister from Consul.
+
+	// The name of the service in Consul will either be the name of the Endpoints object,
+	// or the annotationService on the first Pod referenced
+	var serviceNameForDeregistrationCheck string
+	endpointAddressMap := map[string]bool{}
+
 	// Register all addresses of this Endpoints object as service instances in Consul.
-	for _, subset := range serviceEndpoints.Subsets {
+	for i, subset := range serviceEndpoints.Subsets {
 		// Do the same thing for all addresses, regardless of whether they're ready.
 		allAddresses := subset.Addresses
 		allAddresses = append(allAddresses, subset.NotReadyAddresses...)
 
 		r.Log.Info("all addresses", "addresses", allAddresses)
-		for _, address := range allAddresses {
+		for j, address := range allAddresses {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+				// Build the endpointAddressMap up for deregistering service instances later.
+				endpointAddressMap[address.IP] = true
 				// Get pod associated with this address.
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
@@ -124,11 +136,14 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					if raw, ok := pod.Annotations[annotationService]; ok && raw != "" {
 						serviceName = raw
 					}
+					if i == 0 && j == 0 {
+						serviceNameForDeregistrationCheck = serviceName
+					}
 
 					serviceID := fmt.Sprintf("%s-%s", pod.Name, serviceName)
 					// TODO tags, meta, upstreams
 
-					fmt.Printf("&&& Pod name: %+v, service port: %+v, service name: %+v, service id: %+v\n", pod, servicePort, serviceName, serviceID)
+					//fmt.Printf("&&& Pod name: %+v, service port: %+v, service name: %+v, service id: %+v\n", pod, servicePort, serviceName, serviceID)
 					service := &api.AgentServiceRegistration{
 						ID:      serviceID,
 						Name:    serviceName,
@@ -208,34 +223,65 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// allAddresses, it is deregistered.
 
 		// Create a map from allAddresses, so we can check if the instance address is in this map.
-		ipMap := map[string]bool{}
-		for _, epAddress := range allAddresses {
-			ipMap[epAddress.IP] = true
-		}
+		//ipMap := map[string]bool{}
+		//for _, epAddress := range allAddresses {
+		//	ipMap[epAddress.IP] = true
+		//}
+		//
+		//fmt.Printf("==== ips in eps obj %+v\n", ipMap)
+		//// Deregisters the service and proxy service instances if they are not in the list of
+		//// allAddresses.
+		//err := r.deregisterServiceOnAllAgentsIfNotInMap(req.Name, req.Namespace, ipMap)
+		//if err != nil {
+		//	r.Log.Info("failed to deregister instances not in map", "service", req.Name)
+		//	return ctrl.Result{}, err
+		//}
+		//serviceInstances, _, err := r.ConsulClient.Catalog().Service(req.Name, "", nil)
+		//fmt.Printf("new svcinstances %+v", serviceInstances)
+	}
 
-		fmt.Printf("==== ips in eps obj %+v\n", ipMap)
-		// Deregisters the service and proxy service instances if they are not in the list of
-		// allAddresses.
-		err := r.deregisterServiceOnAllAgentsIfNotInMap(req.Name, req.Namespace, ipMap)
-		if err != nil {
-			r.Log.Info("failed to deregister instances not in map", "service", req.Name)
-			return ctrl.Result{}, err
+	// Deregister service instances in Consul that are no longer in the Endpoints addresses.
+	// TODO only do this if there is a serviceNameForDeregistration
+	fmt.Printf("*** serviceNameForDeregistration %s\n", serviceNameForDeregistrationCheck)
+	serviceInstances, _, err := r.ConsulClient.Catalog().Service(serviceNameForDeregistrationCheck, "", nil)
+	proxyInstances, _, err := r.ConsulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", serviceNameForDeregistrationCheck), "", nil)
+	fmt.Printf("*** svcinstances %+v\n", serviceInstances)
+	fmt.Printf("*** endpointAddressMap %+v\n", endpointAddressMap)
+
+	serviceAndProxyInstances := append(serviceInstances, proxyInstances...)
+
+	for _, instance := range serviceAndProxyInstances {
+		fmt.Printf("*** instance %+v\n", instance)
+		if _, ok := endpointAddressMap[instance.ServiceAddress]; !ok {
+
+			agentClient, err := r.getConsulClient(instance.Address)
+			if err != nil {
+				r.Log.Error(err, "failed to create a new Consul client", "address", instance.Address)
+				return ctrl.Result{}, err
+			}
+
+			err = agentClient.Agent().ServiceDeregister(instance.ServiceID)
+			if err != nil {
+				r.Log.Error(err, "failed to deregister service instance", "service", serviceNameForDeregistrationCheck, "serviceID", instance.ServiceID)
+				return ctrl.Result{}, err
+			}
 		}
-		serviceInstances, _, err := r.ConsulClient.Catalog().Service(req.Name, "", nil)
-		fmt.Printf("new svcinstances %+v", serviceInstances)
 	}
 
 	return ctrl.Result{}, nil
 }
 
 // When querying by MetaKeyKubeServiceName, the request will return service instances and associated proxy service instances.
+// TODO pass in a context for entire reconcile, not context.Background
 func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string) error {
 
 	// Get all agents by getting pods with label component=client
+	// TODO more strict: app=consul, maybe release name (need to pass in), also namespace
 	list := corev1.PodList{}
 	listOptions := client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{"component": "client"}),
 	}
+	// TODO error check
 	r.Client.List(context.Background(), &list, &listOptions)
 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
@@ -269,6 +315,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 }
 
 // When querying by MetaKeyKubeServiceName, the request will return service instances and associated proxy service instances.
+// TODO: use the catalog api by deriving the Consul service name from a Pod in the Endpoints object ***
 func (r *EndpointsController) deregisterServiceOnAllAgentsIfNotInMap(k8sSvcName, k8sSvcNamespace string, ipMap map[string]bool) error {
 	// Get all agents by getting pods with label component=client
 	list := corev1.PodList{}
@@ -287,6 +334,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgentsIfNotInMap(k8sSvcName,
 		}
 
 		// Get services matching metadata.
+		// TODO svc ids might only be unique by agent
 		svcs, err := agentClient.Agent().ServicesWithFilter(fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`, MetaKeyKubeServiceName, k8sSvcName, MetaKeyKubeNS, k8sSvcNamespace))
 		fmt.Printf("==== svc instances %+v\n", svcs)
 		if err != nil {
@@ -403,7 +451,7 @@ func (r *EndpointsController) getConsulClient(ip string) (*api.Client, error) {
 	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
 
-	localClient, err := api.NewClient(localConfig)
+	localClient, err := consul.NewClient(localConfig)
 	if err != nil {
 		return nil, err
 	}

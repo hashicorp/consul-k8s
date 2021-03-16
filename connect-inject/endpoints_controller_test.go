@@ -273,7 +273,7 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 
 }
 
-// TODO Different k8s svc name
+// TODO Different k8s svc name STARTHERE
 // TODO Update an IP in an address
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	nodeName := "test-node"
