@@ -54,8 +54,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -acl-auth-method="" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -738,8 +737,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -acl-auth-method="" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -812,8 +810,7 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -acl-auth-method="" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -887,10 +884,10 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -acl-auth-method="auth-method" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -namespace="non-default" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="auth-method" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}" \
+  -namespace="non-default"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -967,10 +964,10 @@ EOF
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-consul-k8s connect-init -acl-auth-method="auth-method" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -namespace="default" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="auth-method" \
+  -meta="pod=${POD_NAMESPACE}/${POD_NAME}" \
+  -namespace="default"
 
 # Register the service. The HCL is stored in the volume so that
 # the preStop hook can access it to deregister the service.
@@ -1151,8 +1148,8 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
-consul-k8s connect-init -acl-auth-method="release-name-consul-k8s-auth-method" \
-  -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="release-name-consul-k8s-auth-method" \
   -meta="pod=${POD_NAMESPACE}/${POD_NAME}"`)
 	require.Contains(actual, `
 /consul/connect-inject/consul services register \

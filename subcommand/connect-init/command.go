@@ -19,8 +19,8 @@ const defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/to
 const defaultTokenSinkFile = "/consul/connect-inject/acl-token"
 const defaultProxyIDFile = "/consul/connect-inject/proxyid"
 
-const numLoginRetries = 3               // The number of times to attempt ACL Login.
-const defaultServicePollingRetries = 60 // The number of times to attempt to read this service. (60s)
+const numLoginRetries = 3                       // The number of times to attempt ACL Login.
+const defaultServicePollingRetries = uint64(60) // The number of times to attempt to read this service. (60s)
 
 type Command struct {
 	UI cli.Ui
@@ -31,10 +31,10 @@ type Command struct {
 	flagPodNamespace                   string            // Pod namespace.
 	flagSkipServiceRegistrationPolling bool              // Whether or not to skip service registration.
 
-	BearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
-	TokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
-	ProxyIDFile                        string // Location to write the output proxyID. Default is defaultProxyIDFile.
-	ServiceRegistrationPollingAttempts int    // Number of times to poll for this service to be registered.
+	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
+	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
+	proxyIDFile                        string // Location to write the output proxyID. Default is defaultProxyIDFile.
+	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
 
 	flagSet      *flag.FlagSet
 	http         *flags.HTTPFlags
@@ -57,17 +57,17 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
 		"Flag to preserve backward compatibility with service registration.")
 
-	if c.BearerTokenFile == "" {
-		c.BearerTokenFile = defaultBearerTokenFile
+	if c.bearerTokenFile == "" {
+		c.bearerTokenFile = defaultBearerTokenFile
 	}
-	if c.TokenSinkFile == "" {
-		c.TokenSinkFile = defaultTokenSinkFile
+	if c.tokenSinkFile == "" {
+		c.tokenSinkFile = defaultTokenSinkFile
 	}
-	if c.ProxyIDFile == "" {
-		c.ProxyIDFile = defaultProxyIDFile
+	if c.proxyIDFile == "" {
+		c.proxyIDFile = defaultProxyIDFile
 	}
-	if c.ServiceRegistrationPollingAttempts == 0 {
-		c.ServiceRegistrationPollingAttempts = defaultServicePollingRetries
+	if c.serviceRegistrationPollingAttempts == 0 {
+		c.serviceRegistrationPollingAttempts = defaultServicePollingRetries
 	}
 
 	c.http = &flags.HTTPFlags{}
@@ -107,12 +107,12 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(c.consulClient, c.BearerTokenFile, c.flagACLAuthMethod, c.TokenSinkFile, c.flagMeta)
+			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagMeta)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 			}
 			return err
-		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), uint64(numLoginRetries)))
+		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Hit maximum retries for consul login: %s", err))
 			return 1
@@ -125,7 +125,7 @@ func (c *Command) Run(args []string) int {
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
 	// which maps to this pod+namespace.
-	data := ""
+	var proxyID string
 	err = backoff.Retry(func() error {
 		filter := fmt.Sprintf("Meta[\"pod-name\"] == %s and Meta[\"k8s-namespace\"] == %s", c.flagPodName, c.flagPodNamespace)
 		serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
@@ -135,33 +135,33 @@ func (c *Command) Run(args []string) int {
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
-			c.UI.Info("Unable to find registered services; Retrying")
-			return fmt.Errorf("Did not find correct number of services: %d", len(serviceList))
+			c.UI.Info("Unable to find registered services; retrying")
+			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
-		for _, y := range serviceList {
-			c.UI.Info(fmt.Sprintf("Registered service has been detected: %s", y.Service))
-			if y.Kind == "connect-proxy" {
+		for _, svc := range serviceList {
+			c.UI.Info(fmt.Sprintf("Registered service has been detected: %s", svc.Service))
+			if svc.Kind == api.ServiceKindConnectProxy {
 				// This is the proxy service ID.
-				data = y.ID
+				proxyID = svc.ID
 				return nil
 			}
 		}
 		// In theory we can't reach this point unless we have 2 services registered against
-		// this pod and neither are the connect-proxy, we don't support this case anyway but it
+		// this pod and neither are the connect-proxy. We don't support this case anyway, but it
 		// is necessary to return from the function.
-		return fmt.Errorf("Unable to find registered connect-proxy service")
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), uint64(c.ServiceRegistrationPollingAttempts)))
+		return fmt.Errorf("unable to find registered connect-proxy service")
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 	if err != nil {
 		c.UI.Error("Timed out waiting for service registration")
 		return 1
 	}
 	// Write the proxyid to the shared volume.
-	err = ioutil.WriteFile(c.ProxyIDFile, []byte(data), 0444)
+	err = ioutil.WriteFile(c.proxyIDFile, []byte(proxyID), 0444)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to write proxyid out: %s", err))
+		c.UI.Error(fmt.Sprintf("unable to write proxy ID to file: %s", err))
 		return 1
 	}
-	c.UI.Info("Service registration completed")
+	c.UI.Info("connect initialization completed")
 	return 0
 }
 

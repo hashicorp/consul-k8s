@@ -18,17 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// NOTES: Test coverage works as follows:
-// 1. All tests which are specific to 'login' are in subcommand/common/common_test.go
-// 2. The rest are here:
-// ACLS enabled happy path							// done
-// ACLs disabled happy path (uses a valid agent)	// done
-// ACLs disabled invalid response on service get 	// covered by ACLs enabled test bc its the same API call
-// invalid proxyid file								// done
-// ACLS enabled fails due to invalid server responses	// done
-// ACLS enabled fails due to IO (invalid bearer, tokenfile)	// covered by common_test.go
-// test that retries work for service polling
-
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -64,6 +53,7 @@ func TestRun_FlagValidation(t *testing.T) {
 // This test mocks ACL login and the service list response (/v1/agent/services),
 // the later of which is also validated by an actual agent in TestRun_happyPathNoACLs().
 func TestRun_happyPathACLs(t *testing.T) {
+	t.Parallel()
 	bearerFile := common.WriteTempFile(t, "bearerTokenFile")
 	proxyFile := common.WriteTempFile(t, "")
 	tokenFile := common.WriteTempFile(t, "")
@@ -89,9 +79,9 @@ func TestRun_happyPathACLs(t *testing.T) {
 	cmd := Command{
 		UI:              ui,
 		consulClient:    client,
-		BearerTokenFile: bearerFile,
-		TokenSinkFile:   tokenFile,
-		ProxyIDFile:     proxyFile,
+		bearerTokenFile: bearerFile,
+		tokenSinkFile:   tokenFile,
+		proxyIDFile:     proxyFile,
 	}
 	flags := []string{"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
@@ -131,7 +121,7 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 	cmd := Command{
 		UI:           ui,
 		consulClient: consulClient,
-		ProxyIDFile:  proxyFile,
+		proxyIDFile:  proxyFile,
 	}
 	code := cmd.Run(defaultTestFlags)
 	require.Equal(t, 0, code)
@@ -160,8 +150,8 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	cmd := Command{
 		UI:                                 ui,
 		consulClient:                       consulClient,
-		ProxyIDFile:                        proxyFile,
-		ServiceRegistrationPollingAttempts: 10,
+		proxyIDFile:                        proxyFile,
+		serviceRegistrationPollingAttempts: 10,
 	}
 	// Start the command asynchronously, later registering the services.
 	exitChan := runCommandAsynchronously(&cmd, defaultTestFlags)
@@ -183,7 +173,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		require.Fail(t, "timeout waiting for command to exit")
 	}
 	// Validate that we hit the retry logic when proxy service is not registered yet.
-	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; Retrying")
+	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; retrying")
 
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
@@ -215,17 +205,18 @@ func TestRun_invalidProxyFile(t *testing.T) {
 	cmd := Command{
 		UI:                                 ui,
 		consulClient:                       consulClient,
-		ProxyIDFile:                        randFileName,
-		ServiceRegistrationPollingAttempts: 3,
+		proxyIDFile:                        randFileName,
+		serviceRegistrationPollingAttempts: 3,
 	}
-	expErr := fmt.Sprintf("Unable to write proxyid out: open %s: no such file or directory\n", randFileName)
+	expErr := fmt.Sprintf("unable to write proxy ID to file: open %s: no such file or directory\n", randFileName)
 	code := cmd.Run(defaultTestFlags)
 	require.Equal(t, 1, code)
 	require.Equal(t, expErr, ui.ErrorWriter.String())
 }
 
-// TestRun_ServiceRegistrationFailsWithBadServerResponses tests error handling with invalid server responses.
-func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
+// TestRun_FailsWithBadServerResponses tests error handling with invalid server responses.
+func TestRun_FailsWithBadServerResponses(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name                    string
 		loginResponse           string
@@ -273,9 +264,9 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 			cmd := Command{
 				UI:                                 ui,
 				consulClient:                       client,
-				BearerTokenFile:                    bearerFile,
-				TokenSinkFile:                      tokenFile,
-				ServiceRegistrationPollingAttempts: 2,
+				bearerTokenFile:                    bearerFile,
+				tokenSinkFile:                      tokenFile,
+				serviceRegistrationPollingAttempts: 2,
 			}
 
 			flags := []string{
@@ -289,21 +280,9 @@ func TestRun_ServiceRegistrationFailsWithBadServerResponses(t *testing.T) {
 	}
 }
 
-// TestRun_RetryACLLoginFails tests that after retry the command fails.
-func TestRun_RetryACLLoginFails(t *testing.T) {
-	t.Parallel()
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
-	}
-	code := cmd.Run([]string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
-		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta})
-	require.Equal(t, 1, code)
-	require.Contains(t, ui.ErrorWriter.String(), "Hit maximum retries for consul login")
-}
-
 // Tests ACL Login with Retries.
 func TestRun_LoginwithRetries(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		Description        string
 		TestRetry          bool
@@ -357,9 +336,9 @@ func TestRun_LoginwithRetries(t *testing.T) {
 			cmd := Command{
 				UI:              ui,
 				consulClient:    client,
-				TokenSinkFile:   tokenFile,
-				BearerTokenFile: bearerFile,
-				ProxyIDFile:     proxyFile,
+				tokenSinkFile:   tokenFile,
+				bearerTokenFile: bearerFile,
+				proxyIDFile:     proxyFile,
 			}
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,
@@ -370,13 +349,13 @@ func TestRun_LoginwithRetries(t *testing.T) {
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
 			// Validate that the token was written to disk if we succeeded.
-			data, err := ioutil.ReadFile(tokenFile)
+			tokenData, err := ioutil.ReadFile(tokenFile)
 			require.NoError(t, err)
-			require.Contains(t, string(data), "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586")
+			require.Equal(t, "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586", string(tokenData))
 			// Validate contents of proxyFile.
 			proxydata, err := ioutil.ReadFile(proxyFile)
 			require.NoError(t, err)
-			require.Contains(t, string(proxydata), "counting-counting-sidecar-proxy")
+			require.Equal(t, "counting-counting-sidecar-proxy", string(proxydata))
 		})
 	}
 }
