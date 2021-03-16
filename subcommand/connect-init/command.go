@@ -15,11 +15,12 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-const tokenSinkFile = "/consul/connect-inject/acl-token"
-const proxyIDFile = "/consul/connect-inject/proxyid"
-const numLoginRetries = 3
-const serviceRegistrationPollingRetries = 60 // This maps to 60 seconds
+const defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+const defaultTokenSinkFile = "/consul/connect-inject/acl-token"
+const defaultProxyIDFile = "/consul/connect-inject/proxyid"
+
+const numLoginRetries = 3               // The number of times to attempt ACL Login.
+const defaultServicePollingRetries = 60 // The number of times to attempt to read this service. (60s)
 
 type Command struct {
 	UI cli.Ui
@@ -30,15 +31,14 @@ type Command struct {
 	flagPodNamespace                   string            // Pod namespace.
 	flagSkipServiceRegistrationPolling bool              // Whether or not to skip service registration.
 
-	flagSet *flag.FlagSet
-	http    *flags.HTTPFlags
-
-	consulClient *api.Client
-
 	BearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
-	TokenSinkFile                      string // Location to write the output token. Default is /consul/connect-inject/acl-token.
-	ProxyIDFile                        string // Location to write the output proxyID. Default is /consul/connect-inject/proxyid.
-	ServiceRegistrationPollingAttempts int    // Number of times to attempt service registration retry
+	TokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
+	ProxyIDFile                        string // Location to write the output proxyID. Default is defaultProxyIDFile.
+	ServiceRegistrationPollingAttempts int    // Number of times to poll for this service to be registered.
+
+	flagSet      *flag.FlagSet
+	http         *flags.HTTPFlags
+	consulClient *api.Client
 
 	once sync.Once
 	help string
@@ -58,16 +58,16 @@ func (c *Command) init() {
 		"Flag to preserve backward compatibility with service registration.")
 
 	if c.BearerTokenFile == "" {
-		c.BearerTokenFile = bearerTokenFile
+		c.BearerTokenFile = defaultBearerTokenFile
 	}
 	if c.TokenSinkFile == "" {
-		c.TokenSinkFile = tokenSinkFile
+		c.TokenSinkFile = defaultTokenSinkFile
 	}
 	if c.ProxyIDFile == "" {
-		c.ProxyIDFile = proxyIDFile
+		c.ProxyIDFile = defaultProxyIDFile
 	}
 	if c.ServiceRegistrationPollingAttempts == 0 {
-		c.ServiceRegistrationPollingAttempts = serviceRegistrationPollingRetries
+		c.ServiceRegistrationPollingAttempts = defaultServicePollingRetries
 	}
 
 	c.http = &flags.HTTPFlags{}
@@ -130,22 +130,26 @@ func (c *Command) Run(args []string) int {
 		filter := fmt.Sprintf("Meta[\"pod-name\"] == %s and Meta[\"k8s-namespace\"] == %s", c.flagPodName, c.flagPodNamespace)
 		serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to get agent service: %s", err))
+			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))
 			return err
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
-			return fmt.Errorf("Unable to find registered service")
+			c.UI.Info("Unable to find registered services; Retrying")
+			return fmt.Errorf("Did not find correct number of services: %d", len(serviceList))
 		}
 		for _, y := range serviceList {
-			c.UI.Info(fmt.Sprintf("Registered pod has been detected: %s", y.Meta["pod-name"]))
+			c.UI.Info(fmt.Sprintf("Registered service has been detected: %s", y.Service))
 			if y.Kind == "connect-proxy" {
-				// This is the proxy service ID
+				// This is the proxy service ID.
 				data = y.ID
 				return nil
 			}
 		}
-		return fmt.Errorf("Unable to find registered service")
+		// In theory we can't reach this point unless we have 2 services registered against
+		// this pod and neither are the connect-proxy, we don't support this case anyway but it
+		// is necessary to return from the function.
+		return fmt.Errorf("Unable to find registered connect-proxy service")
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), uint64(c.ServiceRegistrationPollingAttempts)))
 	if err != nil {
 		c.UI.Error("Timed out waiting for service registration")
