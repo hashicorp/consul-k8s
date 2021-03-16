@@ -112,7 +112,6 @@ func TestRun_happyPathACLs(t *testing.T) {
 
 // This test validates happy path without ACLs : wait on proxy+service to be registered and write out proxyid file
 func TestRun_happyPathNoACLs(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 	// This is the output file for the proxyid.
 	proxyFile := common.WriteTempFile(t, "")
@@ -149,7 +148,6 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 // TestRun_RetryServicePolling starts the command and does not register the consul service
 // for 2 seconds and then asserts that the proxyid file gets written correctly.
 func TestRun_RetryServicePolling(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 	proxyFile := common.WriteTempFile(t, "")
 
@@ -199,7 +197,6 @@ func TestRun_RetryServicePolling(t *testing.T) {
 // TestRun_invalidProxyFile validates that we correctly fail in case the proxyid file
 // is not writable. This functions as coverage for both ACL and non-ACL codepaths.
 func TestRun_invalidProxyFile(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 	// This is the output file for the proxyid.
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
