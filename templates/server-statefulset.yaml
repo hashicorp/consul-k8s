@@ -64,7 +64,7 @@ spec:
       tolerations:
         {{ tpl .Values.server.tolerations . | nindent 8 | trim }}
     {{- end }}
-    {{- if .Values.server.topologySpreadConstraints }}
+    {{- if and (.Values.server.topologySpreadConstraints) (and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "18")) }}
       topologySpreadConstraints:
         {{ tpl .Values.server.topologySpreadConstraints . | nindent 8 | trim }}
     {{- end }}
