@@ -128,7 +128,7 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
-// TestRun_RetryServicePolling starts the command and does not register the consul service
+// TestRun_RetryServicePolling runs the command but does not register the consul service
 // for 2 seconds and then asserts that the proxyid file gets written correctly.
 func TestRun_RetryServicePolling(t *testing.T) {
 	t.Parallel()
@@ -142,6 +142,18 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
 	require.NoError(t, err)
 
+	// Start the consul service registration in a go func and delay it so that it runs
+	// after the cmd.Run() starts.
+	go func() {
+		// Wait a moment.
+		time.Sleep(time.Second * 1)
+		// Register counting service.
+		require.NoError(t, consulClient.Agent().ServiceRegister(&consulCountingSvc))
+		time.Sleep(time.Second * 2)
+		// Register proxy sidecar service.
+		require.NoError(t, consulClient.Agent().ServiceRegister(&consulCountingSvcSidecar))
+	}()
+
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
@@ -149,26 +161,9 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		proxyIDFile:                        proxyFile,
 		serviceRegistrationPollingAttempts: 10,
 	}
-	// Start the command asynchronously, later registering the services.
-	exitChan := runCommandAsynchronously(&cmd, defaultTestFlags)
-	// Wait a moment.
-	time.Sleep(time.Second * 1)
-	// Register Consul services.
-	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
-	for _, svc := range testConsulServices {
-		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
-		time.Sleep(time.Second * 2)
-	}
-
-	// Assert that it exits cleanly or timeout.
-	select {
-	case exitCode := <-exitChan:
-		require.Equal(t, 0, exitCode)
-	case <-time.After(time.Second * 10):
-		// Fail if the stopCh was not caught.
-		require.Fail(t, "timeout waiting for command to exit")
-	}
-	// Validate that we hit the retry logic when proxy service is not registered yet.
+	code := cmd.Run(defaultTestFlags)
+	require.Equal(t, 0, code)
+	// Validate that we hit the retry logic when the service was registered but the proxy service is not registered yet.
 	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; retrying")
 
 	// Validate contents of proxyFile.
@@ -482,20 +477,3 @@ var (
 	}
 	defaultTestFlags = []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-skip-service-registration-polling=false"}
 )
-
-// This function starts the command asynchronously and returns a non-blocking chan.
-// When finished, the command will send its exit code to the channel.
-// Note that it's the responsibility of the caller to terminate the command by calling stopCommand,
-// otherwise it can run forever.
-func runCommandAsynchronously(cmd *Command, args []string) chan int {
-	// We have to run cmd.init() to ensure that the channel the command is
-	// using to watch for os interrupts is initialized. If we don't do this,
-	// then if stopCommand is called immediately, it will block forever
-	// because it calls interrupt() which will attempt to send on a nil channel.
-	cmd.init()
-	exitChan := make(chan int, 1)
-	go func() {
-		exitChan <- cmd.Run(args)
-	}()
-	return exitChan
-}
