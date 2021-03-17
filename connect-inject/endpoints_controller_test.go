@@ -69,10 +69,15 @@ func TestHasBeenInjected(t *testing.T) {
 	}
 }
 
+func TestProcessUpstreams(t *testing.T) {
+
+}
+
 // Test create make sure to have a test that asserts against all fields
-// TODO basic service
-// TODO service with a port
-// TODO service with upstreams
+// TODO EMPTY endpoints object
+// todo service with everything
+// todo service with multiple endpoints
+// todo basic service
 // TODO k8s-svc-name different from svc name/svc name annotation
 func TestReconcileCreateEndpoint(t *testing.T) {
 	nodeName := "test-node"
@@ -86,12 +91,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedProxySvcInstances  []*capi.CatalogService
 	}{
 		{
-			name:          "New basic endpoints object added: every config field: port, TBD",
+			name:          "Every configurable field set: port, different Consul service name, TBD",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				pod1.Annotations[annotationPort] = "1234"
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
+				pod1.Annotations[fmt.Sprintf("%sfoo", annotationMeta)] = "bar"
+				pod1.Annotations[annotationTags] = "abc, 123"
 				pod2 := createPod("pod2", "2.2.3.4", true)
 				pod2.Annotations[annotationPort] = "1234"
 				pod2.Annotations[annotationService] = "different-consul-svc-name"
@@ -135,7 +142,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "different-consul-svc-name",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    1234,
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceMeta:    map[string]string{"foo": "bar", MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceTags:    []string{"abc", "123"},
 				},
 				{
 					ServiceID:      "pod2-different-consul-svc-name",
@@ -156,7 +164,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServiceAddress:    "127.0.0.1",
 						LocalServicePort:       1234,
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceMeta: map[string]string{"foo": "bar", MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceTags: []string{"abc", "123"},
 				},
 				{
 					ServiceID:      "pod2-different-consul-svc-name-sidecar-proxy",
@@ -252,33 +261,20 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 	}
 }
 
-func createPod(name, ip string, inject bool) *corev1.Pod {
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   "default",
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
-		},
-		Status: corev1.PodStatus{
-			PodIP:  ip,
-			HostIP: "127.0.0.1",
-		},
-	}
-	if inject {
-		pod.Labels[labelInject] = injected
-		pod.Annotations[annotationStatus] = injected
-	}
-	return pod
-
-}
-
-// TODO Different k8s svc name STARTHERE
-// TODO Update an IP in an address
+// Tests updating an Endpoints object.
+//   - Tests updates via the register codepath:
+//     - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated.
+//     - When an address is added to an Endpoint, an additional service instance in Consul is registered.
+//   - Tests updates via the deregister codepath:
+//     - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
+//
+// For the register and deregister codepath, this also tests that they work when the Consul service name is different
+// from the K8s service name.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
 		name                       string
+		consulSvcName              string
 		k8sObjects                 func() []runtime.Object
 		initialConsulSvcs          []*capi.AgentServiceRegistration
 		expectedNumSvcInstances    int
@@ -286,7 +282,131 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 		expectedProxySvcInstances  []*capi.CatalogService
 	}{
 		{
-			name: "Endpoints has additional address not in Consul.",
+			name:          "Endpoints has an updated address (pod IP change).",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "4.4.4.4", true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						corev1.EndpointSubset{
+							Addresses: []corev1.EndpointAddress{
+								corev1.EndpointAddress{
+									IP:       "4.4.4.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*capi.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated",
+					ServiceAddress: "4.4.4.4",
+				},
+			},
+			expectedProxySvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated-sidecar-proxy",
+					ServiceAddress: "4.4.4.4",
+				},
+			},
+		},
+		{
+			name:          "Different Consul service name: Endpoints has an updated address (pod IP change).",
+			consulSvcName: "different-consul-svc-name",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "4.4.4.4", true)
+				pod1.Annotations[annotationService] = "different-consul-svc-name"
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						corev1.EndpointSubset{
+							Addresses: []corev1.EndpointAddress{
+								corev1.EndpointAddress{
+									IP:       "4.4.4.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*capi.AgentServiceRegistration{
+				{
+					ID:      "pod1-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
+					Port:    80,
+					Address: "1.2.3.4",
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod1-different-consul-svc-name",
+					},
+				},
+			},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-different-consul-svc-name",
+					ServiceAddress: "4.4.4.4",
+				},
+			},
+			expectedProxySvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					ServiceAddress: "4.4.4.4",
+				},
+			},
+		},
+		{
+			name:          "Endpoints has additional address not in Consul.",
+			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				pod2 := createPod("pod2", "2.2.3.4", true)
@@ -364,7 +484,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Endpoints does not have addresses that are in Consul.",
+			name:          "Consul has instances that are not in the Endpoints addresses.",
+			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				endpoint := &corev1.Endpoints{
@@ -444,6 +565,89 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses.",
+			consulSvcName: "different-consul-svc-name",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				pod1.Annotations[annotationService] = "different-consul-svc-name"
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						corev1.EndpointSubset{
+							Addresses: []corev1.EndpointAddress{
+								corev1.EndpointAddress{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*capi.AgentServiceRegistration{
+				{
+					ID:      "pod1-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod1-different-consul-svc-name",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					ID:      "pod2-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
+					Port:    80,
+					Address: "2.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod2-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
+					Port:    20000,
+					Address: "2.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod2-different-consul-svc-name",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+			},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-different-consul-svc-name",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+			expectedProxySvcInstances: []*capi.CatalogService{
+				{
+					ServiceID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -501,14 +705,14 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should have service-updated with the correct number of instances
-			serviceInstances, _, err := consulClient.Catalog().Service("service-updated", "", nil)
+			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
 			require.NoError(t, err)
 			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
 			for i, instance := range serviceInstances {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
 			}
-			proxyServiceInstances, _, err := consulClient.Catalog().Service("service-updated-sidecar-proxy", "", nil)
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
 			require.NoError(t, err)
 			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
 			for i, instance := range proxyServiceInstances {
@@ -519,18 +723,17 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 	}
 }
 
+// Tests deleting an Endpoints object, with and without matching Consul and K8s service names.
 func TestReconcileDeleteEndpoint(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
-		name                       string
-		k8sSvcName                 string
-		initialConsulSvcs          []*capi.AgentServiceRegistration
-		expectedConsulSvcInstances []*capi.CatalogService
-		expectedProxySvcInstances  []*capi.CatalogService
+		name              string
+		consulSvcName     string
+		initialConsulSvcs []*capi.AgentServiceRegistration
 	}{
 		{
-			name:       "K8s service name matches Consul service name",
-			k8sSvcName: "service-deleted",
+			name:          "Consul service name matches K8s service name",
+			consulSvcName: "service-deleted",
 			initialConsulSvcs: []*capi.AgentServiceRegistration{
 				{
 					ID:      "pod1-service-deleted",
@@ -552,35 +755,31 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
 				},
 			},
-			expectedConsulSvcInstances: []*capi.CatalogService{},
-			expectedProxySvcInstances:  []*capi.CatalogService{},
 		},
 		{
-			name:       "K8s service name does not match Consul service name",
-			k8sSvcName: "different-k8s-svc-name",
+			name:          "Consul service name does not match K8s service name",
+			consulSvcName: "different-consul-svc-name",
 			initialConsulSvcs: []*capi.AgentServiceRegistration{
 				{
-					ID:      "pod1-service-deleted",
-					Name:    "service-deleted",
+					ID:      "pod1-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{"k8s-service-name": "different-k8s-svc-name", "k8s-namespace": "default"},
+					Meta:    map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
-					ID:      "pod1-service-deleted-sidecar-proxy",
-					Name:    "service-deleted-sidecar-proxy",
+					ID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
 					Port:    20000,
 					Address: "1.2.3.4",
 					Proxy: &api.AgentServiceConnectProxyConfig{
-						DestinationServiceName: "service-deleted",
-						DestinationServiceID:   "pod1-service-deleted",
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod1-different-consul-svc-name",
 					},
-					Meta: map[string]string{"k8s-service-name": "different-k8s-svc-name", "k8s-namespace": "default"},
+					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
 				},
 			},
-			expectedConsulSvcInstances: []*capi.CatalogService{},
-			expectedProxySvcInstances:  []*capi.CatalogService{},
 		},
 	}
 	for _, tt := range cases {
@@ -630,7 +829,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// Set up the Endpoint that will be reconciled, and reconcile
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
-				Name:      tt.k8sSvcName,
+				Name:      "service-deleted",
 			}
 			resp, err := ep.Reconcile(ctrl.Request{
 				NamespacedName: namespacedName,
@@ -639,13 +838,34 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should not have any instances of service-deleted
-			serviceInstances, _, err := consulClient.Catalog().Service("service-deleted", "", nil)
+			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
 			require.NoError(t, err)
 			require.Empty(t, serviceInstances)
-			proxyServiceInstances, _, err := consulClient.Catalog().Service("service-deleted-sidecar-proxy", "", nil)
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
 			require.NoError(t, err)
 			require.Empty(t, proxyServiceInstances)
 
 		})
 	}
+}
+
+func createPod(name, ip string, inject bool) *corev1.Pod {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   "default",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Status: corev1.PodStatus{
+			PodIP:  ip,
+			HostIP: "127.0.0.1",
+		},
+	}
+	if inject {
+		pod.Labels[labelInject] = injected
+		pod.Annotations[annotationStatus] = injected
+	}
+	return pod
+
 }
