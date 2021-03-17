@@ -54,6 +54,10 @@ If not already included, please provide the following:
 - `consul-helm` version:
 - `values.yaml` used to deploy the helm chart:
 
+Additionally, please provide details regarding the Kubernetes Infrastructure, if known:
+- Cloud Provider (If self-hosted, the Kubernetes provider utilized):
+- Networking CNI plugin in use:
+
 Any other information you can provide about the environment/deployment.
 
 ### Additional Context
