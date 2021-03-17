@@ -155,7 +155,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Timed out waiting for service registration")
 		return 1
 	}
-	// Write the proxyid to the shared volume.
+	// Write the proxyid to the shared volume so `consul connect envoy` can use it for bootstrapping.
 	err = ioutil.WriteFile(c.proxyIDFile, []byte(proxyID), 0444)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to write proxy ID to file: %s", err))
