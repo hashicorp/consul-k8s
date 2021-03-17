@@ -34,7 +34,7 @@ type EndpointsController struct {
 	Scheme                *runtime.Scheme
 }
 
-// TODO: get consul installation namespace passed in for querying agents (for more efficient lookup of agent pods)
+// TODO: get consul installation namespace and release name passed in for querying agents (for more efficient lookup of agent pods)
 
 const MetaKeyKubeServiceName = "k8s-service-name"
 
@@ -63,13 +63,8 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// If the endpoints object has been deleted (and we get an IsNotFound
 	// error), we need to deregister all instances in Consul for that service.
 	if k8serrors.IsNotFound(err) {
-		// The k8s service name may or may not match the consul service
-		// name, but the k8s service name will always match the metadata on
-		// the Consul service "k8s-service-name". So, we query Consul
-		// services by "k8s-service-name" metadata, which is only exposed on
-		// the agent API. Therefore, we need to query all agents who have
-		// services matching that metadata, and deregister each service
-		// instance.
+		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
+		// the case where the Consul service name is different from the K8s service name.
 		err := r.deregisterServiceOnAllAgents(req.Name, req.Namespace)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -82,13 +77,16 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	r.Log.Info("retrieved service from kube", "serviceEndpoints", serviceEndpoints)
 
-	// Get Consul service name for the Endpoints object
-	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints,
-	// deregister from Consul.
+	// consulServiceName will be populated when iterating through the Endpoints
+	// addresses to register the service instances for the service represented by the Endpoints object.
+	// It will be set to the Consul service name, which defaults to the name of the Endpoints object or is overridden
+	// by the serviceName annotation on a Pod representing a service instance. It is only set when getting the Pod
+	// corresponding to the first address in the first subset. This way, it is only set if there are service instances
+	// at all, so we can do the deregistration logic only if there are service instances.
+	var consulServiceName string
 
-	// The name of the service in Consul will either be the name of the Endpoints object,
-	// or the annotationService on the first Pod referenced
-	var serviceNameForDeregistrationCheck string
+	// endpointAddressMap stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
+	// against service instances in Consul to deregister them if they are not in the map.
 	endpointAddressMap := map[string]bool{}
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
@@ -131,29 +129,52 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					// TODO remove logic in handler to always set the service name annotation
 					// We only want that annotation to be present when explicitly overriding the consul svc name
 					// Otherwise, the Consul service name should equal the K8s Service name.
+					// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
+					// annotation annotationService.
 					var serviceName string
 					serviceName = serviceEndpoints.Name
 					if raw, ok := pod.Annotations[annotationService]; ok && raw != "" {
 						serviceName = raw
 					}
 					if i == 0 && j == 0 {
-						serviceNameForDeregistrationCheck = serviceName
+						consulServiceName = serviceName
 					}
 
 					serviceID := fmt.Sprintf("%s-%s", pod.Name, serviceName)
+
+					meta := map[string]string{
+						MetaKeyPodName:         pod.Name,
+						MetaKeyKubeServiceName: serviceEndpoints.Name,
+						MetaKeyKubeNS:          serviceEndpoints.Namespace,
+					}
+					for k, v := range pod.Annotations {
+						if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
+							meta[strings.TrimPrefix(k, annotationMeta)] = v
+						}
+					}
+
+					var tags []string
+					if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
+						tags = strings.Split(raw, ",")
+					}
+					// Get the tags from the deprecated tags annotation and combine.
+					if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
+						tags = append(tags, strings.Split(raw, ",")...)
+					}
+
 					// TODO tags, meta, upstreams
 
 					//fmt.Printf("&&& Pod name: %+v, service port: %+v, service name: %+v, service id: %+v\n", pod, servicePort, serviceName, serviceID)
 					service := &api.AgentServiceRegistration{
-						ID:      serviceID,
-						Name:    serviceName,
-						Tags:    nil, // todo: process tags from annotations
-						Port:    servicePort,
-						Address: pod.Status.PodIP,
-						Meta: map[string]string{MetaKeyPodName: pod.Name,
-							MetaKeyKubeServiceName: serviceEndpoints.Name,
-							MetaKeyKubeNS:          serviceEndpoints.Namespace}, // todo process user-provided meta tag;
-						Namespace: "", // todo deal with namespaces
+						ID:        serviceID,
+						Name:      serviceName,
+						Port:      servicePort,
+						Address:   pod.Status.PodIP,
+						Meta:      meta,
+						Namespace: "", // todo: namespace support
+					}
+					if len(tags) > 0 {
+						service.Tags = tags
 					}
 					r.Log.Info("registering service", "service", service)
 					err = client.Agent().ServiceRegister(service)
@@ -184,12 +205,11 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						Kind:            api.ServiceKindConnectProxy,
 						ID:              proxyServiceID,
 						Name:            proxyServiceName,
-						Tags:            nil, // todo: same as service tags
 						Port:            20000,
 						Address:         pod.Status.PodIP,
-						TaggedAddresses: nil,                                                                                                                                   // todo: set cluster IP here (will be done later)
-						Meta:            map[string]string{MetaKeyPodName: pod.Name, MetaKeyKubeServiceName: serviceEndpoints.Name, MetaKeyKubeNS: serviceEndpoints.Namespace}, // todo process user-provided meta tag;
-						Namespace:       "",                                                                                                                                    // todo: same as service namespace
+						TaggedAddresses: nil, // todo: set cluster IP here (will be done later)
+						Meta:            meta,
+						Namespace:       "", // todo: same as service namespace
 						Proxy:           proxyConfig,
 						Check:           nil,
 						Checks: api.AgentServiceChecks{
@@ -206,7 +226,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						},
 						Connect: nil,
 					}
-
+					if len(tags) > 0 {
+						proxyService.Tags = tags
+					}
 					r.Log.Info("registering proxy service", "service", proxyService)
 					err = client.Agent().ServiceRegister(proxyService)
 					if err != nil {
@@ -217,53 +239,47 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				}
 			}
 		}
-		// Deregister service instances in Consul that are no longer in the Endpoints address.
-		// This is done by getting all instances for this service from Consul, comparing
-		// allAddresses with the instances. For each service instance, if it is not in
-		// allAddresses, it is deregistered.
-
-		// Create a map from allAddresses, so we can check if the instance address is in this map.
-		//ipMap := map[string]bool{}
-		//for _, epAddress := range allAddresses {
-		//	ipMap[epAddress.IP] = true
-		//}
-		//
-		//fmt.Printf("==== ips in eps obj %+v\n", ipMap)
-		//// Deregisters the service and proxy service instances if they are not in the list of
-		//// allAddresses.
-		//err := r.deregisterServiceOnAllAgentsIfNotInMap(req.Name, req.Namespace, ipMap)
-		//if err != nil {
-		//	r.Log.Info("failed to deregister instances not in map", "service", req.Name)
-		//	return ctrl.Result{}, err
-		//}
-		//serviceInstances, _, err := r.ConsulClient.Catalog().Service(req.Name, "", nil)
-		//fmt.Printf("new svcinstances %+v", serviceInstances)
 	}
 
-	// Deregister service instances in Consul that are no longer in the Endpoints addresses.
-	// TODO only do this if there is a serviceNameForDeregistration
-	fmt.Printf("*** serviceNameForDeregistration %s\n", serviceNameForDeregistrationCheck)
-	serviceInstances, _, err := r.ConsulClient.Catalog().Service(serviceNameForDeregistrationCheck, "", nil)
-	proxyInstances, _, err := r.ConsulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", serviceNameForDeregistrationCheck), "", nil)
-	fmt.Printf("*** svcinstances %+v\n", serviceInstances)
-	fmt.Printf("*** endpointAddressMap %+v\n", endpointAddressMap)
+	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
+	// from Consul. This uses consulServiceName and endpointAddressMap that are populated with data during the
+	// registration codepath. consulServiceName will be empty if the Endpoints object being reconciled has no addresses,
+	// since we don't need to deregister extraneous service instances if there aren't any.
+	if consulServiceName != "" {
+		// Get service and proxy instances from Consul.
+		fmt.Printf("*** consulServiceName %s\n", consulServiceName)
+		serviceInstances, _, err := r.ConsulClient.Catalog().Service(consulServiceName, "", nil)
+		if err != nil {
+			r.Log.Error(err, "failed to get service instances", "service", consulServiceName)
+			return ctrl.Result{}, err
+		}
+		proxyServiceName := fmt.Sprintf("%s-sidecar-proxy", consulServiceName)
+		proxyInstances, _, err := r.ConsulClient.Catalog().Service(proxyServiceName, "", nil)
+		if err != nil {
+			r.Log.Error(err, "failed to get service instances", "service", proxyServiceName)
+			return ctrl.Result{}, err
+		}
+		fmt.Printf("*** svcinstances %+v\n", serviceInstances)
+		fmt.Printf("*** endpointAddressMap %+v\n", endpointAddressMap)
 
-	serviceAndProxyInstances := append(serviceInstances, proxyInstances...)
+		serviceAndProxyInstances := append(serviceInstances, proxyInstances...)
 
-	for _, instance := range serviceAndProxyInstances {
-		fmt.Printf("*** instance %+v\n", instance)
-		if _, ok := endpointAddressMap[instance.ServiceAddress]; !ok {
+		// Check if each instance is in the endpointAddressMap. If it is not, then deregister that service instance.
+		for _, instance := range serviceAndProxyInstances {
+			fmt.Printf("*** instance %+v\n", instance)
+			if _, ok := endpointAddressMap[instance.ServiceAddress]; !ok {
 
-			agentClient, err := r.getConsulClient(instance.Address)
-			if err != nil {
-				r.Log.Error(err, "failed to create a new Consul client", "address", instance.Address)
-				return ctrl.Result{}, err
-			}
+				agentClient, err := r.getConsulClient(instance.Address)
+				if err != nil {
+					r.Log.Error(err, "failed to create a new Consul client", "address", instance.Address)
+					return ctrl.Result{}, err
+				}
 
-			err = agentClient.Agent().ServiceDeregister(instance.ServiceID)
-			if err != nil {
-				r.Log.Error(err, "failed to deregister service instance", "service", serviceNameForDeregistrationCheck, "serviceID", instance.ServiceID)
-				return ctrl.Result{}, err
+				err = agentClient.Agent().ServiceDeregister(instance.ServiceID)
+				if err != nil {
+					r.Log.Error(err, "failed to deregister service instance", "service", consulServiceName, "serviceID", instance.ServiceID)
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}
@@ -271,8 +287,14 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-// When querying by MetaKeyKubeServiceName, the request will return service instances and associated proxy service instances.
 // TODO pass in a context for entire reconcile, not context.Background
+// deregisterServiceOnAllAgents queries all agents for service instances that have the metadata
+// "k8s-service-name"=k8sSvcName and "k8s-namespace"=k8sSvcNamespace. The k8s service name may or may not match the
+// consul service name, but the k8s service name will always match the metadata on the Consul service
+// "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata, which is only exposed on the agent
+// API. Therefore, we need to query all agents who have services matching that metadata, and deregister each service
+// instance. When querying by the k8s service name and namespace, the request will return service instances and
+// associated proxy service instances.
 func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string) error {
 
 	// Get all agents by getting pods with label component=client
@@ -310,53 +332,6 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 			}
 		}
 
-	}
-	return nil
-}
-
-// When querying by MetaKeyKubeServiceName, the request will return service instances and associated proxy service instances.
-// TODO: use the catalog api by deriving the Consul service name from a Pod in the Endpoints object ***
-func (r *EndpointsController) deregisterServiceOnAllAgentsIfNotInMap(k8sSvcName, k8sSvcNamespace string, ipMap map[string]bool) error {
-	// Get all agents by getting pods with label component=client
-	list := corev1.PodList{}
-	listOptions := client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{"component": "client"}),
-	}
-	r.Client.List(context.Background(), &list, &listOptions)
-
-	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-	for _, pod := range list.Items {
-		// Create client for this agent.
-		agentClient, err := r.getConsulClient(pod.Status.PodIP)
-		if err != nil {
-			r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.PodIP)
-			return err
-		}
-
-		// Get services matching metadata.
-		// TODO svc ids might only be unique by agent
-		svcs, err := agentClient.Agent().ServicesWithFilter(fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`, MetaKeyKubeServiceName, k8sSvcName, MetaKeyKubeNS, k8sSvcNamespace))
-		fmt.Printf("==== svc instances %+v\n", svcs)
-		if err != nil {
-			r.Log.Error(err, "failed to get service instances", MetaKeyKubeServiceName, k8sSvcName)
-			return err
-		}
-
-		// For each service instance, if it's not in the map of addresses for this endpoints object, deregister the
-		// service instance.
-		for svcID, instance := range svcs {
-			fmt.Printf("&&&&&&& instance: %+v, ipmap[instance.svcaddr]: %+v\n", instance, ipMap)
-			// if the service instance is in Consul and not in the endpoint
-			if _, ok := ipMap[instance.Address]; !ok {
-				fmt.Printf("==== instance was not in ipmap\n")
-				err = agentClient.Agent().ServiceDeregister(svcID)
-				if err != nil {
-					r.Log.Error(err, "failed to deregister service instance", "ID", svcID)
-					return err
-				}
-				fmt.Printf("should have deregistered\n")
-			}
-		}
 	}
 	return nil
 }
