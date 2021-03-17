@@ -32,6 +32,7 @@ type EndpointsController struct {
 	DenyK8sNamespacesSet  mapset.Set
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
+	Context               context.Context
 }
 
 // TODO: get consul installation namespace and release name passed in for querying agents (for more efficient lookup of agent pods)

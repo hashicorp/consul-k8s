@@ -35,6 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -443,52 +444,58 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Start the cleanup controller that cleans up Consul service instances
-	// still registered after the pod has been deleted (usually due to a force delete).
+	// Create a channel for all controllers' exits.
 	ctrlExitCh := make(chan error)
 
-	// Start the endpoints controller
-	{
-		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
-		ctrl.SetLogger(zapLogger)
-		klog.SetLogger(zapLogger)
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-			Scheme:             scheme,
-			LeaderElection:     false,
-			Logger:             zapLogger,
-			MetricsBindAddress: "0.0.0.0:9444",
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to start manager")
-			return 1
-		}
-
-		if err = (&connectinject.EndpointsController{
-			ConsulClient: c.consulClient,
-			Client:       mgr.GetClient(),
-			Log:          ctrl.Log.WithName("controller").WithName("endpoints-controller"),
-			Scheme:       mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
-			return 1
-		}
-
-		// todo: Add tests in case it's not refactored to not have any signal handling
-		// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
-		go func() {
-			// Pass existing context's done channel so that the controller
-			// will stop when this context is canceled.
-			// This could be due to an interrupt signal or if any other component did not start
-			// successfully. In those cases, we want to make sure that this controller is no longer
-			// running.
-			if err := mgr.Start(ctx.Done()); err != nil {
-				setupLog.Error(err, "problem running manager")
-				// Use an existing channel for ctrl exists in case manager failed to start properly.
-				ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
-			}
-		}()
+	// Create a manager for endpoints controller and the mutating webhook.
+	// Note: the webhook refactor PR will use this manager for the mutating webhook.
+	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+	ctrl.SetLogger(zapLogger)
+	klog.SetLogger(zapLogger)
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:             scheme,
+		LeaderElection:     false,
+		Logger:             zapLogger,
+		MetricsBindAddress: "0.0.0.0:9444",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		return 1
 	}
 
+	// Start the endpoints controller
+	if err = (&connectinject.EndpointsController{
+		Client:                mgr.GetClient(),
+		ConsulClient:          c.consulClient,
+		ConsulScheme:          consulURL.Scheme,
+		ConsulPort:            consulURL.Port(),
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
+		Scheme:                mgr.GetScheme(),
+		Context:               ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+		return 1
+	}
+
+	// todo: Add tests in case it's not refactored to not have any signal handling
+	// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
+	go func() {
+		// Pass existing context's done channel so that the controller
+		// will stop when this context is canceled.
+		// This could be due to an interrupt signal or if any other component did not start
+		// successfully. In those cases, we want to make sure that this controller is no longer
+		// running.
+		if err := mgr.Start(ctx.Done()); err != nil {
+			setupLog.Error(err, "problem running manager")
+			// Use an existing channel for ctrl exists in case manager failed to start properly.
+			ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
+		}
+	}()
+
+	// Start the cleanup controller that cleans up Consul service instances
+	// still registered after the pod has been deleted (usually due to a force delete).
 	if c.flagEnableCleanupController {
 		cleanupResource := connectinject.CleanupResource{
 			Log:                    logger.Named("cleanupResource"),
