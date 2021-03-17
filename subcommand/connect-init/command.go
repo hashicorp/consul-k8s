@@ -25,11 +25,10 @@ const defaultServicePollingRetries = uint64(60) // The number of times to attemp
 type Command struct {
 	UI cli.Ui
 
-	flagACLAuthMethod                  string            // Auth Method to use for ACLs, if enabled.
-	flagMeta                           map[string]string // Flag for metadata to consul login.
-	flagPodName                        string            // Pod name.
-	flagPodNamespace                   string            // Pod namespace.
-	flagSkipServiceRegistrationPolling bool              // Whether or not to skip service registration.
+	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled.
+	flagPodName                        string // Pod name.
+	flagPodNamespace                   string // Pod namespace.
+	flagSkipServiceRegistrationPolling bool   // Whether or not to skip service registration.
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -47,9 +46,6 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
-	c.flagSet.Var((*flags.FlagMapValue)(&c.flagMeta), "meta",
-		"Metadata to set on the token, formatted as key=value. This flag may be specified multiple "+
-			"times to set multiple meta fields.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 
@@ -101,13 +97,10 @@ func (c *Command) Run(args []string) int {
 	}
 	// First do the ACL Login, if necessary.
 	if c.flagACLAuthMethod != "" {
-		// Validate flags related to ACL login.
-		if c.flagMeta == nil {
-			c.UI.Error("-meta must be set")
-			return 1
-		}
+		// loginMeta is the default metadata that we pass to the consul login API.
+		loginMeta := map[string]string{"pod-name": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagMeta)
+			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, loginMeta)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 			}

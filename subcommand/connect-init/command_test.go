@@ -32,10 +32,6 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-pod-name", testPodName},
 			expErr: "-pod-namespace must be set",
 		},
-		{
-			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod},
-			expErr: "-meta must be set",
-		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -85,7 +81,7 @@ func TestRun_happyPathACLs(t *testing.T) {
 	}
 	flags := []string{"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
-		"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
+		"-acl-auth-method", testAuthMethod,
 		"-skip-service-registration-polling=false"}
 	// Run the command.
 	code := cmd.Run(flags)
@@ -271,7 +267,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 
 			flags := []string{
 				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
-				"-meta", testPodMeta, "-acl-auth-method", testAuthMethod,
+				"-acl-auth-method", testAuthMethod,
 				"-skip-service-registration-polling=false"}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
@@ -343,7 +339,7 @@ func TestRun_LoginwithRetries(t *testing.T) {
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-acl-auth-method", testAuthMethod, "-meta", testPodMeta,
+				"-acl-auth-method", testAuthMethod,
 				"-skip-service-registration-polling=false"})
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.

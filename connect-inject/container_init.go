@@ -337,7 +337,6 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}" \
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is

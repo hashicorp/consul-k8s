@@ -886,7 +886,6 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}" \
   -namespace="non-default"
 
 # Register the service. The HCL is stored in the volume so that
@@ -966,7 +965,6 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}" \
   -namespace="default"
 
 # Register the service. The HCL is stored in the volume so that
@@ -1149,8 +1147,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-  -acl-auth-method="release-name-consul-k8s-auth-method" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"`)
+  -acl-auth-method="release-name-consul-k8s-auth-method"`)
 	require.Contains(actual, `
 /consul/connect-inject/consul services register \
   -token-file="/consul/connect-inject/acl-token" \
