@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 func TestShouldIgnore(t *testing.T) {
@@ -369,9 +371,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -380,7 +382,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 										Namespace: "default",
 									},
 								},
-								corev1.EndpointAddress{
+								{
 									IP:       "2.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -646,9 +648,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "4.4.4.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -708,9 +710,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "4.4.4.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -770,9 +772,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -781,7 +783,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 										Namespace: "default",
 									},
 								},
-								corev1.EndpointAddress{
+								{
 									IP:       "2.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -848,9 +850,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -931,9 +933,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -1325,6 +1327,599 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	}
 }
 
+func TestFilterAgentPods(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		meta     metav1.Object
+		expected bool
+	}{
+		"label[app]=consul label[component]=client label[release] consul": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "consul",
+						"component": "client",
+						"release":   "consul",
+					},
+				},
+			},
+			expected: true,
+		},
+		"no labels": {
+			meta:     &corev1.Pod{},
+			expected: false,
+		},
+		"label[app] empty": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"component": "client",
+						"release":   "consul",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[component] empty": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":     "consul",
+						"release": "consul",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[release] empty": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "consul",
+						"component": "client",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[app]!=consul label[component]=client label[release]=consul": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "not-consul",
+						"component": "client",
+						"release":   "consul",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[component]!=client label[app]=consul label[release]=consul": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "consul",
+						"component": "not-client",
+						"release":   "consul",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[release]!=consul label[app]=consul label[component]=client": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "consul",
+						"component": "client",
+						"release":   "not-consul",
+					},
+				},
+			},
+			expected: false,
+		},
+		"label[app]!=consul label[component]!=client label[release]!=consul": {
+			meta: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":       "not-consul",
+						"component": "not-client",
+						"release":   "not-consul",
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			controller := EndpointsController{
+				ReleaseName: "consul",
+			}
+
+			result := controller.filterAgentPods(test.meta, nil)
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestRequestsForRunningAgentPods(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		agentPod          *corev1.Pod
+		existingEndpoints []*corev1.Endpoints
+		expectedRequests  []ctrl.Request
+	}{
+		"pod=running, all endpoints need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-bar"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name: "endpoint-1",
+					},
+				},
+			},
+		},
+		"pod=running, endpoints with ready address need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name: "endpoint-1",
+					},
+				},
+			},
+		},
+		"pod=running, endpoints with not-ready address need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name: "endpoint-1",
+					},
+				},
+			},
+		},
+		"pod=running, some endpoints need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-bar"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-2",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-other"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-baz"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-3",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-baz"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name: "endpoint-1",
+					},
+				},
+				{
+					NamespacedName: types.NamespacedName{
+						Name: "endpoint-3",
+					},
+				},
+			},
+		},
+		"pod=running, no endpoints need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-baz"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-bar"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-2",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-bar"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-baz"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-3",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-bar"),
+								},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-baz"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{},
+		},
+		"pod not ready, no endpoints need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionFalse,
+						},
+					},
+					Phase: corev1.PodRunning,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-3",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{},
+		},
+		"pod not running, no endpoints need to be reconciled": {
+			agentPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-agent",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-foo",
+				},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+					Phase: corev1.PodUnknown,
+				},
+			},
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-3",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{},
+		},
+		"pod is deleted, no endpoints need to be reconciled": {
+			agentPod: nil,
+			existingEndpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-1",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "endpoint-3",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									NodeName: toStringPtr("node-foo"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: []ctrl.Request{},
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			logger := logrtest.TestLogger{T: t}
+			s := runtime.NewScheme()
+			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &corev1.Endpoints{}, &corev1.EndpointsList{})
+			var objects []runtime.Object
+			if test.agentPod != nil {
+				objects = append(objects, test.agentPod)
+			}
+			for _, endpoint := range test.existingEndpoints {
+				objects = append(objects, endpoint)
+			}
+
+			fakeClient := fake.NewFakeClientWithScheme(s, objects...)
+
+			controller := &EndpointsController{
+				Client: fakeClient,
+				Ctx:    ctx,
+				Scheme: s,
+				Log:    logger,
+			}
+			var requests []ctrl.Request
+			if test.agentPod != nil {
+				requests = controller.requestsForRunningAgentPods(handler.MapObject{Meta: test.agentPod})
+			} else {
+				requests = controller.requestsForRunningAgentPods(handler.MapObject{Meta: minimal()})
+			}
+			require.ElementsMatch(t, requests, test.expectedRequests)
+		})
+	}
+}
+
 func createPod(name, ip string, inject bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1344,4 +1939,8 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 	}
 	return pod
 
+}
+
+func toStringPtr(input string) *string {
+	return &input
 }
