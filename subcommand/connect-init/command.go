@@ -50,7 +50,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 
 	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
-	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", false,
+	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
 		"Flag to preserve backward compatibility with service registration.")
 
 	if c.bearerTokenFile == "" {
