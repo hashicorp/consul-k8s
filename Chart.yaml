@@ -2,6 +2,7 @@ apiVersion: v2
 name: consul
 version: 0.30.0
 appVersion: 1.9.3
+kubeVersion: ">= 1.13.0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
 icon: https://raw.githubusercontent.com/hashicorp/consul-helm/master/assets/icon.png
