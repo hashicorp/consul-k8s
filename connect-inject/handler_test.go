@@ -1,19 +1,21 @@
 package connectinject
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"fmt"
 	"testing"
 
 	"github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
+	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func TestHandlerHandle(t *testing.T) {
@@ -24,13 +26,20 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 	}
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}, &corev1.Pod{})
+	decoder, err := admission.NewDecoder(s)
+	require.NoError(t, err)
 
 	cases := []struct {
 		Name    string
 		Handler Handler
-		Req     v1beta1.AdmissionRequest
+		Req     admission.Request
 		Err     string // expected error string, not exact
-		Patches []jsonpatch.JsonPatchOperation
+		Patches []jsonpatch.Operation
 	}{
 		{
 			"kube-system namespace",
@@ -38,12 +47,15 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Namespace: metav1.NamespaceSystem,
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Namespace: metav1.NamespaceSystem,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
 			nil,
@@ -55,17 +67,19 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationStatus: injected,
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationStatus: injected,
+							},
 						},
-					},
-
-					Spec: basicSpec,
-				}),
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
 			nil,
@@ -77,14 +91,21 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
-			[]jsonpatch.JsonPatchOperation{
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations",
@@ -99,23 +120,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/initContainers/-",
+					Path:      "/spec/containers/1",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
+					Path:      "/spec/containers/2",
 				},
 			},
 		},
@@ -126,20 +135,30 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationUpstreams: "echo:1234,db:1234",
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationUpstreams: "echo:1234,db:1234",
+							},
 						},
-					},
-
-					Spec: basicSpec,
-				}),
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
-			[]jsonpatch.JsonPatchOperation{
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+				},
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
@@ -150,43 +169,15 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/0/env",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/env/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/env/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/env/-",
-				},
-				{
-					Operation: "add",
 					Path:      "/spec/initContainers",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/initContainers/-",
+					Path:      "/spec/containers/1",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
+					Path:      "/spec/containers/2",
 				},
 			},
 		},
@@ -197,17 +188,19 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationInject: "false",
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationInject: "false",
+							},
 						},
-					},
-
-					Spec: basicSpec,
-				}),
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
 			nil,
@@ -219,20 +212,22 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationInject: "t",
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationInject: "t",
+							},
 						},
-					},
-
-					Spec: basicSpec,
-				}),
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
-			[]jsonpatch.JsonPatchOperation{
+			[]jsonpatch.Operation{
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
@@ -247,15 +242,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/initContainers/-",
+					Path:      "/spec/containers/1",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
+					Path:      "/spec/containers/2",
 				},
 				{
 					Operation: "add",
@@ -274,19 +265,22 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							annotationService: "foo",
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationService: "foo",
+							},
 						},
-					},
-				}),
+					}),
+				},
 			},
 			"",
-			[]jsonpatch.JsonPatchOperation{
+			[]jsonpatch.Operation{
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -297,15 +291,11 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/initContainers/-",
+					Path:      "/spec/containers/1",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/-",
+					Path:      "/spec/containers/2",
 				},
 				{
 					Operation: "add",
@@ -324,24 +314,22 @@ func TestHandlerHandle(t *testing.T) {
 				Log:                   hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"testLabel": "123",
+			admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"testLabel": "123",
+							},
 						},
-					},
-
-					Spec: basicSpec,
-				}),
+						Spec: basicSpec,
+					}),
+				},
 			},
 			"",
-			[]jsonpatch.JsonPatchOperation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations",
-				},
+			[]jsonpatch.Operation{
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -352,19 +340,15 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/initContainers/-",
+					Path:      "/spec/containers/1",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
+					Path:      "/spec/containers/2",
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/-",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationStatus),
+					Path:      "/metadata/annotations",
 				},
 				{
 					Operation: "add",
@@ -377,7 +361,8 @@ func TestHandlerHandle(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			resp := tt.Handler.Mutate(&tt.Req)
+			ctx := context.Background()
+			resp := tt.Handler.Handle(ctx, tt.Req)
 			if (tt.Err == "") != resp.Allowed {
 				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
 			}
@@ -386,14 +371,14 @@ func TestHandlerHandle(t *testing.T) {
 				return
 			}
 
-			var actual []jsonpatch.JsonPatchOperation
-			if len(resp.Patch) > 0 {
-				require.NoError(json.Unmarshal(resp.Patch, &actual))
+			actual := resp.Patches
+			fmt.Println(resp.Patches)
+			if len(actual) > 0 {
 				for i, _ := range actual {
 					actual[i].Value = nil
 				}
 			}
-			require.Equal(tt.Patches, actual)
+			require.ElementsMatch(tt.Patches, actual)
 		})
 	}
 }
@@ -401,67 +386,44 @@ func TestHandlerHandle(t *testing.T) {
 // Test that we error out if the protocol annotation is set.
 func TestHandler_ErrorsOnProtocolAnnotations(t *testing.T) {
 	require := require.New(t)
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}, &corev1.Pod{})
+	decoder, err := admission.NewDecoder(s)
+	require.NoError(err)
+
 	handler := Handler{
 		Log:                   hclog.Default().Named("handler"),
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
+		decoder:               decoder,
 	}
 
-	request := v1beta1.AdmissionRequest{
-		Namespace: "default",
-		Object: encodeRaw(t, &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					annotationProtocol: "http",
-				},
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name: "web",
+	request := admission.Request{
+		AdmissionRequest: v1beta1.AdmissionRequest{
+			Namespace: "default",
+			Object: encodeRaw(t, &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationProtocol: "http",
 					},
 				},
-			},
-		}),
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}),
+		},
 	}
 
-	response := handler.Mutate(&request)
+	response := handler.Handle(context.Background(), request)
 	require.False(response.Allowed)
-	require.Equal(response.Result.Message, "Error validating pod: the \"consul.hashicorp.com/connect-service-protocol\" annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)")
-}
-
-// Test that an incorrect content type results in an error.
-func TestHandlerHandle_badContentType(t *testing.T) {
-	req, err := http.NewRequest("POST", "/", nil)
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "text/plain")
-
-	h := Handler{
-		Log:                   hclog.Default().Named("handler"),
-		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-		DenyK8sNamespacesSet:  mapset.NewSet(),
-	}
-	rec := httptest.NewRecorder()
-	h.Handle(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code)
-	require.Contains(t, rec.Body.String(), "content-type")
-}
-
-// Test that no body results in an error
-func TestHandlerHandle_noBody(t *testing.T) {
-	req, err := http.NewRequest("POST", "/", nil)
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-
-	h := Handler{
-		Log:                   hclog.Default().Named("handler"),
-		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-		DenyK8sNamespacesSet:  mapset.NewSet(),
-	}
-	rec := httptest.NewRecorder()
-	h.Handle(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code)
-	require.Contains(t, rec.Body.String(), "body")
+	require.Equal("the \"consul.hashicorp.com/connect-service-protocol\" annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)", response.Result.Message)
 }
 
 func TestHandlerDefaultAnnotations(t *testing.T) {
@@ -587,8 +549,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			require := require.New(t)
 
 			var h Handler
-			var patches []jsonpatch.JsonPatchOperation
-			err := h.defaultAnnotations(tt.Pod, &patches)
+			err := h.defaultAnnotations(tt.Pod)
 			if (tt.Err != "") != (err != nil) {
 				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
 			}
@@ -678,7 +639,7 @@ func TestHandlerEnableMetrics(t *testing.T) {
 			require := require.New(t)
 			h := tt.Handler
 
-			actual, err := h.enableMetrics(tt.Pod(minimal()))
+			actual, err := h.enableMetrics(*tt.Pod(minimal()))
 
 			if tt.Err == "" {
 				require.Equal(tt.Expected, actual)
@@ -740,7 +701,7 @@ func TestHandlerEnableMetricsMerging(t *testing.T) {
 			require := require.New(t)
 			h := tt.Handler
 
-			actual, err := h.enableMetricsMerging(tt.Pod(minimal()))
+			actual, err := h.enableMetricsMerging(*tt.Pod(minimal()))
 
 			if tt.Err == "" {
 				require.Equal(tt.Expected, actual)
@@ -789,7 +750,7 @@ func TestHandlerServiceMetricsPort(t *testing.T) {
 			require := require.New(t)
 			h := Handler{}
 
-			actual, err := h.serviceMetricsPort(tt.Pod(minimal()))
+			actual, err := h.serviceMetricsPort(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 			require.NoError(err)
@@ -825,7 +786,7 @@ func TestHandlerServiceMetricsPath(t *testing.T) {
 			require := require.New(t)
 			h := Handler{}
 
-			actual := h.serviceMetricsPath(tt.Pod(minimal()))
+			actual := h.serviceMetricsPath(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 		})
@@ -867,7 +828,7 @@ func TestHandlerPrometheusScrapePath(t *testing.T) {
 			require := require.New(t)
 			h := tt.Handler
 
-			actual := h.prometheusScrapePath(tt.Pod(minimal()))
+			actual := h.prometheusScrapePath(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 		})
@@ -882,10 +843,7 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 		Expected map[string]string
 	}{
 		{
-			Name: "Returns the correct prometheus annotations",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
+			Name: "Sets the correct prometheus annotations on the pod",
 			Handler: Handler{
 				DefaultEnableMetrics:        true,
 				DefaultPrometheusScrapePort: "20200",
@@ -898,16 +856,13 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 			},
 		},
 		{
-			Name: "Returns nil if metrics are not enabled",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
+			Name: "Does not set annotations if metrics are not enabled",
 			Handler: Handler{
 				DefaultEnableMetrics:        false,
 				DefaultPrometheusScrapePort: "20200",
 				DefaultPrometheusScrapePath: "/metrics",
 			},
-			Expected: nil,
+			Expected: map[string]string{},
 		},
 	}
 
@@ -915,11 +870,12 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 			h := tt.Handler
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
 
-			actual, err := h.prometheusAnnotations(tt.Pod(minimal()))
-
-			require.Equal(tt.Expected, actual)
+			err := h.prometheusAnnotations(pod)
 			require.NoError(err)
+
+			require.Equal(pod.Annotations, tt.Expected)
 		})
 	}
 }
@@ -964,7 +920,7 @@ func TestHandlerShouldRunMergedMetricsServer(t *testing.T) {
 			require := require.New(t)
 			h := tt.Handler
 
-			actual, err := h.shouldRunMergedMetricsServer(tt.Pod(minimal()))
+			actual, err := h.shouldRunMergedMetricsServer(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 			require.NoError(err)
@@ -1103,7 +1059,7 @@ func TestHandlerDetermineAndValidatePort(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := determineAndValidatePort(tt.Pod(minimal()), tt.Annotation, tt.DefaultPort, tt.Privileged)
+			actual, err := determineAndValidatePort(*tt.Pod(minimal()), tt.Annotation, tt.DefaultPort, tt.Privileged)
 
 			if tt.Err == "" {
 				require.NoError(err)
@@ -1188,7 +1144,7 @@ func TestHandlerPortValue(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			port, err := portValue(tt.Pod, tt.Value)
+			port, err := portValue(*tt.Pod, tt.Value)
 			if (tt.Err != "") != (err != nil) {
 				t.Fatalf("actual: %v, expected err: %v", err, tt.Err)
 			}
@@ -1597,7 +1553,7 @@ func TestShouldInject(t *testing.T) {
 				DenyK8sNamespacesSet:  tt.DenyK8sNamespacesSet,
 			}
 
-			injected, err := h.shouldInject(tt.Pod, tt.K8sNamespace)
+			injected, err := h.shouldInject(*tt.Pod, tt.K8sNamespace)
 
 			require.Equal(nil, err)
 			require.Equal(tt.Expected, injected)

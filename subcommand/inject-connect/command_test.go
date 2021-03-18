@@ -49,7 +49,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-ca-file", "bar"},
-			expErr: "Error reading Consul's CA cert file \"bar\"",
+			expErr: "error reading Consul's CA cert file \"bar\"",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
@@ -153,6 +153,20 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "request must be <= limit: -consul-sidecar-cpu-request value of \"50m\" is greater than the -consul-sidecar-cpu-limit value of \"25m\"",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-health-checks-controller=true",
+				"-http-addr=http://0.0.0.0:9999",
+				"-listen", "999999"},
+			expErr: "missing port in address: 999999",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-health-checks-controller=true",
+				"-http-addr=http://0.0.0.0:9999",
+				"-listen", ":foobar"},
+			expErr: "unable to parse port string: strconv.Atoi: parsing \"foobar\": invalid syntax",
+		},
 	}
 
 	for _, c := range cases {
@@ -188,53 +202,21 @@ func TestRun_ResourceLimitDefaults(t *testing.T) {
 }
 
 func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
-	cases := []struct {
-		name    string
-		envVars []string
-		flags   []string
-		expErr  string
-	}{
-		{
-			envVars: []string{api.HTTPAddrEnvName, "%"},
-			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true"},
-			expErr: "Error parsing consul address \"http://%\": parse \"http://%\": invalid URL escape \"%",
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.expErr, func(t *testing.T) {
-			k8sClient := fake.NewSimpleClientset()
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8sClient,
-			}
-			os.Setenv(c.envVars[0], c.envVars[1])
-			code := cmd.Run(c.flags)
-			os.Unsetenv(c.envVars[0])
-			require.Equal(t, 1, code)
-			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
-		})
-	}
-}
-
-// Test that with health checks enabled, if the listener fails to bind that
-// everything shuts down gracefully and the command exits.
-func TestRun_CommandFailsWithInvalidListener(t *testing.T) {
 	k8sClient := fake.NewSimpleClientset()
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
 		clientset: k8sClient,
 	}
-	code := cmd.Run([]string{
-		"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-		"-enable-health-checks-controller=true",
-		"-http-addr=http://0.0.0.0:9999",
-		"-listen", "999999",
-	})
+	flags := []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+		"-enable-health-checks-controller=true"}
+
+	os.Setenv(api.HTTPAddrEnvName, "%")
+	code := cmd.Run(flags)
+	os.Unsetenv(api.HTTPAddrEnvName)
+
 	require.Equal(t, 1, code)
-	require.Contains(t, ui.ErrorWriter.String(), "Error listening: listen tcp: address 999999: missing port in address")
+	require.Contains(t, ui.ErrorWriter.String(), "error parsing consul address \"http://%\": parse \"http://%\": invalid URL escape \"%")
 }
 
 // Test that when healthchecks are enabled that SIGINT/SIGTERM exits the
@@ -272,7 +254,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		select {
 		case exitCode := <-exitChan:
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
-		case <-time.After(time.Second * 1):
+		case <-time.After(time.Second * 2):
 			// Fail if the stopCh was not caught.
 			require.Fail(t, "timeout waiting for command to exit")
 		}

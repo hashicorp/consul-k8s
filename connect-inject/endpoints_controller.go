@@ -112,7 +112,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					// and register that port for the host service.
 					var servicePort int
 					if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-						if port, _ := portValue(&pod, raw); port > 0 {
+						if port, _ := portValue(pod, raw); port > 0 {
 							servicePort = int(port)
 						}
 					}
@@ -184,7 +184,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						proxyConfig.LocalServicePort = servicePort
 					}
 
-					proxyConfig.Upstreams, err = r.processUpstreams(&pod)
+					proxyConfig.Upstreams, err = r.processUpstreams(pod)
 					if err != nil {
 						return ctrl.Result{}, err
 					}
@@ -328,7 +328,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
 // objects.
-func (r *EndpointsController) processUpstreams(pod *corev1.Pod) ([]api.Upstream, error) {
+func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, error) {
 	var upstreams []api.Upstream
 	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {

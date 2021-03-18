@@ -671,7 +671,7 @@ services {
 			h := Handler{
 				ConsulClient: consulClient,
 			}
-			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
+			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -1100,7 +1100,7 @@ EOF
 			require.True(written)
 			h.ConsulClient = consulClient
 
-			container, err := h.containerInit(tt.Pod(minimal()), k8sNamespace)
+			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -1139,7 +1139,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 			ServiceAccountName: "foo",
 		},
 	}
-	container, err := h.containerInit(pod, k8sNamespace)
+	container, err := h.containerInit(*pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -1180,7 +1180,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod, k8sNamespace)
+	container, err := h.containerInit(*pod, k8sNamespace)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -1224,7 +1224,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(pod, k8sNamespace)
+	container, err := h.containerInit(*pod, k8sNamespace)
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
@@ -1259,7 +1259,7 @@ func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsEna
 		},
 	}
 
-	_, err := h.containerInit(pod, k8sNamespace)
+	_, err := h.containerInit(*pod, k8sNamespace)
 	require.EqualError(err, `serviceAccountName "notServiceName" does not match service name "foo"`)
 }
 
@@ -1282,7 +1282,7 @@ func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsDis
 		},
 	}
 
-	_, err := h.containerInit(pod, k8sNamespace)
+	_, err := h.containerInit(*pod, k8sNamespace)
 	require.NoError(err)
 }
 
@@ -1407,7 +1407,7 @@ func TestHandlerContainerInit_MeshGatewayModeErrors(t *testing.T) {
 					},
 				},
 			}
-			_, err = h.containerInit(pod, k8sNamespace)
+			_, err = h.containerInit(*pod, k8sNamespace)
 			if c.ExpError == "" {
 				require.NoError(err)
 			} else {

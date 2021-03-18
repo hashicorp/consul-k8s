@@ -1,10 +1,10 @@
 package connectinject
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -12,13 +12,14 @@ import (
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mattbaird/jsonpatch"
-	"k8s.io/api/admission/v1beta1"
+	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -215,238 +216,127 @@ type Handler struct {
 
 	// Log
 	Log hclog.Logger
+
+	decoder *admission.Decoder
 }
 
-// Handle is the http.HandlerFunc implementation that actually handles the
+// Handle is the admission.Handler implementation that actually handles the
 // webhook request for admission control. This should be registered or
-// served via an HTTP server.
-func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
-	h.Log.Info("Request received", "Method", r.Method, "URL", r.URL)
-
-	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-		msg := fmt.Sprintf("Invalid content-type: %q", ct)
-		http.Error(w, msg, http.StatusBadRequest)
-		h.Log.Error("Error on request", "err", msg, "Code", http.StatusBadRequest)
-		return
-	}
-
-	var body []byte
-	if r.Body != nil {
-		var err error
-		if body, err = ioutil.ReadAll(r.Body); err != nil {
-			msg := fmt.Sprintf("Error reading request body: %s", err)
-			http.Error(w, msg, http.StatusBadRequest)
-			h.Log.Error("Error on request", "err", msg, "Code", http.StatusBadRequest)
-			return
-		}
-	}
-	if len(body) == 0 {
-		msg := "Empty request body"
-		http.Error(w, msg, http.StatusBadRequest)
-		h.Log.Error("Error on request", "err", msg, "Code", http.StatusBadRequest)
-		return
-	}
-
-	var admReq v1beta1.AdmissionReview
-	var admResp v1beta1.AdmissionReview
-	if _, _, err := deserializer.Decode(body, nil, &admReq); err != nil {
-		h.Log.Error("Could not decode admission request", "err", err)
-		admResp.Response = admissionError(err)
-	} else {
-		admResp.Response = h.Mutate(admReq.Request)
-	}
-
-	resp, err := json.Marshal(&admResp)
-	if err != nil {
-		msg := fmt.Sprintf("Error marshalling admission response: %s", err)
-		http.Error(w, msg, http.StatusInternalServerError)
-		h.Log.Error("Error on request", "err", msg, "Code", http.StatusInternalServerError)
-		return
-	}
-
-	if _, err := w.Write(resp); err != nil {
-		h.Log.Error("Error writing response", "err", err)
-	}
-}
-
-// Mutate takes an admission request and performs mutation if necessary,
-// returning the final API response.
-func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionResponse {
-	// Decode the pod from the request
+// served via the controller runtime manager.
+func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Response {
 	var pod corev1.Pod
-	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
+
+	// Decode the pod from the request
+	if err := h.decoder.Decode(req, &pod); err != nil {
 		h.Log.Error("Could not unmarshal request to pod", "err", err)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Could not unmarshal request to pod: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	// Build the basic response
-	resp := &v1beta1.AdmissionResponse{
-		Allowed: true,
-		UID:     req.UID,
+	// Marshall the contents of the pod that was received.
+	origPodJson, err := json.Marshal(pod)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
-
-	// Accumulate any patches here
-	var patches []jsonpatch.JsonPatchOperation
 
 	if err := h.validatePod(pod); err != nil {
 		h.Log.Error("Error validating pod", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error validating pod: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since that function
 	// uses these annotations.
-	if err := h.defaultAnnotations(&pod, &patches); err != nil {
+	if err := h.defaultAnnotations(&pod); err != nil {
 		h.Log.Error("Error creating default annotations", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error creating default annotations: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating default annotations: %s", err))
 	}
 
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
-	if shouldInject, err := h.shouldInject(&pod, req.Namespace); err != nil {
+	if shouldInject, err := h.shouldInject(pod, req.Namespace); err != nil {
 		h.Log.Error("Error checking if should inject", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error checking if should inject: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking if should inject: %s", err))
 	} else if !shouldInject {
-		return resp
+		return admission.Allowed(fmt.Sprintf("valid %s request", pod.Kind))
 	}
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
-	patches = append(patches, addVolume(
-		pod.Spec.Volumes,
-		[]corev1.Volume{h.containerVolume()},
-		"/spec/volumes")...)
+	pod.Spec.Volumes = append(pod.Spec.Volumes, h.containerVolume())
 
 	// Add the upstream services as environment variables for easy
 	// service discovery.
-	for i, container := range pod.Spec.InitContainers {
-		patches = append(patches, addEnvVar(
-			container.Env,
-			h.containerEnvVars(&pod),
-			fmt.Sprintf("/spec/initContainers/%d/env", i))...)
-	}
-	for i, container := range pod.Spec.Containers {
-		patches = append(patches, addEnvVar(
-			container.Env,
-			h.containerEnvVars(&pod),
-			fmt.Sprintf("/spec/containers/%d/env", i))...)
+	containerEnvVars := h.containerEnvVars(pod)
+	for _, container := range pod.Spec.InitContainers {
+		container.Env = append(container.Env, containerEnvVars...)
 	}
 
-	// Add the init container which copies the consul binary.
+	for _, container := range pod.Spec.Containers {
+		container.Env = append(container.Env, containerEnvVars...)
+	}
+
+	// TODO: rename both of these initcontainers appropriately
+	// Add the consul-init container
 	initCopyContainer := h.containerInitCopyContainer()
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
 	// Add the init container that registers the service and sets up
 	// the Envoy configuration.
-	initContainer, err := h.containerInit(&pod, req.Namespace)
+	initContainer, err := h.containerInit(pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection init container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error configuring injection init container: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
 	}
-	patches = append(patches, addContainer(
-		pod.Spec.InitContainers,
-		[]corev1.Container{initCopyContainer, initContainer},
-		"/spec/initContainers")...)
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 	// Add the Envoy and Consul sidecars.
-	esContainer, err := h.envoySidecar(&pod, req.Namespace)
+	esContainer, err := h.envoySidecar(pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection sidecar container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error configuring injection sidecar container: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 	}
-	connectContainer, err := h.consulSidecar(&pod)
+	pod.Spec.Containers = append(pod.Spec.Containers, esContainer)
+
+	connectContainer, err := h.consulSidecar(pod)
 	if err != nil {
 		h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error configuring consul sidecar container: %s", err),
-			},
-		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
 	}
-	patches = append(patches, addContainer(
-		pod.Spec.Containers,
-		[]corev1.Container{esContainer, connectContainer},
-		"/spec/containers")...)
+	pod.Spec.Containers = append(pod.Spec.Containers, connectContainer)
 
-	// Add annotations so that we know we're injected
-	patches = append(patches, updateAnnotation(
-		pod.Annotations,
-		map[string]string{
-			annotationStatus: injected,
-		})...)
+	// The annotations here have already been initialized be h.defaultAnnotations()
+	// and do not need to be checked for being a nil value.
+	pod.Annotations[annotationStatus] = injected
 
-	// Add annotations for metrics
-	promAnnotations, err := h.prometheusAnnotations(&pod)
+	// Add annotations for metrics.
+	err = h.prometheusAnnotations(&pod)
 	if err != nil {
 		h.Log.Error("Error configuring prometheus annotations", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("Error configuring prometheus annotations: %s", err),
-			},
-		}
-	}
-	if promAnnotations != nil {
-		patches = append(patches, updateAnnotation(
-			pod.Annotations,
-			promAnnotations)...)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring prometheus annotations: %s", err))
 	}
 
-	// Add Pod label for health checks
-	patches = append(patches, updateLabels(
-		pod.Labels,
-		map[string]string{
-			labelInject: injected,
-		})...)
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[labelInject] = injected
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if h.EnableNamespaces {
-		patches = append(patches, updateAnnotation(
-			pod.Annotations,
-			map[string]string{
-				annotationConsulNamespace: h.consulNamespace(req.Namespace),
-			})...)
+		pod.Annotations[annotationConsulNamespace] = h.consulNamespace(req.Namespace)
 	}
 
-	// Generate the patch
-	var patch []byte
-	if len(patches) > 0 {
-		var err error
-		patch, err = json.Marshal(patches)
-		if err != nil {
-			h.Log.Error("Could not marshal patches", "err", err, "Request Name", req.Name)
-			return &v1beta1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: fmt.Sprintf("Could not marshal patches: %s", err),
-				},
-			}
-		}
+	// Marshall the pod into JSON after it has the desired envs, annotations, labels,
+	// sidecars and initContainers appended to it.
+	updatedPodJson, err := json.Marshal(pod)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
 
-		resp.Patch = patch
-		patchType := v1beta1.PatchTypeJSONPatch
-		resp.PatchType = &patchType
+	// Create a patches based on the Pod that was received by the handler
+	// and the desired Pod spec.
+	patches, err := jsonpatch.CreatePatch(origPodJson, updatedPodJson)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	// Check and potentially create Consul resources. This is done after
@@ -456,18 +346,16 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		if _, err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
 			h.Log.Error("Error checking or creating namespace", "err", err,
 				"Namespace", h.consulNamespace(req.Namespace), "Request Name", req.Name)
-			return &v1beta1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: fmt.Sprintf("Error checking or creating namespace: %s", err),
-				},
-			}
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
 		}
 	}
 
-	return resp
+	// return a Patched response along with the patches we intend on applying to the
+	// Pod received by the handler.
+	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
 }
 
-func (h *Handler) shouldInject(pod *corev1.Pod, namespace string) (bool, error) {
+func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	// Don't inject in the Kubernetes system namespaces
 	if kubeSystemNamespaces.Contains(namespace) {
 		return false, nil
@@ -506,22 +394,16 @@ func (h *Handler) shouldInject(pod *corev1.Pod, namespace string) (bool, error) 
 	return !h.RequireAnnotation, nil
 }
 
-func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonPatchOperation) error {
-	if pod.ObjectMeta.Annotations == nil {
-		pod.ObjectMeta.Annotations = make(map[string]string)
+func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
 	}
 
 	// Default service name is the name of the first container.
 	if _, ok := pod.ObjectMeta.Annotations[annotationService]; !ok {
 		if cs := pod.Spec.Containers; len(cs) > 0 {
-			// Create the patch for this first, so that the Annotation
-			// object will be created if necessary
-			*patches = append(*patches, updateAnnotation(
-				pod.Annotations,
-				map[string]string{annotationService: cs[0].Name})...)
-
 			// Set the annotation for checking in shouldInject
-			pod.ObjectMeta.Annotations[annotationService] = cs[0].Name
+			pod.Annotations[annotationService] = cs[0].Name
 		}
 	}
 
@@ -530,21 +412,9 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 		if cs := pod.Spec.Containers; len(cs) > 0 {
 			if ps := cs[0].Ports; len(ps) > 0 {
 				if ps[0].Name != "" {
-					// Create the patch for this first, so that the Annotation
-					// object will be created if necessary
-					*patches = append(*patches, updateAnnotation(
-						pod.Annotations,
-						map[string]string{annotationPort: ps[0].Name})...)
-
-					pod.ObjectMeta.Annotations[annotationPort] = ps[0].Name
+					pod.Annotations[annotationPort] = ps[0].Name
 				} else {
-					// Create the patch for this first, so that the Annotation
-					// object will be created if necessary
-					*patches = append(*patches, updateAnnotation(
-						pod.Annotations,
-						map[string]string{annotationPort: strconv.Itoa(int(ps[0].ContainerPort))})...)
-
-					pod.ObjectMeta.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
+					pod.Annotations[annotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
 				}
 			}
 		}
@@ -555,7 +425,7 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod, patches *[]jsonpatch.JsonP
 
 // enableMetrics returns the default value in the handler, or overrides that
 // with the annotation if provided.
-func (h *Handler) enableMetrics(pod *corev1.Pod) (bool, error) {
+func (h *Handler) enableMetrics(pod corev1.Pod) (bool, error) {
 	enabled := h.DefaultEnableMetrics
 	if raw, ok := pod.Annotations[annotationEnableMetrics]; ok && raw != "" {
 		enableMetrics, err := strconv.ParseBool(raw)
@@ -569,7 +439,7 @@ func (h *Handler) enableMetrics(pod *corev1.Pod) (bool, error) {
 
 // enableMetricsMerging returns the default value in the handler, or overrides
 // that with the annotation if provided.
-func (h *Handler) enableMetricsMerging(pod *corev1.Pod) (bool, error) {
+func (h *Handler) enableMetricsMerging(pod corev1.Pod) (bool, error) {
 	enabled := h.DefaultEnableMetricsMerging
 	if raw, ok := pod.Annotations[annotationEnableMetricsMerging]; ok && raw != "" {
 		enableMetricsMerging, err := strconv.ParseBool(raw)
@@ -583,19 +453,19 @@ func (h *Handler) enableMetricsMerging(pod *corev1.Pod) (bool, error) {
 
 // mergedMetricsPort returns the default value in the handler, or overrides
 // that with the annotation if provided.
-func (h *Handler) mergedMetricsPort(pod *corev1.Pod) (string, error) {
+func (h *Handler) mergedMetricsPort(pod corev1.Pod) (string, error) {
 	return determineAndValidatePort(pod, annotationMergedMetricsPort, h.DefaultMergedMetricsPort, false)
 }
 
 // prometheusScrapePort returns the default value in the handler, or overrides
 // that with the annotation if provided.
-func (h *Handler) prometheusScrapePort(pod *corev1.Pod) (string, error) {
+func (h *Handler) prometheusScrapePort(pod corev1.Pod) (string, error) {
 	return determineAndValidatePort(pod, annotationPrometheusScrapePort, h.DefaultPrometheusScrapePort, false)
 }
 
 // prometheusScrapePath returns the default value in the handler, or overrides
 // that with the annotation if provided.
-func (h *Handler) prometheusScrapePath(pod *corev1.Pod) string {
+func (h *Handler) prometheusScrapePath(pod corev1.Pod) string {
 	if raw, ok := pod.Annotations[annotationPrometheusScrapePath]; ok && raw != "" {
 		return raw
 	}
@@ -606,7 +476,7 @@ func (h *Handler) prometheusScrapePath(pod *corev1.Pod) string {
 // serviceMetricsPort returns the port the service exposes metrics on. This will
 // default to the port used to register the service with Consul, and can be
 // overridden with the annotation if provided.
-func (h *Handler) serviceMetricsPort(pod *corev1.Pod) (string, error) {
+func (h *Handler) serviceMetricsPort(pod corev1.Pod) (string, error) {
 	// The annotationPort is the port used to register the service with Consul.
 	// If that has been set, it'll be used as the port for getting service
 	// metrics as well, unless overridden by the service-metrics-port annotation.
@@ -627,7 +497,7 @@ func (h *Handler) serviceMetricsPort(pod *corev1.Pod) (string, error) {
 
 // serviceMetricsPath returns a default of /metrics, or overrides
 // that with the annotation if provided.
-func (h *Handler) serviceMetricsPath(pod *corev1.Pod) string {
+func (h *Handler) serviceMetricsPath(pod corev1.Pod) string {
 	if raw, ok := pod.Annotations[annotationServiceMetricsPath]; ok && raw != "" {
 		return raw
 	}
@@ -638,32 +508,30 @@ func (h *Handler) serviceMetricsPath(pod *corev1.Pod) string {
 // prometheusAnnotations returns the Prometheus scraping configuration
 // annotations. It returns a nil map if metrics are not enabled and annotations
 // should not be set.
-func (h *Handler) prometheusAnnotations(pod *corev1.Pod) (map[string]string, error) {
-	enableMetrics, err := h.enableMetrics(pod)
+func (h *Handler) prometheusAnnotations(pod *corev1.Pod) error {
+	enableMetrics, err := h.enableMetrics(*pod)
 	if err != nil {
-		return map[string]string{}, err
+		return err
 	}
-	prometheusScrapePort, err := h.prometheusScrapePort(pod)
+	prometheusScrapePort, err := h.prometheusScrapePort(*pod)
 	if err != nil {
-		return map[string]string{}, err
+		return err
 	}
-	prometheusScrapePath := h.prometheusScrapePath(pod)
+	prometheusScrapePath := h.prometheusScrapePath(*pod)
 
 	if enableMetrics {
-		return map[string]string{
-			"prometheus.io/scrape": "true",
-			"prometheus.io/port":   prometheusScrapePort,
-			"prometheus.io/path":   prometheusScrapePath,
-		}, nil
+		pod.Annotations["prometheus.io/scrape"] = "true"
+		pod.Annotations["prometheus.io/port"] = prometheusScrapePort
+		pod.Annotations["prometheus.io/path"] = prometheusScrapePath
 	}
-	return nil, nil
+	return nil
 }
 
 // shouldRunMergedMetricsServer returns whether we need to run a merged metrics
 // server. This is used to configure the consul sidecar command, and the init
 // container, so it can pass appropriate arguments to the consul connect envoy
 // command.
-func (h *Handler) shouldRunMergedMetricsServer(pod *corev1.Pod) (bool, error) {
+func (h *Handler) shouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
 	enableMetrics, err := h.enableMetrics(pod)
 	if err != nil {
 		return false, err
@@ -693,7 +561,7 @@ func (h *Handler) shouldRunMergedMetricsServer(pod *corev1.Pod) (bool, error) {
 // If the privileged flag is true, it will allow the port to be in the
 // privileged port range of 1-1023. Otherwise, it will only allow ports in the
 // unprivileged range of 1024-65535.
-func determineAndValidatePort(pod *corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
+func determineAndValidatePort(pod corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
 	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
 		port, err := portValue(pod, raw)
 		if err != nil {
@@ -736,7 +604,7 @@ func (h *Handler) validatePod(pod corev1.Pod) error {
 	return nil
 }
 
-func portValue(pod *corev1.Pod, value string) (int32, error) {
+func portValue(pod corev1.Pod, value string) (int32, error) {
 	// First search for the named port
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
@@ -751,15 +619,7 @@ func portValue(pod *corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
-func admissionError(err error) *v1beta1.AdmissionResponse {
-	return &v1beta1.AdmissionResponse{
-		Result: &metav1.Status{
-			Message: err.Error(),
-		},
-	}
-}
-
-func findServiceAccountVolumeMount(pod *corev1.Pod) (corev1.VolumeMount, error) {
+func findServiceAccountVolumeMount(pod corev1.Pod) (corev1.VolumeMount, error) {
 	// Find the volume mount that is mounted at the known
 	// service account token location
 	var volumeMount corev1.VolumeMount
@@ -778,4 +638,9 @@ func findServiceAccountVolumeMount(pod *corev1.Pod) (corev1.VolumeMount, error) 
 	}
 
 	return volumeMount, nil
+}
+
+func (h *Handler) InjectDecoder(d *admission.Decoder) error {
+	h.decoder = d
+	return nil
 }

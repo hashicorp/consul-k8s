@@ -3,7 +3,7 @@
 package connectinject
 
 import (
-	"encoding/json"
+	"context"
 	"testing"
 	"time"
 
@@ -12,10 +12,13 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // This tests the checkAndCreate namespace function that is called
@@ -32,126 +35,148 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			},
 		},
 	}
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
+	decoder, err := admission.NewDecoder(s)
+	require.NoError(t, err)
 
 	cases := []struct {
 		Name               string
 		Handler            Handler
-		Req                v1beta1.AdmissionRequest
+		Req                admission.Request
 		ExpectedNamespaces []string
 	}{
 		{
-			"single destination namespace 'default' from k8s 'default'",
-			Handler{
+			Name: "single destination namespace 'default' from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"single destination namespace 'default' from k8s 'non-default'",
-			Handler{
+			Name: "single destination namespace 'default' from k8s 'non-default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "non-default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "non-default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"single destination namespace 'dest' from k8s 'default'",
-			Handler{
+			Name: "single destination namespace 'dest' from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"single destination namespace 'dest' from k8s 'non-default'",
-			Handler{
+			Name: "single destination namespace 'dest' from k8s 'non-default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "non-default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "non-default",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"mirroring from k8s 'default'",
-			Handler{
+			Name: "mirroring from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"mirroring from k8s 'dest'",
-			Handler{
+			Name: "mirroring from k8s 'dest'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "dest",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "dest",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"mirroring with prefix from k8s 'default'",
-			Handler{
+			Name: "mirroring with prefix from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -159,19 +184,22 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default", "k8s-default"},
+			ExpectedNamespaces: []string{"default", "k8s-default"},
 		},
 
 		{
-			"mirroring with prefix from k8s 'dest'",
-			Handler{
+			Name: "mirroring with prefix from k8s 'dest'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -179,14 +207,17 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "dest",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "dest",
+				},
 			},
-			[]string{"default", "k8s-dest"},
+			ExpectedNamespaces: []string{"default", "k8s-dest"},
 		},
 	}
 
@@ -197,6 +228,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			// Set up consul server
 			a, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(err)
+			a.WaitForSerfCheck(t)
 			defer a.Stop()
 
 			// Set up consul client
@@ -209,7 +241,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 			tt.Handler.ConsulClient = client
 
 			// Mutate!
-			resp := tt.Handler.Mutate(&tt.Req)
+			resp := tt.Handler.Handle(context.Background(), tt.Req)
 			require.Equal(resp.Allowed, true)
 
 			// Check all the namespace things
@@ -251,91 +283,108 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		},
 	}
 
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
+	decoder, err := admission.NewDecoder(s)
+	require.NoError(t, err)
+
 	cases := []struct {
 		Name               string
 		Handler            Handler
-		Req                v1beta1.AdmissionRequest
+		Req                admission.Request
 		ExpectedNamespaces []string
 	}{
 		{
-			"acls + single destination namespace 'default' from k8s 'default'",
-			Handler{
+			Name: "acls + single destination namespace 'default' from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"acls + single destination namespace 'default' from k8s 'non-default'",
-			Handler{
+			Name: "acls + single destination namespace 'default' from k8s 'non-default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "non-default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "non-default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"acls + single destination namespace 'dest' from k8s 'default'",
-			Handler{
+			Name: "acls + single destination namespace 'dest' from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"acls + single destination namespace 'dest' from k8s 'non-default'",
-			Handler{
+			Name: "acls + single destination namespace 'dest' from k8s 'non-default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "non-default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "non-default",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"acls + mirroring from k8s 'default'",
-			Handler{
+			Name: "acls + mirroring from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -343,19 +392,22 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default"},
+			ExpectedNamespaces: []string{"default"},
 		},
 
 		{
-			"acls + mirroring from k8s 'dest'",
-			Handler{
+			Name: "acls + mirroring from k8s 'dest'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -363,19 +415,22 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "dest",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "dest",
+				},
 			},
-			[]string{"default", "dest"},
+			ExpectedNamespaces: []string{"default", "dest"},
 		},
 
 		{
-			"acls + mirroring with prefix from k8s 'default'",
-			Handler{
+			Name: "acls + mirroring with prefix from k8s 'default'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -384,19 +439,22 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "default",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "default",
+				},
 			},
-			[]string{"default", "k8s-default"},
+			ExpectedNamespaces: []string{"default", "k8s-default"},
 		},
 
 		{
-			"acls + mirroring with prefix from k8s 'dest'",
-			Handler{
+			Name: "acls + mirroring with prefix from k8s 'dest'",
+			Handler: Handler{
 				Log:                        hclog.Default().Named("handler"),
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
@@ -405,14 +463,17 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
+				decoder:                    decoder,
 			},
-			v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: basicSpec,
-				}),
-				Namespace: "dest",
+			Req: admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+					Namespace: "dest",
+				},
 			},
-			[]string{"default", "k8s-dest"},
+			ExpectedNamespaces: []string{"default", "k8s-dest"},
 		},
 	}
 
@@ -422,6 +483,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.ACL.Enabled = true
 			})
+			a.WaitForSerfCheck(t)
 			defer a.Stop()
 
 			// Set up a client for bootstrapping
@@ -472,7 +534,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 			require.NoError(t, err)
 
 			// Mutate!
-			resp := tt.Handler.Mutate(&tt.Req)
+			resp := tt.Handler.Handle(context.Background(), tt.Req)
 			require.Equal(t, resp.Allowed, true)
 
 			// Check all the namespace things
@@ -548,7 +610,13 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 			// Set up consul server
 			a, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(err)
+			a.WaitForSerfCheck(t)
 			defer a.Stop()
+
+			s := runtime.NewScheme()
+			s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
+			decoder, err := admission.NewDecoder(s)
+			require.NoError(err)
 
 			// Set up consul client
 			client, err := api.NewClient(&api.Config{
@@ -565,29 +633,39 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 				EnableK8SNSMirroring:       c.Mirroring,
 				K8SNSMirroringPrefix:       c.MirroringPrefix,
 				ConsulClient:               client,
+				decoder:                    decoder,
 			}
 
-			resp := handler.Mutate(&v1beta1.AdmissionRequest{
-				Object: encodeRaw(t, &corev1.Pod{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name: "web",
-							},
+			pod := corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: sourceKubeNS,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
 						},
 					},
-				}),
-				Namespace: sourceKubeNS,
-			})
+				},
+			}
+			request := admission.Request{
+				AdmissionRequest: v1beta1.AdmissionRequest{
+					Object:    encodeRaw(t, &pod),
+					Namespace: sourceKubeNS,
+				},
+			}
+			resp := handler.Handle(context.Background(), request)
 			require.Equal(resp.Allowed, true)
 
 			// Check that the annotation was added as a patch.
 			var consulNamespaceAnnotationValue string
-			var patches []jsonpatch.JsonPatchOperation
-			require.NoError(json.Unmarshal(resp.Patch, &patches))
-			for _, patch := range patches {
-				if patch.Path == "/metadata/annotations/"+escapeJSONPointer(annotationConsulNamespace) {
-					consulNamespaceAnnotationValue = patch.Value.(string)
+			for _, patch := range resp.Patches {
+				if patch.Path == "/metadata/annotations" {
+					for annotationName, annotationValue := range patch.Value.(map[string]interface{}) {
+						if annotationName == annotationConsulNamespace {
+							consulNamespaceAnnotationValue = annotationValue.(string)
+						}
+					}
 				}
 			}
 			require.NotEmpty(consulNamespaceAnnotationValue, "no namespace annotation set")
