@@ -395,12 +395,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		LeaderElection:     false,
-		Host:               listenSplits[0],
-		Port:               port,
-		Logger:             zapLogger,
-		MetricsBindAddress: "0.0.0.0:9444",
+		Scheme:                 scheme,
+		LeaderElection:         false,
+		Host:                   listenSplits[0],
+		Port:                   port,
+		Logger:                 zapLogger,
+		MetricsBindAddress:     "0.0.0.0:9444",
+		HealthProbeBindAddress: "0.0.0.0:9445",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -421,6 +422,11 @@ func (c *Command) Run(args []string) int {
 		ReleaseNamespace:      c.flagReleaseNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+		return 1
+	}
+
+	if err = mgr.AddReadyzCheck("ready", connectinject.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check", "controller", connectinject.EndpointsController{})
 		return 1
 	}
 
