@@ -234,12 +234,9 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 }
 
-// Test create make sure to have a test that asserts against all fields
-// TODO EMPTY endpoints object
-// todo service with everything
-// todo service with multiple endpoints
-// todo basic service
-// TODO k8s-svc-name different from svc name/svc name annotation
+// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
+// object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
+// with two addresses, and an endpoints object with every possible customization.
 func TestReconcileCreateEndpoint(t *testing.T) {
 	nodeName := "test-node"
 	cases := []struct {
@@ -251,6 +248,28 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 	}{
+		{
+			name:          "Empty endpoints",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						corev1.EndpointSubset{
+							Addresses: []corev1.EndpointAddress{},
+						},
+					},
+				}
+				return []runtime.Object{endpoint}
+			},
+			initialConsulSvcs:          []*api.AgentServiceRegistration{},
+			expectedNumSvcInstances:    0,
+			expectedConsulSvcInstances: []*api.CatalogService{},
+			expectedProxySvcInstances:  []*api.CatalogService{},
+		},
 		{
 			name:          "Basic endpoints",
 			consulSvcName: "service-created",
