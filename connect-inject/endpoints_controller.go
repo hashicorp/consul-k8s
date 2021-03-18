@@ -280,7 +280,6 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string) error {
 
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
-	// TODO more strict: app=consul, maybe release name (need to pass in), also namespace
 	list := corev1.PodList{}
 	listOptions := client.ListOptions{
 		Namespace: r.ReleaseNamespace,
