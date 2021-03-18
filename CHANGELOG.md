@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.25.0 (March 18, 2021)
 
 FEATURES:
 * Metrics: add metrics configuration to inject-connect and metrics-merging capability to consul-sidecar. When metrics and metrics merging are enabled, the consul-sidecar will expose an endpoint that merges the app and proxy metrics.
