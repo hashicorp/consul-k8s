@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -46,47 +45,92 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// This test mocks ACL login and the service list response (/v1/agent/services),
-// the later of which is also validated by an actual agent in TestRun_happyPathNoACLs().
-func TestRun_happyPathACLs(t *testing.T) {
+// TestRun_HappyPathACLs bootstraps and starts a consul server using a mock
+// kubernetes server to provide responses for setting up the consul AuthMethod
+// then validates that the command runs end to end succesfully.
+func TestRun_HappyPathACLs(t *testing.T) {
 	t.Parallel()
-	bearerFile := common.WriteTempFile(t, "bearerTokenFile")
+	bearerFile := common.WriteTempFile(t, serviceAccountJWTToken)
 	proxyFile := common.WriteTempFile(t, "")
 	tokenFile := common.WriteTempFile(t, "")
 
-	// Start the mock Consul server.
-	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// ACL login request.
-		if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
-			w.Write([]byte(testLoginResponse))
+	// Start Consul server with ACLs enabled and default deny policy.
+	var masterToken = "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.DefaultPolicy = "deny"
+		c.ACL.Tokens.Master = masterToken
+	})
+	defer server.Stop()
+	require.NoError(t, err)
+	server.WaitForLeader(t)
+	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr, Token: masterToken})
+	require.NoError(t, err)
+
+	// Start the mock k8s server.
+	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		if r != nil && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews" && r.Method == "POST" {
+			w.Write([]byte(tokenReviewFoundResponse))
 		}
-		// Get list of Agent Services.
-		if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
-			w.Write([]byte(testServiceListResponse))
+		if r != nil && r.URL.Path == "/api/v1/namespaces/default/serviceaccounts/counting" && r.Method == "GET" {
+			w.Write([]byte(readServiceAccountFound))
 		}
 	}))
-	defer consulServer.Close()
-	serverURL, err := url.Parse(consulServer.URL)
+	defer k8sMockServer.Close()
+
+	// Set up Consul's auth method.
+	authMethodTmpl := api.ACLAuthMethod{
+		Name:        testAuthMethod,
+		Description: "Kubernetes Auth Method",
+		Type:        "kubernetes",
+		Config: map[string]interface{}{
+			"Host":              k8sMockServer.URL,
+			"CACert":            serviceAccountCACert,
+			"ServiceAccountJWT": serviceAccountJWTToken,
+		},
+	}
+	_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, nil)
 	require.NoError(t, err)
-	clientConfig := &api.Config{Address: serverURL.String()}
-	client, err := consul.NewClient(clientConfig)
+
+	// Create the binding rule.
+	aclBindingRule := api.ACLBindingRule{
+		Description: "Kubernetes binding rule",
+		AuthMethod:  testAuthMethod,
+		BindType:    api.BindingRuleBindTypeService,
+		BindName:    "${serviceaccount.name}",
+		Selector:    "serviceaccount.name!=default",
+	}
+	_, _, err = consulClient.ACL().BindingRuleCreate(&aclBindingRule, nil)
 	require.NoError(t, err)
+
+	// Register Consul services.
+	testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+	for _, svc := range testConsulServices {
+		require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+	}
+
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:              ui,
-		consulClient:    client,
-		bearerTokenFile: bearerFile,
-		tokenSinkFile:   tokenFile,
-		proxyIDFile:     proxyFile,
+		UI:                                 ui,
+		bearerTokenFile:                    bearerFile,
+		tokenSinkFile:                      tokenFile,
+		proxyIDFile:                        proxyFile,
+		serviceRegistrationPollingAttempts: 3,
 	}
 	flags := []string{"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
 		"-acl-auth-method", testAuthMethod,
+		"-http-addr", server.HTTPAddr,
 		"-skip-service-registration-polling=false"}
 	// Run the command.
 	code := cmd.Run(flags)
-	require.Equal(t, 0, code)
+	require.Equal(t, 0, code, ui.ErrorWriter.String())
 
+	// Validate the ACL token was written.
+	tokenData, err := ioutil.ReadFile(tokenFile)
+	require.NoError(t, err)
+	require.NotEmpty(t, tokenData)
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
 	require.NoError(t, err)
@@ -115,11 +159,12 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:           ui,
-		consulClient: consulClient,
-		proxyIDFile:  proxyFile,
+		UI:          ui,
+		proxyIDFile: proxyFile,
 	}
-	code := cmd.Run(defaultTestFlags)
+	flags := []string{"-http-addr", server.HTTPAddr}
+	flags = append(flags, defaultTestFlags...)
+	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
 
 	// Validate contents of proxyFile.
@@ -157,11 +202,12 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		consulClient:                       consulClient,
 		proxyIDFile:                        proxyFile,
 		serviceRegistrationPollingAttempts: 10,
 	}
-	code := cmd.Run(defaultTestFlags)
+	flags := []string{"-http-addr", server.HTTPAddr}
+	flags = append(flags, defaultTestFlags...)
+	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
 	// Validate that we hit the retry logic when the service was registered but the proxy service is not registered yet.
 	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; retrying")
@@ -195,12 +241,13 @@ func TestRun_invalidProxyFile(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		consulClient:                       consulClient,
 		proxyIDFile:                        randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
 	expErr := fmt.Sprintf("unable to write proxy ID to file: open %s: no such file or directory\n", randFileName)
-	code := cmd.Run(defaultTestFlags)
+	flags := []string{"-http-addr", server.HTTPAddr}
+	flags = append(flags, defaultTestFlags...)
+	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
 	require.Equal(t, expErr, ui.ErrorWriter.String())
 }
@@ -243,27 +290,22 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				}
 			}))
 			defer consulServer.Close()
-			// Setup the Client.
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			clientConfig := &api.Config{Address: serverURL.String()}
-			client, err := consul.NewClient(clientConfig)
-			require.NoError(t, err)
 
 			// Setup the Command.
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				consulClient:                       client,
 				bearerTokenFile:                    bearerFile,
 				tokenSinkFile:                      tokenFile,
 				serviceRegistrationPollingAttempts: 2,
 			}
 
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
 			flags := []string{
 				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
-				"-skip-service-registration-polling=false"}
+				"-skip-service-registration-polling=false", "-http-addr", serverURL.String()}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
 			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
@@ -319,14 +361,10 @@ func TestRun_LoginwithRetries(t *testing.T) {
 
 			serverURL, err := url.Parse(consulServer.URL)
 			require.NoError(t, err)
-			clientConfig := &api.Config{Address: serverURL.String()}
-			client, err := consul.NewClient(clientConfig)
-			require.NoError(t, err)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:              ui,
-				consulClient:    client,
 				tokenSinkFile:   tokenFile,
 				bearerTokenFile: bearerFile,
 				proxyIDFile:     proxyFile,
@@ -335,7 +373,8 @@ func TestRun_LoginwithRetries(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
-				"-skip-service-registration-polling=false"})
+				"-skip-service-registration-polling=false",
+				"-http-addr", serverURL.String()})
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
@@ -351,13 +390,76 @@ func TestRun_LoginwithRetries(t *testing.T) {
 	}
 }
 
-const testPodNamespace = "default"
-const testPodName = "counting"
-const testPodMeta = "pod=default/counting"
-const testAuthMethod = "consul-k8s-auth-method"
+const (
+	metaKeyPodName   = "pod-name"
+	metaKeyKubeNS    = "k8s-namespace"
+	testPodNamespace = "default"
+	testPodName      = "counting"
+	testAuthMethod   = "consul-k8s-auth-method"
 
-// sample response from https://consul.io/api-docs/acl#sample-response
-const testLoginResponse = `{
+	serviceAccountJWTToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImtoYWtpLWFyYWNobmlkLWNvbnN1bC1jb25uZWN0LWluamVjdG9yLWF1dGhtZXRob2Qtc3ZjLWFjY29obmRidiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJraGFraS1hcmFjaG5pZC1jb25zdWwtY29ubmVjdC1pbmplY3Rvci1hdXRobWV0aG9kLXN2Yy1hY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiN2U5NWUxMjktZTQ3My0xMWU5LThmYWEtNDIwMTBhODAwMTIyIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6a2hha2ktYXJhY2huaWQtY29uc3VsLWNvbm5lY3QtaW5qZWN0b3ItYXV0aG1ldGhvZC1zdmMtYWNjb3VudCJ9.Yi63MMtzh5MBWKKd3a7dzCJjTITE15ikFy_Tnpdk_AwdwA9J4AMSGEeHN5vWtCuuFjo_lMJqBBPHkK2AqbnoFUj9m5CopWyqICJQlvEOP4fUQ-Rc0W1P_JjU1rZERHG39b5TMLgKPQguyhaiZEJ6CjVtm9wUTagrgiuqYV2iUqLuF6SYNm6SrKtkPS-lqIO-u7C06wVk5m5uqwIVQNpZSIC_5Ls5aLmyZU3nHvH-V7E3HmBhVyZAB76jgKB0TyVX1IOskt9PDFarNtU3suZyCjvqC-UJA6sYeySe4dBNKsKlSZ6YuxUUmn1Rgv32YMdImnsWg8khf-zJvqgWk7B5EA`
+	serviceAccountCACert   = `-----BEGIN CERTIFICATE-----
+MIIDCzCCAfOgAwIBAgIQKzs7Njl9Hs6Xc8EXou25hzANBgkqhkiG9w0BAQsFADAv
+MS0wKwYDVQQDEyQ1OWU2ZGM0MS0yMDhmLTQwOTUtYTI4OS0xZmM3MDBhYzFjYzgw
+HhcNMTkwNjA3MTAxNzMxWhcNMjQwNjA1MTExNzMxWjAvMS0wKwYDVQQDEyQ1OWU2
+ZGM0MS0yMDhmLTQwOTUtYTI4OS0xZmM3MDBhYzFjYzgwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQDZjHzwqofzTpGpc0MdICS7euvfujUKE3PC/apfDAgB
+4jzEFKA78/9+KUGw/c/0SHeSQhN+a8gwlHRnAz1NJcfOIXy4dweUuOkAiFxH8pht
+ECwkeNO7z8DoV8ceminCRHGjaRmoMxpZ7g2pZAJNZePxi3y1aNkFAXe9gSUSdjRZ
+RXYka7wh2AO9k2dlGFAYB+t3vWwJ6twjG0TtKQrhYM9Od1/oN0E01LzBcZuxkN1k
+8gfIHy7bOFCBM2WTEDW/0aAvcAPrO8DLqDJ+6Mjc3r7+zlzl8aQspb0S08pVzki5
+Dz//83kyu0phJuij5eB88V7UfPXxXF/EtV6fvrL7MN4fAgMBAAGjIzAhMA4GA1Ud
+DwEB/wQEAwICBDAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBv
+QsaG6qlcaRktJ0zGhxxJ52NnRV2GcIYPeN3Zv2VXe3ML3Vd6G32PV7lIOhjx3KmA
+/uMh6NhqBzsekkTz0PuC3wJyM2OGonVQisFlqx9sFQ3fU2mIGXCa3wC8e/qP8BHS
+w7/VeA7lzmj3TQRE/W0U0ZGeoAxn9b6JtT0iMucYvP0hXKTPBWlnzIijamU50r2Y
+7ia065Ug2xUN5FLX/vxOA3y4rjpkjWoVQcu1p8TZrVoM3dsGFWp10fDMRiAHTvOH
+Z23jGuk6rn9DUHC2xPj3wCTmd8SGEJoV31noJV5dVeQ90wusXz3vTG7ficKnvHFS
+xtr5PSwH1DusYfVaGH2O
+-----END CERTIFICATE-----`
+
+	readServiceAccountFound = `{
+ "kind": "ServiceAccount",
+ "apiVersion": "v1",
+ "metadata": {
+   "name": "counting",
+   "namespace": "default",
+   "selfLink": "/api/v1/namespaces/default/serviceaccounts/counting",
+   "uid": "9ff51ff4-557e-11e9-9687-48e6c8b8ecb5",
+   "resourceVersion": "2101",
+   "creationTimestamp": "2019-04-02T19:36:34Z"
+ },
+ "secrets": [
+   {
+	 "name": "counting-token-m9cvn"
+   }
+ ]
+}`
+
+	tokenReviewFoundResponse = `{
+ "kind": "TokenReview",
+ "apiVersion": "authentication.k8s.io/v1",
+ "metadata": {
+   "creationTimestamp": null
+ },
+ "spec": {
+   "token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImRlbW8tdG9rZW4tbTljdm4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVtbyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6IjlmZjUxZmY0LTU1N2UtMTFlOS05Njg3LTQ4ZTZjOGI4ZWNiNSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmRlbW8ifQ.UJEphtrN261gy9WCl4ZKjm2PRDLDkc3Xg9VcDGfzyroOqFQ6sog5dVAb9voc5Nc0-H5b1yGwxDViEMucwKvZpA5pi7VEx_OskK-KTWXSmafM0Xg_AvzpU9Ed5TSRno-OhXaAraxdjXoC4myh1ay2DMeHUusJg_ibqcYJrWx-6MO1bH_ObORtAKhoST_8fzkqNAlZmsQ87FinQvYN5mzDXYukl-eeRdBgQUBkWvEb-Ju6cc0-QE4sUQ4IH_fs0fUyX_xc0om0SZGWLP909FTz4V8LxV8kr6L7irxROiS1jn3Fvyc9ur1PamVf3JOPPrOyfmKbaGRiWJM32b3buQw7cg"
+ },
+ "status": {
+   "authenticated": true,
+   "user": {
+	 "username": "system:serviceaccount:default:counting",
+	 "uid": "9ff51ff4-557e-11e9-9687-48e6c8b8ecb5",
+	 "groups": [
+	   "system:serviceaccounts",
+	   "system:serviceaccounts:default",
+	   "system:authenticated"
+	 ]
+   }
+ }
+}`
+	// sample response from https://consul.io/api-docs/acl#sample-response
+	testLoginResponse = `{
   "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
   "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
   "Description": "token created via login",
@@ -380,7 +482,7 @@ const testLoginResponse = `{
   "ModifyIndex": 36
 }`
 
-const testServiceListResponse = `{
+	testServiceListResponse = `{
   "counting-counting": {
     "ID": "counting-counting",
     "Service": "counting",
@@ -445,8 +547,7 @@ const testServiceListResponse = `{
     "Datacenter": "dc1"
   }
 }`
-const metaKeyPodName = "pod-name"
-const metaKeyKubeNS = "k8s-namespace"
+)
 
 var (
 	consulCountingSvc = api.AgentServiceRegistration{

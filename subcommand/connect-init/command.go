@@ -50,7 +50,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 
 	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
-	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
+	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", false,
 		"Flag to preserve backward compatibility with service registration.")
 
 	if c.bearerTokenFile == "" {
@@ -85,16 +85,15 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("-pod-namespace must be set")
 		return 1
 	}
-	// TODO: Add namespace support
-	if c.consulClient == nil {
-		cfg := api.DefaultConfig()
-		c.http.MergeOntoConfig(cfg)
-		c.consulClient, err = consul.NewClient(cfg)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to get client connection: %s", err))
-			return 1
-		}
+
+	cfg := api.DefaultConfig()
+	c.http.MergeOntoConfig(cfg)
+	c.consulClient, err = consul.NewClient(cfg)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to get client connection: %s", err))
+		return 1
 	}
+
 	// First do the ACL Login, if necessary.
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
@@ -108,6 +107,14 @@ func (c *Command) Run(args []string) int {
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Hit maximum retries for consul login: %s", err))
+			return 1
+		}
+		// Now update the client so that it will read the ACL token we just fetched.
+		cfg.TokenFile = c.tokenSinkFile
+		c.http.MergeOntoConfig(cfg)
+		c.consulClient, err = consul.NewClient(cfg)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Unable to update client connection: %s", err))
 			return 1
 		}
 		c.UI.Info("Consul login complete")
@@ -128,7 +135,7 @@ func (c *Command) Run(args []string) int {
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
-			c.UI.Info("Unable to find registered services; retrying")
+			c.UI.Info(fmt.Sprintf("Unable to find registered services; retrying, %d", len(serviceList)))
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
@@ -148,7 +155,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Timed out waiting for service registration")
 		return 1
 	}
-	// Write the proxyid to the shared volume so `consul connect envoy` can use it for bootstrapping.
+	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
 	err = ioutil.WriteFile(c.proxyIDFile, []byte(proxyID), 0444)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to write proxy ID to file: %s", err))
