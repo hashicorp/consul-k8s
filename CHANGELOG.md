@@ -1,7 +1,7 @@
 ## Unreleased
 
 BREAKING CHANGES:
-* Helm 2 is no longer supported as of the previous release, 0.30.0. the `apiVersion` for the `Charts.yaml` is now correctly set to `v2` to properly indicate that the chart is now only supported for Helm 3 [[GH-868](https://github.com/hashicorp/consul-helm/pull/868)]
+* Helm 2 is no longer supported as of the previous release, 0.30.0. the `apiVersion` for the `Chart.yaml` is now correctly set to `v2` to properly indicate that the chart is now only supported for Helm 3 [[GH-868](https://github.com/hashicorp/consul-helm/pull/868)]
 
 FEATURES:
 * Metrics: add support for metrics in Consul. This enables support for Consul Agent metrics,
@@ -17,6 +17,7 @@ FEATURES:
 IMPROVEMENTS:
 * CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
   resource was last successfully synced with Consul. [[GH-849](https://github.com/hashicorp/consul-helm/pull/849)]
+* Specify `kubeVersion` in `Chart.yaml` to denote that this chart is tested with Kubernetes 1.13+ [[GH-870](https://github.com/hashicorp/consul-helm/pull/870)]
 
 BUG FIXES:
 * Increase Consul client daemonset's memory from `25Mi` to `50Mi` for its `client-tls-init`
