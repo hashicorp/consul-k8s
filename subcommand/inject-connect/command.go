@@ -78,6 +78,10 @@ type Command struct {
 	flagEnableCleanupController          bool          // Start the cleanup controller.
 	flagCleanupControllerReconcilePeriod time.Duration // Period for cleanup controller reconcile.
 
+	// Flags for endpoints controller.
+	flagReleaseName      string
+	flagReleaseNamespace string
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -165,6 +169,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
 		"Enables cleanup controller that cleans up stale Consul service instances.")
 	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
+	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
+	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -209,6 +215,10 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 
 	flags.Merge(c.flagSet, c.http.Flags())
+	// flag.CommandLine is a package level variable representing the default flagSet. The init() function in
+	// "sigs.k8s.io/controller-runtime/pkg/client/config", which is imported by ctrl, registers the flag --kubeconfig to
+	// the default flagSet. That's why we need to merge it to have access with our flagSet.
+	flags.Merge(c.flagSet, flag.CommandLine)
 	c.help = flags.Usage(help, c.flagSet)
 
 	// Wait on an interrupt or terminate for exit, be sure to init it before running
@@ -462,7 +472,6 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to start manager")
 		return 1
 	}
-
 	// Start the endpoints controller
 	if err = (&connectinject.EndpointsController{
 		Client:                mgr.GetClient(),
@@ -473,7 +482,9 @@ func (c *Command) Run(args []string) int {
 		DenyK8sNamespacesSet:  denyK8sNamespaces,
 		Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
 		Scheme:                mgr.GetScheme(),
-		Context:               ctx,
+		Ctx:                   ctx,
+		ReleaseName:           c.flagReleaseName,
+		ReleaseNamespace:      c.flagReleaseNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 		return 1
