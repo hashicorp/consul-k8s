@@ -251,7 +251,7 @@ func TestProcessUpstreams(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 			}
 
-			upstreams, err := ep.processUpstreams(tt.pod())
+			upstreams, err := ep.processUpstreams(*tt.pod())
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {

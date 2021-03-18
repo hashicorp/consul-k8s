@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/consul"
@@ -311,7 +310,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
 // objects.
-func (r *EndpointsController) processUpstreams(pod *corev1.Pod) ([]api.Upstream, error) {
+func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, error) {
 	var upstreams []api.Upstream
 	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {

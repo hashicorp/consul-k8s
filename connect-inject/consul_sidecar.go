@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (h *Handler) consulSidecar(pod *corev1.Pod) (corev1.Container, error) {
+func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 	command := []string{
 		"consul-k8s",
 		"consul-sidecar",

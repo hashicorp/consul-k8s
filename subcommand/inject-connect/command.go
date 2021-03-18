@@ -3,7 +3,6 @@ package connectinject
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,7 +19,6 @@ import (
 
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/consul"
-	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -29,9 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -39,16 +36,15 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type Command struct {
 	UI cli.Ui
 
 	flagListen               string
-	flagAutoName             string // MutatingWebhookConfiguration for updating
-	flagAutoHosts            string // SANs for the auto-generated TLS cert.
-	flagCertFile             string // TLS cert for listening (PEM)
-	flagKeyFile              string // TLS cert private key (PEM)
+	flagCertDir              string // Directory with TLS certs for listening (PEM)
 	flagDefaultInject        bool   // True to inject by default
 	flagConsulImage          string // Docker image for Consul
 	flagEnvoyImage           string // Docker image for Envoy
@@ -133,14 +129,8 @@ func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
 	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")
-	c.flagSet.StringVar(&c.flagAutoName, "tls-auto", "",
-		"MutatingWebhookConfiguration name. If specified, will auto generate cert bundle.")
-	c.flagSet.StringVar(&c.flagAutoHosts, "tls-auto-hosts", "",
-		"Comma-separated hosts for auto-generated TLS cert. If specified, will auto generate cert bundle.")
-	c.flagSet.StringVar(&c.flagCertFile, "tls-cert-file", "",
-		"PEM-encoded TLS certificate to serve. If blank, will generate random cert.")
-	c.flagSet.StringVar(&c.flagKeyFile, "tls-key-file", "",
-		"PEM-encoded TLS private key to serve. If blank, will generate random cert.")
+	c.flagSet.StringVar(&c.flagCertDir, "tls-cert-dir", "",
+		"Directory with PEM-encoded TLS certificate and key to serve.")
 	c.flagSet.StringVar(&c.flagConsulImage, "consul-image", "",
 		"Docker image for Consul.")
 	c.flagSet.StringVar(&c.flagEnvoyImage, "envoy-image", "",
@@ -328,12 +318,12 @@ func (c *Command) Run(args []string) int {
 	if c.clientset == nil {
 		config, err := rest.InClusterConfig()
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error loading in-cluster K8S config: %s", err))
+			c.UI.Error(fmt.Sprintf("error loading in-cluster K8S config: %s", err))
 			return 1
 		}
 		c.clientset, err = kubernetes.NewForConfig(config)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error creating K8S client: %s", err))
+			c.UI.Error(fmt.Sprintf("error creating K8S client: %s", err))
 			return 1
 		}
 	}
@@ -351,7 +341,7 @@ func (c *Command) Run(args []string) int {
 	}
 	consulURL, err := url.Parse(consulURLRaw)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error parsing consul address %q: %s", consulURLRaw, err))
+		c.UI.Error(fmt.Sprintf("error parsing consul address %q: %s", consulURLRaw, err))
 		return 1
 	}
 
@@ -361,7 +351,7 @@ func (c *Command) Run(args []string) int {
 		var err error
 		consulCACert, err = ioutil.ReadFile(cfg.TLSConfig.CAFile)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
+			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q: %s", cfg.TLSConfig.CAFile, err))
 			return 1
 		}
 	}
@@ -371,86 +361,18 @@ func (c *Command) Run(args []string) int {
 		var err error
 		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
+			c.UI.Error(fmt.Sprintf("error connecting to Consul agent: %s", err))
 			return 1
 		}
 	}
 
-	// Determine where to source the certificates from
-	var certSource cert.Source = &cert.GenSource{
-		Name:  "Connect Inject",
-		Hosts: strings.Split(c.flagAutoHosts, ","),
-	}
-	if c.flagCertFile != "" {
-		certSource = &cert.DiskSource{
-			CertPath: c.flagCertFile,
-			KeyPath:  c.flagKeyFile,
-		}
-	}
-
-	// Create the certificate notifier so we can update for certificates,
-	// then start all the background routines for updating certificates.
-	certCh := make(chan cert.MetaBundle)
-	certNotify := &cert.Notify{Ch: certCh, Source: certSource}
-	defer certNotify.Stop()
-	go certNotify.Start(context.Background())
+	// Create a context to be used by the processes started in this command.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	go c.certWatcher(ctx, certCh, c.clientset)
 
 	// Convert allow/deny lists to sets
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
-
-	// Build the HTTP handler and server
-	injector := connectinject.Handler{
-		ConsulClient:                c.consulClient,
-		ImageConsul:                 c.flagConsulImage,
-		ImageEnvoy:                  c.flagEnvoyImage,
-		EnvoyExtraArgs:              c.flagEnvoyExtraArgs,
-		ImageConsulK8S:              c.flagConsulK8sImage,
-		RequireAnnotation:           !c.flagDefaultInject,
-		AuthMethod:                  c.flagACLAuthMethod,
-		ConsulCACert:                string(consulCACert),
-		DefaultProxyCPURequest:      sidecarProxyCPURequest,
-		DefaultProxyCPULimit:        sidecarProxyCPULimit,
-		DefaultProxyMemoryRequest:   sidecarProxyMemoryRequest,
-		DefaultProxyMemoryLimit:     sidecarProxyMemoryLimit,
-		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-		InitContainerResources:      initResources,
-		ConsulSidecarResources:      consulSidecarResources,
-		EnableNamespaces:            c.flagEnableNamespaces,
-		AllowK8sNamespacesSet:       allowK8sNamespaces,
-		DenyK8sNamespacesSet:        denyK8sNamespaces,
-		ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-		EnableK8SNSMirroring:        c.flagEnableK8SNSMirroring,
-		K8SNSMirroringPrefix:        c.flagK8SNSMirroringPrefix,
-		CrossNamespaceACLPolicy:     c.flagCrossNamespaceACLPolicy,
-		Log:                         logger.Named("handler"),
-	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/mutate", injector.Handle)
-	mux.HandleFunc("/health/ready", c.handleReady)
-	var handler http.Handler = mux
-	serverErrors := make(chan error)
-	server := &http.Server{
-		Addr:      c.flagListen,
-		Handler:   handler,
-		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
-	}
-
-	// Start the mutating webhook server.
-	go func() {
-		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
-		if err := server.ListenAndServeTLS("", ""); err != nil {
-			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
-			serverErrors <- err
-		}
-	}()
 
 	// Start the cleanup controller that cleans up Consul service instances
 	// still registered after the pod has been deleted (usually due to a force delete).
@@ -461,9 +383,22 @@ func (c *Command) Run(args []string) int {
 		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
 		ctrl.SetLogger(zapLogger)
 		klog.SetLogger(zapLogger)
+		listenSplits := strings.SplitN(c.flagListen, ":", 2)
+		if len(listenSplits) < 2 {
+			c.UI.Error(fmt.Sprintf("missing port in address: %s", c.flagListen))
+			return 1
+		}
+		port, err := strconv.Atoi(listenSplits[1])
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to parse port string: %s", err))
+			return 1
+		}
+
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme:             scheme,
 			LeaderElection:     false,
+			Host:               listenSplits[0],
+			Port:               port,
 			Logger:             zapLogger,
 			MetricsBindAddress: "0.0.0.0:9444",
 		})
@@ -488,6 +423,39 @@ func (c *Command) Run(args []string) int {
 		//	setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 		//	return 1
 		//}
+
+		mgr.GetWebhookServer().CertDir = c.flagCertDir
+
+		mgr.GetWebhookServer().Register("/mutate",
+			&webhook.Admission{Handler: &connectinject.Handler{
+				ConsulClient:                c.consulClient,
+				ImageConsul:                 c.flagConsulImage,
+				ImageEnvoy:                  c.flagEnvoyImage,
+				EnvoyExtraArgs:              c.flagEnvoyExtraArgs,
+				ImageConsulK8S:              c.flagConsulK8sImage,
+				RequireAnnotation:           !c.flagDefaultInject,
+				AuthMethod:                  c.flagACLAuthMethod,
+				ConsulCACert:                string(consulCACert),
+				DefaultProxyCPURequest:      sidecarProxyCPURequest,
+				DefaultProxyCPULimit:        sidecarProxyCPULimit,
+				DefaultProxyMemoryRequest:   sidecarProxyMemoryRequest,
+				DefaultProxyMemoryLimit:     sidecarProxyMemoryLimit,
+				DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+				DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+				DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+				InitContainerResources:      initResources,
+				ConsulSidecarResources:      consulSidecarResources,
+				EnableNamespaces:            c.flagEnableNamespaces,
+				AllowK8sNamespacesSet:       allowK8sNamespaces,
+				DenyK8sNamespacesSet:        denyK8sNamespaces,
+				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+				EnableK8SNSMirroring:        c.flagEnableK8SNSMirroring,
+				K8SNSMirroringPrefix:        c.flagK8SNSMirroringPrefix,
+				CrossNamespaceACLPolicy:     c.flagCrossNamespaceACLPolicy,
+				Log:                         logger.Named("handler"),
+			}})
 
 		// todo: Add tests in case it's not refactored to not have any signal handling
 		// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
@@ -560,14 +528,7 @@ func (c *Command) Run(args []string) int {
 	select {
 	case sig := <-c.sigCh:
 		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-		if err := server.Close(); err != nil {
-			c.UI.Error(fmt.Sprintf("shutting down server: %v", err))
-			return 1
-		}
 		return 0
-
-	case <-serverErrors:
-		return 1
 
 	case err := <-ctrlExitCh:
 		c.UI.Error(fmt.Sprintf("controller error: %v", err))
@@ -597,57 +558,6 @@ func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	}
 
 	return certRaw.(*tls.Certificate), nil
-}
-
-func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, clientset kubernetes.Interface) {
-	var bundle cert.MetaBundle
-	for {
-		select {
-		case bundle = <-ch:
-			c.UI.Output("Updated certificate bundle received. Updating certs...")
-			// Bundle is updated, set it up
-
-		case <-time.After(1 * time.Second):
-			// This forces the mutating webhook config to remain updated
-			// fairly quickly. This is a jank way to do this and we should
-			// look to improve it in the future. Since we use Patch requests
-			// it is pretty cheap to do, though.
-
-		case <-ctx.Done():
-			// Quit
-			return
-		}
-
-		cert, err := tls.X509KeyPair(bundle.Cert, bundle.Key)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error loading TLS keypair: %s", err))
-			continue
-		}
-
-		// If there is a MWC name set, then update the CA bundle.
-		if c.flagAutoName != "" && len(bundle.CACert) > 0 {
-			// The CA Bundle value must be base64 encoded
-			value := base64.StdEncoding.EncodeToString(bundle.CACert)
-
-			_, err := clientset.AdmissionregistrationV1beta1().
-				MutatingWebhookConfigurations().
-				Patch(context.TODO(), c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
-					`[{
-						"op": "add",
-						"path": "/webhooks/0/clientConfig/caBundle",
-						"value": %q
-					}]`, value)), metav1.PatchOptions{})
-			if err != nil {
-				c.UI.Error(fmt.Sprintf(
-					"Error updating MutatingWebhookConfiguration: %s",
-					err))
-				continue
-			}
-		}
-
-		// Update the certificate
-		c.cert.Store(&cert)
-	}
 }
 
 func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {
