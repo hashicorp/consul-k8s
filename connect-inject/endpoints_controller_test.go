@@ -19,6 +19,7 @@ import (
 )
 
 func TestShouldIgnore(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		namespace string
@@ -71,6 +72,7 @@ func TestShouldIgnore(t *testing.T) {
 }
 
 func TestHasBeenInjected(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		pod      func() *corev1.Pod
@@ -103,6 +105,7 @@ func TestHasBeenInjected(t *testing.T) {
 }
 
 func TestProcessUpstreams(t *testing.T) {
+	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
 		name        string
@@ -238,6 +241,7 @@ func TestProcessUpstreams(t *testing.T) {
 // object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
 // with two addresses, and an endpoints object with every possible customization.
 func TestReconcileCreateEndpoint(t *testing.T) {
+	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
 		name                       string
@@ -591,6 +595,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 func TestReconcileUpdateEndpoint(t *testing.T) {
+	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
 		name                       string
@@ -1047,6 +1052,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 
 // Tests deleting an Endpoints object, with and without matching Consul and K8s service names.
 func TestReconcileDeleteEndpoint(t *testing.T) {
+	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
 		name              string
