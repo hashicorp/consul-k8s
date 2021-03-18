@@ -692,12 +692,12 @@ load _helpers
 
   # todo: test for Kube versions < 1.18 when helm supports --kube-version flag (https://github.com/helm/helm/pull/9040)
   # not supported before 1.18
-  # local actual=$(helm template \
+  # run helm template \
   #     -s templates/server-statefulset.yaml  \
   #     --kube-version "1.17" \
-  #     . | tee /dev/stderr |
-  #     yq '.spec.template.spec | .topologySpreadConstraints? == null' | tee /dev/stderr)
-  # [ "${actual}" = "true" ]
+  #     .
+  # [ "$status" -eq 1 ]
+  # [[ "$output" =~ "`topologySpreadConstraints` requires Kubernetes 1.18 and above." ]]
 }
 
 #--------------------------------------------------------------------
