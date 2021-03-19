@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -1664,8 +1663,7 @@ func TestRun_HTTPS(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
-	caFile, certFile, keyFile, cleanup := generateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	srv, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
@@ -2073,50 +2071,6 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 	bootToken, ok := bootstrapSecret.Data["token"]
 	require.True(t, ok)
 	return string(bootToken)
-}
-
-// generateServerCerts generates Consul CA
-// and a server certificate and saves them to temp files.
-// It returns file names in this order:
-// CA certificate, server certificate, and server key.
-// Note that it's the responsibility of the caller to
-// remove the temporary files created by this function.
-func generateServerCerts(t *testing.T) (string, string, string, func()) {
-	require := require.New(t)
-
-	caFile, err := ioutil.TempFile("", "ca")
-	require.NoError(err)
-
-	certFile, err := ioutil.TempFile("", "cert")
-	require.NoError(err)
-
-	certKeyFile, err := ioutil.TempFile("", "key")
-	require.NoError(err)
-
-	// Generate CA
-	signer, _, caCertPem, caCertTemplate, err := cert.GenerateCA("Consul Agent CA - Test")
-	require.NoError(err)
-
-	// Generate Server Cert
-	name := "server.dc1.consul"
-	hosts := []string{name, "localhost", "127.0.0.1"}
-	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
-	require.NoError(err)
-
-	// Write certs and key to files
-	_, err = caFile.WriteString(caCertPem)
-	require.NoError(err)
-	_, err = certFile.WriteString(certPem)
-	require.NoError(err)
-	_, err = certKeyFile.WriteString(keyPem)
-	require.NoError(err)
-
-	cleanupFunc := func() {
-		os.Remove(caFile.Name())
-		os.Remove(certFile.Name())
-		os.Remove(certKeyFile.Name())
-	}
-	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
 }
 
 // setUpK8sServiceAccount creates a Service Account for the connect injector.

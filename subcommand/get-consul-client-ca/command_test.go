@@ -71,8 +71,7 @@ func TestRun(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -133,8 +132,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -220,8 +218,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -318,8 +315,7 @@ func TestRun_WithProvider(t *testing.T) {
 		providers: map[string]discover.Provider{"mock": provider},
 	}
 
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	// start the test server
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
