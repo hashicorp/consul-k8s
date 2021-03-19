@@ -15,12 +15,16 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-const defaultTokenSinkFile = "/consul/connect-inject/acl-token"
-const defaultProxyIDFile = "/consul/connect-inject/proxyid"
+const (
+	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	defaultTokenSinkFile   = "/consul/connect-inject/acl-token"
+	defaultProxyIDFile     = "/consul/connect-inject/proxyid"
 
-const numLoginRetries = 3                       // The number of times to attempt ACL Login.
-const defaultServicePollingRetries = uint64(60) // The number of times to attempt to read this service. (60s)
+	// The number of times to attempt ACL Login.
+	numLoginRetries = 3
+	// The number of times to attempt to read this service (60s).
+	defaultServicePollingRetries = 60
+)
 
 type Command struct {
 	UI cli.Ui
@@ -35,9 +39,8 @@ type Command struct {
 	proxyIDFile                        string // Location to write the output proxyID. Default is defaultProxyIDFile.
 	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
 
-	flagSet      *flag.FlagSet
-	http         *flags.HTTPFlags
-	consulClient *api.Client
+	flagSet *flag.FlagSet
+	http    *flags.HTTPFlags
 
 	once sync.Once
 	help string
@@ -88,7 +91,7 @@ func (c *Command) Run(args []string) int {
 
 	cfg := api.DefaultConfig()
 	c.http.MergeOntoConfig(cfg)
-	c.consulClient, err = consul.NewClient(cfg)
+	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to get client connection: %s", err))
 		return 1
@@ -97,9 +100,9 @@ func (c *Command) Run(args []string) int {
 	// First do the ACL Login, if necessary.
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
-		loginMeta := map[string]string{"pod-name": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
+		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(c.consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, loginMeta)
+			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, loginMeta)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 			}
@@ -111,8 +114,7 @@ func (c *Command) Run(args []string) int {
 		}
 		// Now update the client so that it will read the ACL token we just fetched.
 		cfg.TokenFile = c.tokenSinkFile
-		c.http.MergeOntoConfig(cfg)
-		c.consulClient, err = consul.NewClient(cfg)
+		consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Unable to update client connection: %s", err))
 			return 1
@@ -128,7 +130,7 @@ func (c *Command) Run(args []string) int {
 	var proxyID string
 	err = backoff.Retry(func() error {
 		filter := fmt.Sprintf("Meta[\"pod-name\"] == %s and Meta[\"k8s-namespace\"] == %s", c.flagPodName, c.flagPodNamespace)
-		serviceList, err := c.consulClient.Agent().ServicesWithFilter(filter)
+		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))
 			return err
@@ -152,16 +154,16 @@ func (c *Command) Run(args []string) int {
 		return fmt.Errorf("unable to find registered connect-proxy service")
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 	if err != nil {
-		c.UI.Error("Timed out waiting for service registration")
+		c.UI.Error(fmt.Sprintf("Timed out waiting for service registration: %v", err))
 		return 1
 	}
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
 	err = ioutil.WriteFile(c.proxyIDFile, []byte(proxyID), 0444)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to write proxy ID to file: %s", err))
+		c.UI.Error(fmt.Sprintf("Unable to write proxy ID to file: %s", err))
 		return 1
 	}
-	c.UI.Info("connect initialization completed")
+	c.UI.Info("Connect initialization completed")
 	return 0
 }
 

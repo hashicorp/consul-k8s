@@ -45,10 +45,10 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 }
 
-// TestRun_HappyPathACLs bootstraps and starts a consul server using a mock
+// TestRun_ServicePollingWithACLs bootstraps and starts a consul server using a mock
 // kubernetes server to provide responses for setting up the consul AuthMethod
-// then validates that the command runs end to end succesfully.
-func TestRun_HappyPathACLs(t *testing.T) {
+// then validates that the command runs end to end successfully.
+func TestRun_ServicePollingWithACLs(t *testing.T) {
 	t.Parallel()
 	bearerFile := common.WriteTempFile(t, serviceAccountJWTToken)
 	proxyFile := common.WriteTempFile(t, "")
@@ -131,14 +131,23 @@ func TestRun_HappyPathACLs(t *testing.T) {
 	tokenData, err := ioutil.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenData)
+
+	// Check that the token has the metadata with pod name and pod namespace.
+	consulClient,
+		err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
+	require.NoError(t, err)
+	token, _, err := consulClient.ACL().TokenReadSelf(nil)
+	require.NoError(t, err)
+	require.Equal(t, token.Description, "token created via login: {\"pod\":\"default/counting\"}")
+
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
-// This test validates happy path without ACLs : wait on proxy+service to be registered and write out proxyid file
-func TestRun_happyPathNoACLs(t *testing.T) {
+// This test validates service polling works in a happy case scenario.
+func TestRun_ServicePollingOnly(t *testing.T) {
 	t.Parallel()
 	// This is the output file for the proxyid.
 	proxyFile := common.WriteTempFile(t, "")
@@ -171,6 +180,193 @@ func TestRun_happyPathNoACLs(t *testing.T) {
 	data, err := ioutil.ReadFile(proxyFile)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+}
+
+// TestRun_ServicePollingErrors tests that when registered services could not be found,
+// we error out.
+func TestRun_ServicePollingErrors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		services []api.AgentServiceRegistration
+		expError string
+	}{
+		{
+			name: "only service is registered; proxy service is missing",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "counting-counting",
+					Name:    "counting",
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+						metaKeyKubeNS:  "default",
+					},
+				},
+			},
+			expError: "Timed out waiting for service registration: did not find correct number of services: 1",
+		},
+		{
+			name: "only proxy is registered; service is missing",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:   "counting-counting-sidecar-proxy",
+					Name: "counting-sidecar-proxy",
+					Kind: "connect-proxy",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "counting",
+						DestinationServiceID:   "counting-counting",
+					},
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+						metaKeyKubeNS:  "default",
+					},
+				},
+			},
+			expError: "Timed out waiting for service registration: did not find correct number of services: 1",
+		},
+		{
+			name: "service and proxy without pod-name and k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "counting-counting",
+					Name:    "counting",
+					Address: "127.0.0.1",
+				},
+				{
+					ID:   "counting-counting-sidecar-proxy",
+					Name: "counting-sidecar-proxy",
+					Kind: "connect-proxy",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "counting",
+						DestinationServiceID:   "counting-counting",
+					},
+					Port:    9999,
+					Address: "127.0.0.1",
+				},
+			},
+			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
+		},
+		{
+			name: "service and proxy with pod-name meta but without k8s-namespace meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "counting-counting",
+					Name:    "counting",
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+					},
+				},
+				{
+					ID:   "counting-counting-sidecar-proxy",
+					Name: "counting-sidecar-proxy",
+					Kind: "connect-proxy",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "counting",
+						DestinationServiceID:   "counting-counting",
+					},
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+					},
+				},
+			},
+			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
+		},
+		{
+			name: "service and proxy with k8s-namespace meta but pod-name meta",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "counting-counting",
+					Name:    "counting",
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyKubeNS: "default",
+					},
+				},
+				{
+					ID:   "counting-counting-sidecar-proxy",
+					Name: "counting-sidecar-proxy",
+					Kind: "connect-proxy",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "counting",
+						DestinationServiceID:   "counting-counting",
+					},
+					Port:    9999,
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyKubeNS: "default",
+					},
+				},
+			},
+			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
+		},
+		{
+			name: "both services are non-proxy services",
+			services: []api.AgentServiceRegistration{
+				{
+					ID:      "counting-counting",
+					Name:    "counting",
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+						metaKeyKubeNS:  "default",
+					},
+				},
+				{
+					ID:      "counting-counting-1",
+					Name:    "counting",
+					Address: "127.0.0.1",
+					Meta: map[string]string{
+						metaKeyPodName: "counting",
+						metaKeyKubeNS:  "default",
+					},
+				},
+			},
+			expError: "Timed out waiting for service registration: unable to find registered connect-proxy service",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			proxyFile := common.WriteTempFile(t, "")
+
+			// Start Consul server.
+			server, err := testutil.NewTestServerConfigT(t, nil)
+			defer server.Stop()
+			require.NoError(t, err)
+			server.WaitForLeader(t)
+			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
+			require.NoError(t, err)
+
+			// Register Consul services.
+			for _, svc := range c.services {
+				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
+			}
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                                 ui,
+				proxyIDFile:                        proxyFile,
+				serviceRegistrationPollingAttempts: 1,
+			}
+			flags := []string{
+				"-http-addr", server.HTTPAddr,
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-skip-service-registration-polling=false",
+			}
+
+			code := cmd.Run(flags)
+			require.Equal(t, 1, code)
+			require.Contains(t, ui.ErrorWriter.String(), c.expError)
+		})
+	}
 }
 
 // TestRun_RetryServicePolling runs the command but does not register the consul service
@@ -218,9 +414,9 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 }
 
-// TestRun_invalidProxyFile validates that we correctly fail in case the proxyid file
+// TestRun_InvalidProxyFile validates that we correctly fail in case the proxyid file
 // is not writable. This functions as coverage for both ACL and non-ACL codepaths.
-func TestRun_invalidProxyFile(t *testing.T) {
+func TestRun_InvalidProxyFile(t *testing.T) {
 	t.Parallel()
 	// This is the output file for the proxyid.
 	randFileName := fmt.Sprintf("/foo/%d/%d", rand.Int(), rand.Int())
@@ -244,7 +440,7 @@ func TestRun_invalidProxyFile(t *testing.T) {
 		proxyIDFile:                        randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
-	expErr := fmt.Sprintf("unable to write proxy ID to file: open %s: no such file or directory\n", randFileName)
+	expErr := fmt.Sprintf("Unable to write proxy ID to file: open %s: no such file or directory\n", randFileName)
 	flags := []string{"-http-addr", server.HTTPAddr}
 	flags = append(flags, defaultTestFlags...)
 	code := cmd.Run(flags)
@@ -314,7 +510,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 }
 
 // Tests ACL Login with Retries.
-func TestRun_LoginwithRetries(t *testing.T) {
+func TestRun_LoginWithRetries(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		Description        string
