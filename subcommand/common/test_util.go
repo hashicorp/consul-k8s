@@ -58,7 +58,7 @@ func GenerateServerCerts(t *testing.T) (string, string, string, func()) {
 // name. It will remove the file once the test completes.
 func WriteTempFile(t *testing.T, contents string) string {
 	t.Helper()
-	file, err := ioutil.TempFile("", contents)
+	file, err := ioutil.TempFile("", "testName")
 	require.NoError(t, err)
 	_, err = file.WriteString(contents)
 	require.NoError(t, err)
