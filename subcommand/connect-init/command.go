@@ -137,7 +137,7 @@ func (c *Command) Run(args []string) int {
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
-			c.UI.Info(fmt.Sprintf("Unable to find registered services; retrying, %d", len(serviceList)))
+			c.UI.Info("Unable to find registered services; retrying")
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
