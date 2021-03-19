@@ -1,6 +1,6 @@
 apiVersion: v2
 name: consul
-version: 0.31.0
+version: 0.31.1
 appVersion: 1.9.4
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io

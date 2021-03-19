@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.31.1 (Mar 19, 2021)
+
 BUG FIXES:
 * Remove `kubeVersion` in `Chart.yaml` since it was causing installs to fail on EKS and GKE. [[GH-873](https://github.com/hashicorp/consul-helm/pull/873)]
 
