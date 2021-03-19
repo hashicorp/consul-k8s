@@ -189,7 +189,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	}
 }
 
-// This test validates service polling works in a happy case scenario.
+// This test validates service polling works in a happy case scenario with and without TLS.
 func TestRun_ServicePollingOnly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -197,11 +197,11 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 		secure bool
 	}{
 		{
-			name:   "ACLs enabled, not secure",
+			name:   "ACLs disabled, not secure",
 			secure: false,
 		},
 		{
-			name:   "ACLs enabled, secure",
+			name:   "ACLs disabled, secure",
 			secure: true,
 		},
 	}
