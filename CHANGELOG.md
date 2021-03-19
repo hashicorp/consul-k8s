@@ -18,6 +18,8 @@ IMPROVEMENTS:
 * CRDs: add field Last Synced Time to CRD status and add printer column on CRD to display time since when the
   resource was last successfully synced with Consul. [[GH-849](https://github.com/hashicorp/consul-helm/pull/849)]
 * Specify `kubeVersion` in `Chart.yaml` to denote that this chart is tested with Kubernetes 1.13+ [[GH-870](https://github.com/hashicorp/consul-helm/pull/870)]
+* Updated the default Consul image to `hashicorp/consul:1.9.4`.
+* Updated the default consul-k8s image to `hashicorp/consul-k8s:0.25.0`.
 
 BUG FIXES:
 * Increase Consul client daemonset's memory from `25Mi` to `50Mi` for its `client-tls-init`
@@ -28,6 +30,8 @@ BUG FIXES:
 
   In addition, if `server.exposeGossipAndRPCPorts` is true, expose the WAN port
   (`8302`) as a host port. [[GH-839](https://github.com/hashicorp/consul-helm/pull/839)]
+* Fix a warning when running `helm template` and overriding `client.affinity` setting with a string.
+  [[GH-854](https://github.com/hashicorp/consul-helm/pull/854)]
 
 ## 0.30.0 (Feb 16, 2021)
 
