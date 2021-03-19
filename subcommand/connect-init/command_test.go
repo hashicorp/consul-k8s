@@ -210,7 +210,6 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			proxyFile := common.WriteTempFile(t, "")
 
 			var caFile, certFile, keyFile string
-			//defer cleanup()
 			// Start Consul server with TLS enabled if required.
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				if test.secure {
