@@ -133,8 +133,7 @@ func TestRun_ServicePollingWithACLs(t *testing.T) {
 	require.NotEmpty(t, tokenData)
 
 	// Check that the token has the metadata with pod name and pod namespace.
-	consulClient,
-		err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
+	consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
 	require.NoError(t, err)
 	token, _, err := consulClient.ACL().TokenReadSelf(nil)
 	require.NoError(t, err)
