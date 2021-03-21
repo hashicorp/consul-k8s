@@ -171,3 +171,51 @@ load _helpers
       yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
   [ "${actual}" == "" ]
 }
+
+#--------------------------------------------------------------------
+# nodePort
+
+@test "ui/Service: HTTP node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=false' \
+      --set 'ui.service.type=NodePort' \
+      --set 'ui.service.nodePort.http=4443' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+}
+
+@test "ui/Service: HTTPS node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=true' \
+      --set 'ui.service.type=NodePort' \
+      --set 'ui.service.nodePort.https=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}
+
+@test "ui/Service: both HTTP and HTTPS node ports can be set" {
+  cd `chart_dir`
+  local ports=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      --set 'ui.service.type=NodePort' \
+      --set 'ui.service.nodePort.http=4443' \
+      --set 'ui.service.nodePort.https=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $ports | jq -r 'select(.name == "http") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+
+  actual=$(echo $ports | jq -r 'select(.name == "https") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}
