@@ -25,11 +25,17 @@ spec:
     - name: http
       port: 80
       targetPort: 8500
+      {{- if .Values.ui.service.type }}{{ if (and (eq .Values.ui.service.type "NodePort") .Values.ui.service.nodePort.http) }}
+      nodePort: {{ .Values.ui.service.nodePort.http }}
+      {{- end }}{{ end }}
     {{- end }}
     {{- if .Values.global.tls.enabled }}
     - name: https
       port: 443
       targetPort: 8501
+      {{- if .Values.ui.service.type }}{{ if (and (eq .Values.ui.service.type "NodePort") .Values.ui.service.nodePort.https) }}
+      nodePort: {{ .Values.ui.service.nodePort.https }}
+      {{- end }}{{ end }}
     {{- end }}
   {{- if .Values.ui.service.type }}
   type: {{ .Values.ui.service.type }}

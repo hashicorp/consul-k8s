@@ -991,6 +991,19 @@ ui:
     # @type: string
     type: null
 
+    # Optionally hardcode the nodePort of the ui service if using a NodePort service.
+    # If not set and using a NodePort service, Kubernetes will automatically assign
+    # a port.
+    nodePort:
+
+      # HTTP node port
+      # @type: integer
+      http: null
+
+      # HTTPS node port
+      # @type: integer
+      https: null
+
     # Annotations to apply to the UI service.
     #
     # Example:
