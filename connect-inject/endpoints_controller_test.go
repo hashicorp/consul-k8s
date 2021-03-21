@@ -591,7 +591,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 //     - When an address is added to an Endpoint, an additional service instance in Consul is registered.
 //   - Tests updates via the deregister codepath:
 //     - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
-//
+//     - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
+//     corresponding service instance in Consul is deregistered.
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 func TestReconcileUpdateEndpoint(t *testing.T) {
@@ -972,6 +973,123 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 				},
 			},
+		},
+		{
+			// When a k8s deployment is deleted but it's k8s service continues to exist, the endpoints has no addresses.
+			name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					ID:      "pod2-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "2.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod2-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "2.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod2-service-updated",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+			},
+			expectedNumSvcInstances:    0,
+			expectedConsulSvcInstances: []*api.CatalogService{},
+			expectedProxySvcInstances:  []*api.CatalogService{},
+		},
+		{
+			// When a k8s deployment is deleted but it's k8s service continues to exist, the endpoints has no addresses.
+			name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
+			consulSvcName: "different-consul-svc-name",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				pod1.Annotations[annotationService] = "different-consul-svc-name"
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod1-different-consul-svc-name",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					ID:      "pod2-different-consul-svc-name",
+					Name:    "different-consul-svc-name",
+					Port:    80,
+					Address: "2.2.3.4",
+					Meta:    map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod2-different-consul-svc-name-sidecar-proxy",
+					Name:    "different-consul-svc-name-sidecar-proxy",
+					Port:    20000,
+					Address: "2.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "different-consul-svc-name",
+						DestinationServiceID:   "pod2-different-consul-svc-name",
+					},
+					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default"},
+				},
+			},
+			expectedNumSvcInstances:    0,
+			expectedConsulSvcInstances: []*api.CatalogService{},
+			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
 	}
 	for _, tt := range cases {
