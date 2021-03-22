@@ -100,116 +100,26 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 						return ctrl.Result{}, err
 					}
 
-					// If a port is specified, then we determine the value of that port
-					// and register that port for the host service.
-					var servicePort int
-					if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-						if port, _ := portValue(&pod, raw); port > 0 {
-							servicePort = int(port)
-						}
-					}
-
-					// TODO: remove logic in handler to always set the service name annotation
-					// We only want that annotation to be present when explicitly overriding the consul svc name
-					// Otherwise, the Consul service name should equal the K8s Service name.
-					// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
-					// annotation annotationService.
-					var serviceName string
-					serviceName = serviceEndpoints.Name
-					if raw, ok := pod.Annotations[annotationService]; ok && raw != "" {
-						serviceName = raw
-					}
-
-					serviceID := fmt.Sprintf("%s-%s", pod.Name, serviceName)
-
-					meta := map[string]string{
-						MetaKeyPodName:         pod.Name,
-						MetaKeyKubeServiceName: serviceEndpoints.Name,
-						MetaKeyKubeNS:          serviceEndpoints.Namespace,
-					}
-					for k, v := range pod.Annotations {
-						if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
-							meta[strings.TrimPrefix(k, annotationMeta)] = v
-						}
-					}
-
-					var tags []string
-					if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-						tags = strings.Split(raw, ",")
-					}
-					// Get the tags from the deprecated tags annotation and combine.
-					if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
-						tags = append(tags, strings.Split(raw, ",")...)
-					}
-
-					service := &api.AgentServiceRegistration{
-						ID:        serviceID,
-						Name:      serviceName,
-						Port:      servicePort,
-						Address:   pod.Status.PodIP,
-						Meta:      meta,
-						Namespace: "", // TODO: namespace support
-					}
-					if len(tags) > 0 {
-						service.Tags = tags
-					}
-					r.Log.Info("registering service", "service", service)
-					err = client.Agent().ServiceRegister(service)
+					// Get information from the pod to create service instance registrations.
+					serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints)
 					if err != nil {
-						r.Log.Error(err, "failed to register service with Consul", "service name", service.Name)
+						r.Log.Error(err, "failed to create service registrations", "endpoints", serviceEndpoints.Name)
 						return ctrl.Result{}, err
 					}
 
-					proxyServiceName := fmt.Sprintf("%s-sidecar-proxy", serviceName)
-					proxyServiceID := fmt.Sprintf("%s-%s", pod.Name, proxyServiceName)
-					proxyConfig := &api.AgentServiceConnectProxyConfig{
-						DestinationServiceName: serviceName,
-						DestinationServiceID:   serviceID,
-						Config:                 nil, // TODO: add config for metrics (upcoming PR)
-					}
-
-					if servicePort > 0 {
-						proxyConfig.LocalServiceAddress = "127.0.0.1"
-						proxyConfig.LocalServicePort = servicePort
-					}
-
-					proxyConfig.Upstreams, err = r.processUpstreams(&pod)
+					// Register the service instance with the local agent.
+					r.Log.Info("registering service", "service", serviceRegistration.Name)
+					err = client.Agent().ServiceRegister(serviceRegistration)
 					if err != nil {
+						r.Log.Error(err, "failed to register service with Consul", "service name", serviceRegistration.Name)
 						return ctrl.Result{}, err
 					}
 
-					proxyService := &api.AgentServiceRegistration{
-						Kind:            api.ServiceKindConnectProxy,
-						ID:              proxyServiceID,
-						Name:            proxyServiceName,
-						Port:            20000,
-						Address:         pod.Status.PodIP,
-						TaggedAddresses: nil, // TODO: set cluster IP here (will be done later)
-						Meta:            meta,
-						Namespace:       "", // TODO: same as service namespace
-						Proxy:           proxyConfig,
-						Check:           nil,
-						Checks: api.AgentServiceChecks{
-							{
-								Name:                           "Proxy Public Listener",
-								TCP:                            fmt.Sprintf("%s:20000", pod.Status.PodIP),
-								Interval:                       "10s",
-								DeregisterCriticalServiceAfter: "10m",
-							},
-							{
-								Name:         "Destination Alias",
-								AliasService: serviceID,
-							},
-						},
-						Connect: nil,
-					}
-					if len(tags) > 0 {
-						proxyService.Tags = tags
-					}
-					r.Log.Info("registering proxy service", "service", proxyService)
-					err = client.Agent().ServiceRegister(proxyService)
+					// Register the proxy service instance with the local agent.
+					r.Log.Info("registering proxy service", "service", proxyServiceRegistration.Name)
+					err = client.Agent().ServiceRegister(proxyServiceRegistration)
 					if err != nil {
-						r.Log.Error(err, "failed to register proxy service with Consul", "service name", proxyServiceName)
+						r.Log.Error(err, "failed to register proxy service with Consul", "proxy service name", proxyServiceRegistration.Name)
 						return ctrl.Result{}, err
 					}
 
@@ -228,6 +138,114 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// createServiceRegistrations creates the service and proxy service instance registrations with the information from the
+// Pod.
+func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
+	// If a port is specified, then we determine the value of that port
+	// and register that port for the host service.
+	var servicePort int
+	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
+		if port, _ := portValue(&pod, raw); port > 0 {
+			servicePort = int(port)
+		}
+	}
+
+	// TODO: remove logic in handler to always set the service name annotation
+	// We only want that annotation to be present when explicitly overriding the consul svc name
+	// Otherwise, the Consul service name should equal the K8s Service name.
+	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
+	// annotation annotationService.
+	var serviceName string
+	serviceName = serviceEndpoints.Name
+	if raw, ok := pod.Annotations[annotationService]; ok && raw != "" {
+		serviceName = raw
+	}
+
+	serviceID := fmt.Sprintf("%s-%s", pod.Name, serviceName)
+
+	meta := map[string]string{
+		MetaKeyPodName:         pod.Name,
+		MetaKeyKubeServiceName: serviceEndpoints.Name,
+		MetaKeyKubeNS:          serviceEndpoints.Namespace,
+	}
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
+			meta[strings.TrimPrefix(k, annotationMeta)] = v
+		}
+	}
+
+	var tags []string
+	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
+		tags = strings.Split(raw, ",")
+	}
+	// Get the tags from the deprecated tags annotation and combine.
+	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
+		tags = append(tags, strings.Split(raw, ",")...)
+	}
+
+	service := &api.AgentServiceRegistration{
+		ID:        serviceID,
+		Name:      serviceName,
+		Port:      servicePort,
+		Address:   pod.Status.PodIP,
+		Meta:      meta,
+		Namespace: "", // TODO: namespace support
+	}
+	if len(tags) > 0 {
+		service.Tags = tags
+	}
+
+	proxyServiceName := fmt.Sprintf("%s-sidecar-proxy", serviceName)
+	proxyServiceID := fmt.Sprintf("%s-%s", pod.Name, proxyServiceName)
+	proxyConfig := &api.AgentServiceConnectProxyConfig{
+		DestinationServiceName: serviceName,
+		DestinationServiceID:   serviceID,
+		Config:                 nil, // TODO: add config for metrics (upcoming PR)
+	}
+
+	if servicePort > 0 {
+		proxyConfig.LocalServiceAddress = "127.0.0.1"
+		proxyConfig.LocalServicePort = servicePort
+	}
+
+	upstreams, err := r.processUpstreams(&pod)
+	if err != nil {
+		return nil, nil, err
+	}
+	proxyConfig.Upstreams = upstreams
+
+	proxyService := &api.AgentServiceRegistration{
+		Kind:            api.ServiceKindConnectProxy,
+		ID:              proxyServiceID,
+		Name:            proxyServiceName,
+		Port:            20000,
+		Address:         pod.Status.PodIP,
+		TaggedAddresses: nil, // TODO: set cluster IP here (will be done later)
+		Meta:            meta,
+		Namespace:       "", // TODO: same as service namespace
+		Proxy:           proxyConfig,
+		Check:           nil,
+		Checks: api.AgentServiceChecks{
+			{
+				Name:                           "Proxy Public Listener",
+				TCP:                            fmt.Sprintf("%s:20000", pod.Status.PodIP),
+				Interval:                       "10s",
+				DeregisterCriticalServiceAfter: "10m",
+			},
+			{
+				Name:         "Destination Alias",
+				AliasService: serviceID,
+			},
+		},
+		Connect: nil,
+	}
+	if len(tags) > 0 {
+		proxyService.Tags = tags
+	}
+
+	return service, proxyService, nil
 }
 
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata

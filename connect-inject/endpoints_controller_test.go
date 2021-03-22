@@ -240,6 +240,7 @@ func TestProcessUpstreams(t *testing.T) {
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
 // object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
 // with two addresses, and an endpoints object with every possible customization.
+// This test covers EndpointsController.createServiceRegistrations.
 func TestReconcileCreateEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -595,6 +596,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 //     corresponding service instance in Consul is deregistered.
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
+// This test covers EndpointsController.deregisterServiceOnAllAgents when selectivelyDeregister is true.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -1169,6 +1171,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 }
 
 // Tests deleting an Endpoints object, with and without matching Consul and K8s service names.
+// This test covers EndpointsController.deregisterServiceOnAllAgents when selectivelyDeregister is false.
 func TestReconcileDeleteEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
