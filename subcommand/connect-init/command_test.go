@@ -51,16 +51,16 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name   string
-		secure bool
+		name string
+		tls  bool
 	}{
 		{
-			name:   "ACLs enabled, not secure",
-			secure: false,
+			name: "ACLs enabled, no tls",
+			tls:  false,
 		},
 		{
-			name:   "ACLs enabled, secure",
-			secure: true,
+			name: "ACLs enabled, tls",
+			tls:  true,
 		},
 	}
 	for _, test := range cases {
@@ -71,27 +71,27 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 
 			var caFile, certFile, keyFile string
 			// Start Consul server with ACLs enabled and default deny policy.
-			var masterToken = "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+			masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.ACL.Enabled = true
 				c.ACL.DefaultPolicy = "deny"
 				c.ACL.Tokens.Master = masterToken
-				if test.secure {
+				if test.tls {
 					caFile, certFile, keyFile = common.GenerateServerCerts(t)
 					c.CAFile = caFile
 					c.CertFile = certFile
 					c.KeyFile = keyFile
 				}
 			})
-			defer server.Stop()
 			require.NoError(t, err)
+			defer server.Stop()
 			server.WaitForLeader(t)
 			cfg := &api.Config{
 				Scheme:  "http",
 				Address: server.HTTPAddr,
 				Token:   masterToken,
 			}
-			if test.secure {
+			if test.tls {
 				cfg.Address = server.HTTPSAddr
 				cfg.Scheme = "https"
 				cfg.TLSConfig = api.TLSConfig{
@@ -160,7 +160,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-skip-service-registration-polling=false"}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
-			if test.secure {
+			if test.tls {
 				flags = append(flags, "-ca-file", caFile)
 			}
 			// Run the command.
@@ -191,16 +191,16 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 func TestRun_ServicePollingOnly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name   string
-		secure bool
+		name string
+		tls  bool
 	}{
 		{
-			name:   "ACLs disabled, not secure",
-			secure: false,
+			name: "ACLs disabled, no tls",
+			tls:  false,
 		},
 		{
-			name:   "ACLs disabled, secure",
-			secure: true,
+			name: "ACLs disabled, tls",
+			tls:  true,
 		},
 	}
 	for _, test := range cases {
@@ -210,16 +210,15 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			var caFile, certFile, keyFile string
 			// Start Consul server with TLS enabled if required.
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				if test.secure {
+				if test.tls {
 					caFile, certFile, keyFile = common.GenerateServerCerts(t)
 					c.CAFile = caFile
 					c.CertFile = certFile
 					c.KeyFile = keyFile
 				}
 			})
-			// Start Consul server.
-			defer server.Stop()
 			require.NoError(t, err)
+			defer server.Stop()
 			server.WaitForLeader(t)
 
 			// Get the Consul Client.
@@ -227,7 +226,7 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 				Scheme:  "http",
 				Address: server.HTTPAddr,
 			}
-			if test.secure {
+			if test.tls {
 				cfg.Address = server.HTTPSAddr
 				cfg.Scheme = "https"
 				cfg.TLSConfig = api.TLSConfig{
@@ -254,7 +253,7 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			flags := []string{"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
 			flags = append(flags, defaultTestFlags...)
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
-			if test.secure {
+			if test.tls {
 				flags = append(flags, "-ca-file", caFile)
 			}
 
@@ -427,8 +426,8 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 
 			// Start Consul server.
 			server, err := testutil.NewTestServerConfigT(t, nil)
-			defer server.Stop()
 			require.NoError(t, err)
+			defer server.Stop()
 			server.WaitForLeader(t)
 			consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
 			require.NoError(t, err)
@@ -466,8 +465,8 @@ func TestRun_RetryServicePolling(t *testing.T) {
 
 	// Start Consul server.
 	server, err := testutil.NewTestServerConfigT(t, nil)
-	defer server.Stop()
 	require.NoError(t, err)
+	defer server.Stop()
 	server.WaitForLeader(t)
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
 	require.NoError(t, err)
@@ -512,8 +511,8 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 
 	// Start Consul server.
 	server, err := testutil.NewTestServerConfigT(t, nil)
-	defer server.Stop()
 	require.NoError(t, err)
+	defer server.Stop()
 	server.WaitForLeader(t)
 	consulClient, err := api.NewClient(&api.Config{Address: server.HTTPAddr})
 	require.NoError(t, err)
