@@ -75,22 +75,22 @@ func TestHasBeenInjected(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name     string
-		pod      func() *corev1.Pod
+		pod      func() corev1.Pod
 		expected bool
 	}{
 		{
 			name: "Pod with annotation",
-			pod: func() *corev1.Pod {
+			pod: func() corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true)
-				return pod1
+				return *pod1
 			},
 			expected: true,
 		},
 		{
 			name: "Pod without injected annotation",
-			pod: func() *corev1.Pod {
+			pod: func() corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", false)
-				return pod1
+				return *pod1
 			},
 			expected: false,
 		},

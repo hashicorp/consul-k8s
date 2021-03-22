@@ -458,7 +458,6 @@ func (c *Command) Run(args []string) int {
 	ctrlExitCh := make(chan error)
 
 	// Create a manager for endpoints controller and the mutating webhook.
-	// Note: the webhook refactor PR will use this manager for the mutating webhook.
 	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)
@@ -472,7 +471,7 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to start manager")
 		return 1
 	}
-	// Start the endpoints controller
+	// Start the endpoints controller.
 	if err = (&connectinject.EndpointsController{
 		Client:                mgr.GetClient(),
 		ConsulClient:          c.consulClient,
