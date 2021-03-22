@@ -14,9 +14,7 @@ import (
 // and a server certificate and saves them to temp files.
 // It returns file names in this order:
 // CA certificate, server certificate, and server key.
-// Note that it's the responsibility of the caller to
-// remove the temporary files created by this function.
-func GenerateServerCerts(t *testing.T) (string, string, string, func()) {
+func GenerateServerCerts(t *testing.T) (string, string, string) {
 	require := require.New(t)
 
 	caFile, err := ioutil.TempFile("", "ca")
@@ -46,12 +44,12 @@ func GenerateServerCerts(t *testing.T) (string, string, string, func()) {
 	_, err = certKeyFile.WriteString(keyPem)
 	require.NoError(err)
 
-	cleanupFunc := func() {
+	t.Cleanup(func() {
 		os.Remove(caFile.Name())
 		os.Remove(certFile.Name())
 		os.Remove(certKeyFile.Name())
-	}
-	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
+	})
+	return caFile.Name(), certFile.Name(), certKeyFile.Name()
 }
 
 // WriteTempFile writes contents to a temporary file and returns the file

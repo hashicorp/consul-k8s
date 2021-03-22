@@ -300,8 +300,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 
 			// Set up Consul server with TLS.
-			caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-			defer cleanup()
+			caFile, certFile, keyFile := common.GenerateServerCerts(t)
 			a, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.CAFile = caFile
 				cfg.CertFile = certFile
@@ -482,8 +481,7 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	// Set up Consul server with TLS.
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
@@ -551,8 +549,7 @@ func TestRun_MeshGatewayNoWANAddr(t *testing.T) {
 	t.Parallel()
 
 	// Set up Consul server with TLS.
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
@@ -622,8 +619,7 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 			k8s := fake.NewSimpleClientset()
 
 			// Set up Consul server with TLS.
-			caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-			defer cleanup()
+			caFile, certFile, keyFile := common.GenerateServerCerts(t)
 			a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.CAFile = caFile
 				c.CertFile = certFile
@@ -700,8 +696,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 	t.Parallel()
 
 	// Set up Consul server with TLS.
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 	a, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 		cfg.CAFile = caFile
 		cfg.CertFile = certFile
@@ -834,8 +829,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	// Set up Consul server with TLS.
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
@@ -946,8 +940,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 	// We need to reserve all 6 ports to avoid potential
 	// port collisions with other tests.
 	randomPorts := freeport.MustTake(6)
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 
 	// Create fake k8s.
 	k8s := fake.NewSimpleClientset()
@@ -1038,8 +1031,7 @@ func TestRun_Autoencrypt(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	// Set up Consul server with TLS.
-	caFile, certFile, keyFile, cleanup := common.GenerateServerCerts(t)
-	defer cleanup()
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
