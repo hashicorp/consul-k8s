@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -66,8 +67,12 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			bearerFile := common.WriteTempFile(t, serviceAccountJWTToken)
-			proxyFile := common.WriteTempFile(t, "")
-			tokenFile := common.WriteTempFile(t, "")
+			tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
+			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
+			t.Cleanup(func() {
+				os.Remove(proxyFile)
+				os.Remove(tokenFile)
+			})
 
 			var caFile, certFile, keyFile string
 			// Start Consul server with ACLs enabled and default deny policy.
@@ -205,7 +210,10 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			proxyFile := common.WriteTempFile(t, "")
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				os.Remove(proxyFile)
+			})
 
 			var caFile, certFile, keyFile string
 			// Start Consul server with TLS enabled if required.
@@ -422,7 +430,10 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			proxyFile := common.WriteTempFile(t, "")
+			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			t.Cleanup(func() {
+				os.Remove(proxyFile)
+			})
 
 			// Start Consul server.
 			server, err := testutil.NewTestServerConfigT(t, nil)
@@ -528,7 +539,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		proxyIDFile:                        randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
-	expErr := fmt.Sprintf("Unable to write proxy ID to file: open %s: no such file or directory\n", randFileName)
+	expErr := fmt.Sprintf("Unable to write proxy ID to file: unable to write file: open %s: no such file or directory\n", randFileName)
 	flags := []string{"-http-addr", server.HTTPAddr}
 	flags = append(flags, defaultTestFlags...)
 	code := cmd.Run(flags)
@@ -773,7 +784,7 @@ xtr5PSwH1DusYfVaGH2O
     "Tags": [],
     "Meta": {
       "k8s-namespace": "default",
-      "pod-name": "counting"
+      "pod-name": "counting-pod"
     },
     "Port": 9001,
     "Address": "10.32.3.26",
@@ -801,7 +812,7 @@ xtr5PSwH1DusYfVaGH2O
     "Tags": [],
     "Meta": {
       "k8s-namespace": "default",
-      "pod-name": "counting"
+      "pod-name": "counting-pod"
     },
     "Port": 20000,
     "Address": "10.32.3.26",

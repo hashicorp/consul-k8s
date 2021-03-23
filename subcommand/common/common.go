@@ -75,10 +75,25 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 		return fmt.Errorf("error logging in: %s", err)
 	}
 
-	// Write the token out to file with permissions so consul-k8s user can read.
-	payload := []byte(tok.SecretID)
-	if err := ioutil.WriteFile(tokenSinkFile, payload, 0444); err != nil {
+	if err := WriteFileWithPerms(tokenSinkFile, tok.SecretID, 0444); err != nil {
 		return fmt.Errorf("error writing token to file sink: %v", err)
 	}
 	return nil
+}
+
+// WriteFileWithPerms will write payload as the contents of the outputFile and set permissions.
+func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
+	// ioutil.WriteFile truncates existing files or if they do not exist writes them as FileMode(0666), but only if
+	// the file is currently writable. If the file exists it will already likely be read-only. Remove it.
+	if _, err := os.Stat(outputFile); err == nil {
+		err = os.Remove(outputFile)
+		if err != nil {
+			return fmt.Errorf("unable to delete existing token file: %s", err)
+		}
+	}
+	err := ioutil.WriteFile(outputFile, []byte(payload), os.FileMode(0666))
+	if err != nil {
+		return fmt.Errorf("unable to write file: %s", err)
+	}
+	return os.Chmod(outputFile, mode)
 }
