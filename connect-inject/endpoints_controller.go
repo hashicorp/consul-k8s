@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/consul"
@@ -33,14 +35,12 @@ type EndpointsController struct {
 	DenyK8sNamespacesSet mapset.Set
 	// ReleaseName is the Consul Helm installation release.
 	ReleaseName string
-	// ReleaseNamespace is the namespace where Consul is Helm installed.
+	// ReleaseNamespace is the namespace where Consul is installed.
 	ReleaseNamespace string
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
 	Ctx              context.Context
 }
-
-const MetaKeyKubeServiceName = "k8s-service-name"
 
 func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var serviceEndpoints corev1.Endpoints
@@ -56,10 +56,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		if err := r.deregisterServiceOnAllAgents(req.Name, req.Namespace, false, nil); err != nil {
+		if err = r.deregisterServiceOnAllAgents(req.Name, req.Namespace, nil); err != nil {
 			return ctrl.Result{}, err
 		}
-
 		return ctrl.Result{}, nil
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints from Kubernetes", "name", req.Name, "namespace", req.Namespace)
@@ -75,10 +74,8 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
 		// Do the same thing for all addresses, regardless of whether they're ready.
-		allAddresses := subset.Addresses
-		allAddresses = append(allAddresses, subset.NotReadyAddresses...)
+		allAddresses := append(subset.Addresses, subset.NotReadyAddresses...)
 
-		r.Log.Info("all addresses", "addresses", allAddresses)
 		for _, address := range allAddresses {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				// Build the endpointAddressMap up for deregistering service instances later.
@@ -86,8 +83,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				// Get pod associated with this address.
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				err = r.Client.Get(r.Ctx, objectKey, &pod)
-				if err != nil {
+				if err = r.Client.Get(r.Ctx, objectKey, &pod); err != nil {
 					r.Log.Error(err, "failed to get pod from Kubernetes", "pod-name", address.TargetRef.Name)
 					return ctrl.Result{}, err
 				}
@@ -130,7 +126,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	if err = r.deregisterServiceOnAllAgents(serviceEndpoints.Name, serviceEndpoints.Namespace, true, endpointAddressMap); err != nil {
+	if err = r.deregisterServiceOnAllAgents(serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
 		r.Log.Error(err, "failed to deregister service instances on all agents", "k8s-service-name", serviceEndpoints.Name, "k8s-namespace", serviceEndpoints.Namespace)
 		return ctrl.Result{}, err
 	}
@@ -145,7 +141,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	// and register that port for the host service.
 	var servicePort int
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-		if port, _ := portValue(&pod, raw); port > 0 {
+		if port, err := portValue(&pod, raw); port > 0 {
+			if err != nil {
+				return nil, nil, err
+			}
 			servicePort = int(port)
 		}
 	}
@@ -154,7 +153,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
-	// annotation annotationService.
+	// annotation consul.hashicorp.com/connect-service..
 	serviceName := serviceEndpoints.Name
 	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" {
 		serviceName = serviceNameFromAnnotation
@@ -251,10 +250,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 // API. Therefore, we need to query all agents who have services matching that metadata, and deregister each service
 // instance. When querying by the k8s service name and namespace, the request will return service instances and
 // associated proxy service instances.
-// The argument selectivelyDeregister decides whether to deregister *all* service instances or selectively deregister
-// them only if they are not in endpointsAddressesMap. If selectivelyDeregister is false, this function won't check the
-// endpointsAddressMap so that can be nil.
-func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string, selectivelyDeregister bool, endpointsAddressesMap map[string]bool) error {
+// The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
+// them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
+// has addresses, it will only deregister instances not in the map.
+func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
 
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	list := corev1.PodList{}
@@ -266,8 +265,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 			"release":   r.ReleaseName,
 		}),
 	}
-	err := r.Client.List(r.Ctx, &list, &listOptions)
-	if err != nil {
+	if err := r.Client.List(r.Ctx, &list, &listOptions); err != nil {
 		r.Log.Error(err, "failed to get agent pods from Kubernetes")
 		return err
 	}
@@ -292,7 +290,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 		for svcID, serviceRegistration := range svcs {
 			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
 			// every service instance.
-			if selectivelyDeregister {
+			if endpointsAddressesMap != nil {
 				if _, ok := endpointsAddressesMap[serviceRegistration.Address]; !ok {
 					// If the service address is not in the Endpoints addresses, deregister it.
 					if err = client.Agent().ServiceDeregister(svcID); err != nil {
@@ -399,7 +397,7 @@ func (r *EndpointsController) getConsulClient(ip string) (*api.Client, error) {
 // shouldIgnore ignores namespaces where we don't connect-inject.
 func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 	// Ignores system namespaces.
-	if namespace == "kube-system" || namespace == "local-path-storage" {
+	if namespace == metav1.NamespaceSystem || namespace == metav1.NamespacePublic || namespace == "local-path-storage" {
 		return true
 	}
 
