@@ -79,7 +79,7 @@ func TestHasBeenInjected(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "Pod with annotation",
+			name: "Pod with injected annotation",
 			pod: func() corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				return *pod1
@@ -192,6 +192,31 @@ func TestProcessUpstreams(t *testing.T) {
 					DestinationType: api.UpstreamDestTypePreparedQuery,
 					DestinationName: "queryname",
 					LocalBindPort:   1234,
+				},
+			},
+		},
+		{
+			name: "prepared query and non-query upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234, upstream1:2234, prepared_query:6687bd19-5654-76be-d764:8202"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType: api.UpstreamDestTypePreparedQuery,
+					DestinationName: "queryname",
+					LocalBindPort:   1234,
+				},
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream1",
+					LocalBindPort:   2234,
+				},
+				{
+					DestinationType: api.UpstreamDestTypePreparedQuery,
+					DestinationName: "6687bd19-5654-76be-d764",
+					LocalBindPort:   8202,
 				},
 			},
 		},
@@ -977,18 +1002,18 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			// When a k8s deployment is deleted but it's k8s service continues to exist, the endpoints has no addresses.
+			// When a k8s deployment is deleted but it's k8s service continues to exist, the endpoints has no addresses
+			// and the instances should be deleted from Consul.
 			name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{endpoint}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
@@ -1035,19 +1060,18 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
 		{
-			// When a k8s deployment is deleted but it's k8s service continues to exist, the endpoints has no addresses.
+			// With a different Consul service name, when a k8s deployment is deleted but it's k8s service continues to
+			// exist, the endpoints has no addresses and the instances should be deleted from Consul.
 			name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true)
-				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
 						Namespace: "default",
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{endpoint}
 			},
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{

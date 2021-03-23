@@ -20,7 +20,7 @@ import (
 
 type EndpointsController struct {
 	client.Client
-	// ConsulClient points at the agent local to the connect-inject deployment pod
+	// ConsulClient points at the agent local to the connect-inject deployment pod.
 	ConsulClient *api.Client
 	// ConsulScheme is the scheme to use when making API calls to Consul,
 	// i.e. "http" or "https".
@@ -66,7 +66,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	r.Log.Info("retrieved Kubernetes Endpoints", "serviceEndpoints", serviceEndpoints.Name, "serviceEndpoints namespace", serviceEndpoints.Namespace)
+	r.Log.Info("retrieved Kubernetes Endpoints", "endpoints", serviceEndpoints.Name, "endpoints-namespace", serviceEndpoints.Namespace)
 
 	// endpointAddressMap stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
 	// against service instances in Consul to deregister them if they are not in the map.
@@ -88,7 +88,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
 				err = r.Client.Get(r.Ctx, objectKey, &pod)
 				if err != nil {
-					r.Log.Error(err, "failed to get pod from Kubernetes", "pod name", address.TargetRef.Name)
+					r.Log.Error(err, "failed to get pod from Kubernetes", "pod-name", address.TargetRef.Name)
 					return ctrl.Result{}, err
 				}
 
@@ -111,7 +111,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					r.Log.Info("registering service", "service", serviceRegistration.Name)
 					err = client.Agent().ServiceRegister(serviceRegistration)
 					if err != nil {
-						r.Log.Error(err, "failed to register service with Consul", "service name", serviceRegistration.Name)
+						r.Log.Error(err, "failed to register service with Consul", "consul-service-name", serviceRegistration.Name)
 						return ctrl.Result{}, err
 					}
 
@@ -119,10 +119,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					r.Log.Info("registering proxy service", "service", proxyServiceRegistration.Name)
 					err = client.Agent().ServiceRegister(proxyServiceRegistration)
 					if err != nil {
-						r.Log.Error(err, "failed to register proxy service with Consul", "proxy service name", proxyServiceRegistration.Name)
+						r.Log.Error(err, "failed to register proxy service with Consul", "consul-proxy-service-name", proxyServiceRegistration.Name)
 						return ctrl.Result{}, err
 					}
-
 				}
 			}
 		}
@@ -132,7 +131,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
 	if err = r.deregisterServiceOnAllAgents(serviceEndpoints.Name, serviceEndpoints.Namespace, true, endpointAddressMap); err != nil {
-		r.Log.Error(err, "failed to deregister service instances on all agents", "k8s service name", serviceEndpoints.Name, "k8s namespace", serviceEndpoints.Namespace)
+		r.Log.Error(err, "failed to deregister service instances on all agents", "k8s-service-name", serviceEndpoints.Name, "k8s-namespace", serviceEndpoints.Namespace)
 		return ctrl.Result{}, err
 	}
 
@@ -157,8 +156,8 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
 	// annotation annotationService.
 	serviceName := serviceEndpoints.Name
-	if raw, ok := pod.Annotations[annotationService]; ok && raw != "" {
-		serviceName = raw
+	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" {
+		serviceName = serviceNameFromAnnotation
 	}
 
 	serviceID := fmt.Sprintf("%s-%s", pod.Name, serviceName)
@@ -224,7 +223,6 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Meta:            meta,
 		Namespace:       "", // TODO: same as service namespace
 		Proxy:           proxyConfig,
-		Check:           nil,
 		Checks: api.AgentServiceChecks{
 			{
 				Name:                           "Proxy Public Listener",
@@ -292,20 +290,19 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 
 		// Deregister each service instance that matches the metadata.
 		for svcID, serviceRegistration := range svcs {
-			r.Log.Info("deregistering service", "service id", svcID)
 			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
 			// every service instance.
 			if selectivelyDeregister {
 				if _, ok := endpointsAddressesMap[serviceRegistration.Address]; !ok {
 					// If the service address is not in the Endpoints addresses, deregister it.
 					if err = client.Agent().ServiceDeregister(svcID); err != nil {
-						r.Log.Error(err, "failed to deregister service instance", "ID", svcID)
+						r.Log.Error(err, "failed to deregister service instance", "consul-service-id", svcID)
 						return err
 					}
 				}
 			} else {
 				if err = client.Agent().ServiceDeregister(svcID); err != nil {
-					r.Log.Error(err, "failed to deregister service instance", "ID", svcID)
+					r.Log.Error(err, "failed to deregister service instance", "consul-service-id", svcID)
 					return err
 				}
 			}
