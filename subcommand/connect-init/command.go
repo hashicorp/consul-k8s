@@ -129,7 +129,7 @@ func (c *Command) Run(args []string) int {
 	// which maps to this pod+namespace.
 	var proxyID string
 	err = backoff.Retry(func() error {
-		filter := fmt.Sprintf("Meta[\"pod-name\"] == %s and Meta[\"k8s-namespace\"] == %s", c.flagPodName, c.flagPodNamespace)
+		filter := fmt.Sprintf("Meta[\"pod-name\"] == %q and Meta[\"k8s-namespace\"] == %q", c.flagPodName, c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))
