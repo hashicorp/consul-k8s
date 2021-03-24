@@ -13,7 +13,7 @@ import (
 func TestHandlerEnvoySidecar(t *testing.T) {
 	require := require.New(t)
 	h := Handler{}
-	pod := &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationService: "foo",
@@ -144,7 +144,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(tc.pod, k8sNamespace)
+			c, err := h.envoySidecar(*tc.pod, k8sNamespace)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
@@ -158,7 +158,7 @@ func TestHandlerEnvoySidecar_AuthMethod(t *testing.T) {
 	h := Handler{
 		AuthMethod: "test-auth-method",
 	}
-	pod := &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationService: "foo",
@@ -192,7 +192,7 @@ func TestHandlerEnvoySidecar_WithTLS(t *testing.T) {
 	h := Handler{
 		ConsulCACert: "consul-ca-cert",
 	}
-	pod := &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationService: "foo",
@@ -237,7 +237,7 @@ func TestHandlerEnvoySidecar_Namespaces(t *testing.T) {
 		EnableNamespaces:           true,
 		ConsulDestinationNamespace: k8sNamespace,
 	}
-	pod := &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationService: "foo",
@@ -268,7 +268,7 @@ func TestHandlerEnvoySidecar_NamespacesAndAuthMethod(t *testing.T) {
 		ConsulDestinationNamespace: k8sNamespace,
 		AuthMethod:                 "test-auth-method",
 	}
-	pod := &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationService: "foo",
@@ -449,7 +449,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			pod := &corev1.Pod{
+			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: c.annotations,
 				},

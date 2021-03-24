@@ -86,7 +86,7 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
+func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		ServiceName:               pod.Annotations[annotationService],
 		ProxyServiceName:          fmt.Sprintf("%s-sidecar-proxy", pod.Annotations[annotationService]),

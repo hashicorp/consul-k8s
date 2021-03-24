@@ -28,7 +28,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-testing-interface v1.14.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
-	github.com/radovskyb/watcher v1.0.2
 	github.com/stretchr/testify v1.6.1
 	go.uber.org/zap v1.15.0
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
