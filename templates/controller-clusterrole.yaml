@@ -44,6 +44,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [""]
   resources:
