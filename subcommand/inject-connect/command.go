@@ -25,12 +25,18 @@ import (
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Command struct {
@@ -69,6 +75,10 @@ type Command struct {
 	flagEnableCleanupController          bool          // Start the cleanup controller.
 	flagCleanupControllerReconcilePeriod time.Duration // Period for cleanup controller reconcile.
 
+	// Flags for endpoints controller.
+	flagReleaseName      string
+	flagReleaseNamespace string
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -104,6 +114,17 @@ type Command struct {
 	once  sync.Once
 	help  string
 	cert  atomic.Value
+}
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	//+kubebuilder:scaffold:scheme
 }
 
 func (c *Command) init() {
@@ -144,6 +165,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
 		"Enables cleanup controller that cleans up stale Consul service instances.")
 	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
+	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
+	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -188,6 +211,10 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 
 	flags.Merge(c.flagSet, c.http.Flags())
+	// flag.CommandLine is a package level variable representing the default flagSet. The init() function in
+	// "sigs.k8s.io/controller-runtime/pkg/client/config", which is imported by ctrl, registers the flag --kubeconfig to
+	// the default flagSet. That's why we need to merge it to have access with our flagSet.
+	flags.Merge(c.flagSet, flag.CommandLine)
 	c.help = flags.Usage(help, c.flagSet)
 
 	// Wait on an interrupt or terminate for exit, be sure to init it before running
@@ -423,10 +450,59 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Start the cleanup controller that cleans up Consul service instances
-	// still registered after the pod has been deleted (usually due to a force delete).
+	// Create a channel for all controllers' exits.
 	ctrlExitCh := make(chan error)
 
+	// TODO: future PR to enable this and disable the old service registration path
+	// Create a manager for endpoints controller and the mutating webhook.
+	//zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+	//ctrl.SetLogger(zapLogger)
+	//klog.SetLogger(zapLogger)
+	//mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	//	Scheme:             scheme,
+	//	LeaderElection:     false,
+	//	Logger:             zapLogger,
+	//	MetricsBindAddress: "0.0.0.0:9444",
+	//})
+	//if err != nil {
+	//	setupLog.Error(err, "unable to start manager")
+	//	return 1
+	//}
+	//// Start the endpoints controller.
+	//if err = (&connectinject.EndpointsController{
+	//	Client:                mgr.GetClient(),
+	//	ConsulClient:          c.consulClient,
+	//	ConsulScheme:          consulURL.Scheme,
+	//	ConsulPort:            consulURL.Port(),
+	//	AllowK8sNamespacesSet: allowK8sNamespaces,
+	//	DenyK8sNamespacesSet:  denyK8sNamespaces,
+	//	Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
+	//	Scheme:                mgr.GetScheme(),
+	//	Ctx:                   ctx,
+	//	ReleaseName:           c.flagReleaseName,
+	//	ReleaseNamespace:      c.flagReleaseNamespace,
+	//}).SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+	//	return 1
+	//}
+	//
+	//// todo: Add tests in case it's not refactored to not have any signal handling
+	//// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
+	//go func() {
+	//	// Pass existing context's done channel so that the controller
+	//	// will stop when this context is canceled.
+	//	// This could be due to an interrupt signal or if any other component did not start
+	//	// successfully. In those cases, we want to make sure that this controller is no longer
+	//	// running.
+	//	if err := mgr.Start(ctx.Done()); err != nil {
+	//		setupLog.Error(err, "problem running manager")
+	//		// Use an existing channel for ctrl exists in case manager failed to start properly.
+	//		ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
+	//	}
+	//}()
+
+	// Start the cleanup controller that cleans up Consul service instances
+	// still registered after the pod has been deleted (usually due to a force delete).
 	if c.flagEnableCleanupController {
 		cleanupResource := connectinject.CleanupResource{
 			Log:                    logger.Named("cleanupResource"),

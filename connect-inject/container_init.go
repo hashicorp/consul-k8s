@@ -15,6 +15,7 @@ const (
 	InjectInitCopyContainerName = "copy-consul-bin"
 	InjectInitContainerName     = "consul-connect-inject-init"
 	MetaKeyPodName              = "pod-name"
+	MetaKeyKubeServiceName      = "k8s-service-name"
 	MetaKeyKubeNS               = "k8s-namespace"
 )
 
