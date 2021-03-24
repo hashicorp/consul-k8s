@@ -2,7 +2,11 @@
 
 IMPROVEMENTS: 
 
-* Specify `kubeVersion` in `Chart.yaml` to denote that this chart is compatible with Kubernetes 1.13+. [[GH-877](https://github.com/hashicorp/consul-helm/pull/877]
+* Specify `kubeVersion` in `Chart.yaml` to denote that this chart is compatible with Kubernetes 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+* CRDs: update the CRD versions from v1beta1 to v1. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+
+BREAKING CHANGES:
+* Minimum Kubernetes versions supported is 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
 
 ## 0.31.1 (Mar 19, 2021)
 
