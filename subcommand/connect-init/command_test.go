@@ -177,7 +177,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			require.NoError(t, err)
 			token, _, err := consulClient.ACL().TokenReadSelf(nil)
 			require.NoError(t, err)
-			require.Equal(t, token.Description, "token created via login: {\"pod\":\"default/counting\"}")
+			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
 
 			// Validate contents of proxyFile.
 			data, err := ioutil.ReadFile(proxyFile)
@@ -288,8 +288,8 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Name:    "counting",
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
-						metaKeyKubeNS:  "default",
+						metaKeyPodName: "counting-pod",
+						metaKeyKubeNS:  "default-ns",
 					},
 				},
 			},
@@ -309,8 +309,8 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Port:    9999,
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
-						metaKeyKubeNS:  "default",
+						metaKeyPodName: "counting-pod",
+						metaKeyKubeNS:  "default-ns",
 					},
 				},
 			},
@@ -346,7 +346,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Name:    "counting",
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
+						metaKeyPodName: "counting-pod",
 					},
 				},
 				{
@@ -360,7 +360,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Port:    9999,
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
+						metaKeyPodName: "counting-pod",
 					},
 				},
 			},
@@ -374,7 +374,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Name:    "counting",
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyKubeNS: "default",
+						metaKeyKubeNS: "default-ns",
 					},
 				},
 				{
@@ -388,7 +388,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Port:    9999,
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyKubeNS: "default",
+						metaKeyKubeNS: "default-ns",
 					},
 				},
 			},
@@ -402,8 +402,8 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Name:    "counting",
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
-						metaKeyKubeNS:  "default",
+						metaKeyPodName: "counting-pod",
+						metaKeyKubeNS:  "default-ns",
 					},
 				},
 				{
@@ -411,8 +411,8 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Name:    "counting",
 					Address: "127.0.0.1",
 					Meta: map[string]string{
-						metaKeyPodName: "counting",
-						metaKeyKubeNS:  "default",
+						metaKeyPodName: "counting-pod",
+						metaKeyKubeNS:  "default-ns",
 					},
 				},
 			},
@@ -677,8 +677,8 @@ func TestRun_LoginWithRetries(t *testing.T) {
 const (
 	metaKeyPodName   = "pod-name"
 	metaKeyKubeNS    = "k8s-namespace"
-	testPodNamespace = "default"
-	testPodName      = "counting"
+	testPodNamespace = "default-ns"
+	testPodName      = "counting-pod"
 	testAuthMethod   = "consul-k8s-auth-method"
 
 	serviceAccountJWTToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImtoYWtpLWFyYWNobmlkLWNvbnN1bC1jb25uZWN0LWluamVjdG9yLWF1dGhtZXRob2Qtc3ZjLWFjY29obmRidiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJraGFraS1hcmFjaG5pZC1jb25zdWwtY29ubmVjdC1pbmplY3Rvci1hdXRobWV0aG9kLXN2Yy1hY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiN2U5NWUxMjktZTQ3My0xMWU5LThmYWEtNDIwMTBhODAwMTIyIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6a2hha2ktYXJhY2huaWQtY29uc3VsLWNvbm5lY3QtaW5qZWN0b3ItYXV0aG1ldGhvZC1zdmMtYWNjb3VudCJ9.Yi63MMtzh5MBWKKd3a7dzCJjTITE15ikFy_Tnpdk_AwdwA9J4AMSGEeHN5vWtCuuFjo_lMJqBBPHkK2AqbnoFUj9m5CopWyqICJQlvEOP4fUQ-Rc0W1P_JjU1rZERHG39b5TMLgKPQguyhaiZEJ6CjVtm9wUTagrgiuqYV2iUqLuF6SYNm6SrKtkPS-lqIO-u7C06wVk5m5uqwIVQNpZSIC_5Ls5aLmyZU3nHvH-V7E3HmBhVyZAB76jgKB0TyVX1IOskt9PDFarNtU3suZyCjvqC-UJA6sYeySe4dBNKsKlSZ6YuxUUmn1Rgv32YMdImnsWg8khf-zJvqgWk7B5EA`
@@ -839,8 +839,8 @@ var (
 		Name:    "counting",
 		Address: "127.0.0.1",
 		Meta: map[string]string{
-			metaKeyPodName: "counting",
-			metaKeyKubeNS:  "default",
+			metaKeyPodName: "counting-pod",
+			metaKeyKubeNS:  "default-ns",
 		},
 	}
 	consulCountingSvcSidecar = api.AgentServiceRegistration{
@@ -856,8 +856,8 @@ var (
 		Port:    9999,
 		Address: "127.0.0.1",
 		Meta: map[string]string{
-			metaKeyPodName: "counting",
-			metaKeyKubeNS:  "default",
+			metaKeyPodName: "counting-pod",
+			metaKeyKubeNS:  "default-ns",
 		},
 	}
 	defaultTestFlags = []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-skip-service-registration-polling=false"}
