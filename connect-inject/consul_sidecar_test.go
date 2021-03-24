@@ -34,7 +34,7 @@ func TestConsulSidecar_Default(t *testing.T) {
 		ImageConsulK8S:         "hashicorp/consul-k8s:9.9.9",
 		ConsulSidecarResources: consulSidecarResources,
 	}
-	container, err := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -84,7 +84,7 @@ func TestConsulSidecar_AuthMethod(t *testing.T) {
 				AuthMethod:     authMethod,
 				ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 			}
-			container, err := handler.consulSidecar(&corev1.Pod{
+			container, err := handler.consulSidecar(corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -113,7 +113,7 @@ func TestConsulSidecar_SyncPeriodAnnotation(t *testing.T) {
 		Log:            hclog.Default().Named("handler"),
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 	}
-	container, err := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"consul.hashicorp.com/connect-sync-period": "55s",
@@ -141,7 +141,7 @@ func TestConsulSidecar_TLS(t *testing.T) {
 		ConsulCACert:           "consul-ca-cert",
 		ConsulSidecarResources: consulSidecarResources,
 	}
-	container, err := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -194,7 +194,7 @@ func TestConsulSidecar_MetricsFlags(t *testing.T) {
 		DefaultEnableMetrics:        true,
 		DefaultEnableMetricsMerging: true,
 	}
-	container, err := handler.consulSidecar(&corev1.Pod{
+	container, err := handler.consulSidecar(corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				annotationMergedMetricsPort:  "20100",

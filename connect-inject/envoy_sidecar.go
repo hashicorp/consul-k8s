@@ -17,7 +17,7 @@ type sidecarContainerCommandData struct {
 	ConsulNamespace string
 }
 
-func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Container, error) {
+func (h *Handler) envoySidecar(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	templateData := sidecarContainerCommandData{
 		AuthMethod:      h.AuthMethod,
 		ConsulNamespace: h.consulNamespace(k8sNamespace),
@@ -91,7 +91,7 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 	return container, nil
 }
-func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) {
+func (h *Handler) getContainerSidecarCommand(pod corev1.Pod) ([]string, error) {
 	cmd := []string{
 		"envoy",
 		"--config-path", "/consul/connect-inject/envoy-bootstrap.yaml",
@@ -124,7 +124,7 @@ func (h *Handler) getContainerSidecarCommand(pod *corev1.Pod) ([]string, error) 
 	return cmd, nil
 }
 
-func (h *Handler) envoySidecarResources(pod *corev1.Pod) (corev1.ResourceRequirements, error) {
+func (h *Handler) envoySidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
