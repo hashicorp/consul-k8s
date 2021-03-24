@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,13 +30,13 @@ const (
 // ConfigEntryController to abstract CRD-specific controllers.
 type Controller interface {
 	// Update updates the state of the whole object.
-	Update(context.Context, runtime.Object, ...client.UpdateOption) error
+	Update(context.Context, client.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
-	UpdateStatus(context.Context, runtime.Object, ...client.UpdateOption) error
+	UpdateStatus(context.Context, client.Object, ...client.UpdateOption) error
 	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
 	// obj must be a struct pointer so that obj can be updated with the response
 	// returned by the Server.
-	Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error
+	Get(ctx context.Context, key client.ObjectKey, obj client.Object) error
 	// Logger returns a logger with values added for the specific controller
 	// and request name.
 	Logger(types.NamespacedName) logr.Logger

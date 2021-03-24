@@ -23,7 +23,7 @@ type TerminatingGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways/status,verbs=get;update;patch
 
-func (r *TerminatingGatewayController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *TerminatingGatewayController) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.TerminatingGateway{})
 }
 
@@ -31,7 +31,7 @@ func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Lo
 	return r.Log.WithValues("request", name)
 }
 
-func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
+func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 

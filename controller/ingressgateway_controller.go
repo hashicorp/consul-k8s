@@ -23,7 +23,7 @@ type IngressGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ingressgateways,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ingressgateways/status,verbs=get;update;patch
 
-func (r *IngressGatewayController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *IngressGatewayController) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.IngressGateway{})
 }
 
@@ -31,7 +31,7 @@ func (r *IngressGatewayController) Logger(name types.NamespacedName) logr.Logger
 	return r.Log.WithValues("request", name)
 }
 
-func (r *IngressGatewayController) UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
+func (r *IngressGatewayController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 

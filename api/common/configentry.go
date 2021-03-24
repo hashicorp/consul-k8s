@@ -6,6 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ConfigEntryResource is a generic config entry custom resource. It is implemented
@@ -62,4 +63,37 @@ type ConfigEntryResource interface {
 	// DefaultNamespaceFields sets Consul namespace fields on the config entry
 	// spec to their default values if namespaces are enabled.
 	DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string)
+
+	GetNamespace() string
+	SetNamespace(namespace string)
+	GetName() string
+	SetName(name string)
+	GetGenerateName() string
+	SetGenerateName(name string)
+	GetUID() types.UID
+	SetUID(uid types.UID)
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetGeneration() int64
+	SetGeneration(generation int64)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+	GetCreationTimestamp() metav1.Time
+	SetCreationTimestamp(timestamp metav1.Time)
+	GetDeletionTimestamp() *metav1.Time
+	SetDeletionTimestamp(timestamp *metav1.Time)
+	GetDeletionGracePeriodSeconds() *int64
+	SetDeletionGracePeriodSeconds(*int64)
+	GetLabels() map[string]string
+	SetLabels(labels map[string]string)
+	GetAnnotations() map[string]string
+	SetAnnotations(annotations map[string]string)
+	GetFinalizers() []string
+	SetFinalizers(finalizers []string)
+	GetOwnerReferences() []metav1.OwnerReference
+	SetOwnerReferences([]metav1.OwnerReference)
+	GetClusterName() string
+	SetClusterName(clusterName string)
+	GetManagedFields() []metav1.ManagedFieldsEntry
+	SetManagedFields(managedFields []metav1.ManagedFieldsEntry)
 }

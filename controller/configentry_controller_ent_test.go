@@ -217,7 +217,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					},
 				)
 
-				resp, err := r.Reconcile(ctrl.Request{
+				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: c.SourceKubeNS,
 						Name:      in.KubeResource.KubernetesName(),
@@ -509,7 +509,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					err := in.UpdateResourceFunc(fakeClient, ctx, in.KubeResource)
 					req.NoError(err)
 
-					resp, err := r.Reconcile(ctrl.Request{
+					resp, err := r.Reconcile(ctx, ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
 							Name:      in.KubeResource.KubernetesName(),
@@ -751,7 +751,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 				// Now run reconcile. It's marked for deletion so this should delete it.
 				{
-					resp, err := r.Reconcile(ctrl.Request{
+					resp, err := r.Reconcile(context.Background(), ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
 							Name:      in.KubeResource.KubernetesName(),
