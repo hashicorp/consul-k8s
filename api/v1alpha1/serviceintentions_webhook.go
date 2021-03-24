@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -50,7 +50,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	}
 
 	singleConsulDestNS := !(v.EnableConsulNamespaces && v.EnableNSMirroring)
-	if req.Operation == v1beta1.Create {
+	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", svcIntentions.KubernetesName())
 
 		if err := v.Client.List(ctx, &svcIntentionsList); err != nil {
@@ -72,7 +72,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 					fmt.Errorf("an existing ServiceIntentions resource has `spec.destination.name: %s` and `spec.destination.namespace: %s`", svcIntentions.Spec.Destination.Name, svcIntentions.Spec.Destination.Namespace))
 			}
 		}
-	} else if req.Operation == v1beta1.Update {
+	} else if req.Operation == admissionv1.Update {
 		v.Logger.Info("validate update", "name", svcIntentions.KubernetesName())
 		var prevIntention, newIntention ServiceIntentions
 		if err := v.decoder.DecodeRaw(*req.OldObject.DeepCopy(), &prevIntention); err != nil {

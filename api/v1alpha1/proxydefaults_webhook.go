@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -41,7 +41,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if req.Operation == v1beta1.Create {
+	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", proxyDefaults.KubernetesName())
 
 		if proxyDefaults.KubernetesName() != common.Global {

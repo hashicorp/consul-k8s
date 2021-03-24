@@ -6,7 +6,8 @@ metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -24,7 +25,8 @@ webhooks:
     resources:
     - ingressgateways
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -42,7 +44,8 @@ webhooks:
     resources:
     - proxydefaults
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -60,7 +63,8 @@ webhooks:
     resources:
     - servicedefaults
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -78,7 +82,8 @@ webhooks:
     resources:
     - serviceintentions
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -96,7 +101,8 @@ webhooks:
     resources:
     - serviceresolvers
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -114,7 +120,8 @@ webhooks:
     resources:
     - servicerouters
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
@@ -132,7 +139,8 @@ webhooks:
     resources:
     - servicesplitters
   sideEffects: None
-- clientConfig:
+- admissionReviewVersions: null
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
