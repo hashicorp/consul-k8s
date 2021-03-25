@@ -24,6 +24,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const (
+	MetaKeyPodName         = "pod-name"
+	MetaKeyKubeServiceName = "k8s-service-name"
+	MetaKeyKubeNS          = "k8s-namespace"
+)
+
 type EndpointsController struct {
 	client.Client
 	// ConsulClient points at the agent local to the connect-inject deployment pod.
@@ -108,6 +114,9 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					}
 
 					// Register the service instance with the local agent.
+					// Note: the order of how we register services is important,
+					// and the connect-proxy service should come after the "main" service
+					// because its alias health check depends on the main service to exist.
 					r.Log.Info("registering service", "service", serviceRegistration.Name)
 					err = client.Agent().ServiceRegister(serviceRegistration)
 					if err != nil {
@@ -136,6 +145,20 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *EndpointsController) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("request", name)
+}
+
+func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Endpoints{}).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			&handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(r.requestsForRunningAgentPods)},
+			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterAgentPods)),
+		).Complete(r)
 }
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
@@ -284,7 +307,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 		}
 
 		// Get services matching metadata.
-		svcs, err := client.Agent().ServicesWithFilter(fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`, MetaKeyKubeServiceName, k8sSvcName, MetaKeyKubeNS, k8sSvcNamespace))
+		svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace, client)
 		if err != nil {
 			r.Log.Error(err, "failed to get service instances", MetaKeyKubeServiceName, k8sSvcName)
 			return err
@@ -311,6 +334,14 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 		}
 	}
 	return nil
+}
+
+// serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
+// of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
+func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace string, client *api.Client) (map[string]*api.AgentService, error) {
+	return client.Agent().ServicesWithFilter(
+		fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`,
+			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace))
 }
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream
@@ -377,20 +408,6 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 	}
 
 	return upstreams, nil
-}
-
-func (r *EndpointsController) Logger(name types.NamespacedName) logr.Logger {
-	return r.Log.WithValues("request", name)
-}
-
-func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Endpoints{}).
-		Watches(
-			&source.Kind{Type: &corev1.Pod{}},
-			&handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(r.requestsForRunningAgentPods)},
-			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterAgentPods)),
-		).Complete(r)
 }
 
 // getConsulClient returns an *api.Client that points at the consul agent local to the pod.
