@@ -10,11 +10,12 @@ import (
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -102,10 +103,10 @@ func TestValidateConfigEntry(t *testing.T) {
 				Resources: c.existingResources,
 			}
 			response := ValidateConfigEntry(ctx, admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: v1beta1.Create,
+					Operation: admissionv1.Create,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},
@@ -158,6 +159,106 @@ type mockConfigEntry struct {
 	MockNamespace string
 	Valid         bool
 }
+
+func (in *mockConfigEntry) GetNamespace() string {
+	return in.MockNamespace
+}
+
+func (in *mockConfigEntry) SetNamespace(namespace string) {
+	in.MockNamespace = namespace
+}
+
+func (in *mockConfigEntry) GetName() string {
+	return in.MockName
+}
+
+func (in *mockConfigEntry) SetName(name string) {
+	in.MockName = name
+}
+
+func (in *mockConfigEntry) GetGenerateName() string {
+	return ""
+}
+
+func (in *mockConfigEntry) SetGenerateName(_ string) {}
+
+func (in *mockConfigEntry) GetUID() types.UID {
+	return ""
+}
+
+func (in *mockConfigEntry) SetUID(_ types.UID) {}
+
+func (in *mockConfigEntry) GetResourceVersion() string {
+	return ""
+}
+
+func (in *mockConfigEntry) SetResourceVersion(_ string) {}
+
+func (in *mockConfigEntry) GetGeneration() int64 {
+	return 0
+}
+
+func (in *mockConfigEntry) SetGeneration(_ int64) {}
+
+func (in *mockConfigEntry) GetSelfLink() string {
+	return ""
+}
+
+func (in *mockConfigEntry) SetSelfLink(_ string) {}
+
+func (in *mockConfigEntry) GetCreationTimestamp() metav1.Time {
+	return metav1.Time{}
+}
+
+func (in *mockConfigEntry) SetCreationTimestamp(_ metav1.Time) {}
+
+func (in *mockConfigEntry) GetDeletionTimestamp() *metav1.Time {
+	return nil
+}
+
+func (in *mockConfigEntry) SetDeletionTimestamp(_ *metav1.Time) {}
+
+func (in *mockConfigEntry) GetDeletionGracePeriodSeconds() *int64 {
+	return nil
+}
+
+func (in *mockConfigEntry) SetDeletionGracePeriodSeconds(_ *int64) {}
+
+func (in *mockConfigEntry) GetLabels() map[string]string {
+	return nil
+}
+
+func (in *mockConfigEntry) SetLabels(_ map[string]string) {}
+
+func (in *mockConfigEntry) GetAnnotations() map[string]string {
+	return nil
+}
+
+func (in *mockConfigEntry) SetAnnotations(_ map[string]string) {}
+
+func (in *mockConfigEntry) GetFinalizers() []string {
+	return nil
+}
+
+func (in *mockConfigEntry) SetFinalizers(_ []string) {}
+
+func (in *mockConfigEntry) GetOwnerReferences() []metav1.OwnerReference {
+	return nil
+}
+
+func (in *mockConfigEntry) SetOwnerReferences(_ []metav1.OwnerReference) {}
+
+func (in *mockConfigEntry) GetClusterName() string {
+	return ""
+}
+
+func (in *mockConfigEntry) SetClusterName(_ string) {}
+
+func (in *mockConfigEntry) GetManagedFields() []metav1.ManagedFieldsEntry {
+	return nil
+}
+
+func (in *mockConfigEntry) SetManagedFields(_ []metav1.ManagedFieldsEntry) {}
 
 func (in *mockConfigEntry) KubernetesName() string {
 	return in.MockName

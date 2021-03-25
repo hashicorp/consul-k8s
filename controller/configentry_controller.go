@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,13 +30,13 @@ const (
 // ConfigEntryController to abstract CRD-specific controllers.
 type Controller interface {
 	// Update updates the state of the whole object.
-	Update(context.Context, runtime.Object, ...client.UpdateOption) error
+	Update(context.Context, client.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
-	UpdateStatus(context.Context, runtime.Object, ...client.UpdateOption) error
+	UpdateStatus(context.Context, client.Object, ...client.UpdateOption) error
 	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
 	// obj must be a struct pointer so that obj can be updated with the response
 	// returned by the Server.
-	Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error
+	Get(ctx context.Context, key client.ObjectKey, obj client.Object) error
 	// Logger returns a logger with values added for the specific controller
 	// and request name.
 	Logger(types.NamespacedName) logr.Logger
@@ -84,14 +83,8 @@ type ConfigEntryController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *ConfigEntryController) ReconcileEntry(
-	crdCtrl Controller,
-	req ctrl.Request,
-	configEntry common.ConfigEntryResource) (ctrl.Result, error) {
-
-	ctx := context.Background()
+func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
-
 	err := crdCtrl.Get(ctx, req.NamespacedName, configEntry)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -102,11 +95,11 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
 
-	if configEntry.GetObjectMeta().DeletionTimestamp.IsZero() {
+	if configEntry.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
+		if !containsString(configEntry.GetFinalizers(), FinalizerName) {
 			configEntry.AddFinalizer(FinalizerName)
 			if err := r.syncUnknown(ctx, crdCtrl, configEntry); err != nil {
 				return ctrl.Result{}, err
@@ -114,7 +107,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 		}
 	} else {
 		// The object is being deleted
-		if containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
+		if containsString(configEntry.GetFinalizers(), FinalizerName) {
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
 			entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{

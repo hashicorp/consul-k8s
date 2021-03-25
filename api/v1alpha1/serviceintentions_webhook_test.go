@@ -9,7 +9,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -243,7 +243,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
@@ -256,10 +256,10 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 				EnableNSMirroring:      c.mirror,
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: v1beta1.Create,
+					Operation: admissionv1.Create,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},
@@ -430,7 +430,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
@@ -443,10 +443,10 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 				EnableNSMirroring:      c.mirror,
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: v1beta1.Update,
+					Operation: admissionv1.Update,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},
@@ -589,7 +589,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				require.NoError(t, err)
 				s := runtime.NewScheme()
 				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-				client := fake.NewFakeClientWithScheme(s)
+				client := fake.NewClientBuilder().WithScheme(s).Build()
 				decoder, err := admission.NewDecoder(s)
 				require.NoError(t, err)
 
@@ -602,10 +602,10 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					EnableNSMirroring:      true,
 				}
 				response := validator.Handle(ctx, admission.Request{
-					AdmissionRequest: v1beta1.AdmissionRequest{
+					AdmissionRequest: admissionv1.AdmissionRequest{
 						Name:      c.newResource.KubernetesName(),
 						Namespace: otherNS,
-						Operation: v1beta1.Create,
+						Operation: admissionv1.Create,
 						Object: runtime.RawExtension{
 							Raw: marshalledRequestObject,
 						},

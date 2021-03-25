@@ -202,7 +202,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetController(
 					fakeClient,
@@ -217,7 +217,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					},
 				)
 
-				resp, err := r.Reconcile(ctrl.Request{
+				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: c.SourceKubeNS,
 						Name:      in.KubeResource.KubernetesName(),
@@ -468,7 +468,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,
@@ -509,7 +509,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					err := in.UpdateResourceFunc(fakeClient, ctx, in.KubeResource)
 					req.NoError(err)
 
-					resp, err := r.Reconcile(ctrl.Request{
+					resp, err := r.Reconcile(ctx, ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
 							Name:      in.KubeResource.KubernetesName(),
@@ -721,7 +721,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,
@@ -751,7 +751,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 				// Now run reconcile. It's marked for deletion so this should delete it.
 				{
-					resp, err := r.Reconcile(ctrl.Request{
+					resp, err := r.Reconcile(context.Background(), ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: c.SourceKubeNS,
 							Name:      in.KubeResource.KubernetesName(),
