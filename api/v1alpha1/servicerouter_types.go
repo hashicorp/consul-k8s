@@ -198,7 +198,7 @@ func (in *ServiceRouter) SetSyncedCondition(status corev1.ConditionStatus, reaso
 	}
 }
 
-func (in *ServiceRouter) SetLastSyncedTime(time metav1.Time) {
+func (in *ServiceRouter) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

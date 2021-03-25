@@ -583,9 +583,9 @@ func TestIngressGateway_SetSyncedCondition(t *testing.T) {
 func TestIngressGateway_SetLastSyncedTime(t *testing.T) {
 	ingressGateway := &IngressGateway{}
 	syncedTime := metav1.NewTime(time.Now())
-	ingressGateway.SetLastSyncedTime(syncedTime)
+	ingressGateway.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, ingressGateway.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, ingressGateway.Status.LastSyncedTime)
 }
 
 func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {

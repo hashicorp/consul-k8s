@@ -279,7 +279,8 @@ func (r *ConfigEntryController) syncFailed(ctx context.Context, logger logr.Logg
 
 func (r *ConfigEntryController) syncSuccessful(ctx context.Context, updater Controller, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
 	configEntry.SetSyncedCondition(corev1.ConditionTrue, "", "")
-	configEntry.SetLastSyncedTime(metav1.NewTime(time.Now()))
+	timeNow := metav1.NewTime(time.Now())
+	configEntry.SetLastSyncedTime(&timeNow)
 	return ctrl.Result{}, updater.UpdateStatus(ctx, configEntry)
 }
 

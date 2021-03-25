@@ -306,7 +306,7 @@ func (in *mockConfigEntry) ConsulName() string {
 
 func (in *mockConfigEntry) SetSyncedCondition(_ corev1.ConditionStatus, _ string, _ string) {}
 
-func (in *mockConfigEntry) SetLastSyncedTime(_ metav1.Time) {}
+func (in *mockConfigEntry) SetLastSyncedTime(_ *metav1.Time) {}
 
 func (in *mockConfigEntry) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	return corev1.ConditionTrue, "", ""
