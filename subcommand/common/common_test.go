@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -105,6 +107,57 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 	)
 	require.Error(err)
 	require.Contains(err.Error(), "error writing token to file sink")
+}
+
+func TestWriteFileWithPerms_InvalidOutputFile(t *testing.T) {
+	t.Parallel()
+	rand.Seed(time.Now().UnixNano())
+	randFileName := fmt.Sprintf("/tmp/tmp/tmp/%d", rand.Int())
+	t.Cleanup(func() {
+		os.Remove(randFileName)
+	})
+	err := WriteFileWithPerms(randFileName, "", os.FileMode(0444))
+	require.Errorf(t, err, "unable to create file: %s", randFileName)
+}
+
+func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
+	t.Parallel()
+	rand.Seed(time.Now().UnixNano())
+	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
+	err := ioutil.WriteFile(randFileName, []byte("foo"), os.FileMode(0444))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		os.Remove(randFileName)
+	})
+	payload := "abcd"
+	err = WriteFileWithPerms(randFileName, payload, os.FileMode(0444))
+	require.NoError(t, err)
+	data, err := ioutil.ReadFile(randFileName)
+	require.NoError(t, err)
+	require.Equal(t, payload, string(data))
+}
+
+func TestWriteFileWithPerms(t *testing.T) {
+	t.Parallel()
+	payload := "foo-foo-foo-foo"
+	rand.Seed(time.Now().UnixNano())
+	randFileName := fmt.Sprintf("/tmp/%d", rand.Int())
+	t.Cleanup(func() {
+		os.Remove(randFileName)
+	})
+	// Issue the write.
+	mode := os.FileMode(0444)
+	err := WriteFileWithPerms(randFileName, payload, mode)
+	require.NoError(t, err)
+	file, err := os.Stat(randFileName)
+	require.NoError(t, err)
+	// Validate the size and mode are correct.
+	require.Equal(t, file.Mode(), mode)
+	require.Equal(t, file.Size(), int64(len(payload)))
+	// Validate the data was written correctly.
+	data, err := ioutil.ReadFile(randFileName)
+	require.NoError(t, err)
+	require.Equal(t, payload, string(data))
 }
 
 // startMockServer starts an httptest server used to mock a Consul server's
