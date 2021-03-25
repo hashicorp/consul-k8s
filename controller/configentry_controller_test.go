@@ -27,7 +27,7 @@ import (
 const datacenterName = "datacenter"
 
 type testReconciler interface {
-	Reconcile(req ctrl.Request) (ctrl.Result, error)
+	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
 func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
@@ -391,7 +391,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -408,12 +408,12 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				req.True(written)
 			}
 
-			r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
+			r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
 			}
-			resp, err := r.Reconcile(ctrl.Request{
+			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.NoError(err)
@@ -425,7 +425,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			c.compare(t, cfg)
 
 			// Check that the status is "synced".
-			err = client.Get(ctx, namespacedName, c.configEntryResource)
+			err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
 			req.NoError(err)
 			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
 
@@ -830,7 +830,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryResource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -864,15 +864,15 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Name:      c.configEntryResource.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
-				err = client.Get(ctx, namespacedName, c.configEntryResource)
+				err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
 				req.NoError(err)
 
 				// Update the entry in Kube and run reconcile.
 				c.updateF(c.configEntryResource)
-				err := client.Update(ctx, c.configEntryResource)
+				err := fakeClient.Update(ctx, c.configEntryResource)
 				req.NoError(err)
-				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
-				resp, err := r.Reconcile(ctrl.Request{
+				r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
+				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -1200,7 +1200,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			client := fake.NewFakeClientWithScheme(s, c.configEntryResourceWithDeletion)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -1233,8 +1233,8 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
-				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
-				resp, err := r.Reconcile(ctrl.Request{
+				r := c.reconciler(fakeClient, consulClient, logrtest.TestLogger{T: t})
+				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -1267,7 +1267,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-	client := fake.NewFakeClientWithScheme(s, svcDefaults)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
 	// Construct a Consul client that will error by giving it
 	// an unresolvable address.
@@ -1276,7 +1276,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	})
 	req.NoError(err)
 	reconciler := &ServiceDefaultsController{
-		Client: client,
+		Client: fakeClient,
 		Log:    logrtest.TestLogger{T: t},
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClient:   consulClient,
@@ -1289,7 +1289,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 		Namespace: kubeNS,
 		Name:      svcDefaults.KubernetesName(),
 	}
-	resp, err := reconciler.Reconcile(ctrl.Request{
+	resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 		NamespacedName: namespacedName,
 	})
 	req.Error(err)
@@ -1299,7 +1299,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	req.False(resp.Requeue)
 
 	// Check that the status is "synced=false".
-	err = client.Get(ctx, namespacedName, svcDefaults)
+	err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 	req.NoError(err)
 	status, reason, errMsg := svcDefaults.SyncedCondition()
 	req.Equal(corev1.ConditionFalse, status)
@@ -1335,7 +1335,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 
 	// The config entry exists in kube but its status will be nil.
-	client := fake.NewFakeClientWithScheme(s, svcDefaults)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
 	consul, err := testutil.NewTestServerConfigT(t, nil)
 	req.NoError(err)
@@ -1347,7 +1347,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	})
 	req.NoError(err)
 	reconciler := &ServiceDefaultsController{
-		Client: client,
+		Client: fakeClient,
 		Log:    logrtest.TestLogger{T: t},
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClient:   consulClient,
@@ -1364,14 +1364,14 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 		Namespace: kubeNS,
 		Name:      svcDefaults.KubernetesName(),
 	}
-	resp, err := reconciler.Reconcile(ctrl.Request{
+	resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 		NamespacedName: namespacedName,
 	})
 	req.NoError(err)
 	req.False(resp.Requeue)
 
 	// Check that the status is now "synced".
-	err = client.Get(ctx, namespacedName, svcDefaults)
+	err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 	req.NoError(err)
 	req.Equal(corev1.ConditionTrue, svcDefaults.SyncedConditionStatus())
 }
@@ -1412,7 +1412,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-			client := fake.NewFakeClientWithScheme(s, svcDefaults)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -1439,19 +1439,19 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 					Name:      svcDefaults.KubernetesName(),
 				}
 				// First get it so we have the latest revision number.
-				err = client.Get(ctx, namespacedName, svcDefaults)
+				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 				req.NoError(err)
 
 				// Attempt to create the entry in Kube and run reconcile.
 				reconciler := ServiceDefaultsController{
-					Client: client,
+					Client: fakeClient,
 					Log:    logrtest.TestLogger{T: t},
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClient:   consulClient,
 						DatacenterName: datacenterName,
 					},
 				}
-				resp, err := reconciler.Reconcile(ctrl.Request{
+				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.EqualError(err, c.expErr)
@@ -1463,7 +1463,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				req.Equal(cfg.GetMeta()[common.DatacenterKey], c.datacenterAnnotation)
 
 				// Check that the status is "synced=false".
-				err = client.Get(ctx, namespacedName, svcDefaults)
+				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 				req.NoError(err)
 				status, reason, errMsg := svcDefaults.SyncedCondition()
 				req.Equal(corev1.ConditionFalse, status)
@@ -1501,7 +1501,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
-			client := fake.NewFakeClientWithScheme(s, svcDefaultsWithDeletion)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
 
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			req.NoError(err)
@@ -1513,7 +1513,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			})
 			req.NoError(err)
 			reconciler := &ServiceDefaultsController{
-				Client: client,
+				Client: fakeClient,
 				Log:    logrtest.TestLogger{T: t},
 				ConfigEntryController: &ConfigEntryController{
 					ConsulClient:   consulClient,
@@ -1537,7 +1537,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      svcDefaultsWithDeletion.KubernetesName(),
 				}
-				resp, err := reconciler.Reconcile(ctrl.Request{
+				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -1549,7 +1549,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 
 				// Check that the resource is deleted from cluster.
 				svcDefault := &v1alpha1.ServiceDefaults{}
-				_ = client.Get(ctx, namespacedName, svcDefault)
+				_ = fakeClient.Get(ctx, namespacedName, svcDefault)
 				require.Empty(t, svcDefault.Finalizers())
 			}
 		})
@@ -1588,7 +1588,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 		},
 	}
 
-	client := fake.NewFakeClientWithScheme(s, defaults, splitter)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(defaults, splitter).Build()
 
 	consul, err := testutil.NewTestServerConfigT(t, nil)
 	require.NoError(t, err)
@@ -1603,7 +1603,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	logger := logrtest.TestLogger{T: t}
 
 	svcDefaultsReconciler := ServiceDefaultsController{
-		Client: client,
+		Client: fakeClient,
 		Log:    logger,
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClient:   consulClient,
@@ -1611,7 +1611,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 		},
 	}
 	svcSplitterReconciler := ServiceSplitterController{
-		Client: client,
+		Client: fakeClient,
 		Log:    logger,
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClient:   consulClient,
@@ -1630,28 +1630,28 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	}
 
 	// Create config entries for service-defaults and service-splitter.
-	resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
-	resp, err = svcSplitterReconciler.Reconcile(ctrl.Request{NamespacedName: splitterNamespacedName})
+	resp, err = svcSplitterReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: splitterNamespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
-	err = client.Get(ctx, defaultsNamespacedName, defaults)
+	err = fakeClient.Get(ctx, defaultsNamespacedName, defaults)
 	require.NoError(t, err)
 
 	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
 	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = client.Update(ctx, defaults)
+	err = fakeClient.Update(ctx, defaults)
 	require.NoError(t, err)
 
 	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
-	resp, err = svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	resp, err = svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 	require.EqualError(t, err, "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)")
 	require.False(t, resp.Requeue)
 
-	err = client.Get(ctx, defaultsNamespacedName, defaults)
+	err = fakeClient.Get(ctx, defaultsNamespacedName, defaults)
 	require.NoError(t, err)
 
 	// Ensure the status of the resource is updated to display failure reason.
@@ -1725,7 +1725,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
 
-			client := fake.NewFakeClientWithScheme(s, &c.KubeResource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
 			consul, err := testutil.NewTestServerConfigT(t, nil)
 			require.NoError(t, err)
 			defer consul.Stop()
@@ -1744,7 +1744,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			// Set up the reconciler.
 			logger := logrtest.TestLogger{T: t}
 			svcDefaultsReconciler := ServiceDefaultsController{
-				Client: client,
+				Client: fakeClient,
 				Log:    logger,
 				ConfigEntryController: &ConfigEntryController{
 					ConsulClient:   consulClient,
@@ -1758,7 +1758,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			}
 
 			// Trigger the reconciler.
-			resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+			resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 			if c.ExpErr != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), c.ExpErr)
@@ -1768,7 +1768,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			}
 
 			entryAfterReconcile := &v1alpha1.ServiceDefaults{}
-			err = client.Get(ctx, defaultsNamespacedName, entryAfterReconcile)
+			err = fakeClient.Get(ctx, defaultsNamespacedName, entryAfterReconcile)
 			require.NoError(t, err)
 
 			syncCondition := entryAfterReconcile.GetCondition(v1alpha1.ConditionSynced)

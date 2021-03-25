@@ -23,15 +23,15 @@ type ServiceRouterController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters/status,verbs=get;update;patch
 
-func (r *ServiceRouterController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.ServiceRouter{})
+func (r *ServiceRouterController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ServiceRouter{})
 }
 
 func (r *ServiceRouterController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
 
-func (r *ServiceRouterController) UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
+func (r *ServiceRouterController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 

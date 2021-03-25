@@ -23,15 +23,15 @@ type ServiceDefaultsController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicedefaults,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicedefaults/status,verbs=get;update;patch
 
-func (r *ServiceDefaultsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, req, &consulv1alpha1.ServiceDefaults{})
+func (r *ServiceDefaultsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ServiceDefaults{})
 }
 
 func (r *ServiceDefaultsController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
 
-func (r *ServiceDefaultsController) UpdateStatus(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
+func (r *ServiceDefaultsController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return r.Status().Update(ctx, obj, opts...)
 }
 
