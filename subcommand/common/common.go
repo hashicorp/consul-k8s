@@ -86,8 +86,7 @@ func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 	// os.WriteFile truncates existing files and overwrites them, but only if they are writable.
 	// If the file exists it will already likely be read-only. Remove it first.
 	if _, err := os.Stat(outputFile); err == nil {
-		err = os.Remove(outputFile)
-		if err != nil {
+		if err = os.Remove(outputFile); err != nil {
 			return fmt.Errorf("unable to delete existing file: %s", err)
 		}
 	}
