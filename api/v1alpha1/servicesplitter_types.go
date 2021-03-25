@@ -116,7 +116,7 @@ func (in *ServiceSplitter) SetSyncedCondition(status corev1.ConditionStatus, rea
 	}
 }
 
-func (in *ServiceSplitter) SetLastSyncedTime(time metav1.Time) {
+func (in *ServiceSplitter) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

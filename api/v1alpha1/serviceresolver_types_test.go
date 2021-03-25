@@ -374,9 +374,9 @@ func TestServiceResolver_SetSyncedCondition(t *testing.T) {
 func TestServiceResolver_SetLastSyncedTime(t *testing.T) {
 	serviceResolver := &ServiceResolver{}
 	syncedTime := metav1.NewTime(time.Now())
-	serviceResolver.SetLastSyncedTime(syncedTime)
+	serviceResolver.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, serviceResolver.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, serviceResolver.Status.LastSyncedTime)
 }
 
 func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {

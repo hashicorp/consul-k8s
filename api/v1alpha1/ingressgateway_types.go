@@ -170,7 +170,7 @@ func (in *IngressGateway) SetSyncedCondition(status corev1.ConditionStatus, reas
 	}
 }
 
-func (in *IngressGateway) SetLastSyncedTime(time metav1.Time) {
+func (in *IngressGateway) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

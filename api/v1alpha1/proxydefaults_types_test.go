@@ -290,9 +290,9 @@ func TestProxyDefaults_SetSyncedCondition(t *testing.T) {
 func TestProxyDefaults_SetLastSyncedTime(t *testing.T) {
 	proxyDefaults := &ProxyDefaults{}
 	syncedTime := metav1.NewTime(time.Now())
-	proxyDefaults.SetLastSyncedTime(syncedTime)
+	proxyDefaults.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, proxyDefaults.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, proxyDefaults.Status.LastSyncedTime)
 }
 
 func TestProxyDefaults_GetSyncedConditionStatus(t *testing.T) {

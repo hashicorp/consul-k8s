@@ -187,9 +187,9 @@ func TestServiceSplitter_SetSyncedCondition(t *testing.T) {
 func TestServiceSplitter_SetLastSyncedTime(t *testing.T) {
 	serviceSplitter := &ServiceSplitter{}
 	syncedTime := metav1.NewTime(time.Now())
-	serviceSplitter.SetLastSyncedTime(syncedTime)
+	serviceSplitter.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, serviceSplitter.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, serviceSplitter.Status.LastSyncedTime)
 }
 
 func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {

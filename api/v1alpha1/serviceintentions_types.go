@@ -189,7 +189,7 @@ func (in *ServiceIntentions) SetSyncedCondition(status corev1.ConditionStatus, r
 	}
 }
 
-func (in *ServiceIntentions) SetLastSyncedTime(time metav1.Time) {
+func (in *ServiceIntentions) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

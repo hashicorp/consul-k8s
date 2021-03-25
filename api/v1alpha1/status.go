@@ -77,7 +77,7 @@ type Status struct {
 
 	// LastSyncedTime is the last time the resource successfully synced with Consul.
 	// +optional
-	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty" description:"last time the condition transitioned from one status to another"`
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty" description:"last time the condition transitioned from one status to another"`
 }
 
 func (s *Status) GetCondition(t ConditionType) *Condition {
