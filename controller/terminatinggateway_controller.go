@@ -24,7 +24,7 @@ type TerminatingGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways/status,verbs=get;update;patch
 
 func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, ctx, req, &consulv1alpha1.TerminatingGateway{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.TerminatingGateway{})
 }
 
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {

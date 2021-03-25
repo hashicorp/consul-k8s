@@ -24,7 +24,7 @@ type ProxyDefaultsController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=proxydefaults/status,verbs=get;update;patch
 
 func (r *ProxyDefaultsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, ctx, req, &consulv1alpha1.ProxyDefaults{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ProxyDefaults{})
 }
 
 func (r *ProxyDefaultsController) Logger(name types.NamespacedName) logr.Logger {

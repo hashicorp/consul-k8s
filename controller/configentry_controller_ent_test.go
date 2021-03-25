@@ -202,7 +202,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetController(
 					fakeClient,
@@ -468,7 +468,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,
@@ -721,7 +721,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				})
 				req.NoError(err)
 
-				fakeClient := fake.NewFakeClientWithScheme(s, in.KubeResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,

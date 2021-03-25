@@ -85,7 +85,7 @@ func TestValidateProxyDefault(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ProxyDefaults{}, &ProxyDefaultsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 

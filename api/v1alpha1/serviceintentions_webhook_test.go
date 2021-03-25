@@ -243,7 +243,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
@@ -430,7 +430,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
@@ -589,7 +589,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				require.NoError(t, err)
 				s := runtime.NewScheme()
 				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-				client := fake.NewFakeClientWithScheme(s)
+				client := fake.NewClientBuilder().WithScheme(s).Build()
 				decoder, err := admission.NewDecoder(s)
 				require.NoError(t, err)
 

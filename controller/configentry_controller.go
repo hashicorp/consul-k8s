@@ -83,13 +83,8 @@ type ConfigEntryController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *ConfigEntryController) ReconcileEntry(
-	crdCtrl Controller,
-	ctx context.Context,
-	req ctrl.Request,
-	configEntry common.ConfigEntryResource) (ctrl.Result, error) {
+func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
-
 	err := crdCtrl.Get(ctx, req.NamespacedName, configEntry)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -100,11 +95,11 @@ func (r *ConfigEntryController) ReconcileEntry(
 
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
 
-	if configEntry.GetObjectMeta().DeletionTimestamp.IsZero() {
+	if configEntry.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
+		if !containsString(configEntry.GetFinalizers(), FinalizerName) {
 			configEntry.AddFinalizer(FinalizerName)
 			if err := r.syncUnknown(ctx, crdCtrl, configEntry); err != nil {
 				return ctrl.Result{}, err
@@ -112,7 +107,7 @@ func (r *ConfigEntryController) ReconcileEntry(
 		}
 	} else {
 		// The object is being deleted
-		if containsString(configEntry.GetObjectMeta().Finalizers, FinalizerName) {
+		if containsString(configEntry.GetFinalizers(), FinalizerName) {
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
 			entry, _, err := r.ConsulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{

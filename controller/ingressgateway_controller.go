@@ -24,7 +24,7 @@ type IngressGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ingressgateways/status,verbs=get;update;patch
 
 func (r *IngressGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, ctx, req, &consulv1alpha1.IngressGateway{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.IngressGateway{})
 }
 
 func (r *IngressGatewayController) Logger(name types.NamespacedName) logr.Logger {

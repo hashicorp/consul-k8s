@@ -24,7 +24,7 @@ type ServiceIntentionsController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=serviceintentions/status,verbs=get;update;patch
 
 func (r *ServiceIntentionsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(r, ctx, req, &consulv1alpha1.ServiceIntentions{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ServiceIntentions{})
 }
 
 func (r *ServiceIntentionsController) Logger(name types.NamespacedName) logr.Logger {
