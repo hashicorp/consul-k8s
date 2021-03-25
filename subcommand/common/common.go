@@ -81,7 +81,7 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 	return nil
 }
 
-// WriteFileWithPerms will write payload as the contents of the outputFile and set permissions.
+// WriteFileWithPerms will write payload as the contents of the outputFile and set permissions after writing the contents. This function is necessary since using ioutil.WriteFile() alone will create the new file with the requested permissions prior to actually writing the file, so you can't set read-only permissions.
 func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 	// os.WriteFile truncates existing files and overwrites them, but only if they are writable.
 	// If the file exists it will already likely be read-only. Remove it first.
