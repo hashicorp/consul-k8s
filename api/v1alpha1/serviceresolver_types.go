@@ -241,7 +241,7 @@ func (in *ServiceResolver) SetSyncedCondition(status corev1.ConditionStatus, rea
 	}
 }
 
-func (in *ServiceResolver) SetLastSyncedTime(time metav1.Time) {
+func (in *ServiceResolver) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

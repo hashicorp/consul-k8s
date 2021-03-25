@@ -138,7 +138,7 @@ func (in *ProxyDefaults) SetSyncedCondition(status corev1.ConditionStatus, reaso
 	}
 }
 
-func (in *ProxyDefaults) SetLastSyncedTime(time metav1.Time) {
+func (in *ProxyDefaults) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

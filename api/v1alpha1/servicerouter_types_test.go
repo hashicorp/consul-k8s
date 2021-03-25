@@ -320,9 +320,9 @@ func TestServiceRouter_SetSyncedCondition(t *testing.T) {
 func TestServiceRouter_SetLastSyncedTime(t *testing.T) {
 	serviceRouter := &ServiceRouter{}
 	syncedTime := metav1.NewTime(time.Now())
-	serviceRouter.SetLastSyncedTime(syncedTime)
+	serviceRouter.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, serviceRouter.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, serviceRouter.Status.LastSyncedTime)
 }
 
 func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {

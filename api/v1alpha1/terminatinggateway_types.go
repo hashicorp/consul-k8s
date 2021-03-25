@@ -134,7 +134,7 @@ func (in *TerminatingGateway) SetSyncedCondition(status corev1.ConditionStatus, 
 	}
 }
 
-func (in *TerminatingGateway) SetLastSyncedTime(time metav1.Time) {
+func (in *TerminatingGateway) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 

@@ -393,9 +393,9 @@ func TestTerminatingGateway_SetSyncedCondition(t *testing.T) {
 func TestTerminatingGateway_SetLastSyncedTime(t *testing.T) {
 	terminatingGateway := &TerminatingGateway{}
 	syncedTime := metav1.NewTime(time.Now())
-	terminatingGateway.SetLastSyncedTime(syncedTime)
+	terminatingGateway.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, syncedTime, terminatingGateway.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, terminatingGateway.Status.LastSyncedTime)
 }
 
 func TestTerminatingGateway_GetSyncedConditionStatus(t *testing.T) {
