@@ -134,7 +134,7 @@ func TestWriteFileWithPerms_OutputFileExists(t *testing.T) {
 	require.NoError(t, err)
 	data, err := ioutil.ReadFile(randFileName)
 	require.NoError(t, err)
-	require.Contains(t, string(data), payload)
+	require.Equal(t, payload, string(data))
 }
 
 func TestWriteFileWithPerms(t *testing.T) {
@@ -157,7 +157,7 @@ func TestWriteFileWithPerms(t *testing.T) {
 	// Validate the data was written correctly.
 	data, err := ioutil.ReadFile(randFileName)
 	require.NoError(t, err)
-	require.Contains(t, string(data), payload)
+	require.Equal(t, payload, string(data))
 }
 
 // startMockServer starts an httptest server used to mock a Consul server's

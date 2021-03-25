@@ -83,16 +83,15 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 
 // WriteFileWithPerms will write payload as the contents of the outputFile and set permissions.
 func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
-	// ioutil.WriteFile truncates existing files or if they do not exist writes them as FileMode(0666), but only if
-	// the file is currently writable. If the file exists it will already likely be read-only. Remove it.
+	// os.WriteFile truncates existing files and overwrites them, but only if they are writable.
+	// If the file exists it will already likely be read-only. Remove it first.
 	if _, err := os.Stat(outputFile); err == nil {
 		err = os.Remove(outputFile)
 		if err != nil {
-			return fmt.Errorf("unable to delete existing token file: %s", err)
+			return fmt.Errorf("unable to delete existing file: %s", err)
 		}
 	}
-	err := ioutil.WriteFile(outputFile, []byte(payload), os.FileMode(0666))
-	if err != nil {
+	if err := ioutil.WriteFile(outputFile, []byte(payload), os.ModePerm); err != nil {
 		return fmt.Errorf("unable to write file: %s", err)
 	}
 	return os.Chmod(outputFile, mode)

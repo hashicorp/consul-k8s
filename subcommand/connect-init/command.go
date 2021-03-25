@@ -3,6 +3,7 @@ package connectinit
 import (
 	"flag"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -157,7 +158,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
-	err = common.WriteFileWithPerms(c.proxyIDFile, proxyID, 0444)
+	err = common.WriteFileWithPerms(c.proxyIDFile, proxyID, os.FileMode(0444))
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to write proxy ID to file: %s", err))
 		return 1
