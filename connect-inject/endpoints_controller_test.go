@@ -16,8 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 func TestShouldIgnore(t *testing.T) {
@@ -609,7 +609,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), fakeClientPod)
-			client := fake.NewFakeClient(k8sObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -634,7 +634,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			// Create the endpoints controller
 			ep := &EndpointsController{
-				Client:                client,
+				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
 				ConsulPort:            consulPort,
@@ -649,7 +649,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				Name:      "service-created",
 			}
 
-			resp, err := ep.Reconcile(ctrl.Request{
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			require.NoError(t, err)
@@ -1212,7 +1212,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), fakeClientPod)
-			client := fake.NewFakeClient(k8sObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -1237,7 +1237,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 
 			// Create the endpoints controller
 			ep := &EndpointsController{
-				Client:                client,
+				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
 				ConsulPort:            consulPort,
@@ -1252,7 +1252,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				Name:      "service-updated",
 			}
 
-			resp, err := ep.Reconcile(ctrl.Request{
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			require.NoError(t, err)
@@ -1348,7 +1348,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Create fake k8s client
-			client := fake.NewFakeClient(fakeClientPod)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod).Build()
 
 			// Create test consul server
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -1373,7 +1373,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 			// Create the endpoints controller
 			ep := &EndpointsController{
-				Client:                client,
+				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
 				ConsulClient:          consulClient,
 				ConsulPort:            consulPort,
@@ -1389,7 +1389,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				Namespace: "default",
 				Name:      "service-deleted",
 			}
-			resp, err := ep.Reconcile(ctrl.Request{
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			require.NoError(t, err)
@@ -1410,11 +1410,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
-		meta     metav1.Object
+		object   client.Object
 		expected bool
 	}{
 		"label[app]=consul label[component]=client label[release] consul": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "consul",
@@ -1426,11 +1426,11 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: true,
 		},
 		"no labels": {
-			meta:     &corev1.Pod{},
+			object:   &corev1.Pod{},
 			expected: false,
 		},
 		"label[app] empty": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"component": "client",
@@ -1441,7 +1441,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[component] empty": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":     "consul",
@@ -1452,7 +1452,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[release] empty": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "consul",
@@ -1463,7 +1463,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[app]!=consul label[component]=client label[release]=consul": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "not-consul",
@@ -1475,7 +1475,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[component]!=client label[app]=consul label[release]=consul": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "consul",
@@ -1487,7 +1487,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[release]!=consul label[app]=consul label[component]=client": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "consul",
@@ -1499,7 +1499,7 @@ func TestFilterAgentPods(t *testing.T) {
 			expected: false,
 		},
 		"label[app]!=consul label[component]!=client label[release]!=consul": {
-			meta: &corev1.Pod{
+			object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":       "not-consul",
@@ -1518,7 +1518,7 @@ func TestFilterAgentPods(t *testing.T) {
 				ReleaseName: "consul",
 			}
 
-			result := controller.filterAgentPods(test.meta, nil)
+			result := controller.filterAgentPods(test.object)
 			require.Equal(t, test.expected, result)
 		})
 	}
@@ -1969,7 +1969,6 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
 			logger := logrtest.TestLogger{T: t}
 			s := runtime.NewScheme()
 			s.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &corev1.Endpoints{}, &corev1.EndpointsList{})
@@ -1981,19 +1980,18 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 				objects = append(objects, endpoint)
 			}
 
-			fakeClient := fake.NewFakeClientWithScheme(s, objects...)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objects...).Build()
 
 			controller := &EndpointsController{
 				Client: fakeClient,
-				Ctx:    ctx,
 				Scheme: s,
 				Log:    logger,
 			}
 			var requests []ctrl.Request
 			if test.agentPod != nil {
-				requests = controller.requestsForRunningAgentPods(handler.MapObject{Meta: test.agentPod})
+				requests = controller.requestsForRunningAgentPods(test.agentPod)
 			} else {
-				requests = controller.requestsForRunningAgentPods(handler.MapObject{Meta: minimal()})
+				requests = controller.requestsForRunningAgentPods(minimal())
 			}
 			require.ElementsMatch(t, requests, test.expectedRequests)
 		})

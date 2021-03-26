@@ -415,9 +415,9 @@ func (c *Command) Run(args []string) int {
 			DenyK8sNamespacesSet:  denyK8sNamespaces,
 			Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
 			Scheme:                mgr.GetScheme(),
-			Ctx:                   ctx,
 			ReleaseName:           c.flagReleaseName,
 			ReleaseNamespace:      c.flagReleaseNamespace,
+			Context:               ctx,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 			return 1
@@ -464,7 +464,7 @@ func (c *Command) Run(args []string) int {
 			// This could be due to an interrupt signal or if any other component did not start
 			// successfully. In those cases, we want to make sure that this controller is no longer
 			// running.
-			if err := mgr.Start(ctx.Done()); err != nil {
+			if err := mgr.Start(ctx); err != nil {
 				setupLog.Error(err, "problem running manager")
 				// Use an existing channel for ctrl exists in case manager failed to start properly.
 				ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
