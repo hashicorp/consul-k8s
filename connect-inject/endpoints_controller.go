@@ -49,24 +49,24 @@ type EndpointsController struct {
 	ReleaseNamespace string
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
-	Ctx              context.Context
+	context.Context
 }
 
-func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var serviceEndpoints corev1.Endpoints
 
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
-	err := r.Client.Get(r.Ctx, req.NamespacedName, &serviceEndpoints)
+	err := r.Client.Get(ctx, req.NamespacedName, &serviceEndpoints)
 
 	// If the endpoints object has been deleted (and we get an IsNotFound
 	// error), we need to deregister all instances in Consul for that service.
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		if err = r.deregisterServiceOnAllAgents(req.Name, req.Namespace, nil); err != nil {
+		if err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -93,7 +93,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				// Get pod associated with this address.
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				if err = r.Client.Get(r.Ctx, objectKey, &pod); err != nil {
+				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 					r.Log.Error(err, "failed to get pod from Kubernetes", "pod-name", address.TargetRef.Name)
 					return ctrl.Result{}, err
 				}
@@ -139,7 +139,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	if err = r.deregisterServiceOnAllAgents(serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
+	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
 		r.Log.Error(err, "failed to deregister service instances on all agents", "k8s-service-name", serviceEndpoints.Name, "k8s-namespace", serviceEndpoints.Namespace)
 		return ctrl.Result{}, err
 	}
@@ -156,7 +156,7 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Endpoints{}).
 		Watches(
 			&source.Kind{Type: &corev1.Pod{}},
-			&handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(r.requestsForRunningAgentPods)},
+			handler.EnqueueRequestsFromMapFunc(r.requestsForRunningAgentPods),
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterAgentPods)),
 		).Complete(r)
 }
@@ -280,7 +280,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
+func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
 
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	list := corev1.PodList{}
@@ -292,7 +292,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(k8sSvcName, k8sSvcNam
 			"release":   r.ReleaseName,
 		}),
 	}
-	if err := r.Client.List(r.Ctx, &list, &listOptions); err != nil {
+	if err := r.Client.List(ctx, &list, &listOptions); err != nil {
 		r.Log.Error(err, "failed to get agent pods from Kubernetes")
 		return err
 	}
@@ -445,8 +445,8 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 // which in this case are Pods. It only returns true if the Pod is a Consul Client Agent Pod. It reads the labels
 // from the meta of the resource and uses the values of the "app" and "component" label to validate that
 // the Pod is a Consul Client Agent.
-func (r EndpointsController) filterAgentPods(meta metav1.Object, object runtime.Object) bool {
-	podLabels := meta.GetLabels()
+func (r EndpointsController) filterAgentPods(object client.Object) bool {
+	podLabels := object.GetLabels()
 	app, ok := podLabels["app"]
 	if !ok {
 		return false
@@ -473,10 +473,10 @@ func (r EndpointsController) filterAgentPods(meta metav1.Object, object runtime.
 // are on the same node as the new Consul Agent pod. It receives a Pod Object which is a
 // Consul Agent that has been filtered by filterAgentPods and only enqueues endpoints
 // for client agent pods where the Ready condition is true.
-func (r EndpointsController) requestsForRunningAgentPods(object handler.MapObject) []ctrl.Request {
+func (r EndpointsController) requestsForRunningAgentPods(object client.Object) []ctrl.Request {
 	var consulClientPod corev1.Pod
-	r.Log.Info("received update for consulClientPod", "podName", object.Meta.GetName())
-	err := r.Client.Get(r.Ctx, types.NamespacedName{Name: object.Meta.GetName(), Namespace: object.Meta.GetNamespace()}, &consulClientPod)
+	r.Log.Info("received update for consulClientPod", "podName", object.GetName())
+	err := r.Client.Get(r.Context, types.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()}, &consulClientPod)
 	if k8serrors.IsNotFound(err) {
 		// Ignore if consulClientPod is not found.
 		return []ctrl.Request{}
@@ -503,7 +503,7 @@ func (r EndpointsController) requestsForRunningAgentPods(object handler.MapObjec
 
 	// Get the list of all endpoints.
 	var endpointsList corev1.EndpointsList
-	err = r.Client.List(r.Ctx, &endpointsList)
+	err = r.Client.List(r.Context, &endpointsList)
 	if err != nil {
 		r.Log.Error(err, "failed to list endpoints")
 		return []ctrl.Request{}
