@@ -163,7 +163,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-				"-skip-service-registration-polling=false"}
+			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
 			if test.tls {
 				flags = append(flags, "-ca-file", caFile)
@@ -258,8 +258,10 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			}
 			// We build the http-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.
-			flags := []string{"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
-			flags = append(flags, defaultTestFlags...)
+			flags := []string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
 			if test.tls {
 				flags = append(flags, "-ca-file", caFile)
@@ -458,7 +460,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 				"-http-addr", server.HTTPAddr,
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
-				"-skip-service-registration-polling=false",
 			}
 
 			code := cmd.Run(flags)
@@ -500,8 +501,11 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		proxyIDFile:                        proxyFile,
 		serviceRegistrationPollingAttempts: 10,
 	}
-	flags := []string{"-http-addr", server.HTTPAddr}
-	flags = append(flags, defaultTestFlags...)
+	flags := []string{
+		"-pod-name", testPodName,
+		"-pod-namespace", testPodNamespace,
+		"-http-addr", server.HTTPAddr,
+	}
 	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
 	// Validate that we hit the retry logic when the service was registered but the proxy service is not registered yet.
@@ -540,8 +544,11 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		serviceRegistrationPollingAttempts: 3,
 	}
 	expErr := fmt.Sprintf("Unable to write proxy ID to file: unable to write file: open %s: no such file or directory\n", randFileName)
-	flags := []string{"-http-addr", server.HTTPAddr}
-	flags = append(flags, defaultTestFlags...)
+	flags := []string{
+		"-pod-name", testPodName,
+		"-pod-namespace", testPodNamespace,
+		"-http-addr", server.HTTPAddr,
+	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
 	require.Equal(t, expErr, ui.ErrorWriter.String())
@@ -600,7 +607,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			flags := []string{
 				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
-				"-skip-service-registration-polling=false", "-http-addr", serverURL.String()}
+				"-http-addr", serverURL.String()}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
 			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
@@ -668,7 +675,6 @@ func TestRun_LoginWithRetries(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
-				"-skip-service-registration-polling=false",
 				"-http-addr", serverURL.String()})
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
@@ -859,8 +865,8 @@ var (
 		Name: "counting-sidecar-proxy",
 		Kind: "connect-proxy",
 		Proxy: &api.AgentServiceConnectProxyConfig{
-			DestinationServiceName: "foo",
-			DestinationServiceID:   "foo",
+			DestinationServiceName: "counting",
+			DestinationServiceID:   "counting-counting",
 			Config:                 nil,
 			Upstreams:              nil,
 		},
@@ -871,5 +877,4 @@ var (
 			metaKeyKubeNS:  "default-ns",
 		},
 	}
-	defaultTestFlags = []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-skip-service-registration-polling=false"}
 )

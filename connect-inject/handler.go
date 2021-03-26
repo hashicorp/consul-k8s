@@ -23,90 +23,6 @@ import (
 )
 
 const (
-	// annotationStatus is the key of the annotation that is added to
-	// a pod after an injection is done.
-	annotationStatus = "consul.hashicorp.com/connect-inject-status"
-
-	// annotationInject is the key of the annotation that controls whether
-	// injection is explicitly enabled or disabled for a pod. This should
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
-	annotationInject = "consul.hashicorp.com/connect-inject"
-
-	// annotationService is the name of the service to proxy. This defaults
-	// to the name of the first container.
-	annotationService = "consul.hashicorp.com/connect-service"
-
-	// annotationPort is the name or value of the port to proxy incoming
-	// connections to.
-	annotationPort = "consul.hashicorp.com/connect-service-port"
-
-	// annotationProtocol contains the protocol that should be used for
-	// the service that is being injected. Valid values are "http", "http2",
-	// "grpc" and "tcp".
-	//
-	// Deprecated: This annotation is no longer supported.
-	annotationProtocol = "consul.hashicorp.com/connect-service-protocol"
-
-	// annotationUpstreams is a list of upstreams to register with the
-	// proxy in the format of `<service-name>:<local-port>,...`. The
-	// service name should map to a Consul service namd and the local port
-	// is the local port in the pod that the listener will bind to. It can
-	// be a named port.
-	annotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
-
-	// annotationTags is a list of tags to register with the service
-	// this is specified as a comma separated list e.g. abc,123
-	annotationTags = "consul.hashicorp.com/service-tags"
-
-	// annotationConnectTags is a list of tags to register with the service
-	// this is specified as a comma separated list e.g. abc,123
-	//
-	// Deprecated: 'consul.hashicorp.com/service-tags' is the new annotation
-	// and should be used instead. We made this change because the tagging is
-	// not specific to connect as both the connect proxy *and* the Consul
-	// service that gets registered is tagged.
-	annotationConnectTags = "consul.hashicorp.com/connect-service-tags"
-
-	// annotationMeta is a list of metadata key/value pairs to add to the service
-	// registration. This is specified in the format `<key>:<value>`
-	// e.g. consul.hashicorp.com/service-meta-foo:bar
-	annotationMeta = "consul.hashicorp.com/service-meta-"
-
-	// annotationSyncPeriod controls the -sync-period flag passed to the
-	// consul-k8s consul-sidecar command. This flag controls how often the
-	// service is synced (i.e. re-registered) with the local agent.
-	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
-
-	// annotations for sidecar proxy resource limits
-	annotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
-	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
-	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
-	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
-
-	// annotations for metrics to configure where Prometheus scrapes
-	// metrics from, whether to run a merged metrics endpoint on the consul
-	// sidecar, and configure the connect service metrics.
-	annotationEnableMetrics        = "consul.hashicorp.com/enable-metrics"
-	annotationEnableMetricsMerging = "consul.hashicorp.com/enable-metrics-merging"
-	annotationMergedMetricsPort    = "consul.hashicorp.com/merged-metrics-port"
-	annotationPrometheusScrapePort = "consul.hashicorp.com/prometheus-scrape-port"
-	annotationPrometheusScrapePath = "consul.hashicorp.com/prometheus-scrape-path"
-	annotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
-	annotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
-
-	// annotationEnvoyExtraArgs is a space-separated list of arguments to be passed to the
-	// envoy binary. See list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
-	// e.g. consul.hashicorp.com/envoy-extra-args: "--log-level debug --disable-hot-restart"
-	// The arguments passed in via this annotation will take precendence over arguments
-	// passed via the -envoy-extra-args flag.
-	annotationEnvoyExtraArgs = "consul.hashicorp.com/envoy-extra-args"
-
-	// injected is used as the annotation value for annotationInjected
-	injected = "injected"
-
-	// annotationConsulNamespace is the Consul namespace the service is registered into.
-	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
-
 	defaultServiceMetricsPath = "/metrics"
 )
 
@@ -291,27 +207,39 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 	// Add the Envoy and Consul sidecars.
-	esContainer, err := h.envoySidecar(pod, req.Namespace)
+	envoySidecar, err := h.envoySidecar(pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection sidecar container", "err", err, "Request Name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 	}
-	pod.Spec.Containers = append(pod.Spec.Containers, esContainer)
+	pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 
-	connectContainer, err := h.consulSidecar(pod)
+	// Now that the consul-sidecar no longer needs to re-register services periodically
+	// (that functionality lives in the endpoints-controller),
+	// we only need the consul sidecar to run the metrics merging server.
+	// First, determine if we need to run the metrics merging server.
+	shouldRunMetricsMerging, err := h.shouldRunMergedMetricsServer(pod)
 	if err != nil {
-		h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
+		h.Log.Error("Error determining if metrics merging server should be run", "err", err, "Request Name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if metrics merging server should be run: %s", err))
 	}
-	pod.Spec.Containers = append(pod.Spec.Containers, connectContainer)
+
+	// Add the consul-sidecar only if we need to run the metrics merging server.
+	if shouldRunMetricsMerging {
+		consulSidecar, err := h.consulSidecar(pod)
+		if err != nil {
+			h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, consulSidecar)
+	}
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[annotationStatus] = injected
 
 	// Add annotations for metrics.
-	err = h.prometheusAnnotations(&pod)
-	if err != nil {
+	if err = h.prometheusAnnotations(&pod); err != nil {
 		h.Log.Error("Error configuring prometheus annotations", "err", err, "Request Name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring prometheus annotations: %s", err))
 	}
@@ -521,9 +449,9 @@ func (h *Handler) prometheusAnnotations(pod *corev1.Pod) error {
 	prometheusScrapePath := h.prometheusScrapePath(*pod)
 
 	if enableMetrics {
-		pod.Annotations["prometheus.io/scrape"] = "true"
-		pod.Annotations["prometheus.io/port"] = prometheusScrapePort
-		pod.Annotations["prometheus.io/path"] = prometheusScrapePath
+		pod.Annotations[annotationPrometheusScrape] = "true"
+		pod.Annotations[annotationPrometheusPort] = prometheusScrapePort
+		pod.Annotations[annotationPrometheusPath] = prometheusScrapePath
 	}
 	return nil
 }
@@ -602,6 +530,10 @@ func (h *Handler) validatePod(pod corev1.Pod) error {
 		return fmt.Errorf("the %q annotation is no longer supported. Instead, create a ServiceDefaults resource (see www.consul.io/docs/k8s/crds/upgrade-to-crds)",
 			annotationProtocol)
 	}
+
+	if _, ok := pod.Annotations[annotationSyncPeriod]; ok {
+		return fmt.Errorf("the %q annotation is no longer supported because consul-sidecar is no longer injected to periodically register services", annotationSyncPeriod)
+	}
 	return nil
 }
 
@@ -635,7 +567,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod) (corev1.VolumeMount, error) {
 
 	// Return an error if volumeMount is still empty
 	if (corev1.VolumeMount{}) == volumeMount {
-		return volumeMount, errors.New("Unable to find service account token volumeMount")
+		return volumeMount, errors.New("unable to find service account token volumeMount")
 	}
 
 	return volumeMount, nil
