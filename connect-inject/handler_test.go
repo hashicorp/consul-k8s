@@ -392,15 +392,15 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer("prometheus.io/scrape"),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationPrometheusScrape),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer("prometheus.io/port"),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationPrometheusPath),
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer("prometheus.io/path"),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationPrometheusPort),
 				},
 				{
 					Operation: "add",
@@ -912,21 +912,20 @@ func TestHandlerPrometheusScrapePath(t *testing.T) {
 func TestHandlerPrometheusAnnotations(t *testing.T) {
 	cases := []struct {
 		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
 		Handler  Handler
 		Expected map[string]string
 	}{
 		{
-			Name: "Sets the correct prometheus annotations on the pod",
+			Name: "Sets the correct prometheus annotations on the pod if metrics are enabled",
 			Handler: Handler{
 				DefaultEnableMetrics:        true,
 				DefaultPrometheusScrapePort: "20200",
 				DefaultPrometheusScrapePath: "/metrics",
 			},
 			Expected: map[string]string{
-				"prometheus.io/scrape": "true",
-				"prometheus.io/port":   "20200",
-				"prometheus.io/path":   "/metrics",
+				annotationPrometheusScrape: "true",
+				annotationPrometheusPort:   "20200",
+				annotationPrometheusPath:   "/metrics",
 			},
 		},
 		{
@@ -946,7 +945,7 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 			h := tt.Handler
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
 
-			err := h.prometheusAnnotations(*pod)
+			err := h.prometheusAnnotations(pod)
 			require.NoError(err)
 
 			require.Equal(pod.Annotations, tt.Expected)

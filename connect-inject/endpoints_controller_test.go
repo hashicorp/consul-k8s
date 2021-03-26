@@ -110,12 +110,12 @@ func TestProcessUpstreams(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
-		name        string
-		pod         func() *corev1.Pod
-		expected    []api.Upstream
-		expErr      string
-		configEntry func() api.ConfigEntry
-		consulDown  bool
+		name              string
+		pod               func() *corev1.Pod
+		expected          []api.Upstream
+		expErr            string
+		configEntry       func() api.ConfigEntry
+		consulUnavailable bool
 	}{
 		{
 			name: "upstream with datacenter without ProxyDefaults",
@@ -164,7 +164,7 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 		},
 		{
-			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in remote mode",
+			name: "upstream with datacenter with ProxyDefaults and mesh gateway in remote mode",
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
@@ -186,8 +186,8 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 		},
 		{
-			name:       "when consul is down, we don't return an error",
-			consulDown: true,
+			name:              "when consul is unavailable, we don't return an error",
+			consulUnavailable: true,
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
@@ -296,7 +296,7 @@ func TestProcessUpstreams(t *testing.T) {
 
 			consul.WaitForLeader(t)
 			httpAddr := consul.HTTPAddr
-			if tt.consulDown {
+			if tt.consulUnavailable {
 				httpAddr = "hostname.does.not.exist:8500"
 			}
 			consulClient, err := api.NewClient(&api.Config{
@@ -2066,14 +2066,30 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				{
 					Kind: api.ServiceKindConnectProxy,
 					ID:   "foo1-proxy",
-					Port: 20000,
-					Tags: []string{},
 					Name: "foo-sidecar-proxy",
+					Port: 20000,
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "foo",
 						DestinationServiceID:   "foo1",
 					},
 					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": c.k8sNamespaceMeta},
+				},
+				{
+					ID:   "non-k8s-service-id",
+					Name: "non-k8s-service",
+					Meta: map[string]string{"foo": "bar"},
+				},
+				{
+					Kind: api.ServiceKindConnectProxy,
+					ID:   "non-k8s-proxy",
+					Name: "non-k8s-proxy",
+					Port: 20000,
+					Tags: []string{},
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "non-k8s-service",
+						DestinationServiceID:   "non-k8s-service-id",
+					},
+					Meta: map[string]string{"bar": "baz"},
 				},
 			}
 

@@ -87,3 +87,10 @@ const (
 	// injected is used as the annotation value for annotationInjected
 	injected = "injected"
 )
+
+// Annotations used by Prometheus.
+const (
+	annotationPrometheusScrape = "prometheus.io/scrape"
+	annotationPrometheusPath   = "prometheus.io/path"
+	annotationPrometheusPort   = "prometheus.io/port"
+)

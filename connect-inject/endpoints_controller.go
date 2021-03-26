@@ -116,7 +116,7 @@ func (r *EndpointsController) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					// Register the service instance with the local agent.
 					// Note: the order of how we register services is important,
 					// and the connect-proxy service should come after the "main" service
-					// because its alias health check depends on the main service to exist.
+					// because its alias health check depends on the main service existing.
 					r.Log.Info("registering service", "service", serviceRegistration.Name)
 					err = client.Agent().ServiceRegister(serviceRegistration)
 					if err != nil {

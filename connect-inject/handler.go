@@ -239,8 +239,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	pod.Annotations[annotationStatus] = injected
 
 	// Add annotations for metrics.
-	err = h.prometheusAnnotations(pod)
-	if err != nil {
+	if err = h.prometheusAnnotations(&pod); err != nil {
 		h.Log.Error("Error configuring prometheus annotations", "err", err, "Request Name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring prometheus annotations: %s", err))
 	}
@@ -438,21 +437,21 @@ func (h *Handler) serviceMetricsPath(pod corev1.Pod) string {
 // prometheusAnnotations returns the Prometheus scraping configuration
 // annotations. It returns a nil map if metrics are not enabled and annotations
 // should not be set.
-func (h *Handler) prometheusAnnotations(pod corev1.Pod) error {
-	enableMetrics, err := h.enableMetrics(pod)
+func (h *Handler) prometheusAnnotations(pod *corev1.Pod) error {
+	enableMetrics, err := h.enableMetrics(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePort, err := h.prometheusScrapePort(pod)
+	prometheusScrapePort, err := h.prometheusScrapePort(*pod)
 	if err != nil {
 		return err
 	}
-	prometheusScrapePath := h.prometheusScrapePath(pod)
+	prometheusScrapePath := h.prometheusScrapePath(*pod)
 
 	if enableMetrics {
-		pod.Annotations["prometheus.io/scrape"] = "true"
-		pod.Annotations["prometheus.io/port"] = prometheusScrapePort
-		pod.Annotations["prometheus.io/path"] = prometheusScrapePath
+		pod.Annotations[annotationPrometheusScrape] = "true"
+		pod.Annotations[annotationPrometheusPort] = prometheusScrapePort
+		pod.Annotations[annotationPrometheusPath] = prometheusScrapePath
 	}
 	return nil
 }
