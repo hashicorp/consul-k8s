@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +57,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -78,7 +78,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -99,7 +99,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -120,7 +120,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -142,7 +142,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -164,7 +164,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -187,7 +187,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -210,7 +210,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -306,7 +306,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -328,7 +328,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -350,7 +350,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -372,7 +372,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -395,7 +395,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -418,7 +418,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -442,7 +442,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -466,7 +466,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				decoder:                    decoder,
 			},
 			Req: admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -649,7 +649,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 				},
 			}
 			request := admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object:    encodeRaw(t, &pod),
 					Namespace: sourceKubeNS,
 				},

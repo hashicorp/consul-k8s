@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,7 +51,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Namespace: metav1.NamespaceSystem,
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
@@ -71,7 +71,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -95,7 +95,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -136,7 +136,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -185,7 +185,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -209,7 +209,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -258,7 +258,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
@@ -303,7 +303,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -350,7 +350,7 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:                     decoder,
 			},
 			admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -476,7 +476,7 @@ func TestHandler_ErrorsOnDeprecatedAnnotations(t *testing.T) {
 			}
 
 			request := admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Namespace: "default",
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
