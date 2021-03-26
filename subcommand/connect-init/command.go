@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
@@ -29,10 +30,9 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled.
-	flagPodName                        string // Pod name.
-	flagPodNamespace                   string // Pod namespace.
-	flagSkipServiceRegistrationPolling bool   // Whether or not to skip service registration.
+	flagACLAuthMethod string // Auth Method to use for ACLs, if enabled.
+	flagPodName       string // Pod name.
+	flagPodNamespace  string // Pod namespace.
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -51,10 +51,6 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
-
-	// TODO: when the endpoints controller manages service registration this can be removed. For now it preserves back compatibility.
-	c.flagSet.BoolVar(&c.flagSkipServiceRegistrationPolling, "skip-service-registration-polling", true,
-		"Flag to preserve backward compatibility with service registration.")
 
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
@@ -121,15 +117,17 @@ func (c *Command) Run(args []string) int {
 		}
 		c.UI.Info("Consul login complete")
 	}
-	if c.flagSkipServiceRegistrationPolling {
-		return 0
-	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
 	// which maps to this pod+namespace.
 	var proxyID string
 	err = backoff.Retry(func() error {
-		filter := fmt.Sprintf("Meta[\"pod-name\"] == %q and Meta[\"k8s-namespace\"] == %q", c.flagPodName, c.flagPodNamespace)
+		filter := fmt.Sprintf(
+			"Meta[%q] == %q and Meta[%q] == %q",
+			connectinject.MetaKeyPodName,
+			c.flagPodName,
+			connectinject.MetaKeyKubeNS,
+			c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))

@@ -349,6 +349,7 @@ func TestReconcilePod(t *testing.T) {
 			// Get a server, client, and handler.
 			server, client, resource := testServerAgentResourceAndController(t, tt.Pod)
 			defer server.Stop()
+			server.WaitForLeader(t)
 			// Register the service with Consul.
 			server.AddService(t, testServiceNameReg, api.HealthPassing, nil)
 			if tt.PreCreateHealthCheck {

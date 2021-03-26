@@ -406,22 +406,22 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		//if err = (&connectinject.EndpointsController{
-		//	Client:                mgr.GetClient(),
-		//	ConsulClient:          c.consulClient,
-		//	ConsulScheme:          consulURL.Scheme,
-		//	ConsulPort:            consulURL.Port(),
-		//	AllowK8sNamespacesSet: allowK8sNamespaces,
-		//	DenyK8sNamespacesSet:  denyK8sNamespaces,
-		//	Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
-		//	Scheme:                mgr.GetScheme(),
-		//	Ctx:                   ctx,
-		//	ReleaseName:           c.flagReleaseName,
-		//	ReleaseNamespace:      c.flagReleaseNamespace,
-		//}).SetupWithManager(mgr); err != nil {
-		//	setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
-		//	return 1
-		//}
+		if err = (&connectinject.EndpointsController{
+			Client:                mgr.GetClient(),
+			ConsulClient:          c.consulClient,
+			ConsulScheme:          consulURL.Scheme,
+			ConsulPort:            consulURL.Port(),
+			AllowK8sNamespacesSet: allowK8sNamespaces,
+			DenyK8sNamespacesSet:  denyK8sNamespaces,
+			Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
+			Scheme:                mgr.GetScheme(),
+			Ctx:                   ctx,
+			ReleaseName:           c.flagReleaseName,
+			ReleaseNamespace:      c.flagReleaseNamespace,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+			return 1
+		}
 
 		mgr.GetWebhookServer().CertDir = c.flagCertDir
 
