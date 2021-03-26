@@ -2075,21 +2075,21 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": c.k8sNamespaceMeta},
 				},
 				{
-					ID:   "non-k8s-service-id",
-					Name: "non-k8s-service",
-					Meta: map[string]string{"foo": "bar"},
+					ID:   "k8s-service-different-ns-id",
+					Name: "k8s-service-different-ns",
+					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": "different-ns"},
 				},
 				{
 					Kind: api.ServiceKindConnectProxy,
-					ID:   "non-k8s-proxy",
-					Name: "non-k8s-proxy",
+					ID:   "k8s-service-different-ns-proxy",
+					Name: "k8s-service-different-ns-proxy",
 					Port: 20000,
 					Tags: []string{},
 					Proxy: &api.AgentServiceConnectProxyConfig{
-						DestinationServiceName: "non-k8s-service",
-						DestinationServiceID:   "non-k8s-service-id",
+						DestinationServiceName: "k8s-service-different-ns",
+						DestinationServiceID:   "k8s-service-different-ns-id",
 					},
-					Meta: map[string]string{"bar": "baz"},
+					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": "different-ns"},
 				},
 			}
 
