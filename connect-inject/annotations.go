@@ -57,7 +57,7 @@ const (
 	// Deprecated: This annotation is no longer supported.
 	annotationSyncPeriod = "consul.hashicorp.com/connect-sync-period"
 
-	// annotations for sidecar proxy resource limits
+	// annotations for sidecar proxy resource limits.
 	annotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
 	annotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
@@ -84,7 +84,7 @@ const (
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 
-	// injected is used as the annotation value for annotationInjected
+	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
 )
 
