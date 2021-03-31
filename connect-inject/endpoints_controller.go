@@ -50,6 +50,11 @@ type EndpointsController struct {
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
 	context.Context
+
+	// GetClientFunc allows us to specify how to get a consul client handle.
+	// This is used so that we can provide our own function for testing that is
+	// not dependent on having then ENV set up to pick up tokens and ca certs.
+	GetClientFunc func(string, string, string) (*api.Client, error)
 }
 
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -100,7 +105,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 				if hasBeenInjected(pod) {
 					// Create client for Consul agent local to the pod.
-					client, err := r.getConsulClient(pod.Status.HostIP)
+					client, err := r.GetClientFunc(r.ConsulScheme, r.ConsulPort, pod.Status.HostIP)
 					if err != nil {
 						r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.HostIP)
 						return ctrl.Result{}, err
@@ -300,7 +305,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
 	for _, pod := range list.Items {
 		// Create client for this agent.
-		client, err := r.getConsulClient(pod.Status.PodIP)
+		client, err := r.GetClientFunc(r.ConsulScheme, r.ConsulPort, pod.Status.PodIP)
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.PodIP)
 			return err
@@ -410,9 +415,9 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 	return upstreams, nil
 }
 
-// getConsulClient returns an *api.Client that points at the consul agent local to the pod.
-func (r *EndpointsController) getConsulClient(ip string) (*api.Client, error) {
-	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
+// GetConsulClient returns an *api.Client that points at the consul agent local to the pod.
+func GetConsulClient(scheme, port, ip string) (*api.Client, error) {
+	newAddr := fmt.Sprintf("%s://%s:%s", scheme, ip, port)
 	localConfig := api.DefaultConfig()
 	localConfig.Address = newAddr
 

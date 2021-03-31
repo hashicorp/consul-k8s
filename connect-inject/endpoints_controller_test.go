@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -104,6 +105,74 @@ func TestHasBeenInjected(t *testing.T) {
 			require.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+// TestProcessUpstreamsTLSandACLs enables TLS and ACLS and tests processUpstreams through
+// the only path which sets up and uses a consul client: when proxy defaults need to be read.
+// This test was plucked from the table test TestProcessUpstreams as the rest do not use the client.
+func TestProcessUpstreamsTLSandACLs(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+
+	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	// Create test consul server with ACLs and TLS
+	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.DefaultPolicy = "deny"
+		c.ACL.Tokens.Master = masterToken
+		c.CAFile = caFile
+		c.CertFile = certFile
+		c.KeyFile = keyFile
+		c.NodeName = nodeName
+	})
+	require.NoError(t, err)
+	defer consul.Stop()
+
+	consul.WaitForSerfCheck(t)
+	cfg := &api.Config{
+		Address: consul.HTTPSAddr,
+		Scheme:  "https",
+		TLSConfig: api.TLSConfig{
+			CAFile: caFile,
+		},
+		Token: masterToken,
+	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+	addr := strings.Split(consul.HTTPSAddr, ":")
+	consulPort := addr[1]
+
+	ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+	pd := ce.(*api.ProxyConfigEntry)
+	pd.MeshGateway.Mode = api.MeshGatewayModeRemote
+	_, _, err = consulClient.ConfigEntries().Set(pd, &api.WriteOptions{})
+	require.NoError(t, err)
+
+	ep := &EndpointsController{
+		Log:                   logrtest.TestLogger{T: t},
+		ConsulClient:          consulClient,
+		ConsulPort:            consulPort,
+		ConsulScheme:          "https",
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+	}
+
+	pod := createPod("pod1", "1.2.3.4", true)
+	pod.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
+
+	upstreams, err := ep.processUpstreams(*pod)
+	require.NoError(t, err)
+
+	expected := []api.Upstream{
+		{
+			DestinationType: api.UpstreamDestTypeService,
+			DestinationName: "upstream1",
+			Datacenter:      "dc1",
+			LocalBindPort:   1234,
+		},
+	}
+	require.Equal(t, expected, upstreams)
 }
 
 func TestProcessUpstreams(t *testing.T) {
@@ -704,7 +773,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 // This test covers EndpointsController.deregisterServiceOnAllAgents when services should be selectively deregistered
-// since the map will not be nil.
+// since the map will not be nil. This test also runs each test with ACLs+TLS enabled and disabled.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -1201,79 +1270,113 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
 	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+	for _, secure := range []bool{true, false} {
+		for _, tt := range cases {
+			t.Run(fmt.Sprintf("%s - secure: %v", tt.name, secure), func(t *testing.T) {
+				// The agent pod needs to have the address 127.0.0.1 so when the
+				// code gets the agent pods via the label component=client, and
+				// makes requests against the agent API, it will actually hit the
+				// test server we have on localhost.
+				fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
+				fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
-			// Create fake k8s client
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+				// Create fake k8s client
+				k8sObjects := append(tt.k8sObjects(), fakeClientPod)
+				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
-			require.NoError(t, err)
-			defer consul.Stop()
-
-			consul.WaitForLeader(t)
-			consulClient, err := api.NewClient(&api.Config{
-				Address: consul.HTTPAddr,
-			})
-			require.NoError(t, err)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
-
-			// Register service and proxy in consul
-			for _, svc := range tt.initialConsulSvcs {
-				err = consulClient.Agent().ServiceRegister(svc)
+				masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+				caFile, certFile, keyFile := common.GenerateServerCerts(t)
+				// Create test consul server, with ACLs+TLS if necessary
+				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+					if secure {
+						c.ACL.Enabled = true
+						c.ACL.DefaultPolicy = "deny"
+						c.ACL.Tokens.Master = masterToken
+						c.CAFile = caFile
+						c.CertFile = certFile
+						c.KeyFile = keyFile
+					}
+					c.NodeName = nodeName
+				})
 				require.NoError(t, err)
-			}
+				defer consul.Stop()
+				consul.WaitForSerfCheck(t)
 
-			// Create the endpoints controller
-			ep := &EndpointsController{
-				Client:                fakeClient,
-				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
-				ConsulPort:            consulPort,
-				ConsulScheme:          "http",
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSetWith(),
-				ReleaseName:           "consul",
-				ReleaseNamespace:      "default",
-			}
-			namespacedName := types.NamespacedName{
-				Namespace: "default",
-				Name:      "service-updated",
-			}
+				cfg := &api.Config{
+					Scheme:  "http",
+					Address: consul.HTTPAddr,
+				}
+				if secure {
+					cfg.Address = consul.HTTPSAddr
+					cfg.Scheme = "https"
+					cfg.TLSConfig = api.TLSConfig{
+						CAFile: caFile,
+					}
+					cfg.Token = masterToken
+				}
+				consulClient, err := api.NewClient(cfg)
+				require.NoError(t, err)
+				addr := strings.Split(cfg.Address, ":")
+				consulPort := addr[1]
 
-			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
-				NamespacedName: namespacedName,
+				// Register service and proxy in consul
+				for _, svc := range tt.initialConsulSvcs {
+					err = consulClient.Agent().ServiceRegister(svc)
+					require.NoError(t, err)
+				}
+
+				// Override the internal implementation of getConsulClient() because
+				// there is not a straight-forward way of providing the ACL token and ca info
+				// in tests through the env.
+				// Normally this is provided through the Command via `-ca-file`, etc, httpFlags
+				// which are later re-read for each new consul client in api.DefaultConfig(), but this test does
+				// not run as part of a Command and so api.DefaultConfig() would set our TLS and ACL config to empty.
+				// We can re-use this client as the test defines the fakeClientPod to be 127.0.0.1.
+				getclientfunction := func(string, string, string) (*api.Client, error) {
+					return consulClient, nil
+				}
+
+				// Create the endpoints controller
+				ep := &EndpointsController{
+					Client:                fakeClient,
+					Log:                   logrtest.TestLogger{T: t},
+					ConsulClient:          consulClient,
+					ConsulPort:            consulPort,
+					ConsulScheme:          cfg.Scheme,
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+					ReleaseName:           "consul",
+					ReleaseNamespace:      "default",
+					GetClientFunc:         getclientfunction,
+				}
+				namespacedName := types.NamespacedName{
+					Namespace: "default",
+					Name:      "service-updated",
+				}
+
+				resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+					NamespacedName: namespacedName,
+				})
+				require.NoError(t, err)
+				require.False(t, resp.Requeue)
+
+				// After reconciliation, Consul should have service-updated with the correct number of instances
+				serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
+				require.NoError(t, err)
+				require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+				for i, instance := range serviceInstances {
+					require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
+					require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
+				}
+				proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
+				require.NoError(t, err)
+				require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
+				for i, instance := range proxyServiceInstances {
+					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
+					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
+				}
 			})
-			require.NoError(t, err)
-			require.False(t, resp.Requeue)
-
-			// After reconciliation, Consul should have service-updated with the correct number of instances
-			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
-			require.NoError(t, err)
-			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
-			for i, instance := range serviceInstances {
-				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
-				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
-			}
-			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
-			require.NoError(t, err)
-			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
-			for i, instance := range proxyServiceInstances {
-				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
-				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
-			}
-		})
+		}
 	}
 }
 
