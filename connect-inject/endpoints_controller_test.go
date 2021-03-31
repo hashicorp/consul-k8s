@@ -701,6 +701,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			getclientfunction := func(string, string, string) (*api.Client, error) {
+				return consulClient, nil
+			}
+
 			// Create the endpoints controller
 			ep := &EndpointsController{
 				Client:                fakeClient,
@@ -712,6 +716,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
+				GetClientFunc:         getclientfunction,
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
@@ -1474,6 +1479,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			getclientfunction := func(string, string, string) (*api.Client, error) {
+				return consulClient, nil
+			}
+
 			// Create the endpoints controller
 			ep := &EndpointsController{
 				Client:                fakeClient,
@@ -1485,6 +1494,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
+				GetClientFunc:         getclientfunction,
 			}
 
 			// Set up the Endpoint that will be reconciled, and reconcile
