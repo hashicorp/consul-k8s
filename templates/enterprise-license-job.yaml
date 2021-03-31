@@ -77,7 +77,8 @@ spec:
             - "-c"
             - |
                 # Create a script that we can execute with the timeout command.
-                cat > apply-license.sh << 'EOF'
+                mkdir -p /tmp/scripts/
+                cat > /tmp/scripts/apply-license.sh << 'EOF'
                 #!/bin/sh
                 while true; do
                   echo "Applying license..."
@@ -89,10 +90,10 @@ spec:
                   sleep 2
                 done
                 EOF
-                chmod +x ./apply-license.sh
+                chmod +x /tmp/scripts/apply-license.sh
 
                 # Time out after 20 minutes. Use || to support new timeout versions that don't accept -t
-                timeout -t 1200 ./apply-license.sh 2> /dev/null || timeout 1200 ./apply-license.sh 2> /dev/null
+                timeout -t 1200 /tmp/scripts/apply-license.sh 2> /dev/null || timeout 1200 /tmp/scripts/apply-license.sh 2> /dev/null
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
             - name: consul-ca-cert
