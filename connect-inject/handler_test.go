@@ -342,12 +342,14 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"when metrics merging is enabled, we should inject the consul-sidecar and add prometheus annotations",
 			Handler{
-				Log:                         hclog.Default().Named("handler"),
-				AllowK8sNamespacesSet:       mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:        mapset.NewSet(),
-				DefaultEnableMetrics:        true,
-				DefaultEnableMetricsMerging: true,
-				decoder:                     decoder,
+				Log:                   hclog.Default().Named("handler"),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				MetricsConfig: MetricsConfig{
+					DefaultEnableMetrics:        true,
+					DefaultEnableMetricsMerging: true,
+				},
+				decoder: decoder,
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -641,274 +643,6 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 	}
 }
 
-func minimal() *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "minimal",
-			Annotations: map[string]string{
-				annotationService: "foo",
-			},
-		},
-
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
-				},
-				{
-					Name: "web-side",
-				},
-			},
-		},
-	}
-}
-
-func TestHandlerEnableMetrics(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Handler  Handler
-		Expected bool
-		Err      string
-	}{
-		{
-			Name: "Metrics enabled via handler",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetrics: true,
-			},
-			Expected: true,
-			Err:      "",
-		},
-		{
-			Name: "Metrics enabled via annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetrics] = "true"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetrics: false,
-			},
-			Expected: true,
-			Err:      "",
-		},
-		{
-			Name: "Metrics configured via invalid annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetrics] = "not-a-bool"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetrics: false,
-			},
-			Expected: false,
-			Err:      "consul.hashicorp.com/enable-metrics annotation value of not-a-bool was invalid: strconv.ParseBool: parsing \"not-a-bool\": invalid syntax",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := tt.Handler
-
-			actual, err := h.enableMetrics(*tt.Pod(minimal()))
-
-			if tt.Err == "" {
-				require.Equal(tt.Expected, actual)
-				require.NoError(err)
-			} else {
-				require.EqualError(err, tt.Err)
-			}
-		})
-	}
-}
-
-func TestHandlerEnableMetricsMerging(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Handler  Handler
-		Expected bool
-		Err      string
-	}{
-		{
-			Name: "Metrics merging enabled via handler",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetricsMerging: true,
-			},
-			Expected: true,
-			Err:      "",
-		},
-		{
-			Name: "Metrics merging enabled via annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetricsMerging] = "true"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetricsMerging: false,
-			},
-			Expected: true,
-			Err:      "",
-		},
-		{
-			Name: "Metrics merging configured via invalid annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationEnableMetricsMerging] = "not-a-bool"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetricsMerging: false,
-			},
-			Expected: false,
-			Err:      "consul.hashicorp.com/enable-metrics-merging annotation value of not-a-bool was invalid: strconv.ParseBool: parsing \"not-a-bool\": invalid syntax",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := tt.Handler
-
-			actual, err := h.enableMetricsMerging(*tt.Pod(minimal()))
-
-			if tt.Err == "" {
-				require.Equal(tt.Expected, actual)
-				require.NoError(err)
-			} else {
-				require.EqualError(err, tt.Err)
-			}
-		})
-	}
-}
-
-func TestHandlerServiceMetricsPort(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Expected string
-	}{
-		{
-			Name: "Prefers annotationServiceMetricsPort",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
-				pod.Annotations[annotationServiceMetricsPort] = "9000"
-				return pod
-			},
-			Expected: "9000",
-		},
-		{
-			Name: "Uses annotationPort of annotationServiceMetricsPort is not set",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
-				return pod
-			},
-			Expected: "1234",
-		},
-		{
-			Name: "Is set to 0 if neither annotationPort nor annotationServiceMetricsPort is set",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Expected: "0",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := Handler{}
-
-			actual, err := h.serviceMetricsPort(*tt.Pod(minimal()))
-
-			require.Equal(tt.Expected, actual)
-			require.NoError(err)
-		})
-	}
-}
-
-func TestHandlerServiceMetricsPath(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Expected string
-	}{
-		{
-			Name: "Defaults to /metrics",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Expected: "/metrics",
-		},
-		{
-			Name: "Uses annotationServiceMetricsPath when set",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationServiceMetricsPath] = "/custom-metrics-path"
-				return pod
-			},
-			Expected: "/custom-metrics-path",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := Handler{}
-
-			actual := h.serviceMetricsPath(*tt.Pod(minimal()))
-
-			require.Equal(tt.Expected, actual)
-		})
-	}
-}
-
-func TestHandlerPrometheusScrapePath(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Handler  Handler
-		Expected string
-	}{
-		{
-			Name: "Defaults to the handler's value",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Handler: Handler{
-				DefaultPrometheusScrapePath: "/default-prometheus-scrape-path",
-			},
-			Expected: "/default-prometheus-scrape-path",
-		},
-		{
-			Name: "Uses annotationPrometheusScrapePath when set",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPrometheusScrapePath] = "/custom-scrape-path"
-				return pod
-			},
-			Handler: Handler{
-				DefaultPrometheusScrapePath: "/default-prometheus-scrape-path",
-			},
-			Expected: "/custom-scrape-path",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := tt.Handler
-
-			actual := h.prometheusScrapePath(*tt.Pod(minimal()))
-
-			require.Equal(tt.Expected, actual)
-		})
-	}
-}
-
 func TestHandlerPrometheusAnnotations(t *testing.T) {
 	cases := []struct {
 		Name     string
@@ -918,9 +652,11 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 		{
 			Name: "Sets the correct prometheus annotations on the pod if metrics are enabled",
 			Handler: Handler{
-				DefaultEnableMetrics:        true,
-				DefaultPrometheusScrapePort: "20200",
-				DefaultPrometheusScrapePath: "/metrics",
+				MetricsConfig: MetricsConfig{
+					DefaultEnableMetrics:        true,
+					DefaultPrometheusScrapePort: "20200",
+					DefaultPrometheusScrapePath: "/metrics",
+				},
 			},
 			Expected: map[string]string{
 				annotationPrometheusScrape: "true",
@@ -931,9 +667,11 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 		{
 			Name: "Does not set annotations if metrics are not enabled",
 			Handler: Handler{
-				DefaultEnableMetrics:        false,
-				DefaultPrometheusScrapePort: "20200",
-				DefaultPrometheusScrapePath: "/metrics",
+				MetricsConfig: MetricsConfig{
+					DefaultEnableMetrics:        false,
+					DefaultPrometheusScrapePort: "20200",
+					DefaultPrometheusScrapePath: "/metrics",
+				},
 			},
 			Expected: map[string]string{},
 		},
@@ -949,197 +687,6 @@ func TestHandlerPrometheusAnnotations(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(pod.Annotations, tt.Expected)
-		})
-	}
-}
-
-// This test only needs unique cases not already handled in tests for
-// h.enableMetrics, h.enableMetricsMerging, and h.serviceMetricsPort.
-func TestHandlerShouldRunMergedMetricsServer(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Pod      func(*corev1.Pod) *corev1.Pod
-		Handler  Handler
-		Expected bool
-	}{
-		{
-			Name: "Returns true when metrics and metrics merging are enabled, and the service metrics port is greater than 0",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "1234"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetrics:        true,
-				DefaultEnableMetricsMerging: true,
-			},
-			Expected: true,
-		},
-		{
-			Name: "Returns false when service metrics port is 0",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationPort] = "0"
-				return pod
-			},
-			Handler: Handler{
-				DefaultEnableMetrics:        true,
-				DefaultEnableMetricsMerging: true,
-			},
-			Expected: false,
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-			h := tt.Handler
-
-			actual, err := h.shouldRunMergedMetricsServer(*tt.Pod(minimal()))
-
-			require.Equal(tt.Expected, actual)
-			require.NoError(err)
-		})
-	}
-}
-
-// Tests determineAndValidatePort, which in turn tests the
-// prometheusScrapePort() and mergedMetricsPort() functions because their logic
-// is just to call out to determineAndValidatePort().
-func TestHandlerDetermineAndValidatePort(t *testing.T) {
-	cases := []struct {
-		Name        string
-		Pod         func(*corev1.Pod) *corev1.Pod
-		Annotation  string
-		Privileged  bool
-		DefaultPort string
-		Expected    string
-		Err         string
-	}{
-		{
-			Name: "Valid annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "1234"
-				return pod
-			},
-			Annotation: "consul.hashicorp.com/test-annotation-port",
-			Privileged: false,
-			Expected:   "1234",
-			Err:        "",
-		},
-		{
-			Name: "Uses default when there's no annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Annotation:  "consul.hashicorp.com/test-annotation-port",
-			Privileged:  false,
-			DefaultPort: "4321",
-			Expected:    "4321",
-			Err:         "",
-		},
-		{
-			Name: "Gets the value of the named default port when there's no annotation",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
-					{
-						Name:          "web-port",
-						ContainerPort: 2222,
-					},
-				}
-				return pod
-			},
-			Annotation:  "consul.hashicorp.com/test-annotation-port",
-			Privileged:  false,
-			DefaultPort: "web-port",
-			Expected:    "2222",
-			Err:         "",
-		},
-		{
-			Name: "Errors if the named default port doesn't exist on the pod",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				return pod
-			},
-			Annotation:  "consul.hashicorp.com/test-annotation-port",
-			Privileged:  false,
-			DefaultPort: "web-port",
-			Expected:    "",
-			Err:         "web-port is not a valid port on the pod minimal",
-		},
-		{
-			Name: "Gets the value of the named port",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "web-port"
-				pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
-					{
-						Name:          "web-port",
-						ContainerPort: 2222,
-					},
-				}
-				return pod
-			},
-			Annotation:  "consul.hashicorp.com/test-annotation-port",
-			Privileged:  false,
-			DefaultPort: "4321",
-			Expected:    "2222",
-			Err:         "",
-		},
-		{
-			Name: "Invalid annotation (not an integer)",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "not-an-int"
-				return pod
-			},
-			Annotation: "consul.hashicorp.com/test-annotation-port",
-			Privileged: false,
-			Expected:   "",
-			Err:        "consul.hashicorp.com/test-annotation-port annotation value of not-an-int is not a valid integer",
-		},
-		{
-			Name: "Invalid annotation (integer not in port range)",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "100000"
-				return pod
-			},
-			Annotation: "consul.hashicorp.com/test-annotation-port",
-			Privileged: true,
-			Expected:   "",
-			Err:        "consul.hashicorp.com/test-annotation-port annotation value of 100000 is not in the valid port range 1-65535",
-		},
-		{
-			Name: "Invalid annotation (integer not in unprivileged port range)",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "22"
-				return pod
-			},
-			Annotation: "consul.hashicorp.com/test-annotation-port",
-			Privileged: false,
-			Expected:   "",
-			Err:        "consul.hashicorp.com/test-annotation-port annotation value of 22 is not in the unprivileged port range 1024-65535",
-		},
-		{
-			Name: "Privileged ports allowed",
-			Pod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations["consul.hashicorp.com/test-annotation-port"] = "22"
-				return pod
-			},
-			Annotation: "consul.hashicorp.com/test-annotation-port",
-			Privileged: true,
-			Expected:   "22",
-			Err:        "",
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			require := require.New(t)
-
-			actual, err := determineAndValidatePort(*tt.Pod(minimal()), tt.Annotation, tt.DefaultPort, tt.Privileged)
-
-			if tt.Err == "" {
-				require.NoError(err)
-				require.Equal(tt.Expected, actual)
-			} else {
-				require.EqualError(err, tt.Err)
-			}
 		})
 	}
 }

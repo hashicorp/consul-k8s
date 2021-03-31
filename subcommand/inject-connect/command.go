@@ -406,6 +406,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
+		metricsConfig := connectinject.MetricsConfig{
+			DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+			DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+			DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+		}
+
 		if err = (&connectinject.EndpointsController{
 			Client:                mgr.GetClient(),
 			ConsulClient:          c.consulClient,
@@ -417,6 +425,7 @@ func (c *Command) Run(args []string) int {
 			Scheme:                mgr.GetScheme(),
 			ReleaseName:           c.flagReleaseName,
 			ReleaseNamespace:      c.flagReleaseNamespace,
+			MetricsConfig:         metricsConfig,
 			Context:               ctx,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
@@ -427,33 +436,29 @@ func (c *Command) Run(args []string) int {
 
 		mgr.GetWebhookServer().Register("/mutate",
 			&webhook.Admission{Handler: &connectinject.Handler{
-				ConsulClient:                c.consulClient,
-				ImageConsul:                 c.flagConsulImage,
-				ImageEnvoy:                  c.flagEnvoyImage,
-				EnvoyExtraArgs:              c.flagEnvoyExtraArgs,
-				ImageConsulK8S:              c.flagConsulK8sImage,
-				RequireAnnotation:           !c.flagDefaultInject,
-				AuthMethod:                  c.flagACLAuthMethod,
-				ConsulCACert:                string(consulCACert),
-				DefaultProxyCPURequest:      sidecarProxyCPURequest,
-				DefaultProxyCPULimit:        sidecarProxyCPULimit,
-				DefaultProxyMemoryRequest:   sidecarProxyMemoryRequest,
-				DefaultProxyMemoryLimit:     sidecarProxyMemoryLimit,
-				DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-				DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-				DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-				InitContainerResources:      initResources,
-				ConsulSidecarResources:      consulSidecarResources,
-				EnableNamespaces:            c.flagEnableNamespaces,
-				AllowK8sNamespacesSet:       allowK8sNamespaces,
-				DenyK8sNamespacesSet:        denyK8sNamespaces,
-				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-				EnableK8SNSMirroring:        c.flagEnableK8SNSMirroring,
-				K8SNSMirroringPrefix:        c.flagK8SNSMirroringPrefix,
-				CrossNamespaceACLPolicy:     c.flagCrossNamespaceACLPolicy,
-				Log:                         logger.Named("handler"),
+				ConsulClient:               c.consulClient,
+				ImageConsul:                c.flagConsulImage,
+				ImageEnvoy:                 c.flagEnvoyImage,
+				EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
+				ImageConsulK8S:             c.flagConsulK8sImage,
+				RequireAnnotation:          !c.flagDefaultInject,
+				AuthMethod:                 c.flagACLAuthMethod,
+				ConsulCACert:               string(consulCACert),
+				DefaultProxyCPURequest:     sidecarProxyCPURequest,
+				DefaultProxyCPULimit:       sidecarProxyCPULimit,
+				DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
+				DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
+				InitContainerResources:     initResources,
+				ConsulSidecarResources:     consulSidecarResources,
+				EnableNamespaces:           c.flagEnableNamespaces,
+				AllowK8sNamespacesSet:      allowK8sNamespaces,
+				DenyK8sNamespacesSet:       denyK8sNamespaces,
+				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+				CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+				MetricsConfig:              metricsConfig,
+				Log:                        logger.Named("handler"),
 			}})
 
 		// todo: Add tests in case it's not refactored to not have any signal handling

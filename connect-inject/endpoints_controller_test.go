@@ -515,7 +515,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams",
+			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true)
@@ -526,6 +526,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationTags] = "abc,123"
 				pod1.Annotations[annotationConnectTags] = "def,456"
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
+				pod1.Annotations[annotationEnableMetrics] = "true"
+				pod1.Annotations[annotationPrometheusScrapePort] = "12345"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -584,6 +586,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 								DestinationName: "upstream1",
 								LocalBindPort:   1234,
 							},
+						},
+						Config: map[string]interface{}{
+							"envoy_prometheus_bind_addr": "0.0.0.0:12345",
 						},
 					},
 					ServiceMeta: map[string]string{

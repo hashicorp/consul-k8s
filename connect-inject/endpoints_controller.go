@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	MetaKeyPodName         = "pod-name"
-	MetaKeyKubeServiceName = "k8s-service-name"
-	MetaKeyKubeNS          = "k8s-namespace"
+	MetaKeyPodName          = "pod-name"
+	MetaKeyKubeServiceName  = "k8s-service-name"
+	MetaKeyKubeNS           = "k8s-namespace"
+	envoyPrometheusBindAddr = "envoy_prometheus_bind_addr"
 )
 
 type EndpointsController struct {
@@ -47,6 +48,7 @@ type EndpointsController struct {
 	ReleaseName string
 	// ReleaseNamespace is the namespace where Consul is installed.
 	ReleaseNamespace string
+	MetricsConfig    MetricsConfig
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
 	context.Context
@@ -225,7 +227,25 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	proxyConfig := &api.AgentServiceConnectProxyConfig{
 		DestinationServiceName: serviceName,
 		DestinationServiceID:   serviceID,
-		Config:                 nil, // TODO: add config for metrics (upcoming PR)
+		Config:                 make(map[string]interface{}),
+	}
+
+	// If metrics are enabled, the proxyConfig should set envoy_prometheus_bind_addr to a listener on 0.0.0.0 on
+	// the prometheusScrapePort that points to a metrics backend. The backend for this listener will be determined by
+	// the envoy bootstrapping command (consul connect envoy) configuration in the init container. If there is a merged
+	// metrics server, the backend would be that server. If we are not running the merged metrics server, the backend
+	// should just be the Envoy metrics endpoint.
+	enableMetrics, err := r.MetricsConfig.enableMetrics(pod)
+	if err != nil {
+		return nil, nil, err
+	}
+	if enableMetrics {
+		prometheusScrapePort, err := r.MetricsConfig.prometheusScrapePort(pod)
+		if err != nil {
+			return nil, nil, err
+		}
+		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
 	if servicePort > 0 {
