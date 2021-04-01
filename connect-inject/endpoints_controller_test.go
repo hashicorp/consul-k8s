@@ -701,7 +701,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getclientfunction := func(string, string, string) (*api.Client, error) {
+			getTestClient := func(string, string, string) (*api.Client, error) {
 				return consulClient, nil
 			}
 
@@ -716,7 +716,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				GetClientFunc:         getclientfunction,
+				GetClient:         getTestClient,
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
@@ -778,7 +778,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 // This test covers EndpointsController.deregisterServiceOnAllAgents when services should be selectively deregistered
-// since the map will not be nil. This test also runs each test with ACLs+TLS enabled and disabled.
+// since the map will not be nil. This test also runs each test with ACLs+TLS enabled and disabled, since it covers all the cases where a Consul client is created.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -1336,8 +1336,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				// Normally this is provided through the Command via `-ca-file`, etc, httpFlags
 				// which are later re-read for each new consul client in api.DefaultConfig(), but this test does
 				// not run as part of a Command and so api.DefaultConfig() would set our TLS and ACL config to empty.
-				// We can re-use this client as the test defines the fakeClientPod to be 127.0.0.1.
-				getclientfunction := func(string, string, string) (*api.Client, error) {
+				// We can re-use consulClient as the local agent client since the test defines the fakeClientPod to be 127.0.0.1.
+				getTestClient := func(string, string, string) (*api.Client, error) {
 					return consulClient, nil
 				}
 
@@ -1479,7 +1479,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			getclientfunction := func(string, string, string) (*api.Client, error) {
+			getTestClient := func(string, string, string) (*api.Client, error) {
 				return consulClient, nil
 			}
 

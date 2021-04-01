@@ -54,7 +54,7 @@ type EndpointsController struct {
 	// GetClientFunc allows us to specify how to get a consul client handle.
 	// This is used so that we can provide our own function for testing that is
 	// not dependent on having then ENV set up to pick up tokens and ca certs.
-	GetClientFunc func(string, string, string) (*api.Client, error)
+	GetClient func(string, string, string) (*api.Client, error)
 }
 
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
