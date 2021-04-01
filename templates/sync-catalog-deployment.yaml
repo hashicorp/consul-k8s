@@ -1,3 +1,4 @@
+{{- $clientEnabled := (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
 # The deployment for running the sync-catalog pod
 apiVersion: apps/v1
@@ -43,7 +44,7 @@ spec:
           - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
             path: tls.crt
       {{- end }}
-      {{- if .Values.global.tls.enableAutoEncrypt }}
+      {{- if (and .Values.global.tls.enableAutoEncrypt $clientEnabled) }}
       - name: consul-auto-encrypt-ca-cert
         emptyDir:
           medium: "Memory"
@@ -96,7 +97,7 @@ spec:
             {{- end }}
           {{- if .Values.global.tls.enabled }}
           volumeMounts:
-            {{- if .Values.global.tls.enableAutoEncrypt }}
+            {{- if (and .Values.global.tls.enableAutoEncrypt $clientEnabled) }}
             - name: consul-auto-encrypt-ca-cert
             {{- else }}
             - name: consul-ca-cert
@@ -193,7 +194,7 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- if or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt $clientEnabled) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: sync-acl-init
@@ -213,7 +214,7 @@ spec:
             memory: "25Mi"
             cpu: "50m"
       {{- end }}
-      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+      {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt $clientEnabled) }}
       {{- include "consul.getAutoEncryptClientCA" . | nindent 6 }}
       {{- end }}
       {{- end }}

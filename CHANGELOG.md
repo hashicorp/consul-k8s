@@ -17,6 +17,7 @@ BUG FIXES:
 ## 0.31.1 (Mar 19, 2021)
 
 BUG FIXES:
+* Sync Catalog: fix issue running with clients disabled and auto encrypt enabled. [[GH-891](https://github.com/hashicorp/consul-helm/pull/891)]
 * Remove `kubeVersion` in `Chart.yaml` since it was causing installs to fail on EKS and GKE. [[GH-873](https://github.com/hashicorp/consul-helm/pull/873)]
 
 ## 0.31.0 (Mar 18, 2021)
