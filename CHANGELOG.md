@@ -4,6 +4,7 @@ IMPROVEMENTS:
 
 * Specify `kubeVersion` in `Chart.yaml` to denote that this chart is compatible with Kubernetes 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
 * CRDs: update the CRD versions from v1beta1 to v1. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+* Enterprise: support applying Consul Enterprise license when security context defaults to non-root users. [[GH-880](https://github.com/hashicorp/consul-helm/pull/880)]
 
 BREAKING CHANGES:
 * Minimum Kubernetes versions supported is 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
