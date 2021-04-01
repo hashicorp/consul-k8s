@@ -105,7 +105,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 				if hasBeenInjected(pod) {
 					// Create client for Consul agent local to the pod.
-					client, err := r.GetClientFunc(r.ConsulScheme, r.ConsulPort, pod.Status.HostIP)
+					client, err := r.GetClient(r.ConsulScheme, r.ConsulPort, pod.Status.HostIP)
 					if err != nil {
 						r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.HostIP)
 						return ctrl.Result{}, err
@@ -305,7 +305,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
 	for _, pod := range list.Items {
 		// Create client for this agent.
-		client, err := r.GetClientFunc(r.ConsulScheme, r.ConsulPort, pod.Status.PodIP)
+		client, err := r.GetClient(r.ConsulScheme, r.ConsulPort, pod.Status.PodIP)
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.PodIP)
 			return err

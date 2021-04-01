@@ -716,7 +716,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				GetClient:         getTestClient,
+				GetClient:             getTestClient,
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
@@ -1352,7 +1352,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					DenyK8sNamespacesSet:  mapset.NewSetWith(),
 					ReleaseName:           "consul",
 					ReleaseNamespace:      "default",
-					GetClientFunc:         getclientfunction,
+					GetClient:             getTestClient,
 				}
 				namespacedName := types.NamespacedName{
 					Namespace: "default",
@@ -1494,7 +1494,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				GetClientFunc:         getclientfunction,
+				GetClient:             getTestClient,
 			}
 
 			// Set up the Endpoint that will be reconciled, and reconcile
