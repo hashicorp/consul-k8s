@@ -418,7 +418,7 @@ func (c *Command) Run(args []string) int {
 			ReleaseName:           c.flagReleaseName,
 			ReleaseNamespace:      c.flagReleaseNamespace,
 			Context:               ctx,
-			GetClient:             connectinject.GetConsulClient,
+			ConsulClientCfg:       api.DefaultConfig(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 			return 1

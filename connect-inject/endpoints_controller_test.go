@@ -143,7 +143,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	addr := strings.Split(consul.HTTPSAddr, ":")
 	consulPort := addr[1]
 
-	ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+	ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 	pd := ce.(*api.ProxyConfigEntry)
 	pd.MeshGateway.Mode = api.MeshGatewayModeRemote
 	_, _, err = consulClient.ConfigEntries().Set(pd, &api.WriteOptions{})
@@ -686,11 +686,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
-
 			consul.WaitForLeader(t)
-			consulClient, err := api.NewClient(&api.Config{
+
+			cfg := &api.Config{
 				Address: consul.HTTPAddr,
-			})
+			}
+			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
@@ -699,10 +700,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			for _, svc := range tt.initialConsulSvcs {
 				err = consulClient.Agent().ServiceRegister(svc)
 				require.NoError(t, err)
-			}
-
-			getTestClient := func(string, string, string) (*api.Client, error) {
-				return consulClient, nil
 			}
 
 			// Create the endpoints controller
@@ -716,7 +713,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				GetClient:             getTestClient,
+				ConsulClientCfg:       cfg,
 			}
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
@@ -1330,17 +1327,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				// Override the internal implementation of getConsulClient() because
-				// there is not a straight-forward way of providing the ACL token and ca info
-				// in tests through the env.
-				// Normally this is provided through the Command via `-ca-file`, etc, httpFlags
-				// which are later re-read for each new consul client in api.DefaultConfig(), but this test does
-				// not run as part of a Command and so api.DefaultConfig() would set our TLS and ACL config to empty.
-				// We can re-use consulClient as the local agent client since the test defines the fakeClientPod to be 127.0.0.1.
-				getTestClient := func(string, string, string) (*api.Client, error) {
-					return consulClient, nil
-				}
-
 				// Create the endpoints controller
 				ep := &EndpointsController{
 					Client:                fakeClient,
@@ -1352,7 +1338,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					DenyK8sNamespacesSet:  mapset.NewSetWith(),
 					ReleaseName:           "consul",
 					ReleaseNamespace:      "default",
-					GetClient:             getTestClient,
+					ConsulClientCfg:       cfg,
 				}
 				namespacedName := types.NamespacedName{
 					Namespace: "default",
@@ -1466,9 +1452,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			defer consul.Stop()
 
 			consul.WaitForLeader(t)
-			consulClient, err := api.NewClient(&api.Config{
+			cfg := &api.Config{
 				Address: consul.HTTPAddr,
-			})
+			}
+			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
@@ -1477,10 +1464,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			for _, svc := range tt.initialConsulSvcs {
 				err = consulClient.Agent().ServiceRegister(svc)
 				require.NoError(t, err)
-			}
-
-			getTestClient := func(string, string, string) (*api.Client, error) {
-				return consulClient, nil
 			}
 
 			// Create the endpoints controller
@@ -1494,7 +1477,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
-				GetClient:             getTestClient,
+				ConsulClientCfg:       cfg,
 			}
 
 			// Set up the Endpoint that will be reconciled, and reconcile
