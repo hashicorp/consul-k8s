@@ -26,6 +26,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: sync-catalog
+        {{- if .Values.syncCatalog.extraLabels }}
+          {{- toYaml .Values.syncCatalog.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:

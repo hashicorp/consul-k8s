@@ -1263,6 +1263,19 @@ syncCatalog:
   # @type: string
   consulWriteInterval: null
 
+  # Extra labels to attach to the sync catalog pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
