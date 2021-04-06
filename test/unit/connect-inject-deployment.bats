@@ -482,85 +482,6 @@ EOF
 
 
 #--------------------------------------------------------------------
-# cert secrets
-
-@test "connectInject/Deployment: no secretName: no tls-{cert,key}-file set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-file"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-key-file"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-auto"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: with secretName: tls-{cert,key}-file set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.certs.secretName=foo' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-cert-file"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.certs.secretName=foo' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-key-file"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.certs.secretName=foo' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-auto"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-
-#--------------------------------------------------------------------
-# service account name
-
-@test "connectInject/Deployment: with secretName: no serviceAccountName set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.certs.secretName=foo' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.serviceAccountName | has("serviceAccountName")' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: no secretName: serviceAccountName set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.serviceAccountName | contains("connect-injector-webhook-svc-account")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # affinity
 
 @test "connectInject/Deployment: affinity not set by default" {
@@ -703,18 +624,6 @@ EOF
   [ "${actual}" != "" ]
 }
 
-@test "connectInject/Deployment: Adds both tls-ca-cert and certs volumes when global.tls.enabled is true and connectInject.certs.secretName is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'connectInject.certs.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
-}
-
 @test "connectInject/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -724,18 +633,6 @@ EOF
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" != "" ]
-}
-
-@test "connectInject/Deployment: Adds both tls-ca-cert and certs volumeMounts when global.tls.enabled is true and connectInject.certs.secretName is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'connectInject.certs.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
 }
 
 @test "connectInject/Deployment: can overwrite CA secret with the provided one" {

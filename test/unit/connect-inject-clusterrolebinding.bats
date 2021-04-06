@@ -28,22 +28,3 @@ load _helpers
       --set 'connectInject.enabled=false' \
       .
 }
-
-@test "connectInject/ClusterRoleBinding: disabled with connectInject.certs.secretName set" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/connect-inject-clusterrolebinding.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.certs.secretName=foo' \
-      .
-}
-
-@test "connectInject/ClusterRoleBinding: enabled with connectInject.certs.secretName not set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-clusterrolebinding.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}

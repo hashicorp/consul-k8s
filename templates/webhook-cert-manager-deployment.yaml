@@ -1,4 +1,4 @@
-{{- if .Values.controller.enabled }}
+{{- if or .Values.connectInject.enabled .Values.controller.enabled}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -55,5 +55,4 @@ spec:
       - name: config
         configMap:
           name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
-
 {{- end }}

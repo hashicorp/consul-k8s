@@ -1,4 +1,4 @@
-{{- if and (not .Values.connectInject.certs.secretName) (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -13,7 +13,7 @@ roleRef:
   kind: ClusterRole
   name: {{ template "consul.fullname" . }}-connect-injector-webhook
 subjects:
-  - kind: ServiceAccount
-    name: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
-    namespace: {{ .Release.Namespace }}
+- kind: ServiceAccount
+  name: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
+  namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -9,11 +9,32 @@ load _helpers
       .
 }
 
-@test "webhookCertManager/ServiceAccount: enabled with controller.enabled=true" {
+@test "webhookCertManager/ServiceAccount: enabled with controller.enabled=true and connectInject.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-serviceaccount.yaml  \
       --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "webhookCertManager/ServiceAccount: enabled with connectInject.enabled=true and controller.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "webhookCertManager/ServiceAccount: enabled with connectInject.enabled=true and controller.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-serviceaccount.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

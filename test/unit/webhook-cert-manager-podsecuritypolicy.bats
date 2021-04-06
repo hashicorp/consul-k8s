@@ -17,7 +17,7 @@ load _helpers
       .
 }
 
-@test "webhookCertManager/PodSecurityPolicy: enabled with controller enabled and global.enablePodSecurityPolicies=true" {
+@test "webhookCertManager/PodSecurityPolicy: enabled with controller.enabled=true, connectInject.enabled=false and global.enablePodSecurityPolicies=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
@@ -25,5 +25,28 @@ load _helpers
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "webhookCertManager/Configmap: enabled with connectInject.enabled=true, controller.enabled=false and global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "webhookCertManager/Configmap: enabled with connectInject.enabled=true, controller.enabled=true and global.enablePodSecurityPolicies=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-podsecuritypolicy.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
