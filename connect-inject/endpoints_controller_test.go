@@ -803,6 +803,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				check, err := consulClient.Agent().ChecksWithFilter(filter)
 				require.NoError(t, err)
 				require.EqualValues(t, len(check), 1)
+				// Ignoring Namespace because the response from ENT includes it and OSS does not.
 				var ignoredFields = []string{"Node", "Definition", "Namespace"}
 				require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck.CheckID], tt.expectedAgentHealthCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 			}
@@ -1582,6 +1583,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					check, err := consulClient.Agent().ChecksWithFilter(filter)
 					require.NoError(t, err)
 					require.EqualValues(t, len(check), 1)
+					// Ignoring Namespace because the response from ENT includes it and OSS does not.
 					var ignoredFields = []string{"Node", "Definition", "Namespace"}
 					require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck.CheckID], tt.expectedAgentHealthCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
