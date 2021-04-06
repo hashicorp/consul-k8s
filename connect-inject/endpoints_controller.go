@@ -102,7 +102,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 				if hasBeenInjected(pod) {
 					// Create client for Consul agent local to the pod.
-					client, err := r.getConsulClient(pod.Status.HostIP)
+					client, err := r.remoteConsulClient(pod.Status.HostIP)
 					if err != nil {
 						r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.HostIP)
 						return ctrl.Result{}, err
@@ -302,7 +302,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
 	for _, pod := range list.Items {
 		// Create client for this agent.
-		client, err := r.getConsulClient(pod.Status.PodIP)
+		client, err := r.remoteConsulClient(pod.Status.PodIP)
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.PodIP)
 			return err
@@ -412,8 +412,8 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 	return upstreams, nil
 }
 
-// getConsulClient returns an *api.Client that points at the consul agent local to the pod.
-func (r *EndpointsController) getConsulClient(ip string) (*api.Client, error) {
+// remoteConsulClient returns an *api.Client that points at the consul agent local to the pod.
+func (r *EndpointsController) remoteConsulClient(ip string) (*api.Client, error) {
 	newAddr := fmt.Sprintf("%s://%s:%s", r.ConsulScheme, ip, r.ConsulPort)
 	localConfig := r.ConsulClientCfg
 	localConfig.Address = newAddr
