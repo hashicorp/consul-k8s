@@ -28,26 +28,6 @@ load _helpers
       --set 'connectInject.enabled=false' \
       .
 }
-
-@test "connectInject/ServiceAccount: disabled with connectInject.certs.secretName set" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/connect-inject-serviceaccount.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.certs.secretName=foo' \
-      .
-}
-
-@test "connectInject/ServiceAccount: enabled with connectInject.certs.secretName not set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-serviceaccount.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # global.imagePullSecrets
 

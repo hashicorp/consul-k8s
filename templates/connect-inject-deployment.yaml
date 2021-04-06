@@ -36,12 +36,14 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
-  {{- if not .Values.connectInject.certs.secretName }}
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
-  {{- end }}
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          ports:
+          - containerPort: 8080
+            name: webhook-server
+            protocol: TCP
           env:
             - name: NAMESPACE
               valueFrom:
@@ -132,13 +134,7 @@ spec:
                 -consul-cross-namespace-acl-policy=cross-namespace-policy \
                 {{- end }}
                 {{- end }}
-                {{- if .Values.connectInject.certs.secretName }}
-                -tls-cert-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.certName }} \
-                -tls-key-file=/etc/connect-injector/certs/{{ .Values.connectInject.certs.keyName }} \
-                {{- else }}
-                -tls-auto=${CONSUL_FULLNAME}-connect-injector-cfg \
-                -tls-auto-hosts=${CONSUL_FULLNAME}-connect-injector-svc,${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE},${CONSUL_FULLNAME}-connect-injector-svc.${NAMESPACE}.svc \
-                {{- end }}
+                -tls-cert-dir=/etc/connect-injector/certs \
                 {{- $resources := .Values.connectInject.sidecarProxy.resources }}
                 {{- /* kindIs is used here to differentiate between null and 0 */}}
                 {{- if not (kindIs "invalid" $resources.limits.memory) }}
@@ -185,81 +181,46 @@ spec:
                 -consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTPS
-            failureThreshold: 2
-            initialDelaySeconds: 1
-            periodSeconds: 2
-            successThreshold: 1
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTPS
-            failureThreshold: 2
-            initialDelaySeconds: 2
-            periodSeconds: 2
-            successThreshold: 1
-            timeoutSeconds: 5
-          startupProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTPS
-            failureThreshold: 15
-            periodSeconds: 2
-            timeoutSeconds: 5
-          {{- if (or .Values.connectInject.certs.secretName .Values.global.tls.enabled) }}
           volumeMounts:
-            {{- if .Values.connectInject.certs.secretName }}
-            - name: certs
-              mountPath: /etc/connect-injector/certs
-              readOnly: true
-            {{- end }}
-            {{- if .Values.global.tls.enabled }}
-            {{- if .Values.global.tls.enableAutoEncrypt }}
-            - name: consul-auto-encrypt-ca-cert
-            {{- else }}
-            - name: consul-ca-cert
-            {{- end }}
-              mountPath: /consul/tls/ca
-              readOnly: true
-            {{- end }}
-            {{- end }}
+          - name: certs
+            mountPath: /etc/connect-injector/certs
+            readOnly: true
+          {{- if .Values.global.tls.enabled }}
+          {{- if .Values.global.tls.enableAutoEncrypt }}
+          - name: consul-auto-encrypt-ca-cert
+          {{- else }}
+          - name: consul-ca-cert
+          {{- end }}
+            mountPath: /consul/tls/ca
+            readOnly: true
+          {{- end }}
           {{- with .Values.connectInject.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if (or .Values.connectInject.certs.secretName .Values.global.tls.enabled) }}
       volumes:
-        {{- if .Values.connectInject.certs.secretName }}
-        - name: certs
-          secret:
-            secretName: {{ .Values.connectInject.certs.secretName }}
-        {{- end }}
-        {{- if .Values.global.tls.enabled }}
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-        - name: consul-ca-cert
-          secret:
-            {{- if .Values.global.tls.caCert.secretName }}
-            secretName: {{ .Values.global.tls.caCert.secretName }}
-            {{- else }}
-            secretName: {{ template "consul.fullname" . }}-ca-cert
-            {{- end }}
-            items:
-            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-              path: tls.crt
-        {{- end }}
-        {{- if .Values.global.tls.enableAutoEncrypt }}
-        - name: consul-auto-encrypt-ca-cert
-          emptyDir:
-            medium: "Memory"
-        {{- end }}
-        {{- end }}
+      - name: certs
+        secret:
+          defaultMode: 420
+          secretName: {{ template "consul.fullname" . }}-connect-inject-webhook-cert
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      - name: consul-auto-encrypt-ca-cert
+        emptyDir:
+          medium: "Memory"
+      {{- end }}
       {{- end }}
       {{- if or (and .Values.global.acls.manageSystemACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:

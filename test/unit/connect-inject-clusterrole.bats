@@ -29,25 +29,6 @@ load _helpers
       .
 }
 
-@test "connectInject/ClusterRole: disabled with connectInject.certs.secretName set" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/connect-inject-clusterrole.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'connectInject.certs.secretName=foo' \
-      .
-}
-
-@test "connectInject/ClusterRole: enabled with connectInject.certs.secretName not set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-clusterrole.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 

@@ -1,4 +1,4 @@
-{{- if and (not .Values.connectInject.certs.secretName) (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
 # The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -10,19 +10,12 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 rules:
-- apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["mutatingwebhookconfigurations"]
-  verbs: 
-    - "get"
-    - "list"
-    - "watch"
-    - "patch"
 - apiGroups: [""]
-  resources: ["pods", "nodes"]
+  resources: ["pods", "nodes", "endpoints"]
   verbs:
-    - "get"
-    - "list"
-    - "watch"
+  - "get"
+  - "list"
+  - "watch"
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
@@ -34,10 +27,10 @@ rules:
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [""]
   resources:
-    - secrets
+  - secrets
   resourceNames:
-    - {{ template "consul.fullname" . }}-connect-inject-acl-token
+  - {{ template "consul.fullname" . }}-connect-inject-acl-token
   verbs:
-    - get
+  - get
 {{- end }}
 {{- end }}

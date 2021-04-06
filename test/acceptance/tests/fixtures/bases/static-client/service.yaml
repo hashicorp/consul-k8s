@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-client
+spec:
+  selector:
+    app: static-client
+  ports:
+    - port: 80

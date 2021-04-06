@@ -1,4 +1,5 @@
 resources:
   - deployment.yaml
+  - service.yaml
   - serviceaccount.yaml
   - rolebinding.yaml
