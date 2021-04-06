@@ -8,18 +8,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/consul"
-	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
@@ -107,10 +103,9 @@ type Command struct {
 	consulClient *api.Client
 	clientset    kubernetes.Interface
 
-	sigCh chan os.Signal
-	once  sync.Once
-	help  string
-	cert  atomic.Value
+	once sync.Once
+	help string
+	cert atomic.Value
 }
 
 var (
@@ -208,12 +203,6 @@ func (c *Command) init() {
 	flags.Merge(c.flagSet, flag.CommandLine)
 	c.help = flags.Usage(help, c.flagSet)
 
-	// Wait on an interrupt or terminate for exit, be sure to init it before running
-	// the controller so that we don't receive an interrupt before it's ready.
-	if c.sigCh == nil {
-		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
-	}
 }
 
 func (c *Command) Run(args []string) int {
@@ -373,152 +362,97 @@ func (c *Command) Run(args []string) int {
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
-	// Start the cleanup controller that cleans up Consul service instances
-	// still registered after the pod has been deleted (usually due to a force delete).
-	ctrlExitCh := make(chan error)
-
 	// Start the endpoints controller
-	{
-		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
-		ctrl.SetLogger(zapLogger)
-		klog.SetLogger(zapLogger)
-		listenSplits := strings.SplitN(c.flagListen, ":", 2)
-		if len(listenSplits) < 2 {
-			c.UI.Error(fmt.Sprintf("missing port in address: %s", c.flagListen))
-			return 1
-		}
-		port, err := strconv.Atoi(listenSplits[1])
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("unable to parse port string: %s", err))
-			return 1
-		}
-
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-			Scheme:             scheme,
-			LeaderElection:     false,
-			Host:               listenSplits[0],
-			Port:               port,
-			Logger:             zapLogger,
-			MetricsBindAddress: "0.0.0.0:9444",
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to start manager")
-			return 1
-		}
-
-		metricsConfig := connectinject.MetricsConfig{
-			DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-			DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-			DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-		}
-
-		if err = (&connectinject.EndpointsController{
-			Client:                mgr.GetClient(),
-			ConsulClient:          c.consulClient,
-			ConsulScheme:          consulURL.Scheme,
-			ConsulPort:            consulURL.Port(),
-			AllowK8sNamespacesSet: allowK8sNamespaces,
-			DenyK8sNamespacesSet:  denyK8sNamespaces,
-			Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
-			Scheme:                mgr.GetScheme(),
-			ReleaseName:           c.flagReleaseName,
-			ReleaseNamespace:      c.flagReleaseNamespace,
-			MetricsConfig:         metricsConfig,
-			Context:               ctx,
-			ConsulClientCfg:       cfg,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
-			return 1
-		}
-
-		mgr.GetWebhookServer().CertDir = c.flagCertDir
-
-		mgr.GetWebhookServer().Register("/mutate",
-			&webhook.Admission{Handler: &connectinject.Handler{
-				ConsulClient:               c.consulClient,
-				ImageConsul:                c.flagConsulImage,
-				ImageEnvoy:                 c.flagEnvoyImage,
-				EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
-				ImageConsulK8S:             c.flagConsulK8sImage,
-				RequireAnnotation:          !c.flagDefaultInject,
-				AuthMethod:                 c.flagACLAuthMethod,
-				ConsulCACert:               string(consulCACert),
-				DefaultProxyCPURequest:     sidecarProxyCPURequest,
-				DefaultProxyCPULimit:       sidecarProxyCPULimit,
-				DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
-				DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
-				InitContainerResources:     initResources,
-				ConsulSidecarResources:     consulSidecarResources,
-				EnableNamespaces:           c.flagEnableNamespaces,
-				AllowK8sNamespacesSet:      allowK8sNamespaces,
-				DenyK8sNamespacesSet:       denyK8sNamespaces,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-				CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-				MetricsConfig:              metricsConfig,
-				Log:                        logger.Named("handler"),
-			}})
-
-		// todo: Add tests in case it's not refactored to not have any signal handling
-		// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
-		go func() {
-			// Pass existing context's done channel so that the controller
-			// will stop when this context is canceled.
-			// This could be due to an interrupt signal or if any other component did not start
-			// successfully. In those cases, we want to make sure that this controller is no longer
-			// running.
-			if err := mgr.Start(ctx); err != nil {
-				setupLog.Error(err, "problem running manager")
-				// Use an existing channel for ctrl exists in case manager failed to start properly.
-				ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
-			}
-		}()
-	}
-
-	if c.flagEnableCleanupController {
-		cleanupResource := connectinject.CleanupResource{
-			Log:                    logger.Named("cleanupResource"),
-			KubernetesClient:       c.clientset,
-			Ctx:                    ctx,
-			ReconcilePeriod:        c.flagCleanupControllerReconcilePeriod,
-			ConsulClient:           c.consulClient,
-			ConsulScheme:           consulURL.Scheme,
-			ConsulPort:             consulURL.Port(),
-			EnableConsulNamespaces: c.flagEnableNamespaces,
-		}
-		cleanupCtrl := &controller.Controller{
-			Log:      logger.Named("cleanupController"),
-			Resource: &cleanupResource,
-		}
-		go func() {
-			cleanupCtrl.Run(ctx.Done())
-			if ctx.Err() == nil {
-				ctrlExitCh <- fmt.Errorf("cleanup controller exited unexpectedly")
-			}
-		}()
-	}
-
-	// Block until we get a signal or something errors.
-	select {
-	case sig := <-c.sigCh:
-		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-		return 0
-
-	case err := <-ctrlExitCh:
-		c.UI.Error(fmt.Sprintf("controller error: %v", err))
+	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+	ctrl.SetLogger(zapLogger)
+	klog.SetLogger(zapLogger)
+	listenSplits := strings.SplitN(c.flagListen, ":", 2)
+	if len(listenSplits) < 2 {
+		c.UI.Error(fmt.Sprintf("missing port in address: %s", c.flagListen))
 		return 1
 	}
-}
+	port, err := strconv.Atoi(listenSplits[1])
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to parse port string: %s", err))
+		return 1
+	}
 
-func (c *Command) interrupt() {
-	c.sendSignal(syscall.SIGINT)
-}
+	metricsConfig := connectinject.MetricsConfig{
+		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+	}
 
-func (c *Command) sendSignal(sig os.Signal) {
-	c.sigCh <- sig
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:             scheme,
+		LeaderElection:     false,
+		Host:               listenSplits[0],
+		Port:               port,
+		Logger:             zapLogger,
+		MetricsBindAddress: "0.0.0.0:9444",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		return 1
+	}
+
+	if err = (&connectinject.EndpointsController{
+		Client:                mgr.GetClient(),
+		ConsulClient:          c.consulClient,
+		ConsulScheme:          consulURL.Scheme,
+		ConsulPort:            consulURL.Port(),
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
+		Scheme:                mgr.GetScheme(),
+		ReleaseName:           c.flagReleaseName,
+		ReleaseNamespace:      c.flagReleaseNamespace,
+		MetricsConfig:         metricsConfig,
+		Context:               ctx,
+		ConsulClientCfg:       cfg,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+		return 1
+	}
+
+	mgr.GetWebhookServer().CertDir = c.flagCertDir
+
+	mgr.GetWebhookServer().Register("/mutate",
+		&webhook.Admission{Handler: &connectinject.Handler{
+			ConsulClient:               c.consulClient,
+			ImageConsul:                c.flagConsulImage,
+			ImageEnvoy:                 c.flagEnvoyImage,
+			EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
+			ImageConsulK8S:             c.flagConsulK8sImage,
+			RequireAnnotation:          !c.flagDefaultInject,
+			AuthMethod:                 c.flagACLAuthMethod,
+			ConsulCACert:               string(consulCACert),
+			DefaultProxyCPURequest:     sidecarProxyCPURequest,
+			DefaultProxyCPULimit:       sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
+			InitContainerResources:     initResources,
+			ConsulSidecarResources:     consulSidecarResources,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			AllowK8sNamespacesSet:      allowK8sNamespaces,
+			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			MetricsConfig:              metricsConfig,
+			Log:                        logger.Named("handler"),
+		}})
+
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+		return 1
+	}
+	c.UI.Info("shutting down")
+	return 0
+
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
