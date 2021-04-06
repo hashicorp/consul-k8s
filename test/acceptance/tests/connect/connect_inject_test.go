@@ -165,3 +165,33 @@ func TestConnectInject_CleanupController(t *testing.T) {
 		})
 	}
 }
+
+// Test that when Consul clients are restarted and lose all their registrations,
+// the services get re-registered and can continue to talk to each other.
+func TestConnectInject_RestartConsulClients(t *testing.T) {
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+
+	helmValues := map[string]string{
+		"connectInject.enabled": "true",
+	}
+
+	releaseName := helpers.RandomName()
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+
+	consulCluster.Create(t)
+
+	logger.Log(t, "creating static-server and static-client deployments")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+
+	logger.Log(t, "checking that connection is successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+
+	logger.Log(t, "restarting Consul client daemonset")
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul", releaseName))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul", releaseName))
+
+	logger.Log(t, "checking that connection is still successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+}

@@ -100,7 +100,7 @@ load _helpers
 @test "helper/consul.fullname: used everywhere" {
   cd `chart_dir`
   # Grep for uses of .Release.Name that aren't using it as a label.
-  local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v 'release: ' | tee /dev/stderr )
+  local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v -E 'release: |-release-name=' | tee /dev/stderr )
   [ "${actual}" = '' ]
 }
 

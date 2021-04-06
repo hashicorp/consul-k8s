@@ -65,7 +65,8 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 		KubectlDeleteK(t, options, kustomizeDir)
 	})
 
-	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=1m", fmt.Sprintf("deploy/%s", deployment.Name))
+	// The timeout is 2min to allow for connect-init to wait for services to be registered by the endpoints controller.
+	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=2m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 // CheckStaticServerConnection execs into a pod of the deployment given by deploymentName
