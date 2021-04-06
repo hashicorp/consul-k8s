@@ -365,7 +365,7 @@ func TestProcessUpstreams(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			httpAddr := consul.HTTPAddr
 			if tt.consulUnavailable {
 				httpAddr = "hostname.does.not.exist:8500"
@@ -505,7 +505,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				Status:      api.HealthCritical,
 				Output:      testFailureMessage,
 				Type:        ttl,
-				Namespace:   "default",
 			},
 		},
 		{
@@ -604,7 +603,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				Status:      api.HealthCritical,
 				Output:      testFailureMessage,
 				Type:        ttl,
-				Namespace:   "default",
 			},
 		},
 		{
@@ -702,7 +700,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				Status:      api.HealthCritical,
 				Output:      testFailureMessage,
 				Type:        ttl,
-				Namespace:   "default",
 			},
 		},
 	}
@@ -725,7 +722,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
@@ -919,7 +916,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				Status:      api.HealthPassing,
 				Output:      kubernetesSuccessReasonMsg,
 				Type:        ttl,
-				Namespace:   "default",
 			},
 		},
 		{
@@ -998,7 +994,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				Status:      api.HealthCritical,
 				Output:      testFailureMessage,
 				Type:        ttl,
-				Namespace:   "default",
 			},
 		},
 		{
@@ -1485,6 +1480,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
 	}
+	// Each test is run with ACLs+TLS (secure) enabled and disabled.
 	for _, secure := range []bool{true, false} {
 		for _, tt := range cases {
 			t.Run(fmt.Sprintf("%s - secure: %v", tt.name, secure), func(t *testing.T) {
@@ -1516,12 +1512,15 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				require.NoError(t, err)
 				defer consul.Stop()
 				consul.WaitForSerfCheck(t)
+				addr := strings.Split(consul.HTTPAddr, ":")
+				consulPort := addr[1]
 
 				cfg := &api.Config{
 					Scheme:  "http",
 					Address: consul.HTTPAddr,
 				}
 				if secure {
+					consulPort = strings.Split(consul.HTTPSAddr, ":")[1]
 					cfg.Address = consul.HTTPSAddr
 					cfg.Scheme = "https"
 					cfg.TLSConfig = api.TLSConfig{
@@ -1531,8 +1530,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 				consulClient, err := api.NewClient(cfg)
 				require.NoError(t, err)
-				addr := strings.Split(cfg.Address, ":")
-				consulPort := addr[1]
 
 				// Register service and proxy in consul
 				for _, svc := range tt.initialConsulSvcs {
@@ -1673,7 +1670,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
 			}
@@ -2413,7 +2410,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			consulClient, err := api.NewClient(&api.Config{
 				Address: consul.HTTPAddr,
 			})
