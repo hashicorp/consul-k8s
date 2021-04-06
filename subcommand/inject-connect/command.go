@@ -496,34 +496,6 @@ func (c *Command) Run(args []string) int {
 		}()
 	}
 
-	if c.flagEnableHealthChecks {
-		healthResource := connectinject.HealthCheckResource{
-			Log:                 logger.Named("healthCheckResource"),
-			KubernetesClientset: c.clientset,
-			ConsulScheme:        consulURL.Scheme,
-			ConsulPort:          consulURL.Port(),
-			Ctx:                 ctx,
-			ReconcilePeriod:     c.flagHealthChecksReconcilePeriod,
-		}
-
-		healthChecksCtrl := &controller.Controller{
-			Log:      logger.Named("healthCheckController"),
-			Resource: &healthResource,
-		}
-
-		// Start the health check controller, reconcile is started at the same time
-		// and new events will queue in the informer.
-		go func() {
-			healthChecksCtrl.Run(ctx.Done())
-			// If ctl.Run() exits before ctx is cancelled, then our health checks
-			// controller isn't running. In that case we need to shutdown since
-			// this is unrecoverable.
-			if ctx.Err() == nil {
-				ctrlExitCh <- fmt.Errorf("health checks controller exited unexpectedly")
-			}
-		}()
-	}
-
 	// Block until we get a signal or something errors.
 	select {
 	case sig := <-c.sigCh:

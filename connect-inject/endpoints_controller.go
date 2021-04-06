@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
@@ -25,9 +25,15 @@ import (
 )
 
 const (
-	MetaKeyPodName         = "pod-name"
-	MetaKeyKubeServiceName = "k8s-service-name"
-	MetaKeyKubeNS          = "k8s-namespace"
+	MetaKeyPodName             = "pod-name"
+	MetaKeyKubeServiceName     = "k8s-service-name"
+	MetaKeyKubeNS              = "k8s-namespace"
+	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+	podPendingReasonMsg        = "Pod is pending"
+
+	// labelInject is the label which is applied by the connect-inject webhook to all pods.
+	// This is the key controllers will use on the label filter for its lister, watcher and reconciler.
+	labelInject = "consul.hashicorp.com/connect-inject-status"
 )
 
 type EndpointsController struct {
@@ -133,6 +139,18 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						r.Log.Error(err, "failed to register proxy service with Consul", "consul-proxy-service-name", proxyServiceRegistration.Name)
 						return ctrl.Result{}, err
 					}
+
+					// Update the TTL health check for the service.
+					// This is required because ServiceRegister() does not update the TTL if the service already exists.
+					r.Log.Info("updating ttl health check", "service", proxyServiceRegistration.Name)
+					status, reason, err := getReadyStatusAndReason(&pod)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+					err = client.Agent().UpdateTTL(getConsulHealthCheckID(&pod, serviceRegistration.ID), reason, status)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
 				}
 			}
 		}
@@ -210,6 +228,11 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		tags = append(tags, strings.Split(raw, ",")...)
 	}
 
+	status, _, err := getReadyStatusAndReason(&pod)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	service := &api.AgentServiceRegistration{
 		ID:        serviceID,
 		Name:      serviceName,
@@ -217,6 +240,14 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
 		Namespace: "", // TODO: namespace support
+		Check: &api.AgentServiceCheck{
+			CheckID:                getConsulHealthCheckID(&pod, serviceID),
+			Name:                   "Kubernetes Health Check",
+			TTL:                    "100000h",
+			Status:                 status,
+			SuccessBeforePassing:   1,
+			FailuresBeforeCritical: 1,
+		},
 	}
 	if len(tags) > 0 {
 		service.Tags = tags
@@ -270,6 +301,39 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 
 	return service, proxyService, nil
+}
+
+// getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
+// where the health check is registered and deregistered.
+func getConsulHealthCheckID(pod *corev1.Pod, serviceID string) string {
+	return fmt.Sprintf("%s/%s/kubernetes-health-check", pod.Namespace, serviceID)
+}
+
+// getReadyStatusAndReason returns the formatted status string to pass to Consul based on the
+// ready state of the pod along with the reason message which will be passed into the Notes
+// field of the Consul health check.
+func getReadyStatusAndReason(pod *corev1.Pod) (string, string, error) {
+	// A pod might be pending if the init containers have run but the non-init
+	// containers haven't reached running state. In this case we set a failing health
+	// check so the pod doesn't receive traffic before it's ready.
+	if pod.Status.Phase == corev1.PodPending {
+		return api.HealthCritical, podPendingReasonMsg, nil
+	}
+
+	for _, cond := range pod.Status.Conditions {
+		var consulStatus, reason string
+		if cond.Type == corev1.PodReady {
+			if cond.Status != corev1.ConditionTrue {
+				consulStatus = api.HealthCritical
+				reason = cond.Message
+			} else {
+				consulStatus = api.HealthPassing
+				reason = kubernetesSuccessReasonMsg
+			}
+			return consulStatus, reason, nil
+		}
+	}
+	return "", "", fmt.Errorf("no ready status for pod: %s", pod.Name)
 }
 
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata
