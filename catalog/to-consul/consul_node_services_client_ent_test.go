@@ -5,8 +5,8 @@ package catalog
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/testutil"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -327,22 +327,15 @@ func TestNamespacesNodeServicesClient_NodeServices(t *testing.T) {
 		}
 		t.Run(name, func(tt *testing.T) {
 			require := require.New(tt)
-			svr, err := testutil.NewTestServerConfigT(tt, nil)
-			require.NoError(err)
-			defer svr.Stop()
-
-			consulClient, err := api.NewClient(&api.Config{
-				Address: svr.HTTPAddr,
-			})
-			require.NoError(err)
+			consulClient := testutil.NewConsulTestServer(tt, nil)
 			for _, registration := range c.ConsulServices {
 				if registration.Service.Namespace != "" && registration.Service.Namespace != "default" {
-					_, _, err = consulClient.Namespaces().Create(&api.Namespace{
+					_, _, err := consulClient.Namespaces().Create(&api.Namespace{
 						Name: registration.Service.Namespace,
 					}, nil)
 					require.NoError(err)
 				}
-				_, err = consulClient.Catalog().Register(&registration, nil)
+				_, err := consulClient.Catalog().Register(&registration, nil)
 				require.NoError(err)
 			}
 
