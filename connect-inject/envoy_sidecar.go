@@ -10,6 +10,7 @@ import (
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type sidecarContainerCommandData struct {
@@ -68,6 +69,13 @@ func (h *Handler) envoySidecar(pod *corev1.Pod, k8sNamespace string) (corev1.Con
 						"-ec",
 						buf.String(),
 					},
+				},
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.IntOrString{Type: intstr.Int, IntVal: 20000},
 				},
 			},
 		},
