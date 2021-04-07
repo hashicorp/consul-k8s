@@ -35,6 +35,7 @@ type Command struct {
 	flagPodNamespace           string // Pod namespace.
 	flagAuthMethodNamespace    string // Consul namespace the auth-method is defined in.
 	flagConsulServiceNamespace string // Consul destination namespace for the service.
+	flagServiceAccountName     string // Service account name.
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -55,6 +56,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 	c.flagSet.StringVar(&c.flagAuthMethodNamespace, "auth-method-namespace", "", "Consul namespace the auth-method is defined in")
 	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
+	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
 
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
@@ -126,11 +128,12 @@ func (c *Command) Run(args []string) int {
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
 	// which maps to this pod+namespace.
 	var proxyID string
+	var errServiceNameMismatch error
 	err = backoff.Retry(func() error {
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))
+			c.UI.Error(fmt.Sprintf("unable to get Agent services: %s", err))
 			return err
 		}
 		// Wait for the service and the connect-proxy service to be registered.
@@ -140,6 +143,15 @@ func (c *Command) Run(args []string) int {
 		}
 		for _, svc := range serviceList {
 			c.UI.Info(fmt.Sprintf("Registered service has been detected: %s", svc.Service))
+			// When ACLs are enabled: If the flagServiceAccountName is empty, it means the service name pod annotation
+			// was set, so the check for service account name == consul service name has already occurred in
+			// container_init.go. If the flagServiceAccountName is not empty, we need to check whether it matches the
+			// Kubernetes service name.
+			if c.flagACLAuthMethod != "" && c.flagServiceAccountName != "" && svc.Meta[connectinject.MetaKeyKubeServiceName] != c.flagServiceAccountName {
+				// Set the error but return nil so we don't retry.
+				errServiceNameMismatch = fmt.Errorf("service account name %s doesn't match Kubernetes service name %s", c.flagServiceAccountName, svc.Meta[connectinject.MetaKeyKubeServiceName])
+				return nil
+			}
 			if svc.Kind == api.ServiceKindConnectProxy {
 				// This is the proxy service ID.
 				proxyID = svc.ID
@@ -153,6 +165,10 @@ func (c *Command) Run(args []string) int {
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Timed out waiting for service registration: %v", err))
+		return 1
+	}
+	if errServiceNameMismatch != nil {
+		c.UI.Error(errServiceNameMismatch.Error())
 		return 1
 	}
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.

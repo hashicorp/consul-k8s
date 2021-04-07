@@ -43,10 +43,12 @@ func TestHandlerContainerInit(t *testing.T) {
 	}
 
 	cases := []struct {
-		Name   string
-		Pod    func(*corev1.Pod) *corev1.Pod
-		Cmd    string // Strings.Contains test
-		CmdNot string // Not contains
+		Name    string
+		Pod     func(*corev1.Pod) *corev1.Pod
+		Handler Handler
+		ExpErr  string
+		Cmd     string // Strings.Contains test
+		CmdNot  string // Not contains
 	}{
 		// The first test checks the whole template. Subsequent tests check
 		// the parts that change.
@@ -56,6 +58,8 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
+			Handler{},
+			"",
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -68,6 +72,73 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			"",
 		},
 
+		{
+			"When auth method is set and there is a service name annotation, -service-account-name is passed as an empty flag",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Spec.ServiceAccountName = "web"
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{
+						Name:      "sa",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+					},
+				}
+				return pod
+			},
+			Handler{
+				AuthMethod: "an-auth-method",
+			},
+			"",
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="an-auth-method" \
+`,
+			"",
+		},
+
+		{
+			"Auth method is set and service account name doesn't match annotation",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Spec.ServiceAccountName = "not-match"
+				return pod
+			},
+			Handler{
+				AuthMethod: "an-auth-method",
+			},
+			"serviceAccountName \"not-match\" does not match service name \"web\"",
+			"",
+			"",
+		},
+
+		{
+			"When auth method is set and there is no service name annotation, -service-account-name is passed as a non-empty flag",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = ""
+				pod.Spec.ServiceAccountName = "a-service-account-name"
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{
+						Name:      "sa",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+					},
+				}
+				return pod
+			},
+			Handler{
+				AuthMethod: "an-auth-method",
+			},
+			"",
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="an-auth-method" \
+  -service-account-name="a-service-account-name" \
+`,
+			"",
+		},
 		{
 			"When running the merged metrics server, configures consul connect envoy command",
 			func(pod *corev1.Pod) *corev1.Pod {
@@ -86,6 +157,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
+			Handler{},
+			"",
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
@@ -100,14 +173,18 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := Handler{}
+			h := tt.Handler
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(pod, k8sNamespace)
-			require.NoError(err)
-			actual := strings.Join(container.Command, " ")
-			require.Contains(actual, tt.Cmd)
-			if tt.CmdNot != "" {
-				require.NotContains(actual, tt.CmdNot)
+			if tt.ExpErr != "" {
+				require.Equal(tt.ExpErr, err.Error())
+			} else {
+				require.NoError(err)
+				actual := strings.Join(container.Command, " ")
+				require.Contains(actual, tt.Cmd)
+				if tt.CmdNot != "" {
+					require.NotContains(actual, tt.CmdNot)
+				}
 			}
 		})
 	}
@@ -220,6 +297,7 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
+  -service-account-name="" \
   -auth-method-namespace="non-default" \
   -consul-service-namespace="non-default" \
 
@@ -250,6 +328,7 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
+  -service-account-name="" \
   -auth-method-namespace="default" \
   -consul-service-namespace="k8snamespace" \
 

@@ -15,9 +15,9 @@ const (
 )
 
 type initContainerCommandData struct {
-	// todo: remove once service name annotation is removed
-	ServiceName string
-	AuthMethod  string
+	ServiceName        string
+	ServiceAccountName string
+	AuthMethod         string
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
@@ -72,9 +72,17 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 
 	// When ACLs are enabled, the ACL token returned from `consul login` is only
-	// valid for a service with the same name as the ServiceAccountName.
-	if data.AuthMethod != "" && data.ServiceName != pod.Spec.ServiceAccountName {
+	// valid for a service with the same name as the ServiceAccountName. If the
+	// annotation for service name is set, check against that.
+	if data.AuthMethod != "" && data.ServiceName != "" && data.ServiceName != pod.Spec.ServiceAccountName {
 		return corev1.Container{}, fmt.Errorf("serviceAccountName %q does not match service name %q", pod.Spec.ServiceAccountName, data.ServiceName)
+	}
+
+	// If the service name annotation does not exist, set the service account name flag contents for the init container
+	// command. If the init container sees the service account name flag as non-empty, it will check it against the
+	// Kubernetes service name to ensure they are the same.
+	if data.ServiceName == "" {
+		data.ServiceAccountName = pod.Spec.ServiceAccountName
 	}
 
 	// This determines how to configure the consul connect envoy command: what
@@ -174,6 +182,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
+  -service-account-name="{{ .ServiceAccountName }}" \
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is

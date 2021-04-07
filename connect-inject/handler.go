@@ -298,13 +298,6 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 		return false, nil
 	}
 
-	// A service name is required. Whether a proxy accepting connections
-	// or just establishing outbound, a service name is required to acquire
-	// the correct certificate.
-	if pod.Annotations[annotationService] == "" {
-		return false, nil
-	}
-
 	// If the explicit true/false is on, then take that value. Note that
 	// this has to be the last check since it sets a default value after
 	// all other checks.
@@ -318,14 +311,6 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
-	}
-
-	// Default service name is the name of the first container.
-	if _, ok := pod.ObjectMeta.Annotations[annotationService]; !ok {
-		if cs := pod.Spec.Containers; len(cs) > 0 {
-			// Set the annotation for checking in shouldInject
-			pod.Annotations[annotationService] = cs[0].Name
-		}
 	}
 
 	// Default service port is the first port exported in the container
