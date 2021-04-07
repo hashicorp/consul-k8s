@@ -15,7 +15,6 @@ type rulesData struct {
 	InjectEnableNSMirroring bool
 	InjectNSMirroringPrefix string
 	SyncConsulNodeName      string
-	EnableHealthChecks      bool
 	EnableCleanupController bool
 }
 
@@ -214,7 +213,6 @@ func (c *Command) injectRules() (string, error) {
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
-{{- if (or .EnableHealthChecks .EnableCleanupController) }}
 node_prefix "" {
   policy = "write"
 }
@@ -226,7 +224,6 @@ namespace_prefix "" {
   }
 {{- if .EnableNamespaces }}
 }
-{{- end }}
 {{- end }}`
 	return c.renderRules(injectRulesTpl)
 }
@@ -293,7 +290,6 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:      c.flagSyncConsulNodeName,
-		EnableHealthChecks:      c.flagEnableHealthChecks,
 		EnableCleanupController: c.flagEnableCleanupController,
 	}
 }

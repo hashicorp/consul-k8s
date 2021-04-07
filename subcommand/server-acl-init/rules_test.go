@@ -498,26 +498,11 @@ namespace_prefix "prefix-" {
 func TestInjectRules(t *testing.T) {
 	cases := []struct {
 		EnableNamespaces        bool
-		EnableHealthChecks      bool
 		EnableCleanupController bool
 		Expected                string
 	}{
 		{
 			EnableNamespaces:        false,
-			EnableHealthChecks:      false,
-			EnableCleanupController: false,
-			Expected:                "",
-		},
-		{
-			EnableNamespaces:        true,
-			EnableHealthChecks:      false,
-			EnableCleanupController: false,
-			Expected: `
-operator = "write"`,
-		},
-		{
-			EnableNamespaces:        false,
-			EnableHealthChecks:      true,
 			EnableCleanupController: false,
 			Expected: `
 node_prefix "" {
@@ -529,7 +514,6 @@ node_prefix "" {
 		},
 		{
 			EnableNamespaces:        false,
-			EnableHealthChecks:      false,
 			EnableCleanupController: true,
 			Expected: `
 node_prefix "" {
@@ -541,7 +525,6 @@ node_prefix "" {
 		},
 		{
 			EnableNamespaces:        true,
-			EnableHealthChecks:      true,
 			EnableCleanupController: false,
 			Expected: `
 operator = "write"
@@ -556,7 +539,6 @@ namespace_prefix "" {
 		},
 		{
 			EnableNamespaces:        true,
-			EnableHealthChecks:      false,
 			EnableCleanupController: true,
 			Expected: `
 operator = "write"
@@ -568,45 +550,17 @@ namespace_prefix "" {
     policy = "write"
   }
 }`,
-		},
-		{
-			EnableNamespaces:        true,
-			EnableHealthChecks:      true,
-			EnableCleanupController: true,
-			Expected: `
-operator = "write"
-node_prefix "" {
-  policy = "write"
-}
-namespace_prefix "" {
-  service_prefix "" {
-    policy = "write"
-  }
-}`,
-		},
-		{
-			EnableNamespaces:        false,
-			EnableHealthChecks:      true,
-			EnableCleanupController: true,
-			Expected: `
-node_prefix "" {
-  policy = "write"
-}
-  service_prefix "" {
-    policy = "write"
-  }`,
 		},
 	}
 
 	for _, tt := range cases {
-		caseName := fmt.Sprintf("ns=%t health=%t cleanup=%t",
-			tt.EnableNamespaces, tt.EnableHealthChecks, tt.EnableCleanupController)
+		caseName := fmt.Sprintf("ns=%t cleanup=%t",
+			tt.EnableNamespaces, tt.EnableCleanupController)
 		t.Run(caseName, func(t *testing.T) {
 			require := require.New(t)
 
 			cmd := Command{
 				flagEnableNamespaces:        tt.EnableNamespaces,
-				flagEnableHealthChecks:      tt.EnableHealthChecks,
 				flagEnableCleanupController: tt.EnableCleanupController,
 			}
 

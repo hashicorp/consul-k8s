@@ -238,8 +238,8 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			LocalToken:  false,
 		},
 		{
-			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			TestName:    "Endpoints Controller ACL token",
+			TokenFlags:  []string{"-create-inject-token"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -401,8 +401,8 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken: true,
 		},
 		{
-			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
+			TestName:    "Endpoints controller ACL token",
+			TokenFlags:  []string{"-create-inject-token"},
 			PolicyNames: []string{"connect-inject-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
@@ -546,12 +546,6 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
-		},
-		{
-			TestName:    "Health Checks ACL token",
-			TokenFlags:  []string{"-create-inject-token", "-enable-health-checks"},
-			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 		},
 		{
 			TestName:    "Cleanup controller ACL token",

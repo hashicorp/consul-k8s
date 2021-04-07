@@ -679,8 +679,8 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
 			LocalToken:  false,
 		},
-		"inject token with health checks and namespaces": {
-			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces", "-enable-health-checks"},
+		"inject token and namespaces": {
+			TokenFlags:  []string{"-create-inject-token", "-enable-namespaces"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
