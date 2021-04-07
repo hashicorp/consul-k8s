@@ -23,6 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	testFailureMessage = "Kubernetes pod readiness probe failed"
+	ttl                = "ttl"
+)
+
 func TestShouldIgnore(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -416,7 +421,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedNumSvcInstances    int
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
-		expectedAgentHealthCheck   *api.AgentCheck
+		expectedAgentHealthCheck   []*api.AgentCheck
 	}{
 		{
 			name:          "Empty endpoints",
@@ -497,14 +502,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{},
 				},
 			},
-			expectedAgentHealthCheck: &api.AgentCheck{
-				CheckID:     "default/pod1-service-created/kubernetes-health-check",
-				ServiceName: "service-created",
-				ServiceID:   "pod1-service-created",
-				Name:        "Kubernetes Health Check",
-				Status:      api.HealthCritical,
-				Output:      testFailureMessage,
-				Type:        ttl,
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
 			},
 		},
 		{
@@ -595,14 +602,25 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{},
 				},
 			},
-			expectedAgentHealthCheck: &api.AgentCheck{
-				CheckID:     "default/pod1-service-created/kubernetes-health-check",
-				ServiceName: "service-created",
-				ServiceID:   "pod1-service-created",
-				Name:        "Kubernetes Health Check",
-				Status:      api.HealthCritical,
-				Output:      testFailureMessage,
-				Type:        ttl,
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod2-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod2-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
 			},
 		},
 		{
@@ -692,14 +710,16 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{"abc", "123", "def", "456"},
 				},
 			},
-			expectedAgentHealthCheck: &api.AgentCheck{
-				CheckID:     "default/pod1-different-consul-svc-name/kubernetes-health-check",
-				ServiceName: "different-consul-svc-name",
-				ServiceID:   "pod1-different-consul-svc-name",
-				Name:        "Kubernetes Health Check",
-				Status:      api.HealthCritical,
-				Output:      testFailureMessage,
-				Type:        ttl,
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-different-consul-svc-name/kubernetes-health-check",
+					ServiceName: "different-consul-svc-name",
+					ServiceID:   "pod1-different-consul-svc-name",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
 			},
 		},
 	}
@@ -799,13 +819,15 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			// Check that the Consul health check was created for the k8s pod.
 			if tt.expectedAgentHealthCheck != nil {
-				filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthCheck.CheckID)
-				check, err := consulClient.Agent().ChecksWithFilter(filter)
-				require.NoError(t, err)
-				require.EqualValues(t, len(check), 1)
-				// Ignoring Namespace because the response from ENT includes it and OSS does not.
-				var ignoredFields = []string{"Node", "Definition", "Namespace"}
-				require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck.CheckID], tt.expectedAgentHealthCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+				for i, _ := range tt.expectedConsulSvcInstances {
+					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthCheck[i].CheckID)
+					check, err := consulClient.Agent().ChecksWithFilter(filter)
+					require.NoError(t, err)
+					require.EqualValues(t, len(check), 1)
+					// Ignoring Namespace because the response from ENT includes it and OSS does not.
+					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck[i].CheckID], tt.expectedAgentHealthCheck[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+				}
 			}
 		})
 	}
@@ -835,7 +857,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 		expectedNumSvcInstances    int
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
-		expectedAgentHealthCheck   *api.AgentCheck
+		expectedAgentHealthCheck   []*api.AgentCheck
 	}{
 		{
 			name:          "Endpoints has an updated address because health check changes from unhealthy to healthy",
@@ -909,14 +931,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 				},
 			},
-			expectedAgentHealthCheck: &api.AgentCheck{
-				CheckID:     "default/pod1-service-updated/kubernetes-health-check",
-				ServiceName: "service-updated",
-				ServiceID:   "pod1-service-updated",
-				Name:        "Kubernetes Health Check",
-				Status:      api.HealthPassing,
-				Output:      kubernetesSuccessReasonMsg,
-				Type:        ttl,
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
 			},
 		},
 		{
@@ -987,14 +1011,16 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 				},
 			},
-			expectedAgentHealthCheck: &api.AgentCheck{
-				CheckID:     "default/pod1-service-updated/kubernetes-health-check",
-				ServiceName: "service-updated",
-				ServiceID:   "pod1-service-updated",
-				Name:        "Kubernetes Health Check",
-				Status:      api.HealthCritical,
-				Output:      testFailureMessage,
-				Type:        ttl,
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
 			},
 		},
 		{
@@ -1196,6 +1222,26 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					ServiceID:      "pod2-service-updated-sidecar-proxy",
 					ServiceAddress: "2.2.3.4",
+				},
+			},
+			expectedAgentHealthCheck: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod2-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod2-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
 				},
 			},
 		},
@@ -1579,13 +1625,15 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 				// Check that the Consul health check was created for the k8s pod.
 				if tt.expectedAgentHealthCheck != nil {
-					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthCheck.CheckID)
-					check, err := consulClient.Agent().ChecksWithFilter(filter)
-					require.NoError(t, err)
-					require.EqualValues(t, len(check), 1)
-					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace"}
-					require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck.CheckID], tt.expectedAgentHealthCheck, cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+					for i, _ := range tt.expectedConsulSvcInstances {
+						filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthCheck[i].CheckID)
+						check, err := consulClient.Agent().ChecksWithFilter(filter)
+						require.NoError(t, err)
+						require.EqualValues(t, len(check), 1)
+						// Ignoring Namespace because the response from ENT includes it and OSS does not.
+						var ignoredFields = []string{"Node", "Definition", "Namespace"}
+						require.True(t, cmp.Equal(check[tt.expectedAgentHealthCheck[i].CheckID], tt.expectedAgentHealthCheck[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+					}
 				}
 			})
 		}
@@ -2435,11 +2483,6 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 	}
 }
 
-const (
-	testFailureMessage = "Kubernetes pod readiness probe failed"
-	ttl                = "ttl"
-)
-
 func createPod(name, ip string, inject bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2460,7 +2503,7 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 		},
 	}
 	if inject {
-		pod.Labels[labelInject] = injected
+		pod.Labels[annotationStatus] = injected
 		pod.Annotations[annotationStatus] = injected
 	}
 	return pod

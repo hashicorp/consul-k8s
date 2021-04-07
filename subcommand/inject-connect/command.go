@@ -64,10 +64,6 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
-	// Flags to enable connect-inject health checks.
-	flagEnableHealthChecks          bool          // Start the health check controller.
-	flagHealthChecksReconcilePeriod time.Duration // Period for health check reconcile.
-
 	// Flags for cleanup controller.
 	flagEnableCleanupController          bool          // Start the cleanup controller.
 	flagCleanupControllerReconcilePeriod time.Duration // Period for cleanup controller reconcile.
@@ -150,9 +146,6 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
-	c.flagSet.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks-controller", false,
-		"Enables health checks controller.")
-	c.flagSet.DurationVar(&c.flagHealthChecksReconcilePeriod, "health-checks-reconcile-period", 1*time.Minute, "Reconcile period for health checks controller.")
 	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
 		"Enables cleanup controller that cleans up stale Consul service instances.")
 	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
@@ -462,20 +455,11 @@ func (c *Command) Run(args []string) int {
 				Log:                        logger.Named("handler"),
 			}})
 
-		// todo: Add tests in case it's not refactored to not have any signal handling
-		// (In the future, we plan to only have the manager and rely on it to do signal handling for us).
-		go func() {
-			// Pass existing context's done channel so that the controller
-			// will stop when this context is canceled.
-			// This could be due to an interrupt signal or if any other component did not start
-			// successfully. In those cases, we want to make sure that this controller is no longer
-			// running.
-			if err := mgr.Start(ctx); err != nil {
-				setupLog.Error(err, "problem running manager")
-				// Use an existing channel for ctrl exists in case manager failed to start properly.
-				ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
-			}
-		}()
+		if err := mgr.Start(ctx); err != nil {
+			setupLog.Error(err, "problem running manager")
+			// Use an existing channel for ctrl exists in case manager failed to start properly.
+			ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
+		}
 	}
 
 	if c.flagEnableCleanupController {

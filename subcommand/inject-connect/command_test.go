@@ -216,10 +216,10 @@ func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
 	require.Contains(t, ui.ErrorWriter.String(), "error parsing consul address \"http://%\": parse \"http://%\": invalid URL escape \"%")
 }
 
-// Test that when healthchecks are enabled that SIGINT/SIGTERM exits the
+// Test that when cleanup controller is enabled that SIGINT/SIGTERM exits the
 // command cleanly.
 func TestRun_CommandExitsCleanlyAfterSignal(t *testing.T) {
-	// TODO: fix this skip
+	// TODO: This test will be removed when the cleanupController is removed.
 	t.Skip("This test will be rewritten when the manager handles all signal handling")
 	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))

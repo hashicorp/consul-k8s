@@ -129,7 +129,6 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
-	// TODO: should this default to true?
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
 		"Toggle for creating a connect inject auth method and an ACL token.")
 	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",

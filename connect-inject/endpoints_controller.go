@@ -31,10 +31,6 @@ const (
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	podPendingReasonMsg        = "Pod is pending"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
-
-	// labelInject is the label which is applied by the connect-inject webhook to all pods.
-	// This is the key controllers will use on the label filter for its lister, watcher and reconciler.
-	labelInject = "consul.hashicorp.com/connect-inject-status"
 )
 
 type EndpointsController struct {
@@ -144,12 +140,12 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 					// Update the TTL health check for the service.
 					// This is required because ServiceRegister() does not update the TTL if the service already exists.
-					r.Log.Info("updating ttl health check", "service", proxyServiceRegistration.Name)
-					status, reason, err := getReadyStatusAndReason(&pod)
+					r.Log.Info("updating ttl health check", "service", serviceRegistration.Name)
+					status, reason, err := getReadyStatusAndReason(pod)
 					if err != nil {
 						return ctrl.Result{}, err
 					}
-					err = client.Agent().UpdateTTL(getConsulHealthCheckID(&pod, serviceRegistration.ID), reason, status)
+					err = client.Agent().UpdateTTL(getConsulHealthCheckID(pod, serviceRegistration.ID), reason, status)
 					if err != nil {
 						return ctrl.Result{}, err
 					}
@@ -230,7 +226,10 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		tags = append(tags, strings.Split(raw, ",")...)
 	}
 
-	status, _, err := getReadyStatusAndReason(&pod)
+	// We do not set the Notes field with the 'reason' on creation because it does not set the Output field which
+	// gets read by Consul and you'll end up with both Notes and Output set.
+	// Notes (reason) will updated by UpdateTTL() as soon as this function returns.
+	status, _, err := getReadyStatusAndReason(pod)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -243,7 +242,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Meta:      meta,
 		Namespace: "", // TODO: namespace support
 		Check: &api.AgentServiceCheck{
-			CheckID:                getConsulHealthCheckID(&pod, serviceID),
+			CheckID:                getConsulHealthCheckID(pod, serviceID),
 			Name:                   "Kubernetes Health Check",
 			TTL:                    "100000h",
 			Status:                 status,
@@ -325,14 +324,14 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
 // where the health check is registered and deregistered.
-func getConsulHealthCheckID(pod *corev1.Pod, serviceID string) string {
+func getConsulHealthCheckID(pod corev1.Pod, serviceID string) string {
 	return fmt.Sprintf("%s/%s/kubernetes-health-check", pod.Namespace, serviceID)
 }
 
 // getReadyStatusAndReason returns the formatted status string to pass to Consul based on the
 // ready state of the pod along with the reason message which will be passed into the Notes
 // field of the Consul health check.
-func getReadyStatusAndReason(pod *corev1.Pod) (string, string, error) {
+func getReadyStatusAndReason(pod corev1.Pod) (string, string, error) {
 	// A pod might be pending if the init containers have run but the non-init
 	// containers haven't reached running state. In this case we set a failing health
 	// check so the pod doesn't receive traffic before it's ready.

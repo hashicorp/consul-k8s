@@ -494,7 +494,7 @@ namespace_prefix "prefix-" {
 	}
 }
 
-// There are three true/false settings so 8 permutations to test.
+// Test the inject rules through the 4 permutations of Namespaces/controller enabled or disabled.
 func TestInjectRules(t *testing.T) {
 	cases := []struct {
 		EnableNamespaces        bool

@@ -206,7 +206,7 @@ namespace "{{ .SyncConsulDestNS }}" {
 
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
-	// If health checks are enabled it must also create/update service checks.
+	// It must also create/update service health checks via the endpoints controller.
 	// If the cleanup controller is enabled, it must be able to delete service
 	// instances from every client.
 	injectRulesTpl := `

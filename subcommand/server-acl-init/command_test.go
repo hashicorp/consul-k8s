@@ -494,6 +494,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-client-acl-token"},
 		},
 		{
+			TestName:    "Endpoints controller ACL token",
+			TokenFlags:  []string{"-create-inject-token"},
+			PolicyNames: []string{"connect-inject-token"},
+			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+		},
+		{
 			TestName:    "Sync token",
 			TokenFlags:  []string{"-create-sync-token"},
 			PolicyNames: []string{"catalog-sync-token"},
