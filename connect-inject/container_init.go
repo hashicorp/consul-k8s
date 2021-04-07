@@ -77,34 +77,16 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		return corev1.Container{}, fmt.Errorf("serviceAccountName %q does not match service name %q", pod.Spec.ServiceAccountName, data.ServiceName)
 	}
 
-	// If metrics are enabled, the init container should set up
-	// envoy_prometheus_bind_addr so there's a listener on 0.0.0.0 that points
-	// to a metrics backend. The metrics backend is determined by the call to
-	// h.shouldRunMergedMetricsServer(). If there is a merged metrics server,
-	// the backend would be that server. If we are not running the merged
-	// metrics server, the backend should just be the Envoy metrics endpoint.
-	enableMetrics, err := h.enableMetrics(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-	data.EnableMetrics = enableMetrics
-
-	prometheusScrapePort, err := h.prometheusScrapePort(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-	data.PrometheusScrapeListener = fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
-
 	// This determines how to configure the consul connect envoy command: what
 	// metrics backend to use and what path to expose on the
 	// envoy_prometheus_bind_addr listener for scraping.
-	run, err := h.shouldRunMergedMetricsServer(pod)
+	metricsServer, err := h.MetricsConfig.shouldRunMergedMetricsServer(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
-	if run {
-		prometheusScrapePath := h.prometheusScrapePath(pod)
-		mergedMetricsPort, err := h.mergedMetricsPort(pod)
+	if metricsServer {
+		prometheusScrapePath := h.MetricsConfig.prometheusScrapePath(pod)
+		mergedMetricsPort, err := h.MetricsConfig.mergedMetricsPort(pod)
 		if err != nil {
 			return corev1.Container{}, err
 		}
