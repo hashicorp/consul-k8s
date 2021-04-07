@@ -120,7 +120,7 @@ func TestAppMetrics(t *testing.T) {
 
 	// Deploy service that will emit app and envoy metrics at merged metrics endpoint
 	logger.Log(t, "creating static-metrics-app")
-	k8s.Deploy(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-metrics-app/deployment.yaml")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-metrics-app")
 
 	// Create the static-client deployment so we can use it for in-cluster calls to metrics endpoints.
 	// This simulates queries that would be made by a prometheus server that runs externally to the consul

@@ -133,7 +133,7 @@ jobs:
             # exit early if any test fails (-failfast only works within a single
             # package).
             exit_code=0
-            pkgs=$(go list ./... | grep -v -E 'metrics'| circleci tests split)
+            pkgs=$(go list ./... | circleci tests split)
             echo "Running $pkgs"
             for pkg in $pkgs
             do
@@ -143,7 +143,7 @@ jobs:
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=ishustava/consul-k8s-dev:04-06-2021-8a9a841 # TODO: change once feature-tproxy consul-k8s branch is merged
+                    -consul-k8s-image="gcr.io/nitya-293720/consul-k8s-dev:tproxymetrics2" # TODO: change once feature-tproxy consul-k8s branch is merged
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1
