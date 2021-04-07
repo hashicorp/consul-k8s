@@ -30,6 +30,7 @@ const (
 	MetaKeyKubeNS              = "k8s-namespace"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	podPendingReasonMsg        = "Pod is pending"
+	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
 
 	// labelInject is the label which is applied by the connect-inject webhook to all pods.
 	// This is the key controllers will use on the label filter for its lister, watcher and reconciler.
