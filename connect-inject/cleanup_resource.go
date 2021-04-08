@@ -107,7 +107,7 @@ func (c *CleanupResource) reconcile() {
 	}
 
 	podList, err := c.KubernetesClient.CoreV1().Pods(corev1.NamespaceAll).List(c.Ctx,
-		metav1.ListOptions{LabelSelector: labelInject})
+		metav1.ListOptions{LabelSelector: annotationStatus})
 	if err != nil {
 		c.Log.Error("unable to get pods", "error", err)
 		return
@@ -223,11 +223,11 @@ func (c *CleanupResource) Informer() cache.SharedIndexInformer {
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return c.KubernetesClient.CoreV1().Pods(metav1.NamespaceAll).List(c.Ctx,
-					metav1.ListOptions{LabelSelector: labelInject})
+					metav1.ListOptions{LabelSelector: annotationStatus})
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return c.KubernetesClient.CoreV1().Pods(metav1.NamespaceAll).Watch(c.Ctx,
-					metav1.ListOptions{LabelSelector: labelInject})
+					metav1.ListOptions{LabelSelector: annotationStatus})
 			},
 		},
 		&corev1.Pod{},

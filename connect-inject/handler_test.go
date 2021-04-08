@@ -334,7 +334,7 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
+					Path:      "/metadata/labels/" + escapeJSONPointer(annotationStatus),
 				},
 			},
 		},
@@ -406,7 +406,7 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/labels/" + escapeJSONPointer(labelInject),
+					Path:      "/metadata/labels/" + escapeJSONPointer(annotationStatus),
 				},
 			},
 		},

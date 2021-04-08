@@ -324,7 +324,7 @@ var (
 			Name:      "foo-abc123",
 			Namespace: "default",
 			Labels: map[string]string{
-				labelInject: injected,
+				annotationStatus: injected,
 			},
 			Annotations: map[string]string{
 				annotationStatus:  injected,

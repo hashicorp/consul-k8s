@@ -8,6 +8,8 @@ import (
 
 	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -19,6 +21,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+)
+
+const (
+	testFailureMessage = "Kubernetes pod readiness probe failed"
+	ttl                = "ttl"
 )
 
 func TestShouldIgnore(t *testing.T) {
@@ -363,7 +370,7 @@ func TestProcessUpstreams(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			httpAddr := consul.HTTPAddr
 			if tt.consulUnavailable {
 				httpAddr = "hostname.does.not.exist:8500"
@@ -414,6 +421,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedNumSvcInstances    int
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
+		expectedAgentHealthChecks  []*api.AgentCheck
 	}{
 		{
 			name:          "Empty endpoints",
@@ -436,6 +444,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			expectedNumSvcInstances:    0,
 			expectedConsulSvcInstances: []*api.CatalogService{},
 			expectedProxySvcInstances:  []*api.CatalogService{},
+			expectedAgentHealthChecks:  nil,
 		},
 		{
 			name:          "Basic endpoints",
@@ -491,6 +500,17 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
 					ServiceTags: []string{},
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
 				},
 			},
 		},
@@ -582,6 +602,26 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{},
 				},
 			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod2-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod2-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+			},
 		},
 		{
 			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",
@@ -670,6 +710,17 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{"abc", "123", "def", "456"},
 				},
 			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-different-consul-svc-name/kubernetes-health-check",
+					ServiceName: "different-consul-svc-name",
+					ServiceID:   "pod1-different-consul-svc-name",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+			},
 		},
 	}
 	for _, tt := range cases {
@@ -691,7 +742,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
@@ -765,6 +816,19 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Contains(t, expectedChecks, checks[0].Name)
 				require.Contains(t, expectedChecks, checks[1].Name)
 			}
+
+			// Check that the Consul health check was created for the k8s pod.
+			if tt.expectedAgentHealthChecks != nil {
+				for i, _ := range tt.expectedConsulSvcInstances {
+					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
+					check, err := consulClient.Agent().ChecksWithFilter(filter)
+					require.NoError(t, err)
+					require.EqualValues(t, len(check), 1)
+					// Ignoring Namespace because the response from ENT includes it and OSS does not.
+					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+				}
+			}
 		})
 	}
 }
@@ -773,6 +837,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 //   - Tests updates via the register codepath:
 //     - When an address in an Endpoint is updated, that the corresponding service instance in Consul is updated.
 //     - When an address is added to an Endpoint, an additional service instance in Consul is registered.
+//     - When an address in an Endpoint is updated - via health check change - the corresponding service instance is updated.
 //   - Tests updates via the deregister codepath:
 //     - When an address is removed from an Endpoint, the corresponding service instance in Consul is deregistered.
 //     - When an address is removed from an Endpoint *and there are no addresses left in the Endpoint*, the
@@ -792,7 +857,172 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 		expectedNumSvcInstances    int
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
+		expectedAgentHealthChecks  []*api.AgentCheck
 	}{
+		{
+			name:          "Endpoints has an updated address because health check changes from unhealthy to healthy",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				pod1.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Check: &api.AgentServiceCheck{
+						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
+						Name:                   "Kubernetes Health Check",
+						TTL:                    "100000h",
+						Status:                 "passing",
+						SuccessBeforePassing:   1,
+						FailuresBeforeCritical: 1,
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+			},
+		},
+		{
+			name:          "Endpoints has an updated address because health check changes from healthy to unhealthy",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Check: &api.AgentServiceCheck{
+						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
+						Name:                   "Kubernetes Health Check",
+						TTL:                    "100000h",
+						Status:                 "passing",
+						SuccessBeforePassing:   1,
+						FailuresBeforeCritical: 1,
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+			},
+		},
 		{
 			name:          "Endpoints has an updated address (pod IP change).",
 			consulSvcName: "service-updated",
@@ -992,6 +1222,26 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					ServiceID:      "pod2-service-updated-sidecar-proxy",
 					ServiceAddress: "2.2.3.4",
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod1-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod2-service-updated/kubernetes-health-check",
+					ServiceName: "service-updated",
+					ServiceID:   "pod2-service-updated",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      testFailureMessage,
+					Type:        ttl,
 				},
 			},
 		},
@@ -1277,6 +1527,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
 	}
+	// Each test is run with ACLs+TLS (secure) enabled and disabled.
 	for _, secure := range []bool{true, false} {
 		for _, tt := range cases {
 			t.Run(fmt.Sprintf("%s - secure: %v", tt.name, secure), func(t *testing.T) {
@@ -1308,12 +1559,15 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				require.NoError(t, err)
 				defer consul.Stop()
 				consul.WaitForSerfCheck(t)
+				addr := strings.Split(consul.HTTPAddr, ":")
+				consulPort := addr[1]
 
 				cfg := &api.Config{
 					Scheme:  "http",
 					Address: consul.HTTPAddr,
 				}
 				if secure {
+					consulPort = strings.Split(consul.HTTPSAddr, ":")[1]
 					cfg.Address = consul.HTTPSAddr
 					cfg.Scheme = "https"
 					cfg.TLSConfig = api.TLSConfig{
@@ -1323,8 +1577,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 				consulClient, err := api.NewClient(cfg)
 				require.NoError(t, err)
-				addr := strings.Split(cfg.Address, ":")
-				consulPort := addr[1]
 
 				// Register service and proxy in consul
 				for _, svc := range tt.initialConsulSvcs {
@@ -1370,6 +1622,18 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				for i, instance := range proxyServiceInstances {
 					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
 					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
+				}
+				// Check that the Consul health check was created for the k8s pod.
+				if tt.expectedAgentHealthChecks != nil {
+					for i, _ := range tt.expectedConsulSvcInstances {
+						filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
+						check, err := consulClient.Agent().ChecksWithFilter(filter)
+						require.NoError(t, err)
+						require.EqualValues(t, len(check), 1)
+						// Ignoring Namespace because the response from ENT includes it and OSS does not.
+						var ignoredFields = []string{"Node", "Definition", "Namespace"}
+						require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+					}
 				}
 			})
 		}
@@ -1456,7 +1720,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
 			}
@@ -2196,7 +2460,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForLeader(t)
+			consul.WaitForSerfCheck(t)
 			consulClient, err := api.NewClient(&api.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -2230,14 +2494,19 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 		Status: corev1.PodStatus{
 			PodIP:  ip,
 			HostIP: "127.0.0.1",
+			Phase:  corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:    corev1.PodReady,
+				Status:  corev1.ConditionFalse,
+				Message: testFailureMessage,
+			}},
 		},
 	}
 	if inject {
-		pod.Labels[labelInject] = injected
+		pod.Labels[annotationStatus] = injected
 		pod.Annotations[annotationStatus] = injected
 	}
 	return pod
-
 }
 
 func toStringPtr(input string) *string {

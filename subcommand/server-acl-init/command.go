@@ -80,9 +80,6 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
-	// Flag to indicate that the health checks controller is enabled.
-	flagEnableHealthChecks bool
-
 	flagEnableCleanupController bool
 
 	flagLogLevel string
@@ -133,7 +130,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-auth-method", false,
 		"Toggle for creating a connect inject auth method. Deprecated: use -create-inject-token instead.")
 	c.flags.BoolVar(&c.flagCreateInjectToken, "create-inject-token", false,
-		"Toggle for creating a connect inject auth method and an ACL token. The ACL token will only be created if either of the -enable-namespaces or -enable-health-checks flags is set.")
+		"Toggle for creating a connect inject auth method and an ACL token.")
 	c.flags.StringVar(&c.flagInjectAuthMethodHost, "inject-auth-method-host", "",
 		"Kubernetes Host config parameter for the auth method."+
 			"If not provided, the default cluster Kubernetes service will be used.")
@@ -196,9 +193,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
 			"When provided, servers will not be bootstrapped and their policies and tokens will not be updated.")
-
-	c.flags.BoolVar(&c.flagEnableHealthChecks, "enable-health-checks", false,
-		"Toggle for adding ACL rules for the health check controller to the connect ACL token. Requires -create-inject-token to be also be set.")
 
 	c.flags.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
 		"Toggle for adding ACL rules for the cleanup controller to the connect ACL token. Requires -create-inject-token to be also be set.")
@@ -484,27 +478,24 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		// If health checks or namespaces are enabled,
-		// then the connect injector needs an ACL token.
-		if c.flagEnableNamespaces || c.flagEnableHealthChecks || c.flagEnableCleanupController {
-			injectRules, err := c.injectRules()
-			if err != nil {
-				c.log.Error("Error templating inject rules", "err", err)
-				return 1
-			}
+		// The endpoints controller needs an ACL token always.
+		injectRules, err := c.injectRules()
+		if err != nil {
+			c.log.Error("Error templating inject rules", "err", err)
+			return 1
+		}
 
-			// If namespaces are enabled, the policy and token need to be global
-			// to be allowed to create namespaces.
-			if c.flagEnableNamespaces {
-				err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
-			} else {
-				err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
-			}
+		// If namespaces are enabled, the policy and token need to be global
+		// to be allowed to create namespaces.
+		if c.flagEnableNamespaces {
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
+		} else {
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+		}
 
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 	}
 
