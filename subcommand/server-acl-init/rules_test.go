@@ -494,16 +494,14 @@ namespace_prefix "prefix-" {
 	}
 }
 
-// Test the inject rules through the 4 permutations of Namespaces/controller enabled or disabled.
+// Test the inject rules with namespaces enabled or disabled.
 func TestInjectRules(t *testing.T) {
 	cases := []struct {
-		EnableNamespaces        bool
-		EnableCleanupController bool
-		Expected                string
+		EnableNamespaces bool
+		Expected         string
 	}{
 		{
-			EnableNamespaces:        false,
-			EnableCleanupController: false,
+			EnableNamespaces: false,
 			Expected: `
 node_prefix "" {
   policy = "write"
@@ -513,33 +511,7 @@ node_prefix "" {
   }`,
 		},
 		{
-			EnableNamespaces:        false,
-			EnableCleanupController: true,
-			Expected: `
-node_prefix "" {
-  policy = "write"
-}
-  service_prefix "" {
-    policy = "write"
-  }`,
-		},
-		{
-			EnableNamespaces:        true,
-			EnableCleanupController: false,
-			Expected: `
-operator = "write"
-node_prefix "" {
-  policy = "write"
-}
-namespace_prefix "" {
-  service_prefix "" {
-    policy = "write"
-  }
-}`,
-		},
-		{
-			EnableNamespaces:        true,
-			EnableCleanupController: true,
+			EnableNamespaces: true,
 			Expected: `
 operator = "write"
 node_prefix "" {
@@ -554,14 +526,12 @@ namespace_prefix "" {
 	}
 
 	for _, tt := range cases {
-		caseName := fmt.Sprintf("ns=%t cleanup=%t",
-			tt.EnableNamespaces, tt.EnableCleanupController)
+		caseName := fmt.Sprintf("ns=%t", tt.EnableNamespaces)
 		t.Run(caseName, func(t *testing.T) {
 			require := require.New(t)
 
 			cmd := Command{
-				flagEnableNamespaces:        tt.EnableNamespaces,
-				flagEnableCleanupController: tt.EnableCleanupController,
+				flagEnableNamespaces: tt.EnableNamespaces,
 			}
 
 			injectorRules, err := cmd.injectRules()
