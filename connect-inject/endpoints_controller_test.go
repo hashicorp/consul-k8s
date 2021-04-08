@@ -447,6 +447,75 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			expectedAgentHealthChecks:  nil,
 		},
 		{
+			name:          "PodPending endpoints",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true)
+				pod1.Status.Phase = corev1.PodPending
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						corev1.EndpointSubset{
+							Addresses: []corev1.EndpointAddress{
+								corev1.EndpointAddress{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs:       []*api.AgentServiceRegistration{},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created",
+					ServiceName:    "service-created",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    0,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceTags:    []string{},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created-sidecar-proxy",
+					ServiceName:    "service-created-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-created",
+						DestinationServiceID:   "pod1-service-created",
+						LocalServiceAddress:    "",
+						LocalServicePort:       0,
+					},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default"},
+					ServiceTags: []string{},
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthCritical,
+					Output:      podPendingReasonMsg,
+					Type:        ttl,
+				},
+			},
+		},
+		{
 			name:          "Basic endpoints",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {

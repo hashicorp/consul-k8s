@@ -2,29 +2,16 @@ package connectinject
 
 import (
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"syscall"
-	"time"
-
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/consul"
-	"github.com/hashicorp/consul-k8s/helper/controller"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
+	"io/ioutil"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,9 +21,15 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"net/http"
+	"net/url"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 type Command struct {
@@ -63,10 +56,6 @@ type Command struct {
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
-
-	// Flags for cleanup controller.
-	flagEnableCleanupController          bool          // Start the cleanup controller.
-	flagCleanupControllerReconcilePeriod time.Duration // Period for cleanup controller reconcile.
 
 	// Flags for endpoints controller.
 	flagReleaseName      string
@@ -103,10 +92,9 @@ type Command struct {
 	consulClient *api.Client
 	clientset    kubernetes.Interface
 
-	sigCh chan os.Signal
-	once  sync.Once
-	help  string
-	cert  atomic.Value
+	once sync.Once
+	help string
+	cert atomic.Value
 }
 
 var (
@@ -146,9 +134,6 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
-	c.flagSet.BoolVar(&c.flagEnableCleanupController, "enable-cleanup-controller", true,
-		"Enables cleanup controller that cleans up stale Consul service instances.")
-	c.flagSet.DurationVar(&c.flagCleanupControllerReconcilePeriod, "cleanup-controller-reconcile-period", 5*time.Minute, "Reconcile period for cleanup controller.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
@@ -200,13 +185,6 @@ func (c *Command) init() {
 	// the default flagSet. That's why we need to merge it to have access with our flagSet.
 	flags.Merge(c.flagSet, flag.CommandLine)
 	c.help = flags.Usage(help, c.flagSet)
-
-	// Wait on an interrupt or terminate for exit, be sure to init it before running
-	// the controller so that we don't receive an interrupt before it's ready.
-	if c.sigCh == nil {
-		c.sigCh = make(chan os.Signal, 1)
-		signal.Notify(c.sigCh, syscall.SIGINT, syscall.SIGTERM)
-	}
 }
 
 func (c *Command) Run(args []string) int {
@@ -366,143 +344,96 @@ func (c *Command) Run(args []string) int {
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
-	// Start the cleanup controller that cleans up Consul service instances
-	// still registered after the pod has been deleted (usually due to a force delete).
-	ctrlExitCh := make(chan error)
-
 	// Start the endpoints controller
-	{
-		zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
-		ctrl.SetLogger(zapLogger)
-		klog.SetLogger(zapLogger)
-		listenSplits := strings.SplitN(c.flagListen, ":", 2)
-		if len(listenSplits) < 2 {
-			c.UI.Error(fmt.Sprintf("missing port in address: %s", c.flagListen))
-			return 1
-		}
-		port, err := strconv.Atoi(listenSplits[1])
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("unable to parse port string: %s", err))
-			return 1
-		}
-
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-			Scheme:             scheme,
-			LeaderElection:     false,
-			Host:               listenSplits[0],
-			Port:               port,
-			Logger:             zapLogger,
-			MetricsBindAddress: "0.0.0.0:9444",
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to start manager")
-			return 1
-		}
-
-		metricsConfig := connectinject.MetricsConfig{
-			DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-			DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-			DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-		}
-
-		if err = (&connectinject.EndpointsController{
-			Client:                mgr.GetClient(),
-			ConsulClient:          c.consulClient,
-			ConsulScheme:          consulURL.Scheme,
-			ConsulPort:            consulURL.Port(),
-			AllowK8sNamespacesSet: allowK8sNamespaces,
-			DenyK8sNamespacesSet:  denyK8sNamespaces,
-			Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
-			Scheme:                mgr.GetScheme(),
-			ReleaseName:           c.flagReleaseName,
-			ReleaseNamespace:      c.flagReleaseNamespace,
-			MetricsConfig:         metricsConfig,
-			Context:               ctx,
-			ConsulClientCfg:       cfg,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
-			return 1
-		}
-
-		mgr.GetWebhookServer().CertDir = c.flagCertDir
-
-		mgr.GetWebhookServer().Register("/mutate",
-			&webhook.Admission{Handler: &connectinject.Handler{
-				ConsulClient:               c.consulClient,
-				ImageConsul:                c.flagConsulImage,
-				ImageEnvoy:                 c.flagEnvoyImage,
-				EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
-				ImageConsulK8S:             c.flagConsulK8sImage,
-				RequireAnnotation:          !c.flagDefaultInject,
-				AuthMethod:                 c.flagACLAuthMethod,
-				ConsulCACert:               string(consulCACert),
-				DefaultProxyCPURequest:     sidecarProxyCPURequest,
-				DefaultProxyCPULimit:       sidecarProxyCPULimit,
-				DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
-				DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
-				InitContainerResources:     initResources,
-				ConsulSidecarResources:     consulSidecarResources,
-				EnableNamespaces:           c.flagEnableNamespaces,
-				AllowK8sNamespacesSet:      allowK8sNamespaces,
-				DenyK8sNamespacesSet:       denyK8sNamespaces,
-				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-				EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-				K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-				CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-				MetricsConfig:              metricsConfig,
-				Log:                        logger.Named("handler"),
-			}})
-
-		if err := mgr.Start(ctx); err != nil {
-			setupLog.Error(err, "problem running manager")
-			// Use an existing channel for ctrl exists in case manager failed to start properly.
-			ctrlExitCh <- fmt.Errorf("endpoints controller exited unexpectedly")
-		}
-	}
-
-	if c.flagEnableCleanupController {
-		cleanupResource := connectinject.CleanupResource{
-			Log:                    logger.Named("cleanupResource"),
-			KubernetesClient:       c.clientset,
-			Ctx:                    ctx,
-			ReconcilePeriod:        c.flagCleanupControllerReconcilePeriod,
-			ConsulClient:           c.consulClient,
-			ConsulScheme:           consulURL.Scheme,
-			ConsulPort:             consulURL.Port(),
-			EnableConsulNamespaces: c.flagEnableNamespaces,
-		}
-		cleanupCtrl := &controller.Controller{
-			Log:      logger.Named("cleanupController"),
-			Resource: &cleanupResource,
-		}
-		go func() {
-			cleanupCtrl.Run(ctx.Done())
-			if ctx.Err() == nil {
-				ctrlExitCh <- fmt.Errorf("cleanup controller exited unexpectedly")
-			}
-		}()
-	}
-
-	// Block until we get a signal or something errors.
-	select {
-	case sig := <-c.sigCh:
-		c.UI.Info(fmt.Sprintf("%s received, shutting down", sig))
-		return 0
-
-	case err := <-ctrlExitCh:
-		c.UI.Error(fmt.Sprintf("controller error: %v", err))
+	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+	ctrl.SetLogger(zapLogger)
+	klog.SetLogger(zapLogger)
+	listenSplits := strings.SplitN(c.flagListen, ":", 2)
+	if len(listenSplits) < 2 {
+		c.UI.Error(fmt.Sprintf("missing port in address: %s", c.flagListen))
 		return 1
 	}
-}
+	port, err := strconv.Atoi(listenSplits[1])
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to parse port string: %s", err))
+		return 1
+	}
 
-func (c *Command) interrupt() {
-	c.sendSignal(syscall.SIGINT)
-}
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:             scheme,
+		LeaderElection:     false,
+		Host:               listenSplits[0],
+		Port:               port,
+		Logger:             zapLogger,
+		MetricsBindAddress: "0.0.0.0:9444",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		return 1
+	}
 
-func (c *Command) sendSignal(sig os.Signal) {
-	c.sigCh <- sig
+	metricsConfig := connectinject.MetricsConfig{
+		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+	}
+
+	if err = (&connectinject.EndpointsController{
+		Client:                mgr.GetClient(),
+		ConsulClient:          c.consulClient,
+		ConsulScheme:          consulURL.Scheme,
+		ConsulPort:            consulURL.Port(),
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
+		Scheme:                mgr.GetScheme(),
+		ReleaseName:           c.flagReleaseName,
+		ReleaseNamespace:      c.flagReleaseNamespace,
+		MetricsConfig:         metricsConfig,
+		Context:               ctx,
+		ConsulClientCfg:       cfg,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
+		return 1
+	}
+
+	mgr.GetWebhookServer().CertDir = c.flagCertDir
+
+	mgr.GetWebhookServer().Register("/mutate",
+		&webhook.Admission{Handler: &connectinject.Handler{
+			ConsulClient:               c.consulClient,
+			ImageConsul:                c.flagConsulImage,
+			ImageEnvoy:                 c.flagEnvoyImage,
+			EnvoyExtraArgs:             c.flagEnvoyExtraArgs,
+			ImageConsulK8S:             c.flagConsulK8sImage,
+			RequireAnnotation:          !c.flagDefaultInject,
+			AuthMethod:                 c.flagACLAuthMethod,
+			ConsulCACert:               string(consulCACert),
+			DefaultProxyCPURequest:     sidecarProxyCPURequest,
+			DefaultProxyCPULimit:       sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
+			InitContainerResources:     initResources,
+			ConsulSidecarResources:     consulSidecarResources,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			AllowK8sNamespacesSet:      allowK8sNamespaces,
+			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			MetricsConfig:              metricsConfig,
+			Log:                        logger.Named("handler"),
+		}})
+
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+		return 1
+	}
+	c.UI.Info("shutting down")
+	return 0
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
@@ -510,15 +441,6 @@ func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
 	// there is a TLS certificate. If we reached this point it means we
 	// served a TLS certificate.
 	rw.WriteHeader(204)
-}
-
-func (c *Command) getCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-	certRaw := c.cert.Load()
-	if certRaw == nil {
-		return nil, fmt.Errorf("No certificate available.")
-	}
-
-	return certRaw.(*tls.Certificate), nil
 }
 
 func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {
