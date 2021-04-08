@@ -1,12 +1,13 @@
 package connectinject
 
 import (
+	"os"
+	"testing"
+
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
-	"os"
-	"testing"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
