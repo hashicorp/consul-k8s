@@ -15,7 +15,6 @@ type rulesData struct {
 	InjectEnableNSMirroring bool
 	InjectNSMirroringPrefix string
 	SyncConsulNodeName      string
-	EnableHealthChecks      bool
 	EnableCleanupController bool
 }
 
@@ -207,14 +206,13 @@ namespace "{{ .SyncConsulDestNS }}" {
 
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
-	// If health checks are enabled it must also create/update service checks.
+	// It must also create/update service health checks via the endpoints controller.
 	// If the cleanup controller is enabled, it must be able to delete service
 	// instances from every client.
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
 {{- end }}
-{{- if (or .EnableHealthChecks .EnableCleanupController) }}
 node_prefix "" {
   policy = "write"
 }
@@ -226,7 +224,6 @@ namespace_prefix "" {
   }
 {{- if .EnableNamespaces }}
 }
-{{- end }}
 {{- end }}`
 	return c.renderRules(injectRulesTpl)
 }
@@ -293,7 +290,6 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:      c.flagSyncConsulNodeName,
-		EnableHealthChecks:      c.flagEnableHealthChecks,
 		EnableCleanupController: c.flagEnableCleanupController,
 	}
 }
