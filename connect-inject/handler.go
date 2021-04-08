@@ -239,7 +239,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	pod.Labels[labelInject] = injected
+	pod.Labels[annotationStatus] = injected
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if h.EnableNamespaces {

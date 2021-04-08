@@ -155,14 +155,12 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true",
 				"-http-addr=http://0.0.0.0:9999",
 				"-listen", "999999"},
 			expErr: "missing port in address: 999999",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-enable-health-checks-controller=true",
 				"-http-addr=http://0.0.0.0:9999",
 				"-listen", ":foobar"},
 			expErr: "unable to parse port string: strconv.Atoi: parsing \"foobar\": invalid syntax",
@@ -208,8 +206,7 @@ func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
 		UI:        ui,
 		clientset: k8sClient,
 	}
-	flags := []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-		"-enable-health-checks-controller=true"}
+	flags := []string{"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0"}
 
 	os.Setenv(api.HTTPAddrEnvName, "%")
 	code := cmd.Run(flags)
@@ -219,10 +216,10 @@ func TestRun_ValidationConsulHTTPAddr(t *testing.T) {
 	require.Contains(t, ui.ErrorWriter.String(), "error parsing consul address \"http://%\": parse \"http://%\": invalid URL escape \"%")
 }
 
-// Test that when healthchecks are enabled that SIGINT/SIGTERM exits the
+// Test that when cleanup controller is enabled that SIGINT/SIGTERM exits the
 // command cleanly.
 func TestRun_CommandExitsCleanlyAfterSignal(t *testing.T) {
-	// TODO: fix this skip
+	// TODO: This test will be removed when the cleanupController is removed.
 	t.Skip("This test will be rewritten when the manager handles all signal handling")
 	t.Run("SIGINT", testSignalHandling(syscall.SIGINT))
 	t.Run("SIGTERM", testSignalHandling(syscall.SIGTERM))
@@ -245,7 +242,6 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 		// Start the command asynchronously and then we'll send an interrupt.
 		exitChan := runCommandAsynchronously(&cmd, []string{
 			"-consul-k8s-image", "hashicorp/consul-k8s", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-			"-enable-health-checks-controller=true",
 			"-listen", fmt.Sprintf(":%d", ports[0]),
 		})
 
