@@ -46,13 +46,7 @@ func TestConsulLogin(t *testing.T) {
 	tokenFile := WriteTempFile(t, "")
 
 	client := startMockServer(t, &counter)
-	err := ConsulLogin(
-		client,
-		bearerTokenFile,
-		testAuthMethod,
-		tokenFile,
-		testPodMeta,
-	)
+	err := ConsulLogin(client, bearerTokenFile, testAuthMethod, tokenFile, "", testPodMeta)
 	require.NoError(err)
 	require.Equal(counter, 1)
 	// Validate that the token file was written to disk.
@@ -71,6 +65,7 @@ func TestConsulLogin_EmptyBearerTokenFile(t *testing.T) {
 		bearerTokenFile,
 		testAuthMethod,
 		"",
+		"",
 		testPodMeta,
 	)
 	require.EqualError(err, fmt.Sprintf("no bearer token found in %s", bearerTokenFile))
@@ -84,6 +79,7 @@ func TestConsulLogin_BearerTokenFileDoesNotExist(t *testing.T) {
 		nil,
 		randFileName,
 		testAuthMethod,
+		"",
 		"",
 		testPodMeta,
 	)
@@ -103,6 +99,7 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 		bearerTokenFile,
 		testAuthMethod,
 		randFileName,
+		"",
 		testPodMeta,
 	)
 	require.Error(err)

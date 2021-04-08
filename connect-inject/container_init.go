@@ -178,11 +178,14 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
          defined in the default namespace */}}
-  -namespace="default"
+  -auth-method-namespace="default" \
   {{- else }}
-  -namespace="{{ .ConsulNamespace }}"
+  -auth-method-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   {{- end }}
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -consul-service-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
 
 # Generate the envoy bootstrap code
