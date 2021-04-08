@@ -362,7 +362,8 @@ func (c *Command) Run(args []string) int {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		LeaderElection:     false,
+		LeaderElection:     true,
+		LeaderElectionID:   "consul-controller-lock",
 		Host:               listenSplits[0],
 		Port:               port,
 		Logger:             zapLogger,
