@@ -228,7 +228,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
-	pod.Annotations[keyInjectStatus] = injected
+	pod.Annotations[annotationStatus] = injected
 
 	// Add annotations for metrics.
 	if err = h.prometheusAnnotations(&pod); err != nil {
@@ -239,7 +239,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	pod.Labels[keyInjectStatus] = injected
+	pod.Labels[annotationStatus] = injected
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if h.EnableNamespaces {
@@ -294,7 +294,7 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	}
 
 	// If we already injected then don't inject again
-	if pod.Annotations[keyInjectStatus] != "" {
+	if pod.Annotations[annotationStatus] != "" {
 		return false, nil
 	}
 
