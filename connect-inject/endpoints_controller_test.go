@@ -2503,8 +2503,8 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 		},
 	}
 	if inject {
-		pod.Labels[annotationStatus] = injected
-		pod.Annotations[annotationStatus] = injected
+		pod.Labels[keyInjectStatus] = injected
+		pod.Annotations[keyInjectStatus] = injected
 	}
 	return pod
 }

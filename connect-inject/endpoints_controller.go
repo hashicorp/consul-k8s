@@ -614,7 +614,7 @@ func (r EndpointsController) requestsForRunningAgentPods(object client.Object) [
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
 func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[annotationStatus]; ok {
+	if anno, ok := pod.Annotations[keyInjectStatus]; ok {
 		if anno == injected {
 			return true
 		}
