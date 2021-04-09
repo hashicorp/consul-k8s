@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -136,7 +137,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	require.NoError(t, err)
 	defer consul.Stop()
 
-	consul.WaitForSerfCheck(t)
+	consul.WaitForServiceIntentions(t)
 	cfg := &api.Config{
 		Address: consul.HTTPSAddr,
 		Scheme:  "https",
@@ -431,7 +432,7 @@ func TestProcessUpstreams(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForSerfCheck(t)
+			consul.WaitForServiceIntentions(t)
 			httpAddr := consul.HTTPAddr
 			if tt.consulUnavailable {
 				httpAddr = "hostname.does.not.exist:8500"
@@ -804,7 +805,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
-			consul.WaitForSerfCheck(t)
+			consul.WaitForServiceIntentions(t)
 
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
@@ -1620,7 +1621,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				})
 				require.NoError(t, err)
 				defer consul.Stop()
-				consul.WaitForSerfCheck(t)
+				consul.WaitForServiceIntentions(t)
 				addr := strings.Split(consul.HTTPAddr, ":")
 				consulPort := addr[1]
 
@@ -1782,7 +1783,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForSerfCheck(t)
+			consul.WaitForServiceIntentions(t)
 			cfg := &api.Config{
 				Address: consul.HTTPAddr,
 			}
@@ -2426,6 +2427,8 @@ func TestRequestsForRunningAgentPods(t *testing.T) {
 }
 
 func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
+	t.Parallel()
+
 	const (
 		k8sSvc = "k8s-svc"
 		k8sNS  = "k8s-ns"
@@ -2522,7 +2525,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			require.NoError(t, err)
 			defer consul.Stop()
 
-			consul.WaitForSerfCheck(t)
+			consul.WaitForServiceIntentions(t)
 			consulClient, err := api.NewClient(&api.Config{
 				Address: consul.HTTPAddr,
 			})
@@ -2540,6 +2543,395 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				require.Equal(t, c.expected["foo1"].Service, svcs["foo1"].Service)
 				require.NotNil(t, c.expected["foo1-proxy"], svcs["foo1-proxy"])
 				require.Equal(t, c.expected["foo1-proxy"].Service, svcs["foo1-proxy"].Service)
+			}
+		})
+	}
+}
+
+func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *testing.T) {
+	t.Parallel()
+
+	const serviceName = "test-service"
+
+	cases := map[string]struct {
+		globalEnabled      bool
+		annotationEnabled  *bool
+		service            *corev1.Service
+		expTaggedAddresses map[string]api.ServiceAddress
+		proxyMode          api.ProxyMode
+		expErr             string
+	}{
+		"enabled globally, annotation not provided": {
+			globalEnabled:     true,
+			annotationEnabled: nil,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+		"enabled globally, annotation is false": {
+			globalEnabled:     true,
+			annotationEnabled: pointerToBool(false),
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			expErr:             "",
+		},
+		"enabled globally, annotation is true": {
+			globalEnabled:     true,
+			annotationEnabled: pointerToBool(true),
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+		"disabled globally, annotation not provided": {
+			globalEnabled:     false,
+			annotationEnabled: nil,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			expErr:             "",
+		},
+		"disabled globally, annotation is false": {
+			globalEnabled:     false,
+			annotationEnabled: pointerToBool(false),
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			expErr:             "",
+		},
+		"disabled globally, annotation is true": {
+			globalEnabled:     false,
+			annotationEnabled: pointerToBool(true),
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+		// This case is impossible since we're always passing an endpoints object to this function,
+		// and Kubernetes will ensure that there is only an endpoints object if there is a service object.
+		// However, we're testing this case to check that we return an error in case we cannot get the service from k8s.
+		"no service": {
+			globalEnabled:      true,
+			service:            nil,
+			expTaggedAddresses: nil,
+			proxyMode:          api.ProxyModeDefault,
+			expErr:             "services \"test-service\" not found",
+		},
+		"service with a single port without a name": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+		"service with a single port with a name": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Name: "tcp",
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual-tcp": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+		"service with a multiple ports": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Name: "tcp",
+							Port: 80,
+						},
+						{
+							Name: "http",
+							Port: 8080,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual-tcp": {
+					Address: "10.0.0.1",
+					Port:    80,
+				},
+				"virtual-http": {
+					Address: "10.0.0.1",
+					Port:    8080,
+				},
+			},
+			expErr: "",
+		},
+		"service with clusterIP=None (headless service)": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: corev1.ClusterIPNone,
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			expErr:             "",
+		},
+		"service with an empty clusterIP": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			expErr:             "",
+		},
+		"service with an invalid clusterIP": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "invalid",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			expTaggedAddresses: nil,
+			proxyMode:          api.ProxyModeDefault,
+			expErr:             "",
+		},
+		"service with an IPv6 clusterIP": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "2001:db8::68",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "2001:db8::68",
+					Port:    80,
+				},
+			},
+			expErr: "",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := createPod("test-pod-1", "1.2.3.4", false)
+			if c.annotationEnabled != nil {
+				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
+			}
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP: "1.2.3.4",
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      pod.Name,
+									Namespace: pod.Namespace,
+								},
+							},
+						},
+					},
+				},
+			}
+			var fakeClient client.Client
+			if c.service != nil {
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, c.service).Build()
+			} else {
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints).Build()
+			}
+
+			epCtrl := EndpointsController{
+				Client:                 fakeClient,
+				EnableTransparentProxy: c.globalEnabled,
+				Log:                    logrtest.TestLogger{T: t},
+			}
+
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints)
+			if c.expErr != "" {
+				require.EqualError(t, err, c.expErr)
+			} else {
+				require.NoError(t, err)
+
+				require.Equal(t, c.proxyMode, proxyServiceRegistration.Proxy.Mode)
+				require.Equal(t, serviceRegistration.TaggedAddresses, c.expTaggedAddresses)
+				require.Equal(t, proxyServiceRegistration.TaggedAddresses, c.expTaggedAddresses)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/deckarep/golang-set"
@@ -32,6 +33,7 @@ const (
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	podPendingReasonMsg        = "Pod is pending"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
+	clusterIPTaggedAddressName = "virtual"
 )
 
 type EndpointsController struct {
@@ -72,9 +74,14 @@ type EndpointsController struct {
 	ReleaseName string
 	// ReleaseNamespace is the namespace where Consul is installed.
 	ReleaseNamespace string
-	MetricsConfig    MetricsConfig
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
+	// EnableTransparentProxy controls whether transparent proxy should be enabled
+	// for all proxy service registrations.
+	EnableTransparentProxy bool
+
+	MetricsConfig MetricsConfig
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+
 	context.Context
 }
 
@@ -313,15 +320,14 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	proxyConfig.Upstreams = upstreams
 
 	proxyService := &api.AgentServiceRegistration{
-		Kind:            api.ServiceKindConnectProxy,
-		ID:              proxyServiceID,
-		Name:            proxyServiceName,
-		Port:            20000,
-		Address:         pod.Status.PodIP,
-		TaggedAddresses: nil, // TODO: set cluster IP here (will be done later)
-		Meta:            meta,
-		Namespace:       r.consulNamespace(pod.Namespace),
-		Proxy:           proxyConfig,
+		Kind:      api.ServiceKindConnectProxy,
+		ID:        proxyServiceID,
+		Name:      proxyServiceName,
+		Port:      20000,
+		Address:   pod.Status.PodIP,
+		Meta:      meta,
+		Namespace: r.consulNamespace(pod.Namespace),
+		Proxy:     proxyConfig,
 		Checks: api.AgentServiceChecks{
 			{
 				Name:                           "Proxy Public Listener",
@@ -334,10 +340,47 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				AliasService: serviceID,
 			},
 		},
-		Connect: nil,
 	}
 	if len(tags) > 0 {
 		proxyService.Tags = tags
+	}
+
+	tproxyEnabled, err := transparentProxyEnabled(pod, r.EnableTransparentProxy)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if tproxyEnabled {
+		var k8sService corev1.Service
+
+		err := r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace}, &k8sService)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Check if the service has a valid IP.
+		parsedIP := net.ParseIP(k8sService.Spec.ClusterIP)
+		if parsedIP != nil {
+			taggedAddresses := make(map[string]api.ServiceAddress)
+			for _, servicePort := range k8sService.Spec.Ports {
+				taggedAddressKey := clusterIPTaggedAddressName
+				if servicePort.Name != "" {
+					taggedAddressKey = fmt.Sprintf("%s-%s", clusterIPTaggedAddressName, servicePort.Name)
+				}
+
+				taggedAddresses[taggedAddressKey] = api.ServiceAddress{
+					Address: k8sService.Spec.ClusterIP,
+					Port:    int(servicePort.Port),
+				}
+			}
+
+			service.TaggedAddresses = taggedAddresses
+			proxyService.TaggedAddresses = taggedAddresses
+
+			proxyService.Proxy.Mode = api.ProxyModeTransparent
+		} else {
+			r.Log.Info("skipping syncing service cluster IP to Consul", "name", k8sService.Name, "ns", k8sService.Namespace, "ip", k8sService.Spec.ClusterIP)
+		}
 	}
 
 	return service, proxyService, nil

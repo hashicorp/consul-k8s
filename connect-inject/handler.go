@@ -122,6 +122,11 @@ type Handler struct {
 	// will be populated by the defaults provided in the initial flags.
 	ConsulSidecarResources corev1.ResourceRequirements
 
+	// EnableTransparentProxy enables transparent proxy mode.
+	// This means that the injected init container will apply traffic redirection rules
+	// so that all traffic will go through the Envoy proxy.
+	EnableTransparentProxy bool
+
 	// Log
 	Log hclog.Logger
 

@@ -88,6 +88,9 @@ type Command struct {
 	flagInitContainerMemoryLimit   string
 	flagInitContainerMemoryRequest string
 
+	// Transparent proxy flag(s).
+	flagEnableTransparentProxy bool
+
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
 
@@ -150,6 +153,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", false,
+		"Enable transparent proxy mode for all Consul service mesh applications.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -397,6 +402,7 @@ func (c *Command) Run(args []string) int {
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+		EnableTransparentProxy:     c.flagEnableTransparentProxy,
 		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
@@ -433,6 +439,7 @@ func (c *Command) Run(args []string) int {
 			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			EnableTransparentProxy:     c.flagEnableTransparentProxy,
 			Log:                        logger.Named("handler"),
 		}})
 
