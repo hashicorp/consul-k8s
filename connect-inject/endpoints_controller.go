@@ -332,13 +332,6 @@ func getConsulHealthCheckID(pod corev1.Pod, serviceID string) string {
 // ready state of the pod along with the reason message which will be passed into the Notes
 // field of the Consul health check.
 func getReadyStatusAndReason(pod corev1.Pod) (string, string, error) {
-	// A pod might be pending if the init containers have run but the non-init
-	// containers haven't reached running state. In this case we set a failing health
-	// check so the pod doesn't receive traffic before it's ready.
-	if pod.Status.Phase == corev1.PodPending {
-		return api.HealthCritical, podPendingReasonMsg, nil
-	}
-
 	for _, cond := range pod.Status.Conditions {
 		var consulStatus, reason string
 		if cond.Type == corev1.PodReady {
