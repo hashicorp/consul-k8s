@@ -1,9 +1,9 @@
 package connectinject
 
 const (
-	// keyInjectStatus is the key of the annotation+label that is added to
+	// annotationStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
-	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
+	annotationStatus = "consul.hashicorp.com/connect-inject-status"
 
 	// annotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
