@@ -2,7 +2,6 @@ package connectinject
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"text/template"
 
@@ -64,25 +63,15 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
-		ServiceName:               pod.Annotations[annotationService],
 		AuthMethod:                h.AuthMethod,
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
 	}
 
-	// When ACLs are enabled, the ACL token returned from `consul login` is only
-	// valid for a service with the same name as the ServiceAccountName. If the
-	// annotation for service name is set, check against that.
-	if data.AuthMethod != "" && data.ServiceName != "" && data.ServiceName != pod.Spec.ServiceAccountName {
-		return corev1.Container{}, fmt.Errorf("serviceAccountName %q does not match service name %q", pod.Spec.ServiceAccountName, data.ServiceName)
-	}
-
-	// If the service name annotation does not exist, set the service account name flag contents for the init container
-	// command. If the init container sees the service account name flag as non-empty, it will check it against the
-	// Kubernetes service name to ensure they are the same.
-	if data.ServiceName == "" {
+	if data.AuthMethod != "" {
 		data.ServiceAccountName = pod.Spec.ServiceAccountName
+		data.ServiceName = pod.Annotations[annotationService]
 	}
 
 	// This determines how to configure the consul connect envoy command: what
@@ -183,6 +172,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
+  -service-name="{{ .ServiceName }}" \
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is

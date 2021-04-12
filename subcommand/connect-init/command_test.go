@@ -32,6 +32,10 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-pod-name", testPodName},
 			expErr: "-pod-namespace must be set",
 		},
+		{
+			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod},
+			expErr: "-service-account-name must be set when ACLs are enabled",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -54,29 +58,47 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 	cases := []struct {
 		name                       string
 		tls                        bool
+		serviceAccountName         string
+		serviceName                string
 		includeServiceAccountName  bool
 		serviceAccountNameMismatch bool
 		expErr                     string
 	}{
 		{
-			name: "ACLs enabled, no tls",
-			tls:  false,
+			name:               "ACLs enabled, no tls",
+			tls:                false,
+			serviceAccountName: "counting",
 		},
 		{
-			name: "ACLs enabled, tls",
-			tls:  true,
+			name:               "ACLs enabled, tls",
+			tls:                true,
+			serviceAccountName: "counting",
 		},
 		{
-			name:                      "ACLs enabled, include service account name that matches",
-			tls:                       false,
-			includeServiceAccountName: true,
+			name:               "ACLs enabled, K8s service name matches service account name",
+			tls:                false,
+			serviceAccountName: "counting",
+			serviceName:        "",
 		},
 		{
-			name:                       "ACLs enabled, include service account name that doesn't match",
-			tls:                        false,
-			includeServiceAccountName:  true,
-			serviceAccountNameMismatch: true,
-			expErr:                     "service account name not-a-match doesn't match Kubernetes service name counting",
+			name:               "ACLs enabled, service name annotation matches service account name",
+			tls:                false,
+			serviceAccountName: "web",
+			serviceName:        "web",
+		},
+		{
+			name:               "ACLs enabled, service name annotation doesn't match service account name",
+			tls:                false,
+			serviceAccountName: "not-a-match",
+			serviceName:        "web",
+			expErr:             "service account name not-a-match doesn't match annotation service name web",
+		},
+		{
+			name:               "ACLs enabled, K8s service name doesn't match service account name",
+			tls:                false,
+			serviceAccountName: "not-a-match",
+			serviceName:        "",
+			expErr:             "service account name not-a-match doesn't match Consul service name counting",
 		},
 	}
 	for _, test := range cases {
@@ -177,14 +199,9 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
+				"-service-account-name", test.serviceAccountName,
+				"-service-name", test.serviceName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
-			}
-			if test.includeServiceAccountName {
-				serviceAccountName := "counting"
-				if test.serviceAccountNameMismatch {
-					serviceAccountName = "not-a-match"
-				}
-				flags = append(flags, "-service-account-name", serviceAccountName)
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in test ENV.
 			if test.tls {
@@ -634,6 +651,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			flags := []string{
 				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
+				"-service-account-name", testServiceAccountName,
 				"-http-addr", serverURL.String()}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
@@ -702,7 +720,9 @@ func TestRun_LoginWithRetries(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", testAuthMethod,
+				"-service-account-name", testServiceAccountName,
 				"-http-addr", serverURL.String()})
+			fmt.Println(ui.ErrorWriter.String())
 			require.Equal(t, c.ExpCode, code)
 			// Cmd will return 1 after numACLLoginRetries, so bound LoginAttemptsCount if we exceeded it.
 			require.Equal(t, c.LoginAttemptsCount, counter)
@@ -725,6 +745,7 @@ const (
 	testPodNamespace       = "default-ns"
 	testPodName            = "counting-pod"
 	testAuthMethod         = "consul-k8s-auth-method"
+	testServiceAccountName = "counting"
 
 	serviceAccountJWTToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImtoYWtpLWFyYWNobmlkLWNvbnN1bC1jb25uZWN0LWluamVjdG9yLWF1dGhtZXRob2Qtc3ZjLWFjY29obmRidiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJraGFraS1hcmFjaG5pZC1jb25zdWwtY29ubmVjdC1pbmplY3Rvci1hdXRobWV0aG9kLXN2Yy1hY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiN2U5NWUxMjktZTQ3My0xMWU5LThmYWEtNDIwMTBhODAwMTIyIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6a2hha2ktYXJhY2huaWQtY29uc3VsLWNvbm5lY3QtaW5qZWN0b3ItYXV0aG1ldGhvZC1zdmMtYWNjb3VudCJ9.Yi63MMtzh5MBWKKd3a7dzCJjTITE15ikFy_Tnpdk_AwdwA9J4AMSGEeHN5vWtCuuFjo_lMJqBBPHkK2AqbnoFUj9m5CopWyqICJQlvEOP4fUQ-Rc0W1P_JjU1rZERHG39b5TMLgKPQguyhaiZEJ6CjVtm9wUTagrgiuqYV2iUqLuF6SYNm6SrKtkPS-lqIO-u7C06wVk5m5uqwIVQNpZSIC_5Ls5aLmyZU3nHvH-V7E3HmBhVyZAB76jgKB0TyVX1IOskt9PDFarNtU3suZyCjvqC-UJA6sYeySe4dBNKsKlSZ6YuxUUmn1Rgv32YMdImnsWg8khf-zJvqgWk7B5EA`
 	serviceAccountCACert   = `-----BEGIN CERTIFICATE-----
@@ -818,7 +839,8 @@ xtr5PSwH1DusYfVaGH2O
     "Tags": [],
     "Meta": {
       "k8s-namespace": "default",
-      "pod-name": "counting-pod"
+      "pod-name": "counting-pod",
+      "k8s-service-name": "counting"
     },
     "Port": 9001,
     "Address": "10.32.3.26",
@@ -846,7 +868,8 @@ xtr5PSwH1DusYfVaGH2O
     "Tags": [],
     "Meta": {
       "k8s-namespace": "default",
-      "pod-name": "counting-pod"
+      "pod-name": "counting-pod",
+      "k8s-service-name": "counting"
     },
     "Port": 20000,
     "Address": "10.32.3.26",
