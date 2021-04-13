@@ -24,8 +24,6 @@ IMPROVEMENTS:
 
 * Connect: Connect pods and their Envoy sidecars no longer have a preStop hook as service deregistration is managed by the endpoints controller.  [[GH-467](https://github.com/hashicorp/consul-k8s/pull/467)]
 
-* Connect: connect-inject webhook has been refactored to use controller-runtime manager. [[GH-454](https://github.com/hashicorp/consul-k8s/pull/454)]
-
 BUG FIXES:
 * CRDs: make lastSyncedTime a pointer to prevent setting last synced time Reconcile errors. [[GH-466](https://github.com/hashicorp/consul-k8s/pull/466)]
 
