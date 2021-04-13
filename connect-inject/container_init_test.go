@@ -43,10 +43,11 @@ func TestHandlerContainerInit(t *testing.T) {
 	}
 
 	cases := []struct {
-		Name   string
-		Pod    func(*corev1.Pod) *corev1.Pod
-		Cmd    string // Strings.Contains test
-		CmdNot string // Not contains
+		Name    string
+		Pod     func(*corev1.Pod) *corev1.Pod
+		Handler Handler
+		Cmd     string // Strings.Contains test
+		CmdNot  string // Not contains
 	}{
 		// The first test checks the whole template. Subsequent tests check
 		// the parts that change.
@@ -56,6 +57,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
+			Handler{},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -68,6 +70,32 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			"",
 		},
 
+		{
+			"When auth method is set -service-account-name and -service-name are passed in",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				pod.Spec.ServiceAccountName = "a-service-account-name"
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{
+						Name:      "sa",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+					},
+				}
+				return pod
+			},
+			Handler{
+				AuthMethod: "an-auth-method",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="an-auth-method" \
+  -service-account-name="a-service-account-name" \
+  -service-name="web" \
+`,
+			"",
+		},
 		{
 			"When running the merged metrics server, configures consul connect envoy command",
 			func(pod *corev1.Pod) *corev1.Pod {
@@ -86,6 +114,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
+			Handler{},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
@@ -100,7 +129,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			h := Handler{}
+			h := tt.Handler
 			pod := *tt.Pod(minimal())
 			container, err := h.containerInit(pod, k8sNamespace)
 			require.NoError(err)
@@ -206,7 +235,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 		{
 			"Whole template, auth method, non-default namespace, mirroring disabled",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationService] = ""
 				return pod
 			},
 			Handler{
@@ -220,6 +249,8 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
+  -service-account-name="web" \
+  -service-name="" \
   -auth-method-namespace="non-default" \
   -consul-service-namespace="non-default" \
 
@@ -235,7 +266,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 		{
 			"Whole template, auth method, non-default namespace, mirroring enabled",
 			func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[annotationService] = "web"
+				pod.Annotations[annotationService] = ""
 				return pod
 			},
 			Handler{
@@ -250,6 +281,8 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
+  -service-account-name="web" \
+  -service-name="" \
   -auth-method-namespace="default" \
   -consul-service-namespace="k8snamespace" \
 
@@ -422,54 +455,6 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("10Mi"),
 		},
 	}, container.Resources)
-}
-
-func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsEnabled(t *testing.T) {
-	require := require.New(t)
-	h := Handler{
-		AuthMethod: "auth-method",
-	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				annotationService: "foo",
-			},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "serviceName",
-				},
-			},
-			ServiceAccountName: "notServiceName",
-		},
-	}
-
-	_, err := h.containerInit(*pod, k8sNamespace)
-	require.EqualError(err, `serviceAccountName "notServiceName" does not match service name "foo"`)
-}
-
-func TestHandlerContainerInit_MismatchedServiceNameServiceAccountNameWithACLsDisabled(t *testing.T) {
-	require := require.New(t)
-	h := Handler{}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				annotationService: "foo",
-			},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "serviceName",
-				},
-			},
-			ServiceAccountName: "notServiceName",
-		},
-	}
-
-	_, err := h.containerInit(*pod, k8sNamespace)
-	require.NoError(err)
 }
 
 // Test that the init copy container has the correct command.

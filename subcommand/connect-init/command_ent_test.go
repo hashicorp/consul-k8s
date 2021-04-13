@@ -223,6 +223,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			flags := []string{"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", test.authMethod,
+				"-service-account-name", testServiceAccountName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 				"-consul-service-namespace", test.consulServiceNamespace,
 				"-auth-method-namespace", test.authMethodNamespace,
