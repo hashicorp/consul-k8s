@@ -257,10 +257,10 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 	}
 }
 
-// The namespace here is default-ns as the the k8s-auth method
+// The namespace here is default-ns as the k8s-auth method
 // relies on the namespace in the response from Kubernetes to
 // correctly create the token in the same namespace as the Kubernetes
-// namespace which is required when mirroring namespace is enabled.
+// namespace which is required when namespace mirroring is enabled.
 // Note that this namespace is incorrect for other test cases but
 // Consul only cares about this namespace when mirroring is enabled.
 const (
