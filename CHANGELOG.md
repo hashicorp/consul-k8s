@@ -9,6 +9,8 @@ IMPROVEMENTS:
 
 BREAKING CHANGES:
 * Minimum Kubernetes versions supported is 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+* Connect: `-enable-health-checks-controller`, `-health-checks-reconcile-period`, `-cleanup-controller-reconcile-period` have been removed
+  and are no longer supported as the controllers have been replaced by the endpoints controller. [[GH-892](https://github.com/hashicorp/consul-helm/pull/899)]
 
 BUG FIXES:
 * Add startup probe to connect-inject deployment to give time for certificates to be available.

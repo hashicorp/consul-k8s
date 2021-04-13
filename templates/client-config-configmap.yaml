@@ -19,7 +19,7 @@ data:
       "enable_central_service_config": true
     }
 
-  {{- if (and .Values.connectInject.enabled .Values.connectInject.healthChecks.enabled) }}
+  {{- if .Values.connectInject.enabled }}
   {{/* We set check_update_interval to 0s so that check output is immediately viewable
        in the UI. */}}
   config.json: |-

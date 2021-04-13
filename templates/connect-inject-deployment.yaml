@@ -93,11 +93,6 @@ spec:
                 {{- if .Values.connectInject.logLevel }}
                 -log-level={{ .Values.connectInject.logLevel }} \
                 {{- end }}
-                {{- if .Values.connectInject.healthChecks.enabled }}
-                -enable-health-checks-controller=true \
-                -health-checks-reconcile-period={{ .Values.connectInject.healthChecks.reconcilePeriod }} \
-                {{- end }}
-                -cleanup-controller-reconcile-period={{ .Values.connectInject.cleanupController.reconcilePeriod }} \
                 {{- if (or (and (ne (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.connectInject.metrics.defaultEnabled) (and (eq (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.global.metrics.enabled)) }}
                 -default-enable-metrics=true \
                 {{- else }}

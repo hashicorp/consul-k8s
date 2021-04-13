@@ -1293,18 +1293,6 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
-  # Enables synchronization of Kubernetes health probe status with Consul.
-  # NOTE: It is highly recommended to enable TLS with this feature because it requires
-  # making calls to Consul clients across the cluster. Without TLS enabled, these calls
-  # could leak ACL tokens should the cluster network become compromised.
-  healthChecks:
-    # Enables the Consul Health Check controller which syncs the readiness status of
-    # connect-injected pods with Consul.
-    enabled: true
-    # If `healthChecks.enabled` is set to `true`, `reconcilePeriod` defines how often a full state
-    # reconcile is done after the initial reconcile at startup is completed.
-    reconcilePeriod: "1m"
-
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:
@@ -1342,17 +1330,6 @@ connectInject:
     # That can be configured with the
     # `consul.hashicorp.com/service-metrics-path` annotation.
     defaultPrometheusScrapePath: "/metrics"
-
-  # Cleanup controller cleans up Consul service instances that remain registered
-  # despite their pods no longer running. This could happen if the pod's `preStop`
-  # hook failed to execute for some reason.
-  cleanupController:
-    # How often to do a full reconcile where the controller looks at all pods
-    # and service instances and ensure the state is correct.
-    # The controller reacts to each delete event immediately but if it misses
-    # an event due to being down or a network issue, the reconcile loop will
-    # handle cleaning up any missed deleted pods.
-    reconcilePeriod: "5m"
 
   # Used to pass arguments to the injected envoy sidecar.
   # Valid arguments to pass to envoy can be found here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli

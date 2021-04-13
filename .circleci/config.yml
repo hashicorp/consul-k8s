@@ -143,7 +143,7 @@ jobs:
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image="gcr.io/nitya-293720/consul-k8s-dev:tproxymetrics2" # TODO: change once feature-tproxy consul-k8s branch is merged
+                    -consul-k8s-image=kschoche/consul-k8s-dev2:2021-4-9 # TODO: change once feature-tproxy consul-k8s branch is merged
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1

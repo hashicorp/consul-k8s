@@ -93,8 +93,8 @@ func TestConnectInject(t *testing.T) {
 	}
 }
 
-// Test the cleanup controller that cleans up force-killed pods.
-func TestConnectInject_CleanupController(t *testing.T) {
+// Test the endpoints controller cleans up force-killed pods.
+func TestConnectInject_CleanupKilledPods(t *testing.T) {
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool
