@@ -210,6 +210,8 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			// Run the command.
 			code := cmd.Run(flags)
 			if test.expErr != "" {
+				fmt.Println(ui.OutputWriter.String())
+				fmt.Println(ui.ErrorWriter.String())
 				require.Equal(t, 1, code)
 				require.Contains(t, ui.ErrorWriter.String(), test.expErr)
 			} else {
