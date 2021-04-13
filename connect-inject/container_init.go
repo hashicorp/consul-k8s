@@ -2,7 +2,6 @@ package connectinject
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"text/template"
 
@@ -15,9 +14,9 @@ const (
 )
 
 type initContainerCommandData struct {
-	// todo: remove once service name annotation is removed
-	ServiceName string
-	AuthMethod  string
+	ServiceName        string
+	ServiceAccountName string
+	AuthMethod         string
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
@@ -64,17 +63,15 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
-		ServiceName:               pod.Annotations[annotationService],
 		AuthMethod:                h.AuthMethod,
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
 	}
 
-	// When ACLs are enabled, the ACL token returned from `consul login` is only
-	// valid for a service with the same name as the ServiceAccountName.
-	if data.AuthMethod != "" && data.ServiceName != pod.Spec.ServiceAccountName {
-		return corev1.Container{}, fmt.Errorf("serviceAccountName %q does not match service name %q", pod.Spec.ServiceAccountName, data.ServiceName)
+	if data.AuthMethod != "" {
+		data.ServiceAccountName = pod.Spec.ServiceAccountName
+		data.ServiceName = pod.Annotations[annotationService]
 	}
 
 	// This determines how to configure the consul connect envoy command: what
@@ -174,6 +171,8 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}
   -acl-auth-method="{{ .AuthMethod }}" \
+  -service-account-name="{{ .ServiceAccountName }}" \
+  -service-name="{{ .ServiceName }}" \
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
