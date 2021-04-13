@@ -42,6 +42,13 @@ func TestComponentMetrics(t *testing.T) {
 		"terminatingGateways.enabled":              "true",
 		"terminatingGateways.gateways[0].name":     "terminating-gateway",
 		"terminatingGateways.gateways[0].replicas": "1",
+
+		// Reduce CPU resource requests because tests were running into CPU scheduling
+		// limits and because we're not really testing performance.
+		"controller.resources.requests.cpu":                   "50m",
+		"ingressGateways.defaults.resources.requests.cpu":     "50m",
+		"terminatingGateways.defaults.resources.requests.cpu": "50m",
+		"meshGateway.resources.requests.cpu":                  "50m",
 	}
 
 	if cfg.UseKind {
