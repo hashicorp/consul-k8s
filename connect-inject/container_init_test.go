@@ -168,6 +168,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-service-namespace="default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -192,6 +193,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -218,7 +220,8 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
-  -namespace="non-default"
+  -auth-method-namespace="non-default" \
+  -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
@@ -247,7 +250,8 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="auth-method" \
-  -namespace="default"
+  -auth-method-namespace="default" \
+  -consul-service-namespace="k8snamespace" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
