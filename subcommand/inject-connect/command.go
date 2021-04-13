@@ -49,14 +49,15 @@ type Command struct {
 	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
 	flagLogLevel             string
 
-	// Flags to support namespaces
-	flagEnableNamespaces           bool     // Use namespacing on all components
-	flagConsulDestinationNamespace string   // Consul namespace to register everything if not mirroring
-	flagAllowK8sNamespacesList     []string // K8s namespaces to explicitly inject
-	flagDenyK8sNamespacesList      []string // K8s namespaces to deny injection (has precedence)
-	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
-	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
-	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
+	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
+	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
+
+	// Flags to support Consul namespaces
+	flagEnableNamespaces           bool   // Use namespacing on all components
+	flagConsulDestinationNamespace string // Consul namespace to register everything if not mirroring
+	flagEnableK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul
+	flagK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring
+	flagCrossNamespaceACLPolicy    string // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	// Flags for endpoints controller.
 	flagReleaseName      string
@@ -383,19 +384,24 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err = (&connectinject.EndpointsController{
-		Client:                mgr.GetClient(),
-		ConsulClient:          c.consulClient,
-		ConsulScheme:          consulURL.Scheme,
-		ConsulPort:            consulURL.Port(),
-		AllowK8sNamespacesSet: allowK8sNamespaces,
-		DenyK8sNamespacesSet:  denyK8sNamespaces,
-		Log:                   ctrl.Log.WithName("controller").WithName("endpoints-controller"),
-		Scheme:                mgr.GetScheme(),
-		ReleaseName:           c.flagReleaseName,
-		ReleaseNamespace:      c.flagReleaseNamespace,
-		MetricsConfig:         metricsConfig,
-		Context:               ctx,
-		ConsulClientCfg:       cfg,
+		Client:                     mgr.GetClient(),
+		ConsulClient:               c.consulClient,
+		ConsulScheme:               consulURL.Scheme,
+		ConsulPort:                 consulURL.Port(),
+		AllowK8sNamespacesSet:      allowK8sNamespaces,
+		DenyK8sNamespacesSet:       denyK8sNamespaces,
+		MetricsConfig:              metricsConfig,
+		ConsulClientCfg:            cfg,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
+		Scheme:                     mgr.GetScheme(),
+		ReleaseName:                c.flagReleaseName,
+		ReleaseNamespace:           c.flagReleaseNamespace,
+		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", connectinject.EndpointsController{})
 		return 1
@@ -417,16 +423,16 @@ func (c *Command) Run(args []string) int {
 			DefaultProxyCPULimit:       sidecarProxyCPULimit,
 			DefaultProxyMemoryRequest:  sidecarProxyMemoryRequest,
 			DefaultProxyMemoryLimit:    sidecarProxyMemoryLimit,
+			MetricsConfig:              metricsConfig,
 			InitContainerResources:     initResources,
 			ConsulSidecarResources:     consulSidecarResources,
-			EnableNamespaces:           c.flagEnableNamespaces,
 			AllowK8sNamespacesSet:      allowK8sNamespaces,
 			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			EnableNamespaces:           c.flagEnableNamespaces,
 			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			MetricsConfig:              metricsConfig,
 			Log:                        logger.Named("handler"),
 		}})
 

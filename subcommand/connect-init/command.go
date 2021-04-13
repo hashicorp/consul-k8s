@@ -30,9 +30,11 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagACLAuthMethod string // Auth Method to use for ACLs, if enabled.
-	flagPodName       string // Pod name.
-	flagPodNamespace  string // Pod namespace.
+	flagACLAuthMethod          string // Auth Method to use for ACLs, if enabled.
+	flagPodName                string // Pod name.
+	flagPodNamespace           string // Pod namespace.
+	flagAuthMethodNamespace    string // Consul namespace the auth-method is defined in.
+	flagConsulServiceNamespace string // Consul destination namespace for the service.
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -51,6 +53,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
+	c.flagSet.StringVar(&c.flagAuthMethodNamespace, "auth-method-namespace", "", "Consul namespace the auth-method is defined in")
+	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
 
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
@@ -86,6 +90,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cfg := api.DefaultConfig()
+	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
 	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
@@ -98,7 +103,7 @@ func (c *Command) Run(args []string) int {
 		// loginMeta is the default metadata that we pass to the consul login API.
 		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
 		err = backoff.Retry(func() error {
-			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, loginMeta)
+			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, loginMeta)
 			if err != nil {
 				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
 			}
@@ -122,12 +127,7 @@ func (c *Command) Run(args []string) int {
 	// which maps to this pod+namespace.
 	var proxyID string
 	err = backoff.Retry(func() error {
-		filter := fmt.Sprintf(
-			"Meta[%q] == %q and Meta[%q] == %q",
-			connectinject.MetaKeyPodName,
-			c.flagPodName,
-			connectinject.MetaKeyKubeNS,
-			c.flagPodNamespace)
+		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))

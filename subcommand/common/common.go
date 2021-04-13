@@ -52,7 +52,7 @@ func ValidateUnprivilegedPort(flagName, flagValue string) error {
 
 // ConsulLogin issues an ACL().Login to Consul and writes out the token to tokenSinkFile.
 // The logic of this is taken from the `consul login` command.
-func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkFile string, meta map[string]string) error {
+func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkFile, namespace string, meta map[string]string) error {
 	if meta == nil {
 		return fmt.Errorf("invalid meta")
 	}
@@ -70,7 +70,7 @@ func ConsulLogin(client *api.Client, bearerTokenFile, authMethodName, tokenSinkF
 		BearerToken: bearerToken,
 		Meta:        meta,
 	}
-	tok, _, err := client.ACL().Login(req, nil)
+	tok, _, err := client.ACL().Login(req, &api.WriteOptions{Namespace: namespace})
 	if err != nil {
 		return fmt.Errorf("error logging in: %s", err)
 	}
