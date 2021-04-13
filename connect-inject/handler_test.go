@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
@@ -159,10 +159,6 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
-				},
-				{
-					Operation: "add",
 					Path:      "/spec/volumes",
 				},
 				{
@@ -222,10 +218,6 @@ func TestHandlerHandle(t *testing.T) {
 			},
 			"",
 			[]jsonpatch.Operation{
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
-				},
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -390,10 +382,6 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationService),
-				},
-				{
-					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationPrometheusScrape),
 				},
 				{
@@ -531,9 +519,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 					},
 				},
 			},
-			map[string]string{
-				annotationService: "web",
-			},
+			nil,
 			"",
 		},
 
@@ -586,8 +572,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				annotationService: "web",
-				annotationPort:    "http",
+				annotationPort: "http",
 			},
 			"",
 		},
@@ -613,8 +598,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				annotationService: "web",
-				annotationPort:    "8080",
+				annotationPort: "8080",
 			},
 			"",
 		},
