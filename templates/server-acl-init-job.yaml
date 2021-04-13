@@ -139,9 +139,6 @@ spec:
                 {{- if and .Values.externalServers.enabled .Values.externalServers.k8sAuthMethodHost }}
                 -inject-auth-method-host={{ .Values.externalServers.k8sAuthMethodHost }} \
                 {{- end }}
-                {{- if .Values.connectInject.healthChecks.enabled }}
-                -enable-health-checks \
-                {{- end }}
                 {{- end }}
 
                 {{- if .Values.meshGateway.enabled }}
