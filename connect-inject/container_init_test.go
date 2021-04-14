@@ -190,7 +190,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				RunAsUser:  pointerToInt64(0),
 				RunAsGroup: pointerToInt64(0),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_ADMIN"},
+					Add: []corev1.Capability{netAdminCapability},
 				},
 			}
 			expectedCmd := `/consul/connect-inject/consul connect redirect-traffic \
@@ -198,15 +198,14 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-uid=0`
 			container, err := h.containerInit(*pod, k8sNamespace)
 			require.NoError(t, err)
+			actualCmd := strings.Join(container.Command, " ")
 
 			if c.expectEnabled {
 				require.Equal(t, expectedSecurityContext, container.SecurityContext)
-				cmd := strings.Join(container.Command, " ")
-				require.Contains(t, cmd, expectedCmd)
+				require.Contains(t, actualCmd, expectedCmd)
 			} else {
 				require.Nil(t, container.SecurityContext)
-				cmd := strings.Join(container.Command, " ")
-				require.NotContains(t, cmd, expectedCmd)
+				require.NotContains(t, actualCmd, expectedCmd)
 			}
 		})
 	}

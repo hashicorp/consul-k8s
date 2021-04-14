@@ -179,7 +179,7 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 	return container, nil
 }
 
-// transparentProxyEnabled returns true if transparent proxy should is enabled for this pod.
+// transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
 func transparentProxyEnabled(pod corev1.Pod, globalEnabled bool) (bool, error) {
 	if raw, ok := pod.Annotations[annotationTransparentProxy]; ok {
