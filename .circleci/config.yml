@@ -137,13 +137,15 @@ jobs:
             echo "Running $pkgs"
             for pkg in $pkgs
             do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 30m -failfast \
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 50m -failfast \
                     -use-kind \
+                    -enable-enterprise \
                     -enable-multi-cluster \
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-k8s-image=ashwinvenkatesh/consul-k8s@sha256:f66106414f9e6b05271bd2944bf0a01308a6b9405221d73e89f2d00159189d6e # TODO: change once feature-tproxy consul-k8s branch is merged
+                    -consul-image="ishustava/consul-enterprise:tproxy-test" \
+                    -consul-k8s-image="ishustava/consul-k8s-dev:04-13-2021-8f91d97" # TODO: change once feature-tproxy consul-k8s branch is merged
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1
@@ -212,7 +214,7 @@ jobs:
             # The license expires 15-Oct-2025.
             KUBECONFIG=$primary_kubeconfig kubectl create secret generic ent-license --from-literal=key="${CONSUL_ENT_LICENSE}"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
               -enable-enterprise \
               -enterprise-license-secret-name=ent-license \
               -enterprise-license-secret-key=key \
@@ -350,7 +352,7 @@ jobs:
             chmod 600 "$primary_kubeconfig"
             chmod 600 "$secondary_kubeconfig"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
               -enable-enterprise \
               -enable-multi-cluster \
               -kubeconfig="$primary_kubeconfig" \

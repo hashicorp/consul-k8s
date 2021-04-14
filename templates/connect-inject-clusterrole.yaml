@@ -11,7 +11,7 @@ metadata:
     release: {{ .Release.Name }}
 rules:
 - apiGroups: [""]
-  resources: ["pods", "nodes", "endpoints"]
+  resources: ["pods", "endpoints", "services"]
   verbs:
   - "get"
   - "list"
