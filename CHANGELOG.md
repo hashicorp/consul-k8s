@@ -51,7 +51,7 @@ BREAKING CHANGES:
   Since we no longer inject the `consul-sidecar` to keep services registered in Consul, this annotation is
   now meaningless. [[GH-467](https://github.com/hashicorp/consul-k8s/pull/467)]
 * Connect: transparent proxy feature is enabled by default. This may break existing deployments.
-  Please details of the feature below.
+  Please see details of the feature below.
 
 FEATURES:
 * Connect: Support Transparent Proxy. [[GH-481](https://github.com/hashicorp/consul-k8s/pull/481)]
@@ -64,7 +64,7 @@ FEATURES:
     as tagged addresses so that Consul can configure Envoy to route traffic based on that IP and port.
   - The `consul-connect-inject-init` container will run `consul connect redirect-traffic` [command](https://www.consul.io/commands/connect/redirect-traffic),
     which will apply rules (via iptables) to redirect inbound and outbound traffic to the proxy.
-    To run this command the `consul-connect-inject-init` requires to run as root and have `NET_ADMIN`
+    To run this command the `consul-connect-inject-init` requires running as root with capability `NET_ADMIN`
     capability.
   
   **Note: this feature is currently in beta.** 
