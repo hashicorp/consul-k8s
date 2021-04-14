@@ -1293,6 +1293,14 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
+  # Configures Transparent Proxy for Consul Service mesh services.
+  # Using this feature requires Consul 1.10.0-beta1+ and consul-k8s 0.26.0-beta1+.
+  transparentProxy:
+    # If true, then all Consul Service mesh will run with transparent proxy enabled by default,
+    # i.e. we enforce that all traffic within the pod will go through the proxy.
+    # This value is overridable via the "consul.hashicorp.com/transparent-proxy" pod annotation.
+    defaultEnabled: true
+
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:

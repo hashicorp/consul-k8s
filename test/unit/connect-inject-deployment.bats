@@ -1372,3 +1372,29 @@ EOF
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# transparent proxy
+
+@test "connectInject/Deployment: transparent proxy is enabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: can be disabled by setting connectInject.transparentProxy.defaultEnabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.transparentProxy.defaultEnabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}

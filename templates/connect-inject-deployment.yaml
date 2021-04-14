@@ -90,6 +90,9 @@ spec:
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -listen=:8080 \
+                {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
+                -enable-transparent-proxy \
+                {{- end }}
                 {{- if .Values.connectInject.logLevel }}
                 -log-level={{ .Values.connectInject.logLevel }} \
                 {{- end }}

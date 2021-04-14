@@ -80,12 +80,12 @@ func CheckStaticServerConnection(
 	options *k8s.KubectlOptions,
 	expectSuccess bool,
 	deploymentName string,
-	failureMessage string,
+	failureMessages []string,
 	curlArgs ...string,
 ) {
 	t.Helper()
 
-	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, deploymentName, []string{failureMessage}, curlArgs...)
+	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, deploymentName, failureMessages, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
@@ -133,15 +133,26 @@ func CheckStaticServerConnectionMultipleFailureMessages(
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
 func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, true, deploymentName, "", curlArgs...)
+	CheckStaticServerConnection(t, options, true, deploymentName, nil, curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a failing connection with error "Empty reply from server."
 func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
-	CheckStaticServerConnection(t, options, false, deploymentName, "curl: (52) Empty reply from server", curlArgs...)
+	t.Helper()
+	CheckStaticServerConnection(t,
+		options,
+		false,
+		deploymentName,
+		[]string{
+			"curl: (52) Empty reply from server",
+			"curl: (7) Failed to connect to static-server port 80: Connection refused",
+			"curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused",
+		},
+		curlArgs...)
 }
 
 // labelMapToString takes a label map[string]string
