@@ -245,6 +245,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 {{- if .EnableTransparentProxy }}
+{{- /* The newline below is intentional to allow extra space
+       in the rendered template between this and the previous commands. */}}
 
 # Apply traffic redirection rules.
 /consul/connect-inject/consul connect redirect-traffic \

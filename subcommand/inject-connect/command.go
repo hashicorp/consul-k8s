@@ -153,7 +153,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
-	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", false,
+	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", true,
 		"Enable transparent proxy mode for all Consul service mesh applications.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+

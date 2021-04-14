@@ -31,7 +31,6 @@ const (
 	MetaKeyKubeServiceName     = "k8s-service-name"
 	MetaKeyKubeNS              = "k8s-namespace"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
-	podPendingReasonMsg        = "Pod is pending"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
 	clusterIPTaggedAddressName = "virtual"
 )
