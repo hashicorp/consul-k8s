@@ -13,47 +13,79 @@ BREAKING CHANGES:
 * Connect: The Helm values for health checks and cleanup controller have been removed: `connectInject.healthChecks` and `connectInject.cleanupController`, as these controllers have been replaced by the endpoints controller. [[GH-899](https://github.com/hashicorp/consul-helm/pull/899)]
 * Connect: connect webhook deployment now uses `webhook-cert-manager` to bootstrap the webhook certificates instead of generating them inside of the webhook. [[GH-861](https://github.com/hashicorp/consul-helm/pull/861)]
 * Connect: Kubernetes Services are now required for all connect injected applications.
-  The Kubernetes service name will be used as the service name to register with Consul unless the annotation `consul.hashicorp.com/connect-service` is provided to the deployment/pod to override this. If using ACLs the ServiceAccountName must match the service name used with Consul.
+  The Kubernetes service name will be used as the service name to register with Consul unless the annotation `consul.hashicorp.com/connect-service` is provided to the pod to override this.
+  If using ACLs the ServiceAccountName must match the service name used with Consul.
 
   Example Service:
-```yaml
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sample-app
-spec:
-  selector:
-    app: sample-app
-  ports:
+  ```yaml
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: sample-app
+  spec:
+    selector:
+      app: sample-app
+    ports:
     - port: 80
       targetPort: 9090
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: sample-app
-  name: sample-app
-spec:
-  replicas: 1
-  selector:
-     matchLabels:
-       app: sample-app
-   template:
-     metadata:
-       annotations:
-         'consul.hashicorp.com/connect-inject': 'true'
-       labels:
-         app: sample-app
-     spec:
-       containers:
-       - name: sample-app
-         image: sample-app:0.1.0
-         ports:
-         - containerPort: 9090
-```
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: sample-app
+    name: sample-app
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: sample-app
+    template:
+      metadata:
+        annotations:
+          'consul.hashicorp.com/connect-inject': 'true'
+        labels:
+          app: sample-app
+      spec:
+        containers:
+        - name: sample-app
+          image: sample-app:0.1.0
+          ports:
+          - containerPort: 9090
+    ```
   **Note: if you're already using a Kubernetes service, no changes are required.**
+* Connect: `-enable-health-checks-controller`, `-health-checks-reconcile-period`, `-cleanup-controller-reconcile-period` have been removed
+  and are no longer supported as the controllers have been replaced by the endpoints controller. [[GH-892](https://github.com/hashicorp/consul-helm/pull/899)]
+* Connect: Support transparent proxy. [[GH-905](https://github.com/hashicorp/consul-helm/pull/905)]
+  This feature allows users to reach other services on the Consul Service Mesh by using KubeDNS instead of using `localhost`
+  and enforces all inbound and outbound traffic within a pod to go through the Envoy proxy.
+  Please see [Transparent Proxy](https://www.consul.io/docs/connect/transparent-proxy ) docs for more information.
+
+  **Note: This feature is currently in beta and requires consul-k8s `v0.26.0-beta1` or higher.**
+
+  Transparent proxy is enabled by default for all Consul service mesh application. You can disable it for the
+  entire Helm installation by setting:
+
+  ```yaml
+  connectInject:
+    transparentProxy:
+      defaultEnabled: false
+  ```
+
+  Alternatively, you can enable or disable it for each individual application by using
+  the `consul.hashicorp.com/transparent-proxy` pod annotation:
+
+  ```yaml
+  ...
+  metadata:
+    name: example
+    labels:
+      app: example
+    annotations:
+      "consul.hashicorp.com/transparent-proxy": "true"
+  ...
+  ```
 
 BUG FIXES:
 * Add startup probe to connect-inject deployment to give time for certificates to be available.
