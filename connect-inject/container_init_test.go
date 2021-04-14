@@ -1,11 +1,10 @@
 package connectinject
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
-	capi "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -142,6 +141,76 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 	}
 }
 
+func TestHandlerContainerInit_transparentProxy(t *testing.T) {
+	cases := map[string]struct {
+		globalEnabled     bool
+		annotationEnabled *bool
+		expectEnabled     bool
+	}{
+		"enabled globally, annotation not provided": {
+			true,
+			nil,
+			true,
+		},
+		"enabled globally, annotation is false": {
+			true,
+			pointerToBool(false),
+			false,
+		},
+		"enabled globally, annotation is true": {
+			true,
+			pointerToBool(true),
+			true,
+		},
+		"disabled globally, annotation not provided": {
+			false,
+			nil,
+			false,
+		},
+		"disabled globally, annotation is false": {
+			false,
+			pointerToBool(false),
+			false,
+		},
+		"disabled globally, annotation is true": {
+			false,
+			pointerToBool(true),
+			true,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := Handler{EnableTransparentProxy: c.globalEnabled}
+			pod := minimal()
+			if c.annotationEnabled != nil {
+				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
+			}
+
+			expectedSecurityContext := &corev1.SecurityContext{
+				RunAsUser:  pointerToInt64(0),
+				RunAsGroup: pointerToInt64(0),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{netAdminCapability},
+				},
+			}
+			expectedCmd := `/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=0`
+			container, err := h.containerInit(*pod, k8sNamespace)
+			require.NoError(t, err)
+			actualCmd := strings.Join(container.Command, " ")
+
+			if c.expectEnabled {
+				require.Equal(t, expectedSecurityContext, container.SecurityContext)
+				require.Contains(t, actualCmd, expectedCmd)
+			} else {
+				require.Nil(t, container.SecurityContext)
+				require.NotContains(t, actualCmd, expectedCmd)
+			}
+		})
+	}
+}
+
 func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 	minimal := func() *corev1.Pod {
 		return &corev1.Pod{
@@ -175,12 +244,11 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 	}
 
 	cases := []struct {
-		Name         string
-		Pod          func(*corev1.Pod) *corev1.Pod
-		Handler      Handler
-		K8sNamespace string
-		Cmd          string // Strings.Contains test
-		CmdNot       string // Not contains
+		Name    string
+		Pod     func(*corev1.Pod) *corev1.Pod
+		Handler Handler
+		Cmd     string // Strings.Contains test
+		CmdNot  string // Not contains
 	}{
 		{
 			"whole template, default namespace",
@@ -192,7 +260,6 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
-			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -217,7 +284,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 			},
-			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -243,7 +309,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 			},
-			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -262,7 +327,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
-
 		{
 			"Whole template, auth method, non-default namespace, mirroring enabled",
 			func(pod *corev1.Pod) *corev1.Pod {
@@ -275,7 +339,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 			},
-			k8sNamespace,
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -294,6 +357,105 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 			"",
 		},
+		{
+			"whole template, default namespace, tproxy enabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+				EnableTransparentProxy:     true,
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-service-namespace="default" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -namespace="default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Apply traffic redirection rules.
+/consul/connect-inject/consul connect redirect-traffic \
+  -namespace="default" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=0`,
+			"",
+		},
+
+		{
+			"whole template, non-default namespace, tproxy enabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+				EnableTransparentProxy:     true,
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -consul-service-namespace="non-default" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -namespace="non-default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Apply traffic redirection rules.
+/consul/connect-inject/consul connect redirect-traffic \
+  -namespace="non-default" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=0`,
+			"",
+		},
+
+		{
+			"Whole template, auth method, non-default namespace, mirroring enabled, tproxy enabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				AuthMethod:                 "auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
+				EnableK8SNSMirroring:       true,
+				EnableTransparentProxy:     true,
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="auth-method" \
+  -service-account-name="web" \
+  -service-name="web" \
+  -auth-method-namespace="default" \
+  -consul-service-namespace="k8snamespace" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -token-file="/consul/connect-inject/acl-token" \
+  -namespace="k8snamespace" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+# Apply traffic redirection rules.
+/consul/connect-inject/consul connect redirect-traffic \
+  -namespace="k8snamespace" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=0`,
+			"",
+		},
 	}
 
 	for _, tt := range cases {
@@ -302,31 +464,10 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 			h := tt.Handler
 
-			// Create a Consul server/client and proxy-defaults config because
-			// the handler will call out to Consul if the upstream uses a datacenter.
-			consul, err := testutil.NewTestServerConfigT(t, nil)
-			require.NoError(err)
-			defer consul.Stop()
-			consul.WaitForLeader(t)
-			consulClient, err := capi.NewClient(&capi.Config{
-				Address: consul.HTTPAddr,
-			})
-			require.NoError(err)
-			written, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
-				Kind: capi.ProxyDefaults,
-				Name: capi.ProxyConfigGlobal,
-				MeshGateway: capi.MeshGatewayConfig{
-					Mode: capi.MeshGatewayModeLocal,
-				},
-			}, nil)
-			require.NoError(err)
-			require.True(written)
-			h.ConsulClient = consulClient
-
 			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
-			require.Contains(actual, tt.Cmd)
+			require.Equal(actual, tt.Cmd)
 			if tt.CmdNot != "" {
 				require.NotContains(actual, tt.CmdNot)
 			}
@@ -464,4 +605,9 @@ func TestHandlerContainerInitCopyContainer(t *testing.T) {
 	container := h.containerInitCopyContainer()
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
+}
+
+// pointerToBool takes a boolean and returns a pointer to it.
+func pointerToBool(b bool) *bool {
+	return &b
 }
