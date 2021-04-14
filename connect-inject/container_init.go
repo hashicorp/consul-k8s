@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -11,6 +12,8 @@ import (
 const (
 	InjectInitCopyContainerName = "copy-consul-bin"
 	InjectInitContainerName     = "consul-connect-inject-init"
+	rootUserAndGroupID          = 0
+	netAdminCapability          = "NET_ADMIN"
 )
 
 type initContainerCommandData struct {
@@ -29,15 +32,16 @@ type initContainerCommandData struct {
 	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
 	// metrics from.
 	EnableMetrics bool
-	// todo: remove once endpoints controller supports metrics
-	// PrometheusScrapeListener configures the listener on Envoy where
-	// Prometheus will scrape metrics from.
-	PrometheusScrapeListener string
 	// PrometheusScrapePath configures the path on the listener on Envoy where
 	// Prometheus will scrape metrics from.
 	PrometheusScrapePath string
 	// PrometheusBackendPort configures where the listener on Envoy will point to.
 	PrometheusBackendPort string
+
+	// EnableTransparentProxy configures this init container to run in transparent proxy mode,
+	// i.e. run consul connect redirect-traffic command and add the required privileges to the
+	// container to do that.
+	EnableTransparentProxy bool
 }
 
 // containerInitCopyContainer returns the init container spec for the copy container which places
@@ -62,11 +66,18 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
 func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
+	// Check if tproxy is enabled on this pod.
+	tproxyEnabled, err := transparentProxyEnabled(pod, h.EnableTransparentProxy)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	data := initContainerCommandData{
 		AuthMethod:                h.AuthMethod,
 		ConsulNamespace:           h.consulNamespace(k8sNamespace),
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
+		EnableTransparentProxy:    tproxyEnabled,
 	}
 
 	if data.AuthMethod != "" {
@@ -119,7 +130,7 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		return corev1.Container{}, err
 	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:  InjectInitContainerName,
 		Image: h.ImageConsulK8S,
 		Env: []corev1.EnvVar{
@@ -151,7 +162,36 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		Resources:    h.InitContainerResources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
-	}, nil
+	}
+
+	if tproxyEnabled {
+		// Running consul connect redirect-traffic with iptables
+		// requires both being a root user and having NET_ADMIN capability.
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:  pointerToInt64(rootUserAndGroupID),
+			RunAsGroup: pointerToInt64(rootUserAndGroupID),
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{netAdminCapability},
+			},
+		}
+	}
+
+	return container, nil
+}
+
+// transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
+func transparentProxyEnabled(pod corev1.Pod, globalEnabled bool) (bool, error) {
+	if raw, ok := pod.Annotations[annotationTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+
+	return globalEnabled, nil
+}
+
+// pointerToInt64 takes an int64 and returns a pointer to it.
+func pointerToInt64(i int64) *int64 {
+	return &i
 }
 
 // initContainerCommandTpl is the template for the command executed by
@@ -202,4 +242,18 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+
+{{- if .EnableTransparentProxy }}
+{{- /* The newline below is intentional to allow extra space
+       in the rendered template between this and the previous commands. */}}
+
+# Apply traffic redirection rules.
+/consul/connect-inject/consul connect redirect-traffic \
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=0
+{{- end }}
+`

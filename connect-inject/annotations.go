@@ -84,6 +84,10 @@ const (
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 
+	// annotationTransparentProxy enables or disables transparent proxy mode for a given pod.
+	// This annotation takes a boolean value (true/false).
+	annotationTransparentProxy = "consul.hashicorp.com/transparent-proxy"
+
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
 )
