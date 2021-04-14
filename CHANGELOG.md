@@ -6,11 +6,54 @@ IMPROVEMENTS:
 * CRDs: update the CRD versions from v1beta1 to v1. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
 * Enterprise: support applying Consul Enterprise license when security context defaults to non-root users. [[GH-880](https://github.com/hashicorp/consul-helm/pull/880)]
 * Sync Catalog: add new `syncCatalog.extraLabels` Helm value for configuring labels on sync catalog pods. [[GH-892](https://github.com/hashicorp/consul-helm/pull/892)]
+* Connect: Support high availability of the connect-inject deployment. [[GH-903](https://github.com/hashicorp/consul-helm/pull/903)]
 
 BREAKING CHANGES:
 * Minimum Kubernetes versions supported is 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
-* Connect: `-enable-health-checks-controller`, `-health-checks-reconcile-period`, `-cleanup-controller-reconcile-period` have been removed
-  and are no longer supported as the controllers have been replaced by the endpoints controller. [[GH-892](https://github.com/hashicorp/consul-helm/pull/899)]
+* Connect: The Helm values for health checks and cleanup controller have been removed: `connectInject.healthChecks` and `connectInject.cleanupController`, as these controllers have been replaced by the endpoints controller. [[GH-899](https://github.com/hashicorp/consul-helm/pull/899)]
+* Connect: connect webhook deployment now uses `webhook-cert-manager` to bootstrap the webhook certificates instead of generating them inside of the webhook. [[GH-861](https://github.com/hashicorp/consul-helm/pull/861)]
+* Connect: Kubernetes Services are now required for all connect injected applications.
+  The Kubernetes service name will be used as the service name to register with Consul unless the annotation `consul.hashicorp.com/connect-service` is provided to the deployment/pod to override this. If using ACLs the ServiceAccountName must match the service name used with Consul.
+
+  Example Service:
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-app
+spec:
+  selector:
+    app: sample-app
+  ports:
+    - port: 80
+      targetPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sample-app
+  name: sample-app
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app: sample-app
+   template:
+     metadata:
+       annotations:
+         'consul.hashicorp.com/connect-inject': 'true'
+       labels:
+         app: sample-app
+     spec:
+       containers:
+       - name: sample-app
+         image: sample-app:0.1.0
+         ports:
+         - containerPort: 9090
+```
+  **Note: if you're already using a Kubernetes service, no changes are required.**
 
 BUG FIXES:
 * Add startup probe to connect-inject deployment to give time for certificates to be available.
