@@ -145,7 +145,7 @@ jobs:
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
                     -consul-image="ishustava/consul-enterprise:tproxy-test" \
-                    -consul-k8s-image="ishustava/consul-k8s-dev:04-13-2021-8f91d97" # TODO: change once feature-tproxy consul-k8s branch is merged
+                    -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:296675a"
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1
