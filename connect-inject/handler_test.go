@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/go-hclog"
+	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -45,7 +45,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"kube-system namespace",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -65,7 +65,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"already injected",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -89,7 +89,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod basic",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -130,7 +130,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with upstreams specified",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -175,7 +175,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection disabled",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -199,7 +199,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection truthy",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -244,7 +244,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with service annotation",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -289,7 +289,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with existing label",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -334,7 +334,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"when metrics merging is enabled, we should inject the consul-sidecar and add prometheus annotations",
 			Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				MetricsConfig: MetricsConfig{
@@ -459,7 +459,7 @@ func TestHandler_ErrorsOnDeprecatedAnnotations(t *testing.T) {
 			require.NoError(err)
 
 			handler := Handler{
-				Log:                   hclog.Default().Named("handler"),
+				Log:                   logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,

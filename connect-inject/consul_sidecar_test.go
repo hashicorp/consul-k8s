@@ -3,7 +3,7 @@ package connectinject
 import (
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
+	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +13,7 @@ import (
 // that we pass the metrics flags to consul sidecar.
 func TestConsulSidecar_MetricsFlags(t *testing.T) {
 	handler := Handler{
-		Log:            hclog.Default().Named("handler"),
+		Log:            logrtest.TestLogger{T: t},
 		ImageConsulK8S: "hashicorp/consul-k8s:9.9.9",
 		MetricsConfig: MetricsConfig{
 			DefaultEnableMetrics:        true,
