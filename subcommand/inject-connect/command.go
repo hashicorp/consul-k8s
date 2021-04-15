@@ -155,9 +155,9 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", true,
 		"Enable transparent proxy mode for all Consul service mesh applications.")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
-		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
-			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
+		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
+			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -222,14 +222,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	logger, err := common.Logger(c.flagLogLevel)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-
 	// Proxy resources
 	var sidecarProxyCPULimit, sidecarProxyCPURequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
+	var err error
 	if c.flagDefaultSidecarProxyCPURequest != "" {
 		sidecarProxyCPURequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
 		if err != nil {
@@ -351,8 +346,14 @@ func (c *Command) Run(args []string) int {
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
-	// Start the endpoints controller
-	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapcore.InfoLevel))
+	var zapLevel zapcore.Level
+	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
+		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
+		return 1
+	}
+
+	// We set UseDevMode to true because we don't want our logs json formatted.
+	zapLogger := zap.New(zap.UseDevMode(true), zap.Level(zapLevel))
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)
 	listenSplits := strings.SplitN(c.flagListen, ":", 2)
@@ -440,7 +441,7 @@ func (c *Command) Run(args []string) int {
 			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
 			EnableTransparentProxy:     c.flagEnableTransparentProxy,
-			Log:                        logger.Named("handler"),
+			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
 		}})
 
 	if err := mgr.Start(ctx); err != nil {

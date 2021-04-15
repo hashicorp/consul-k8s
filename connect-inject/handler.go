@@ -9,9 +9,9 @@ import (
 	"strconv"
 
 	"github.com/deckarep/golang-set"
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-hclog"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -128,7 +128,7 @@ type Handler struct {
 	EnableTransparentProxy bool
 
 	// Log
-	Log hclog.Logger
+	Log logr.Logger
 
 	decoder *admission.Decoder
 }
@@ -141,7 +141,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 
 	// Decode the pod from the request
 	if err := h.decoder.Decode(req, &pod); err != nil {
-		h.Log.Error("Could not unmarshal request to pod", "err", err)
+		h.Log.Error(err, "could not unmarshal request to pod")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -153,7 +153,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	}
 
 	if err := h.validatePod(pod); err != nil {
-		h.Log.Error("Error validating pod", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error validating pod", "request name", req.Name)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -161,18 +161,20 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	// This MUST be done before shouldInject is called since that function
 	// uses these annotations.
 	if err := h.defaultAnnotations(&pod); err != nil {
-		h.Log.Error("Error creating default annotations", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error creating default annotations", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating default annotations: %s", err))
 	}
 
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
 	if shouldInject, err := h.shouldInject(pod, req.Namespace); err != nil {
-		h.Log.Error("Error checking if should inject", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error checking if should inject", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking if should inject: %s", err))
 	} else if !shouldInject {
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
+
+	h.Log.Info("received pod", "name", pod.Name, "ns", pod.Namespace)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
@@ -198,7 +200,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	// the Envoy configuration.
 	initContainer, err := h.containerInit(pod, req.Namespace)
 	if err != nil {
-		h.Log.Error("Error configuring injection init container", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
 	}
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
@@ -206,7 +208,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	// Add the Envoy and Consul sidecars.
 	envoySidecar, err := h.envoySidecar(pod, req.Namespace)
 	if err != nil {
-		h.Log.Error("Error configuring injection sidecar container", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 	}
 	pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
@@ -217,7 +219,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	// First, determine if we need to run the metrics merging server.
 	shouldRunMetricsMerging, err := h.MetricsConfig.shouldRunMergedMetricsServer(pod)
 	if err != nil {
-		h.Log.Error("Error determining if metrics merging server should be run", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error determining if metrics merging server should be run", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if metrics merging server should be run: %s", err))
 	}
 
@@ -225,7 +227,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	if shouldRunMetricsMerging {
 		consulSidecar, err := h.consulSidecar(pod)
 		if err != nil {
-			h.Log.Error("Error configuring consul sidecar container", "err", err, "Request Name", req.Name)
+			h.Log.Error(err, "error configuring consul sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring consul sidecar container: %s", err))
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, consulSidecar)
@@ -237,7 +239,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 
 	// Add annotations for metrics.
 	if err = h.prometheusAnnotations(&pod); err != nil {
-		h.Log.Error("Error configuring prometheus annotations", "err", err, "Request Name", req.Name)
+		h.Log.Error(err, "error configuring prometheus annotations", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring prometheus annotations: %s", err))
 	}
 
@@ -270,8 +272,8 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	// that process before modifying the Consul cluster.
 	if h.EnableNamespaces {
 		if _, err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
-			h.Log.Error("Error checking or creating namespace", "err", err,
-				"Namespace", h.consulNamespace(req.Namespace), "Request Name", req.Name)
+			h.Log.Error(err, "error checking or creating namespace",
+				"ns", h.consulNamespace(req.Namespace), "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
 		}
 	}

@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/deckarep/golang-set"
+	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +49,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'default' from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -70,7 +70,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'default' from k8s 'non-default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -91,7 +91,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'dest' from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -112,7 +112,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "single destination namespace 'dest' from k8s 'non-default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -133,7 +133,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -155,7 +155,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring from k8s 'dest'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -177,7 +177,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring with prefix from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -200,7 +200,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 		{
 			Name: "mirroring with prefix from k8s 'dest'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -297,7 +297,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -319,7 +319,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'default' from k8s 'non-default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -341,7 +341,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -363,7 +363,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + single destination namespace 'dest' from k8s 'non-default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -385,7 +385,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -408,7 +408,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring from k8s 'dest'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -431,7 +431,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring with prefix from k8s 'default'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -455,7 +455,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 		{
 			Name: "acls + mirroring with prefix from k8s 'dest'",
 			Handler: Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
@@ -625,7 +625,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 			require.NoError(err)
 
 			handler := Handler{
-				Log:                        hclog.Default().Named("handler"),
+				Log:                        logrtest.TestLogger{T: t},
 				AllowK8sNamespacesSet:      mapset.NewSet("*"),
 				DenyK8sNamespacesSet:       mapset.NewSet(),
 				EnableNamespaces:           true,
