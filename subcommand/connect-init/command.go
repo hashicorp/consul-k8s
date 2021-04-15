@@ -23,8 +23,8 @@ const (
 
 	// The number of times to attempt ACL Login.
 	numLoginRetries = 3
-	// The number of times to attempt to read this service (60s).
-	defaultServicePollingRetries = 60
+	// The number of times to attempt to read this service (120s).
+	defaultServicePollingRetries = 120
 )
 
 type Command struct {
