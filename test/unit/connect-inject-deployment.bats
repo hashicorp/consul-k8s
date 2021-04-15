@@ -1382,7 +1382,7 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy=true"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
@@ -1394,7 +1394,7 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'connectInject.transparentProxy.defaultEnabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy=false"))' | tee /dev/stderr)
 
-  [ "${actual}" = "false" ]
+  [ "${actual}" = "true" ]
 }

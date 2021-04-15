@@ -120,6 +120,11 @@ func (h *HelmCluster) Create(t *testing.T) {
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
+
+	// We no longer have readiness checks in the connect-inject webhook,
+	// and we need to allow some extra time for the webhook to come up and start serving requests.
+	// TODO: remove once we have readiness checks for the webhook (before GA)
+	time.Sleep(30 * time.Second)
 }
 
 func (h *HelmCluster) Destroy(t *testing.T) {

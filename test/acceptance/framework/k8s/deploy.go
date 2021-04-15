@@ -65,8 +65,8 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 		KubectlDeleteK(t, options, kustomizeDir)
 	})
 
-	// The timeout is 2min to allow for connect-init to wait for services to be registered by the endpoints controller.
-	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=2m", fmt.Sprintf("deploy/%s", deployment.Name))
+	// The timeout to allow for connect-init to wait for services to be registered by the endpoints controller.
+	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 // CheckStaticServerConnection execs into a pod of the deployment given by deploymentName
@@ -149,6 +149,7 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		deploymentName,
 		[]string{
 			"curl: (52) Empty reply from server",
+			"curl: (7) Failed to connect to localhost port 1234: Connection refused",
 			"curl: (7) Failed to connect to static-server port 80: Connection refused",
 			"curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused",
 		},
