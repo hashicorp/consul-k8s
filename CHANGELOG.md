@@ -64,21 +64,20 @@ FEATURES:
     as tagged addresses so that Consul can configure Envoy to route traffic based on that IP and port.
   - The `consul-connect-inject-init` container will run `consul connect redirect-traffic` [command](https://www.consul.io/commands/connect/redirect-traffic),
     which will apply rules (via iptables) to redirect inbound and outbound traffic to the proxy.
-    To run this command the `consul-connect-inject-init` requires running as root with capability `NET_ADMIN`
-    capability.
+    To run this command the `consul-connect-inject-init` requires running as root with capability `NET_ADMIN`.
   
   **Note: this feature is currently in beta.** 
   
   This feature includes the following changes:
   * Add new `-enable-transparent-proxy` flag to the `inject-connect` command.
-    When `true`, transparent proxy will be used for all services on the Consul service mesh
+    When `true`, transparent proxy will be used for all services on the Consul Service Mesh
     within a Kubernetes cluster. This flag defaults to `true`.
   * Add new `consul.hashicorp.com/transparent-proxy` pod annotation to allow enabling and disabling transparent
     proxy for individual services.
 
 IMPROVEMENTS:
 * CRDs: update the CRD versions from v1beta1 to v1. [[GH-464](https://github.com/hashicorp/consul-k8s/pull/464)]
-* Connect: the ``consul-connect-inject-init`` container has been split into two init containers. [[GH-441](https://github.com/hashicorp/consul-k8s/pull/441)]
+* Connect: the `consul-connect-inject-init` container has been split into two init containers. [[GH-441](https://github.com/hashicorp/consul-k8s/pull/441)]
 * Connect: A new internal command `consul-k8s connect-init` has been added.
   It replaces the existing init container logic for ACL login and Envoy bootstrapping and introduces a polling wait for service registration,
   see `Endpoints Controller` for more information.
