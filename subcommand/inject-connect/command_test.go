@@ -30,7 +30,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-log-level", "invalid"},
-			expErr: "unknown log level: invalid",
+			expErr: "Error parsing -log-level \"invalid\": unrecognized level: \"invalid\"",
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
