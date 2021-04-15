@@ -133,11 +133,12 @@ jobs:
             # exit early if any test fails (-failfast only works within a single
             # package).
             exit_code=0
-            pkgs=$(go list ./... | circleci tests split)
-            echo "Running $pkgs"
+            pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
+            echo "Running $(echo $pkgs | wc -w) packages:"
+            echo $pkgs
             for pkg in $pkgs
             do
-              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 50m -failfast \
+              if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                     -use-kind \
                     -enable-enterprise \
                     -enable-multi-cluster \
@@ -145,7 +146,7 @@ jobs:
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
                     -consul-image="ishustava/consul-enterprise:tproxy-test" \
-                    -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:296675a"
+                    -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
               then
                 echo "Tests in ${pkg} failed, aborting early"
                 exit_code=1
@@ -223,7 +224,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
+              -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
           path: /tmp/test-results
@@ -285,7 +286,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
+              -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
           path: /tmp/test-results
@@ -358,7 +359,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
+              -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
           path: /tmp/test-results
@@ -480,14 +481,14 @@ jobs:
           working_directory: test/acceptance/tests
           no_output_timeout: 1h
           command: |
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 30m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
               -use-kind \
               -enable-multi-cluster \
               -enable-enterprise \
               -kubecontext="kind-dc1" \
               -secondary-kubecontext="kind-dc2" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-k8s-image=docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest
+              -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
           path: /tmp/test-results
