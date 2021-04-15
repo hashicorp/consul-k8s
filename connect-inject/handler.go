@@ -174,6 +174,8 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
+	h.Log.Info("received pod", "name", pod.Name, "ns", pod.Namespace)
+
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
 	pod.Spec.Volumes = append(pod.Spec.Volumes, h.containerVolume())

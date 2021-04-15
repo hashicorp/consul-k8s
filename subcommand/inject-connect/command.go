@@ -155,9 +155,9 @@ func (c *Command) init() {
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
 	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", true,
 		"Enable transparent proxy mode for all Consul service mesh applications.")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
-		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
-			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
+		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
+			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")

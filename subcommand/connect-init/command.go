@@ -166,13 +166,16 @@ func (c *Command) Run(args []string) int {
 			if svc.Kind == api.ServiceKindConnectProxy {
 				// This is the proxy service ID.
 				proxyID = svc.ID
-				return nil
 			}
 		}
-		// In theory we can't reach this point unless we have 2 services registered against
-		// this pod and neither are the connect-proxy. We don't support this case anyway, but it
-		// is necessary to return from the function.
-		return fmt.Errorf("unable to find registered connect-proxy service")
+
+		if proxyID == "" {
+			// In theory we can't reach this point unless we have 2 services registered against
+			// this pod and neither are the connect-proxy. We don't support this case anyway, but it
+			// is necessary to return from the function.
+			return fmt.Errorf("unable to find registered connect-proxy service")
+		}
+		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Timed out waiting for service registration: %v", err))
