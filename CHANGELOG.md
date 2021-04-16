@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.26.0-beta1 (April 16, 2021)
 
 BREAKING CHANGES:
 * Connect: Kubernetes Services are now required for all Consul Service Mesh applications.
