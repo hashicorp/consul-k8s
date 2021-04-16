@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -347,7 +348,8 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 					Name: "test-psp",
 				},
 				Spec: policyv1beta.PodSecurityPolicySpec{
-					Privileged: false,
+					Privileged:          false,
+					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
 					SELinux: policyv1beta.SELinuxStrategyOptions{
 						Rule: policyv1beta.SELinuxStrategyRunAsAny,
 					},

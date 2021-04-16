@@ -145,7 +145,7 @@ jobs:
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-image="ishustava/consul-enterprise:tproxy-test" \
+                    -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
                     -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
               then
                 echo "Tests in ${pkg} failed, aborting early"
@@ -215,7 +215,7 @@ jobs:
             # The license expires 15-Oct-2025.
             KUBECONFIG=$primary_kubeconfig kubectl create secret generic ent-license --from-literal=key="${CONSUL_ENT_LICENSE}"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 2h -failfast \
               -enable-enterprise \
               -enterprise-license-secret-name=ent-license \
               -enterprise-license-secret-key=key \
@@ -224,6 +224,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -286,6 +287,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -353,12 +355,13 @@ jobs:
             chmod 600 "$primary_kubeconfig"
             chmod 600 "$secondary_kubeconfig"
 
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 2h -failfast \
               -enable-enterprise \
               -enable-multi-cluster \
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -416,7 +419,7 @@ jobs:
           working_directory: test/acceptance/tests
           no_output_timeout: 1h
           command: |
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 40m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 2h -failfast \
               -enable-openshift \
               -enable-enterprise \
               -enable-multi-cluster \
@@ -481,13 +484,14 @@ jobs:
           working_directory: test/acceptance/tests
           no_output_timeout: 1h
           command: |
-            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 50m -failfast \
+            gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- ./... -p 1 -timeout 2h -failfast \
               -use-kind \
               -enable-multi-cluster \
               -enable-enterprise \
               -kubecontext="kind-dc1" \
               -secondary-kubecontext="kind-dc2" \
               -debug-directory="$TEST_RESULTS/debug" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
