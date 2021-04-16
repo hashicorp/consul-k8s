@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.32.0-beta1 (Apr 16, 2021)
+
 IMPROVEMENTS: 
 
 * Specify `kubeVersion` in `Chart.yaml` to denote that this chart is compatible with Kubernetes 1.16+. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
