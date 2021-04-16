@@ -595,7 +595,7 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 // which in this case are Pods. It only returns true if the Pod is a Consul Client Agent Pod. It reads the labels
 // from the meta of the resource and uses the values of the "app" and "component" label to validate that
 // the Pod is a Consul Client Agent.
-func (r EndpointsController) filterAgentPods(object client.Object) bool {
+func (r *EndpointsController) filterAgentPods(object client.Object) bool {
 	podLabels := object.GetLabels()
 	app, ok := podLabels["app"]
 	if !ok {
@@ -623,7 +623,7 @@ func (r EndpointsController) filterAgentPods(object client.Object) bool {
 // are on the same node as the new Consul Agent pod. It receives a Pod Object which is a
 // Consul Agent that has been filtered by filterAgentPods and only enqueues endpoints
 // for client agent pods where the Ready condition is true.
-func (r EndpointsController) requestsForRunningAgentPods(object client.Object) []ctrl.Request {
+func (r *EndpointsController) requestsForRunningAgentPods(object client.Object) []ctrl.Request {
 	var consulClientPod corev1.Pod
 	r.Log.Info("received update for Consul client pod", "name", object.GetName())
 	err := r.Client.Get(r.Context, types.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()}, &consulClientPod)
