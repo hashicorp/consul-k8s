@@ -1,7 +1,7 @@
 apiVersion: v2
 name: consul
-version: 0.31.1
-appVersion: 1.9.4
+version: 0.32.0-beta1
+appVersion: 1.10.0-beta1
 kubeVersion: ">=1.16.0-0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
