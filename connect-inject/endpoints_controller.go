@@ -166,11 +166,12 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 					// Update the TTL health check for the service.
 					// This is required because ServiceRegister() does not update the TTL if the service already exists.
-					r.Log.Info("updating TTL health check for service", "name", serviceRegistration.Name)
 					status, reason, err := getReadyStatusAndReason(pod)
 					if err != nil {
+						r.Log.Error(err, "failed to get status and reason from pod", "name", serviceRegistration.Name)
 						return ctrl.Result{}, err
 					}
+					r.Log.Info("updating TTL health check for service", "name", serviceRegistration.Name, "reason", reason, "status", status)
 					err = client.Agent().UpdateTTL(getConsulHealthCheckID(pod, serviceRegistration.ID), reason, status)
 					if err != nil {
 						r.Log.Error(err, "failed to update TTL health check", "name", serviceRegistration.Name)
@@ -459,12 +460,14 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 			if endpointsAddressesMap != nil {
 				if _, ok := endpointsAddressesMap[serviceRegistration.Address]; !ok {
 					// If the service address is not in the Endpoints addresses, deregister it.
+					r.Log.Info("deregistering service from consul", "svc", svcID)
 					if err = client.Agent().ServiceDeregister(svcID); err != nil {
 						r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 						return err
 					}
 				}
 			} else {
+				r.Log.Info("deregistering service from consul", "svc", svcID)
 				if err = client.Agent().ServiceDeregister(svcID); err != nil {
 					r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 					return err
