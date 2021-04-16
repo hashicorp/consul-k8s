@@ -120,8 +120,6 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		for _, address := range allAddresses {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-				// Build the endpointAddressMap up for deregistering service instances later.
-				endpointAddressMap[address.IP] = true
 				// Get pod associated with this address.
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
@@ -131,6 +129,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 				}
 
 				if hasBeenInjected(pod) {
+					// Build the endpointAddressMap up for deregistering service instances later.
+					endpointAddressMap[pod.Status.PodIP] = true
 					// Create client for Consul agent local to the pod.
 					client, err := r.remoteConsulClient(pod.Status.HostIP, r.consulNamespace(pod.Namespace))
 					if err != nil {
