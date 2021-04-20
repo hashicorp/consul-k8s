@@ -192,10 +192,11 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
+				RunAsNonRoot: pointerToBool(false),
 			}
 			expectedCmd := `/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`
+  -proxy-uid=5995`
 			container, err := h.containerInit(*pod, k8sNamespace)
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
@@ -384,7 +385,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="default" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
+  -proxy-uid=5995`,
 			"",
 		},
 
@@ -415,7 +416,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="non-default" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
+  -proxy-uid=5995`,
 			"",
 		},
 
@@ -453,7 +454,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="k8snamespace" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
+  -proxy-uid=5995`,
 			"",
 		},
 	}
@@ -467,9 +468,9 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
-			require.Equal(actual, tt.Cmd)
+			require.Equal(tt.Cmd, actual)
 			if tt.CmdNot != "" {
-				require.NotContains(actual, tt.CmdNot)
+				require.NotContains(tt.CmdNot, actual)
 			}
 		})
 	}
@@ -598,16 +599,18 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	}, container.Resources)
 }
 
-// Test that the init copy container has the correct command.
+// Test that the init copy container has the correct command and SecurityContext.
 func TestHandlerContainerInitCopyContainer(t *testing.T) {
 	require := require.New(t)
 	h := Handler{}
 	container := h.containerInitCopyContainer()
+	expectedSecurityContext := &corev1.SecurityContext{
+		RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+		RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+		RunAsNonRoot:           pointerToBool(true),
+		ReadOnlyRootFilesystem: pointerToBool(true),
+	}
+	require.Equal(container.SecurityContext, expectedSecurityContext)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
-}
-
-// pointerToBool takes a boolean and returns a pointer to it.
-func pointerToBool(b bool) *bool {
-	return &b
 }

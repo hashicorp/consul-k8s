@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
@@ -13,6 +14,7 @@ const (
 	InjectInitCopyContainerName = "copy-consul-bin"
 	InjectInitContainerName     = "consul-connect-inject-init"
 	rootUserAndGroupID          = 0
+	envoyUserAndGroupID         = 5995
 	netAdminCapability          = "NET_ADMIN"
 )
 
@@ -37,6 +39,8 @@ type initContainerCommandData struct {
 	PrometheusScrapePath string
 	// PrometheusBackendPort configures where the listener on Envoy will point to.
 	PrometheusBackendPort string
+	// EnvoyUID is the UID that `consul connect redirect-traffic` will use when tproxy is enabled.
+	EnvoyUID string
 
 	// EnableTransparentProxy configures this init container to run in transparent proxy mode,
 	// i.e. run consul connect redirect-traffic command and add the required privileges to the
@@ -60,6 +64,12 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 			},
 		},
 		Command: []string{"/bin/sh", "-ec", cmd},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+			RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+			RunAsNonRoot:           pointerToBool(true),
+			ReadOnlyRootFilesystem: pointerToBool(true),
+		},
 	}
 }
 
@@ -78,6 +88,7 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
 		EnableTransparentProxy:    tproxyEnabled,
+		EnvoyUID:                  fmt.Sprintf("%d", envoyUserAndGroupID),
 	}
 
 	if data.AuthMethod != "" {
@@ -170,6 +181,8 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		container.SecurityContext = &corev1.SecurityContext{
 			RunAsUser:  pointerToInt64(rootUserAndGroupID),
 			RunAsGroup: pointerToInt64(rootUserAndGroupID),
+			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
+			RunAsNonRoot: pointerToBool(false),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{netAdminCapability},
 			},
@@ -191,6 +204,11 @@ func transparentProxyEnabled(pod corev1.Pod, globalEnabled bool) (bool, error) {
 
 // pointerToInt64 takes an int64 and returns a pointer to it.
 func pointerToInt64(i int64) *int64 {
+	return &i
+}
+
+// pointerToBool takes a bool and returns a pointer to it.
+func pointerToBool(i bool) *bool {
 	return &i
 }
 
@@ -254,6 +272,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0
+  -proxy-uid={{ .EnvoyUID }}
 {{- end }}
 `

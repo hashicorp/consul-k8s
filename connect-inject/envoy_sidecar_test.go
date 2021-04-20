@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod, k8sNamespace)
+	container, err := h.envoySidecar(pod)
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -40,6 +41,27 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			MountPath: "/consul/connect-inject",
 		},
 	})
+}
+
+// Test that if the user specifies a security context with the same uid as `envoyUserAndGroupID` that we return
+// an error to the handler.
+func TestHandlerEnvoySidecar_FailsWithDuplicateUID(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsUser: pointerToInt64(envoyUserAndGroupID),
+			},
+		},
+	}
+	_, err := h.envoySidecar(pod)
+	require.Error(err, fmt.Sprintf("user container and envoy proxy cannot have same uid: %v", envoyUserAndGroupID))
 }
 
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag
@@ -126,7 +148,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(*tc.pod, k8sNamespace)
+			c, err := h.envoySidecar(*tc.pod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
@@ -300,7 +322,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.envoySidecar(pod, k8sNamespace)
+			container, err := c.handler.envoySidecar(pod)
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)

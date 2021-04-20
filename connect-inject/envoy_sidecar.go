@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (h *Handler) envoySidecar(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
+func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
 	resources, err := h.envoySidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
@@ -19,6 +19,13 @@ func (h *Handler) envoySidecar(pod corev1.Pod, k8sNamespace string) (corev1.Cont
 	cmd, err := h.getContainerSidecarCommand(pod)
 	if err != nil {
 		return corev1.Container{}, err
+	}
+
+	if pod.Spec.SecurityContext != nil {
+		// User container and Envoy container cannot have the same UID.
+		if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == envoyUserAndGroupID {
+			return corev1.Container{}, fmt.Errorf("user container and envoy proxy cannot have same uid: %v", envoyUserAndGroupID)
+		}
 	}
 
 	container := corev1.Container{
@@ -40,6 +47,12 @@ func (h *Handler) envoySidecar(pod corev1.Pod, k8sNamespace string) (corev1.Cont
 			},
 		},
 		Command: cmd,
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+			RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+			RunAsNonRoot:           pointerToBool(true),
+			ReadOnlyRootFilesystem: pointerToBool(true),
+		},
 	}
 	return container, nil
 }
