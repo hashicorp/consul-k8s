@@ -139,8 +139,8 @@ func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOpt
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
-// CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
-// but it always expects a failing connection with error "Empty reply from server."
+// CheckStaticServerConnectionFailing is just like CheckStaticServerConnection
+// but it always expects a failing connection with various errors.
 func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
 	t.Helper()
 	CheckStaticServerConnection(t,
@@ -149,9 +149,7 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		deploymentName,
 		[]string{
 			"curl: (52) Empty reply from server",
-			"curl: (7) Failed to connect to localhost port 1234: Connection refused",
-			"curl: (7) Failed to connect to static-server port 80: Connection refused",
-			"curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused",
+			"curl: (7) Failed to connect",
 		},
 		curlArgs...)
 }
