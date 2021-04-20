@@ -1,5 +1,9 @@
 ## Unreleased
 
+BUG FIXES:
+* CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
+  `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-921](https://github.com/hashicorp/consul-helm/pull/921)]
+
 ## 0.32.0-beta1 (Apr 16, 2021)
 
 IMPROVEMENTS: 
