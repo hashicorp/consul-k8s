@@ -131,6 +131,36 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			},
 		},
 		{
+			kubeKind:   "Mesh",
+			consulKind: capi.MeshConfig,
+			configEntryResource: &v1alpha1.Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Mesh,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.MeshSpec{
+					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+						CatalogDestinationsOnly: true,
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &MeshController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				mesh, ok := consulEntry.(*capi.MeshConfigEntry)
+				require.True(t, ok, "cast error")
+				require.True(t, mesh.TransparentProxy.CatalogDestinationsOnly)
+			},
+		},
+		{
 			kubeKind:   "ServiceRouter",
 			consulKind: capi.ServiceRouter,
 			consulPrereqs: []capi.ConfigEntry{
@@ -546,6 +576,40 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				proxyDefault, ok := consulEntry.(*capi.ProxyConfigEntry)
 				require.True(t, ok, "cast error")
 				require.Equal(t, capi.MeshGatewayModeLocal, proxyDefault.MeshGateway.Mode)
+			},
+		},
+		{
+			kubeKind:   "Mesh",
+			consulKind: capi.MeshConfig,
+			configEntryResource: &v1alpha1.Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.Mesh,
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.MeshSpec{
+					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+						CatalogDestinationsOnly: true,
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &MeshController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				mesh := resource.(*v1alpha1.Mesh)
+				mesh.Spec.TransparentProxy.CatalogDestinationsOnly = false
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				meshConfigEntry, ok := consulEntry.(*capi.MeshConfigEntry)
+				require.True(t, ok, "cast error")
+				require.False(t, meshConfigEntry.TransparentProxy.CatalogDestinationsOnly)
 			},
 		},
 		{
@@ -969,6 +1033,33 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
 				return &ProxyDefaultsController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClient:   consulClient,
+						DatacenterName: datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "Mesh",
+			consulKind: capi.MeshConfig,
+			configEntryResourceWithDeletion: &v1alpha1.Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              common.Global,
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.MeshSpec{
+					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
+						CatalogDestinationsOnly: true,
+					},
+				},
+			},
+			reconciler: func(client client.Client, consulClient *capi.Client, logger logr.Logger) testReconciler {
+				return &MeshController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
