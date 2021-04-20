@@ -2,7 +2,6 @@ package connectinject
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
@@ -88,7 +87,7 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
 		EnableTransparentProxy:    tproxyEnabled,
-		EnvoyUID:                  fmt.Sprintf("%d", envoyUserAndGroupID),
+		EnvoyUID:                  strconv.Itoa(envoyUserAndGroupID),
 	}
 
 	if data.AuthMethod != "" {
@@ -208,8 +207,8 @@ func pointerToInt64(i int64) *int64 {
 }
 
 // pointerToBool takes a bool and returns a pointer to it.
-func pointerToBool(i bool) *bool {
-	return &i
+func pointerToBool(b bool) *bool {
+	return &b
 }
 
 // initContainerCommandTpl is the template for the command executed by

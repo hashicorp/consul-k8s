@@ -43,9 +43,9 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 	})
 }
 
-// Test that if the user specifies a security context with the same uid as `envoyUserAndGroupID` that we return
+// Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
 // an error to the handler.
-func TestHandlerEnvoySidecar_FailsWithDuplicateUID(t *testing.T) {
+func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
 	require := require.New(t)
 	h := Handler{}
 	pod := corev1.Pod{
@@ -61,7 +61,31 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateUID(t *testing.T) {
 		},
 	}
 	_, err := h.envoySidecar(pod)
-	require.Error(err, fmt.Sprintf("user container and envoy proxy cannot have same uid: %v", envoyUserAndGroupID))
+	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
+}
+
+// Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID`
+// that we return an error to the handler.
+func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+				{
+					Name: "app",
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: pointerToInt64(envoyUserAndGroupID),
+					},
+				},
+			},
+		},
+	}
+	_, err := h.envoySidecar(pod)
+	require.Error(err, fmt.Sprintf("user containers cannot have the same uid as envoy: %v", envoyUserAndGroupID))
 }
 
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag

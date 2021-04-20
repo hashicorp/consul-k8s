@@ -24,7 +24,15 @@ func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
 	if pod.Spec.SecurityContext != nil {
 		// User container and Envoy container cannot have the same UID.
 		if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == envoyUserAndGroupID {
-			return corev1.Container{}, fmt.Errorf("user container and envoy proxy cannot have same uid: %v", envoyUserAndGroupID)
+			return corev1.Container{}, fmt.Errorf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID)
+		}
+	}
+	// Ensure that none of the user's containers have the same UID as Envoy. At this point in injection the handler
+	// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
+	for _, c := range pod.Spec.Containers {
+		// User container and Envoy container cannot have the same UID.
+		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == envoyUserAndGroupID {
+			return corev1.Container{}, fmt.Errorf("user containers cannot have the same uid as envoy: %v", envoyUserAndGroupID)
 		}
 	}
 

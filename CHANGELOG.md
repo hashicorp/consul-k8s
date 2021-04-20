@@ -1,8 +1,10 @@
 ## UNRELEASED
 
 FEATURES:
-* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they do not run as root. Also use `RunAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
+* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they do not run as root. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 
+BUG FIXES:
+* Connect: Use `RunAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 
 ## 0.26.0-beta1 (April 16, 2021)
 
