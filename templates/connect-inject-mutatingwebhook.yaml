@@ -1,10 +1,6 @@
 {{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
 # The MutatingWebhookConfiguration to enable the Connect injector.
-{{- if .Capabilities.APIVersions.Has "admissionregistration.k8s.io/v1" }}
 apiVersion: admissionregistration.k8s.io/v1
-{{- else }}
-apiVersion: admissionregistration.k8s.io/v1beta1
-{{- end }}
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ template "consul.fullname" . }}-connect-injector-cfg
@@ -19,18 +15,18 @@ webhooks:
     failurePolicy: Ignore
     sideEffects: None
     admissionReviewVersions:
-      - "v1beta1"
-      - "v1"
+    - "v1beta1"
+    - "v1"
     clientConfig:
       service:
         name: {{ template "consul.fullname" . }}-connect-injector-svc
         namespace: {{ .Release.Namespace }}
         path: "/mutate"
     rules:
-      - operations: [ "CREATE" ]
-        apiGroups: [""]
-        apiVersions: ["v1"]
-        resources: ["pods"]
+    - operations: [ "CREATE" ]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
 {{- if .Values.connectInject.namespaceSelector }}
     namespaceSelector:
 {{ tpl .Values.connectInject.namespaceSelector . | indent 6 }}

@@ -1,9 +1,5 @@
 {{- if .Values.controller.enabled }}
-{{- if .Capabilities.APIVersions.Has "admissionregistration.k8s.io/v1" }}
 apiVersion: admissionregistration.k8s.io/v1
-{{- else }}
-apiVersion: admissionregistration.k8s.io/v1beta1
-{{- end }}
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ template "consul.fullname" . }}-controller-mutating-webhook-configuration
@@ -22,8 +18,8 @@ webhooks:
       path: /mutate-v1alpha1-proxydefaults
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-proxydefaults.consul.hashicorp.com
   rules:
     - apiGroups:
@@ -44,19 +40,19 @@ webhooks:
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-servicedefaults.consul.hashicorp.com
   rules:
-    - apiGroups:
-      - consul.hashicorp.com
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - servicedefaults
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicedefaults
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -66,19 +62,19 @@ webhooks:
       path: /mutate-v1alpha1-serviceresolver
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-serviceresolver.consul.hashicorp.com
   rules:
-    - apiGroups:
-      - consul.hashicorp.com
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - serviceresolvers
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceresolvers
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -88,19 +84,19 @@ webhooks:
       path: /mutate-v1alpha1-servicerouter
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-servicerouter.consul.hashicorp.com
   rules:
-    - apiGroups:
-      - consul.hashicorp.com
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - servicerouters
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicerouters
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -110,19 +106,19 @@ webhooks:
       path: /mutate-v1alpha1-servicesplitter
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-servicesplitter.consul.hashicorp.com
   rules:
-    - apiGroups:
-      - consul.hashicorp.com
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - servicesplitters
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicesplitters
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -132,19 +128,19 @@ webhooks:
       path: /mutate-v1alpha1-serviceintentions
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-serviceintentions.consul.hashicorp.com
   rules:
-    - apiGroups:
-      - consul.hashicorp.com
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - serviceintentions
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceintentions
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -154,19 +150,19 @@ webhooks:
       path: /mutate-v1alpha1-ingressgateway
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-ingressgateway.consul.hashicorp.com
   rules:
-    - apiGroups:
-        - consul.hashicorp.com
-      apiVersions:
-        - v1alpha1
-      operations:
-        - CREATE
-        - UPDATE
-      resources:
-        - ingressgateways
+  - apiGroups:
+      - consul.hashicorp.com
+    apiVersions:
+      - v1alpha1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - ingressgateways
   sideEffects: None
 - clientConfig:
     caBundle: Cg==
@@ -176,18 +172,18 @@ webhooks:
       path: /mutate-v1alpha1-terminatinggateway
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-terminatinggateway.consul.hashicorp.com
   rules:
-    - apiGroups:
-        - consul.hashicorp.com
-      apiVersions:
-        - v1alpha1
-      operations:
-        - CREATE
-        - UPDATE
-      resources:
-        - terminatinggateways
+  - apiGroups:
+      - consul.hashicorp.com
+    apiVersions:
+      - v1alpha1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - terminatinggateways
   sideEffects: None
 {{- end }}
