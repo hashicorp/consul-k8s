@@ -26,6 +26,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 			&capi.ServiceConfigEntry{
 				Name: "foo",
 				Kind: capi.ServiceDefaults,
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -60,6 +63,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "external-sni",
+					TransparentProxy: &TransparentProxyConfig{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -87,6 +93,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					},
 				},
 				ExternalSNI: "external-sni",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
+				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -117,9 +126,12 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:        capi.ServiceDefaults,
-				Name:        "my-test-service",
-				Namespace:   "namespace",
+				Kind:      capi.ServiceDefaults,
+				Name:      "my-test-service",
+				Namespace: "namespace",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -156,6 +168,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "sni-value",
+					TransparentProxy: &TransparentProxyConfig{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -182,6 +197,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 				ExternalSNI: "sni-value",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
+				},
 			},
 			true,
 		},

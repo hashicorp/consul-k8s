@@ -28,9 +28,12 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
-				Name:        common.Global,
-				Kind:        capi.ProxyDefaults,
-				Namespace:   "default",
+				Name:      common.Global,
+				Kind:      capi.ProxyDefaults,
+				Namespace: "default",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -67,6 +70,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &TransparentProxyConfig{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -94,6 +100,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							Protocol:      "https",
 						},
 					},
+				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
 				},
 			},
 			Matches: true,
@@ -138,6 +147,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
 				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 			},
 		},
 		"every field set": {
@@ -167,6 +179,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &TransparentProxyConfig{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -195,6 +210,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							Protocol:      "https",
 						},
 					},
+				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,

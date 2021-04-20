@@ -48,7 +48,7 @@ type IngressGatewayWebhook struct {
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1alpha1,name=mutate-ingressgateway.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1alpha1,name=mutate-ingressgateway.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *IngressGatewayWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource IngressGateway

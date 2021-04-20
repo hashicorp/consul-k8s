@@ -61,6 +61,8 @@ type ProxyDefaultsSpec struct {
 	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
 	Expose ExposeConfig `json:"expose,omitempty"`
+	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	TransparentProxy *TransparentProxyConfig `json:"transparentProxy,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -145,12 +147,13 @@ func (in *ProxyDefaults) SetLastSyncedTime(time *metav1.Time) {
 func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
-		Kind:        in.ConsulKind(),
-		Name:        in.ConsulName(),
-		MeshGateway: in.Spec.MeshGateway.toConsul(),
-		Expose:      in.Spec.Expose.toConsul(),
-		Config:      consulConfig,
-		Meta:        meta(datacenter),
+		Kind:             in.ConsulKind(),
+		Name:             in.ConsulName(),
+		MeshGateway:      in.Spec.MeshGateway.toConsul(),
+		Expose:           in.Spec.Expose.toConsul(),
+		Config:           consulConfig,
+		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		Meta:             meta(datacenter),
 	}
 }
 
