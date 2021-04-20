@@ -56,6 +56,7 @@ type ProxyDefaultsSpec struct {
 	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Config json.RawMessage `json:"config,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
