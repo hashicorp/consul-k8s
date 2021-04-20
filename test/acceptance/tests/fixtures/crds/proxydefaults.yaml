@@ -4,7 +4,18 @@ metadata:
   name: global
 spec:
   config:
-    foo: '{"http":{"name":"envoy.zipkin","config":{"collector_cluster":"zipkin","collector_endpoint":"/api/v1/spans","shared_span_context":false}}}'
-    members: 3
+    protocol: "tcp"
+    number: 3
+    bool: true
+    array:
+      - item1
+      - item2
+    map:
+      key: value
   meshGateway:
     mode: local
+  expose:
+    paths:
+      - path: /health
+        listenerPort: 22000
+        localPathPort: 8080
