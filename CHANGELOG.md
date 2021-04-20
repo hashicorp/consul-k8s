@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
+  `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-495](https://github.com/hashicorp/consul-k8s/pull/495)]
+
 ## 0.26.0-beta1 (April 16, 2021)
 
 BREAKING CHANGES:
