@@ -87,6 +87,13 @@ spec:
                     description: Mode is the mode that should be used for the upstream connection. One of none, local, or remote.
                     type: string
                 type: object
+              transparentProxy:
+                description: TransparentProxy controls configuration specific to proxies in transparent mode.
+                properties:
+                  outboundListenerPort:
+                    description: The port of the listener where outbound application traffic is being redirected to.
+                    type: integer
+                type: object
             type: object
           status:
             properties:

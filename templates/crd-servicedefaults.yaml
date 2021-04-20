@@ -89,6 +89,13 @@ spec:
               protocol:
                 description: Protocol sets the protocol of the service. This is used by Connect proxies for things like observability features and to unlock usage of the service-splitter and service-router config entries for a service.
                 type: string
+              transparentProxy:
+                description: TransparentProxy controls configuration specific to proxies in transparent mode.
+                properties:
+                  outboundListenerPort:
+                    description: The port of the listener where outbound application traffic is being redirected to.
+                    type: integer
+                type: object
             type: object
           status:
             properties:
