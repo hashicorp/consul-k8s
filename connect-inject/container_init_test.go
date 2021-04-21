@@ -192,10 +192,11 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
+				RunAsNonRoot: pointerToBool(false),
 			}
 			expectedCmd := `/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`
+  -proxy-uid=5995`
 			container, err := h.containerInit(*pod, k8sNamespace)
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
@@ -248,7 +249,6 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 		Pod     func(*corev1.Pod) *corev1.Pod
 		Handler Handler
 		Cmd     string // Strings.Contains test
-		CmdNot  string // Not contains
 	}{
 		{
 			"whole template, default namespace",
@@ -271,7 +271,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
-			"",
 		},
 
 		{
@@ -295,7 +294,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
-			"",
 		},
 
 		{
@@ -325,7 +323,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
-			"",
 		},
 		{
 			"Whole template, auth method, non-default namespace, mirroring enabled",
@@ -355,7 +352,6 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
-			"",
 		},
 		{
 			"whole template, default namespace, tproxy enabled",
@@ -384,8 +380,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="default" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
-			"",
+  -proxy-uid=5995`,
 		},
 
 		{
@@ -415,8 +410,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="non-default" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
-			"",
+  -proxy-uid=5995`,
 		},
 
 		{
@@ -453,8 +447,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   -namespace="k8snamespace" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=0`,
-			"",
+  -proxy-uid=5995`,
 		},
 	}
 
@@ -463,14 +456,10 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			require := require.New(t)
 
 			h := tt.Handler
-
 			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
-			require.Equal(actual, tt.Cmd)
-			if tt.CmdNot != "" {
-				require.NotContains(actual, tt.CmdNot)
-			}
+			require.Equal(tt.Cmd, actual)
 		})
 	}
 }
@@ -598,16 +587,18 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 	}, container.Resources)
 }
 
-// Test that the init copy container has the correct command.
+// Test that the init copy container has the correct command and SecurityContext.
 func TestHandlerContainerInitCopyContainer(t *testing.T) {
 	require := require.New(t)
 	h := Handler{}
 	container := h.containerInitCopyContainer()
+	expectedSecurityContext := &corev1.SecurityContext{
+		RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
+		RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
+		RunAsNonRoot:           pointerToBool(true),
+		ReadOnlyRootFilesystem: pointerToBool(true),
+	}
+	require.Equal(container.SecurityContext, expectedSecurityContext)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
-}
-
-// pointerToBool takes a boolean and returns a pointer to it.
-func pointerToBool(b bool) *bool {
-	return &b
 }

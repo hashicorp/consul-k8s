@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod, k8sNamespace)
+	container, err := h.envoySidecar(pod)
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -40,6 +41,56 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			MountPath: "/consul/connect-inject",
 		},
 	})
+}
+
+// Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
+// an error to the handler.
+func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsUser: pointerToInt64(envoyUserAndGroupID),
+			},
+		},
+	}
+	_, err := h.envoySidecar(pod)
+	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
+}
+
+// Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID`
+// that we return an error to the handler.
+func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+					// Setting RunAsUser: 1 should succeed.
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: pointerToInt64(1),
+					},
+				},
+				{
+					Name: "app",
+					// Setting RunAsUser: 5995 should fail.
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: pointerToInt64(envoyUserAndGroupID),
+					},
+				},
+			},
+		},
+	}
+	_, err := h.envoySidecar(pod)
+	require.Error(err, fmt.Sprintf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", pod.Spec.Containers[1].Name, envoyUserAndGroupID))
 }
 
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag
@@ -126,7 +177,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(*tc.pod, k8sNamespace)
+			c, err := h.envoySidecar(*tc.pod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
@@ -300,7 +351,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.envoySidecar(pod, k8sNamespace)
+			container, err := c.handler.envoySidecar(pod)
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)
