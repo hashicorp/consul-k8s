@@ -116,6 +116,13 @@ func (in *TransparentProxy) toConsul() *capi.TransparentProxyConfig {
 	return &capi.TransparentProxyConfig{OutboundListenerPort: in.OutboundListenerPort}
 }
 
+func (in *TransparentProxy) validate(path *field.Path) *field.Error {
+	if in != nil {
+		return field.Invalid(path, in, "use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port")
+	}
+	return nil
+}
+
 func notInSliceMessage(slice []string) string {
 	return fmt.Sprintf(`must be one of "%s"`, strings.Join(slice, `", "`))
 }

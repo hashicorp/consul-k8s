@@ -306,6 +306,19 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
+		"transparentProxy": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+				},
+			},
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+		},
 		"multi-error": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{

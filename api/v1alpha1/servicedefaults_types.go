@@ -156,6 +156,9 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 
 	if len(allErrs) > 0 {

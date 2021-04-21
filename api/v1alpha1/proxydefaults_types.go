@@ -173,6 +173,9 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	if err := in.validateConfig(path.Child("config")); err != nil {
 		allErrs = append(allErrs, err)
 	}
