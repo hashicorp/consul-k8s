@@ -74,9 +74,14 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 			Containers: []corev1.Container{
 				{
 					Name: "web",
+					// Setting RunAsUser: 1 should succeed.
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: pointerToInt64(1),
+					},
 				},
 				{
 					Name: "app",
+					// Setting RunAsUser: 5995 should fail.
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: pointerToInt64(envoyUserAndGroupID),
 					},
@@ -85,7 +90,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 		},
 	}
 	_, err := h.envoySidecar(pod)
-	require.Error(err, fmt.Sprintf("user containers cannot have the same uid as envoy: %v", envoyUserAndGroupID))
+	require.Error(err, fmt.Sprintf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", pod.Spec.Containers[1].Name, envoyUserAndGroupID))
 }
 
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag

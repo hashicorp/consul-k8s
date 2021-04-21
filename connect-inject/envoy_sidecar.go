@@ -32,7 +32,7 @@ func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
 	for _, c := range pod.Spec.Containers {
 		// User container and Envoy container cannot have the same UID.
 		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == envoyUserAndGroupID {
-			return corev1.Container{}, fmt.Errorf("user containers cannot have the same uid as envoy: %v", envoyUserAndGroupID)
+			return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", c.Name, envoyUserAndGroupID)
 		}
 	}
 

@@ -14,6 +14,7 @@ const (
 	InjectInitContainerName     = "consul-connect-inject-init"
 	rootUserAndGroupID          = 0
 	envoyUserAndGroupID         = 5995
+	copyContainerUserAndGroupID = 5996
 	netAdminCapability          = "NET_ADMIN"
 )
 
@@ -38,8 +39,8 @@ type initContainerCommandData struct {
 	PrometheusScrapePath string
 	// PrometheusBackendPort configures where the listener on Envoy will point to.
 	PrometheusBackendPort string
-	// EnvoyUID is the UID that `consul connect redirect-traffic` will use when tproxy is enabled.
-	EnvoyUID string
+	// EnvoyUID is the Linux user id that will be used when tproxy is enabled.
+	EnvoyUID int
 
 	// EnableTransparentProxy configures this init container to run in transparent proxy mode,
 	// i.e. run consul connect redirect-traffic command and add the required privileges to the
@@ -64,8 +65,9 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 		},
 		Command: []string{"/bin/sh", "-ec", cmd},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:              pointerToInt64(envoyUserAndGroupID),
-			RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
+			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
+			RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
 			RunAsNonRoot:           pointerToBool(true),
 			ReadOnlyRootFilesystem: pointerToBool(true),
 		},
@@ -87,7 +89,7 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
 		ConsulCACert:              h.ConsulCACert,
 		EnableTransparentProxy:    tproxyEnabled,
-		EnvoyUID:                  strconv.Itoa(envoyUserAndGroupID),
+		EnvoyUID:                  envoyUserAndGroupID,
 	}
 
 	if data.AuthMethod != "" {
