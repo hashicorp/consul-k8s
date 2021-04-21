@@ -191,8 +191,7 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 		container.Env = append(container.Env, containerEnvVars...)
 	}
 
-	// TODO: rename both of these initcontainers appropriately
-	// Add the consul-init container
+	// Add the init container which copies the Consul binary to /consul/connect-inject/.
 	initCopyContainer := h.containerInitCopyContainer()
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
@@ -205,8 +204,8 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	}
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
-	// Add the Envoy and Consul sidecars.
-	envoySidecar, err := h.envoySidecar(pod, req.Namespace)
+	// Add the Envoy sidecar.
+	envoySidecar, err := h.envoySidecar(pod)
 	if err != nil {
 		h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
