@@ -109,7 +109,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -523,7 +523,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -962,7 +962,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},

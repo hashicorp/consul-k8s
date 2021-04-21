@@ -124,7 +124,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						Namespace: c.SourceKubeNS,
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGatewayConfig{
+						MeshGateway: v1alpha1.MeshGateway{
 							Mode: "remote",
 						},
 					},
@@ -356,7 +356,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 						Finalizers: []string{controller.FinalizerName},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGatewayConfig{
+						MeshGateway: v1alpha1.MeshGateway{
 							Mode: "remote",
 						},
 					},
@@ -630,7 +630,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{
-						MeshGateway: v1alpha1.MeshGatewayConfig{
+						MeshGateway: v1alpha1.MeshGateway{
 							Mode: "remote",
 						},
 					},

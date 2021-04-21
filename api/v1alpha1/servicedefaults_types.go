@@ -49,14 +49,14 @@ type ServiceDefaultsSpec struct {
 	// service-splitter and service-router config entries for a service.
 	Protocol string `json:"protocol,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
-	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
+	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
-	Expose ExposeConfig `json:"expose,omitempty"`
+	Expose Expose `json:"expose,omitempty"`
 	// ExternalSNI is an optional setting that allows for the TLS SNI value
 	// to be changed to a non-connect value when federating with an external system.
 	ExternalSNI string `json:"externalSNI,omitempty"`
 	// TransparentProxy controls configuration specific to proxies in transparent mode.
-	TransparentProxy *TransparentProxyConfig `json:"transparentProxy,omitempty"`
+	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {

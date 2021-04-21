@@ -58,11 +58,11 @@ type ProxyDefaultsSpec struct {
 	// +kubebuilder:validation:Schemaless
 	Config json.RawMessage `json:"config,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
-	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
+	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
-	Expose ExposeConfig `json:"expose,omitempty"`
+	Expose Expose `json:"expose,omitempty"`
 	// TransparentProxy controls configuration specific to proxies in transparent mode.
-	TransparentProxy *TransparentProxyConfig `json:"transparentProxy,omitempty"`
+	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {

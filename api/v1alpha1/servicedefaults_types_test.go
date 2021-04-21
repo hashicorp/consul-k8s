@@ -42,10 +42,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{
@@ -63,7 +63,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "external-sni",
-					TransparentProxy: &TransparentProxyConfig{
+					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
 				},
@@ -148,10 +148,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								ListenerPort:  8080,
@@ -168,7 +168,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "sni-value",
-					TransparentProxy: &TransparentProxyConfig{
+					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
 				},
@@ -239,10 +239,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
 							{
@@ -263,7 +263,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "foobar",
 					},
 				},
@@ -276,7 +276,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "invalid-protocol",
@@ -294,7 +294,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "http",
@@ -312,10 +312,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "invalid-mode",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "invalid-protocol",

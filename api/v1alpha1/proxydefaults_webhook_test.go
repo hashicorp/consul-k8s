@@ -59,7 +59,7 @@ func TestValidateProxyDefault(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
 				},
