@@ -4,7 +4,11 @@ BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 
 BREAKING CHANGES:
-* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned on scheduling. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
+* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
+  do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned
+  on scheduling. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
+* CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
+  `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-495](https://github.com/hashicorp/consul-k8s/pull/495)]
 
 ## 0.26.0-beta1 (April 16, 2021)
 
