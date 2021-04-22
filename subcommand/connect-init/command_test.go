@@ -36,6 +36,10 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod},
 			expErr: "-service-account-name must be set when ACLs are enabled",
 		},
+		{
+			flags:  []string{"-pod-name", testPodName, "-pod-namespace", testPodNamespace, "-acl-auth-method", testAuthMethod, "-service-account-name", "foo", "-log-level", "invalid"},
+			expErr: "unknown log level: invalid",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.expErr, func(t *testing.T) {
@@ -62,43 +66,47 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 		serviceName                string
 		includeServiceAccountName  bool
 		serviceAccountNameMismatch bool
-		expErr                     string
+		expCode                    int
 	}{
 		{
 			name:               "ACLs enabled, no tls",
 			tls:                false,
 			serviceAccountName: "counting",
+			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, tls",
 			tls:                true,
 			serviceAccountName: "counting",
+			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, K8s service name matches service account name",
 			tls:                false,
 			serviceAccountName: "counting",
 			serviceName:        "",
+			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, service name annotation matches service account name",
 			tls:                false,
 			serviceAccountName: "web",
 			serviceName:        "web",
+			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, service name annotation doesn't match service account name",
 			tls:                false,
 			serviceAccountName: "not-a-match",
 			serviceName:        "web",
-			expErr:             "service account name not-a-match doesn't match annotation service name web",
+			expCode:            1,
 		},
 		{
 			name:               "ACLs enabled, K8s service name doesn't match service account name",
 			tls:                false,
 			serviceAccountName: "not-a-match",
 			serviceName:        "",
-			expErr:             "service account name not-a-match doesn't match Consul service name counting",
+			expCode:            1,
 		},
 	}
 	for _, test := range cases {
@@ -209,29 +217,28 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			}
 			// Run the command.
 			code := cmd.Run(flags)
-			if test.expErr != "" {
+			if test.expCode != 0 {
 				require.Equal(t, 1, code)
-				require.Contains(t, ui.ErrorWriter.String(), test.expErr)
-			} else {
-				require.Equal(t, 0, code, ui.ErrorWriter.String())
-
-				// Validate the ACL token was written.
-				tokenData, err := ioutil.ReadFile(tokenFile)
-				require.NoError(t, err)
-				require.NotEmpty(t, tokenData)
-
-				// Check that the token has the metadata with pod name and pod namespace.
-				consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
-				require.NoError(t, err)
-				token, _, err := consulClient.ACL().TokenReadSelf(nil)
-				require.NoError(t, err)
-				require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
-
-				// Validate contents of proxyFile.
-				data, err := ioutil.ReadFile(proxyFile)
-				require.NoError(t, err)
-				require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+				return
 			}
+			require.Equal(t, 0, code, ui.ErrorWriter.String())
+
+			// Validate the ACL token was written.
+			tokenData, err := ioutil.ReadFile(tokenFile)
+			require.NoError(t, err)
+			require.NotEmpty(t, tokenData)
+
+			// Check that the token has the metadata with pod name and pod namespace.
+			consulClient, err = api.NewClient(&api.Config{Address: server.HTTPAddr, Token: string(tokenData)})
+			require.NoError(t, err)
+			token, _, err := consulClient.ACL().TokenReadSelf(nil)
+			require.NoError(t, err)
+			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
+
+			// Validate contents of proxyFile.
+			data, err := ioutil.ReadFile(proxyFile)
+			require.NoError(t, err)
+			require.Contains(t, string(data), "counting-counting-sidecar-proxy")
 		})
 	}
 }
@@ -332,7 +339,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 	cases := []struct {
 		name     string
 		services []api.AgentServiceRegistration
-		expError string
 	}{
 		{
 			name: "only service is registered; proxy service is missing",
@@ -347,7 +353,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					},
 				},
 			},
-			expError: "Timed out waiting for service registration: did not find correct number of services: 1",
 		},
 		{
 			name: "only proxy is registered; service is missing",
@@ -368,7 +373,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					},
 				},
 			},
-			expError: "Timed out waiting for service registration: did not find correct number of services: 1",
 		},
 		{
 			name: "service and proxy without pod-name and k8s-namespace meta",
@@ -390,7 +394,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					Address: "127.0.0.1",
 				},
 			},
-			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
 		},
 		{
 			name: "service and proxy with pod-name meta but without k8s-namespace meta",
@@ -418,7 +421,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					},
 				},
 			},
-			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
 		},
 		{
 			name: "service and proxy with k8s-namespace meta but pod-name meta",
@@ -446,7 +448,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					},
 				},
 			},
-			expError: "Timed out waiting for service registration: did not find correct number of services: 0",
 		},
 		{
 			name: "both services are non-proxy services",
@@ -470,7 +471,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 					},
 				},
 			},
-			expError: "Timed out waiting for service registration: unable to find registered connect-proxy service",
 		},
 	}
 
@@ -508,7 +508,6 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
-			require.Contains(t, ui.ErrorWriter.String(), c.expError)
 		})
 	}
 }
@@ -530,8 +529,8 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	// Start the consul service registration in a go func and delay it so that it runs
 	// after the cmd.Run() starts.
 	go func() {
-		// Wait a moment.
-		time.Sleep(time.Second * 1)
+		// Wait a moment, this ensures that we are already in the retry logic.
+		time.Sleep(time.Second * 2)
 		// Register counting service.
 		require.NoError(t, consulClient.Agent().ServiceRegister(&consulCountingSvc))
 		time.Sleep(time.Second * 2)
@@ -552,8 +551,6 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
-	// Validate that we hit the retry logic when the service was registered but the proxy service is not registered yet.
-	require.Contains(t, ui.OutputWriter.String(), "Unable to find registered services; retrying")
 
 	// Validate contents of proxyFile.
 	data, err := ioutil.ReadFile(proxyFile)
@@ -587,7 +584,6 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		proxyIDFile:                        randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
-	expErr := fmt.Sprintf("Unable to write proxy ID to file: unable to write file: open %s: no such file or directory\n", randFileName)
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
@@ -595,28 +591,31 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
-	require.Equal(t, expErr, ui.ErrorWriter.String())
+	proxyFile, err := os.Stat(randFileName)
+	// if the file has not been written it wont exist and proxyFile will be nil.
+	require.Nil(t, proxyFile)
 }
 
 // TestRun_FailsWithBadServerResponses tests error handling with invalid server responses.
 func TestRun_FailsWithBadServerResponses(t *testing.T) {
 	t.Parallel()
+	const servicesGetRetries int = 2
 	cases := []struct {
 		name                    string
 		loginResponse           string
 		getServicesListResponse string
-		expErr                  string
+		expectedServiceGets     int
 	}{
 		{
-			name:          "acls enabled, acl login response invalid",
-			loginResponse: "",
-			expErr:        "Hit maximum retries for consul login",
+			name:                "acls enabled, acl login response invalid",
+			loginResponse:       "",
+			expectedServiceGets: 0,
 		},
 		{
 			name:                    "acls enabled, get service response invalid",
 			loginResponse:           testLoginResponse,
 			getServicesListResponse: "",
-			expErr:                  "Timed out waiting for service registration",
+			expectedServiceGets:     servicesGetRetries + 1, // Plus 1 because we RETRY after an initial attempt.
 		},
 	}
 	for _, c := range cases {
@@ -624,6 +623,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
 			tokenFile := common.WriteTempFile(t, "")
 
+			servicesGetCounter := 0
 			// Start the mock Consul server.
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// ACL login request.
@@ -632,6 +632,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				}
 				// Agent Services get.
 				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
+					servicesGetCounter++
 					w.Write([]byte(c.getServicesListResponse))
 				}
 			}))
@@ -643,7 +644,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				UI:                                 ui,
 				bearerTokenFile:                    bearerFile,
 				tokenSinkFile:                      tokenFile,
-				serviceRegistrationPollingAttempts: 2,
+				serviceRegistrationPollingAttempts: uint64(servicesGetRetries),
 			}
 
 			serverURL, err := url.Parse(consulServer.URL)
@@ -655,7 +656,8 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				"-http-addr", serverURL.String()}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
-			require.Contains(t, ui.ErrorWriter.String(), c.expErr)
+			// We use the counter to ensure we failed at ACL Login (when counter = 0) or proceeded to the service get portion of the command.
+			require.Equal(t, c.expectedServiceGets, servicesGetCounter)
 		})
 	}
 }
