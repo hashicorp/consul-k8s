@@ -133,6 +133,9 @@ func TestRun_Defaults(t *testing.T) {
 	// Should be a global policy.
 	require.Len(agentPolicy.Datacenters, 0)
 
+	requireAclConfigMap(t, k8s, resourcePrefix, ns,
+		[]string{"bootstrap", "client"})
+
 	// We should also test that the server's token was updated, however I
 	// couldn't find a way to test that with the test agent. Instead we test
 	// that in another test when we're using an httptest server instead of
@@ -150,7 +153,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		TokenFlags  []string
 		PolicyNames []string
 		PolicyDCs   []string
-		SecretNames []string
+		TokenNames  []string
 		LocalToken  bool
 	}{
 		{
@@ -158,7 +161,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			TokenNames:  []string{"client"},
 			LocalToken:  true,
 		},
 		{
@@ -166,7 +169,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-sync-token"},
 			PolicyNames: []string{"catalog-sync-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			TokenNames:  []string{"catalog-sync"},
 			LocalToken:  true,
 		},
 		{
@@ -174,7 +177,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			TokenNames:  []string{"enterprise-license"},
 			LocalToken:  true,
 		},
 		{
@@ -182,7 +185,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			TokenNames:  []string{"client-snapshot-agent"},
 			LocalToken:  true,
 		},
 		{
@@ -190,7 +193,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			TokenNames:  []string{"mesh-gateway"},
 			LocalToken:  false,
 		},
 		{
@@ -202,9 +205,9 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				"gateway-ingress-gateway-token",
 				"another-gateway-ingress-gateway-token"},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+			TokenNames: []string{"ingress-ingress-gateway",
+				"gateway-ingress-gateway",
+				"another-gateway-ingress-gateway"},
 			LocalToken: true,
 		},
 		{
@@ -216,9 +219,9 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				"gateway-terminating-gateway-token",
 				"another-gateway-terminating-gateway-token"},
 			PolicyDCs: []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+			TokenNames: []string{"terminating-terminating-gateway",
+				"gateway-terminating-gateway",
+				"another-gateway-terminating-gateway"},
 			LocalToken: true,
 		},
 		{
@@ -226,7 +229,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+			TokenNames:  []string{"acl-replication"},
 			LocalToken:  false,
 		},
 		{
@@ -234,7 +237,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			TokenNames:  []string{"controller"},
 			LocalToken:  false,
 		},
 		{
@@ -242,7 +245,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TokenFlags:  []string{"-create-inject-token"},
 			PolicyNames: []string{"connect-inject-token"},
 			PolicyDCs:   []string{"dc1"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			TokenNames:  []string{"connect-inject"},
 			LocalToken:  true,
 		},
 	}
@@ -283,8 +286,9 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
 
+				secretName := fmt.Sprintf("%s-%s-acl-token", resourcePrefix, c.TokenNames[i])
 				// Test that the token was created as a Kubernetes Secret.
-				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
@@ -295,6 +299,9 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 				require.NoError(err)
 				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
 				require.Equal(c.LocalToken, tokenData.Local)
+
+				requireAclConfigMap(t, k8s, resourcePrefix, ns,
+					[]string{c.TokenNames[i]})
 			}
 
 			// Test that if the same command is run again, it doesn't error.
@@ -321,7 +328,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		TokenFlags  []string
 		PolicyNames []string
 		PolicyDCs   []string
-		SecretNames []string
+		TokenNames  []string
 		LocalToken  bool
 	}{
 		{
@@ -329,7 +336,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			TokenNames:  []string{"client"},
 			LocalToken:  true,
 		},
 		{
@@ -337,7 +344,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-sync-token"},
 			PolicyNames: []string{"catalog-sync-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			TokenNames:  []string{"catalog-sync"},
 			LocalToken:  true,
 		},
 		{
@@ -345,7 +352,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			TokenNames:  []string{"enterprise-license"},
 			LocalToken:  true,
 		},
 		{
@@ -353,7 +360,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			TokenNames:  []string{"client-snapshot-agent"},
 			LocalToken:  true,
 		},
 		{
@@ -361,7 +368,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token-dc2"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			TokenNames:  []string{"mesh-gateway"},
 			LocalToken:  false,
 		},
 		{
@@ -373,9 +380,9 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				"gateway-ingress-gateway-token-dc2",
 				"another-gateway-ingress-gateway-token-dc2"},
 			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+			TokenNames: []string{"ingress-ingress-gateway",
+				"gateway-ingress-gateway",
+				"another-gateway-ingress-gateway"},
 			LocalToken: true,
 		},
 		{
@@ -387,9 +394,9 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 				"gateway-terminating-gateway-token-dc2",
 				"another-gateway-terminating-gateway-token-dc2"},
 			PolicyDCs: []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+			TokenNames: []string{"terminating-terminating-gateway",
+				"gateway-terminating-gateway",
+				"another-gateway-terminating-gateway"},
 			LocalToken: true,
 		},
 		{
@@ -397,7 +404,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-inject-token"},
 			PolicyNames: []string{"connect-inject-token-dc2"},
 			PolicyDCs:   []string{"dc2"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			TokenNames:  []string{"connect-inject"},
 			LocalToken:  true,
 		},
 		{
@@ -405,7 +412,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token-dc2"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			TokenNames:  []string{"controller"},
 			LocalToken:  false,
 		},
 	}
@@ -443,8 +450,9 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 					policy := policyExists(r, c.PolicyNames[i], consul)
 					require.Equal(r, c.PolicyDCs, policy.Datacenters)
 
+					secretName := fmt.Sprintf("%s-%s-acl-token", resourcePrefix, c.TokenNames[i])
 					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
 					require.NoError(r, err)
 					require.NotNil(r, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
@@ -455,6 +463,9 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 					require.NoError(r, err)
 					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
 					require.Equal(r, c.LocalToken, tokenData.Local)
+
+					requireAclConfigMap(t, k8s, resourcePrefix, ns,
+						[]string{c.TokenNames[i]})
 				}
 			})
 		})
@@ -469,43 +480,43 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		TestName    string
 		TokenFlags  []string
 		PolicyNames []string
-		SecretNames []string
+		TokenNames  []string
 	}{
 		{
 			TestName:    "Client token",
 			TokenFlags:  []string{"-create-client-token"},
 			PolicyNames: []string{"client-token"},
-			SecretNames: []string{resourcePrefix + "-client-acl-token"},
+			TokenNames:  []string{"client"},
 		},
 		{
 			TestName:    "Endpoints controller ACL token",
 			TokenFlags:  []string{"-create-inject-token"},
 			PolicyNames: []string{"connect-inject-token"},
-			SecretNames: []string{resourcePrefix + "-connect-inject-acl-token"},
+			TokenNames:  []string{"connect-inject"},
 		},
 		{
 			TestName:    "Sync token",
 			TokenFlags:  []string{"-create-sync-token"},
 			PolicyNames: []string{"catalog-sync-token"},
-			SecretNames: []string{resourcePrefix + "-catalog-sync-acl-token"},
+			TokenNames:  []string{"catalog-sync"},
 		},
 		{
 			TestName:    "Enterprise license token",
 			TokenFlags:  []string{"-create-enterprise-license-token"},
 			PolicyNames: []string{"enterprise-license-token"},
-			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
+			TokenNames:  []string{"enterprise-license"},
 		},
 		{
 			TestName:    "Snapshot agent token",
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
-			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			TokenNames:  []string{"client-snapshot-agent"},
 		},
 		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-mesh-gateway-acl-token"},
+			TokenNames:  []string{"mesh-gateway"},
 		},
 		{
 			TestName: "Ingress gateway tokens",
@@ -515,9 +526,9 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			PolicyNames: []string{"ingress-ingress-gateway-token",
 				"gateway-ingress-gateway-token",
 				"another-gateway-ingress-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-ingress-ingress-gateway-acl-token",
-				resourcePrefix + "-gateway-ingress-gateway-acl-token",
-				resourcePrefix + "-another-gateway-ingress-gateway-acl-token"},
+			TokenNames: []string{"ingress-ingress-gateway",
+				"gateway-ingress-gateway",
+				"another-gateway-ingress-gateway"},
 		},
 		{
 			TestName: "Terminating gateway tokens",
@@ -527,21 +538,21 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			PolicyNames: []string{"terminating-terminating-gateway-token",
 				"gateway-terminating-gateway-token",
 				"another-gateway-terminating-gateway-token"},
-			SecretNames: []string{resourcePrefix + "-terminating-terminating-gateway-acl-token",
-				resourcePrefix + "-gateway-terminating-gateway-acl-token",
-				resourcePrefix + "-another-gateway-terminating-gateway-acl-token"},
+			TokenNames: []string{"terminating-terminating-gateway",
+				"gateway-terminating-gateway",
+				"another-gateway-terminating-gateway"},
 		},
 		{
 			TestName:    "ACL replication token",
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
-			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+			TokenNames:  []string{"acl-replication"},
 		},
 		{
 			TestName:    "Controller token",
 			TokenFlags:  []string{"-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			TokenNames:  []string{"controller"},
 		},
 	}
 	for _, c := range cases {
@@ -582,8 +593,9 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 				for i := range c.PolicyNames {
 					policyExists(r, c.PolicyNames[i], consul)
 
+					secretName := fmt.Sprintf("%s-%s-acl-token", resourcePrefix, c.TokenNames[i])
 					// Test that the token was created as a Kubernetes Secret.
-					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
+					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), secretName, metav1.GetOptions{})
 					require.NoError(r, err)
 					require.NotNil(r, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
@@ -593,6 +605,9 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
 					require.NoError(r, err)
 					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+
+					requireAclConfigMap(t, k8s, resourcePrefix, ns,
+						[]string{c.TokenNames[i]})
 				}
 			})
 		})
@@ -2049,6 +2064,27 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 	bootToken, ok := bootstrapSecret.Data["token"]
 	require.True(t, ok)
 	return string(bootToken)
+}
+
+// requireAclConfigMap gets the Kubernetes ConfigMap that would be created/updated
+// whenever any tokens are generated and checks that it has been populated
+// with the expected tokens
+func requireAclConfigMap(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace string, expectedTokens []string) v1.ConfigMap {
+	cm, err := k8s.CoreV1().ConfigMaps(k8sNamespace).Get(context.Background(), fmt.Sprintf("%s-acl-tokens-config", prefix), metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+	require.Greater(t, len(cm.Data), 0)
+
+	tokensCreated := make([]string, 0, len(cm.Data))
+	for k := range cm.Data {
+		tokensCreated = append(tokensCreated, k)
+	}
+
+	for _, token := range expectedTokens {
+		require.Contains(t, tokensCreated, token)
+	}
+
+	return *cm
 }
 
 // setUpK8sServiceAccount creates a Service Account for the connect injector.
