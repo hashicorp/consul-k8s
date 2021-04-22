@@ -302,6 +302,11 @@ func (c *Command) Run(args []string) int {
 		scheme = "https"
 	}
 
+	// Map used to track the accessor ids of any tokens we create as part of this process
+	// These will subsequently be stored in a `ConfigMap` which can then be referenced
+	// by external processes that may wish to augment the default policy applied to the token(s)
+	var tokensCreated = make(map[string]string)
+
 	var updateServerPolicy bool
 	var bootstrapToken string
 
@@ -337,7 +342,7 @@ func (c *Command) Run(args []string) int {
 			updateServerPolicy = true
 		} else {
 			c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-			bootstrapToken, err = c.bootstrapServers(serverAddresses, bootTokenSecretName, scheme)
+			bootstrapToken, err = c.bootstrapServers(serverAddresses, bootTokenSecretName, scheme, tokensCreated)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -431,7 +436,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createLocalACL("client", agentRules, consulDC, consulClient)
+		err = c.createLocalACL("client", agentRules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -439,7 +444,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.createAnonymousPolicy() {
-		err := c.configureAnonymousPolicy(consulClient)
+		err := c.configureAnonymousPolicy(consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -456,9 +461,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token needs to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, consulClient)
+			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, consulClient, tokensCreated)
 		} else {
-			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
+			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient, tokensCreated)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -483,9 +488,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token need to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient, tokensCreated)
 		} else {
-			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient, tokensCreated)
 		}
 
 		if err != nil {
@@ -495,7 +500,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateEntLicenseToken {
-		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, consulClient)
+		err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -503,7 +508,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateSnapshotAgentToken {
-		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, consulClient)
+		err = c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -519,7 +524,7 @@ func (c *Command) Run(args []string) int {
 
 		// Mesh gateways require a global policy/token because they must
 		// discover services in other datacenters.
-		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, consulClient)
+		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -574,7 +579,7 @@ func (c *Command) Run(args []string) int {
 			// the words "ingress-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-ingress-gateway`.
 			tokenName := fmt.Sprintf("%s-ingress-gateway", name)
-			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, consulClient)
+			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, consulClient, tokensCreated)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -630,7 +635,7 @@ func (c *Command) Run(args []string) int {
 			// the words "terminating-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-terminating-gateway`.
 			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
-			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, consulClient)
+			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, consulClient, tokensCreated)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -644,9 +649,10 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("Error templating acl replication token rules", "err", err)
 			return 1
 		}
+
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
-		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, consulClient)
+		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -662,12 +668,16 @@ func (c *Command) Run(args []string) int {
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createGlobalACL("controller", rules, consulDC, consulClient)
+		err = c.createGlobalACL("controller", rules, consulDC, consulClient, tokensCreated)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
 	}
+
+	// Create or update the config map containing the list of token accessor ids
+	// provisioned by this process
+	c.createOrUpdateACLConfigMap("acl-tokens-config", tokensCreated)
 
 	c.log.Info("server-acl-init completed successfully")
 	return 0

@@ -14,7 +14,7 @@ import (
 )
 
 // bootstrapServers bootstraps ACLs and ensures each server has an ACL token.
-func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName, scheme string) (string, error) {
+func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName, scheme string, tokensCreated map[string]string) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
 	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
 	consulClient, err := consul.NewClient(&api.Config{
@@ -37,6 +37,7 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName
 			bootstrapResp, _, err := consulClient.ACL().Bootstrap()
 			if err == nil {
 				bootstrapToken = []byte(bootstrapResp.SecretID)
+				tokensCreated["bootstrap"] = bootstrapResp.AccessorID
 				return nil
 			}
 

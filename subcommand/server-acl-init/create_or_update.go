@@ -13,22 +13,22 @@ import (
 
 // createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
 // the policy is only valid for this datacenter and the token is a local token.
-func (c *Command) createLocalACL(name, rules, dc string, consulClient *api.Client) error {
-	return c.createACL(name, rules, true, dc, consulClient)
+func (c *Command) createLocalACL(name, rules, dc string, consulClient *api.Client, tokensCreated map[string]string) error {
+	return c.createACL(name, rules, true, dc, consulClient, tokensCreated)
 }
 
 // createGlobalACL creates a global policy and acl token. The policy is valid
 // for all datacenters and the token is global. dc must be passed because the
 // policy name may have the datacenter name appended.
-func (c *Command) createGlobalACL(name, rules, dc string, consulClient *api.Client) error {
-	return c.createACL(name, rules, false, dc, consulClient)
+func (c *Command) createGlobalACL(name, rules, dc string, consulClient *api.Client, tokensCreated map[string]string) error {
+	return c.createACL(name, rules, false, dc, consulClient, tokensCreated)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then
 // the token will be a local token and the policy will be scoped to only dc.
 // If localToken is false, the policy will be global.
 // The token will be written to a Kubernetes secret.
-func (c *Command) createACL(name, rules string, localToken bool, dc string, consulClient *api.Client) error {
+func (c *Command) createACL(name, rules string, localToken bool, dc string, consulClient *api.Client, tokensCreated map[string]string) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", name)
 	if c.flagACLReplicationTokenFile != "" {
@@ -69,18 +69,20 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, cons
 		Policies:    []*api.ACLTokenPolicyLink{{Name: policyTmpl.Name}},
 		Local:       localToken,
 	}
-	var token string
+	var token *api.ACLToken
 	err = c.untilSucceeds(fmt.Sprintf("creating token for policy %s", policyTmpl.Name),
 		func() error {
 			createdToken, _, err := consulClient.ACL().TokenCreate(&tokenTmpl, &api.WriteOptions{})
 			if err == nil {
-				token = createdToken.SecretID
+				token = createdToken
 			}
 			return err
 		})
 	if err != nil {
 		return err
 	}
+
+	tokensCreated[name] = token.AccessorID
 
 	// Write token to a Kubernetes secret.
 	return c.untilSucceeds(fmt.Sprintf("writing Secret for token %s", policyTmpl.Name),
@@ -90,7 +92,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, cons
 					Name: secretName,
 				},
 				Data: map[string][]byte{
-					common.ACLTokenSecretKey: []byte(token),
+					common.ACLTokenSecretKey: []byte(token.SecretID),
 				},
 			}
 			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
@@ -147,6 +149,45 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 		}
 	}
 	return err
+}
+
+func (c *Command) createOrUpdateACLConfigMap(name string, tokensCreated map[string]string) error {
+	if len(tokensCreated) == 0 {
+		// No tokens were created during this run so there's nothing to do
+		return nil
+	}
+
+	configMapName := c.withPrefix(name)
+
+	cm, err := c.clientset.CoreV1().ConfigMaps(c.flagK8sNamespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
+
+	if err == nil {
+		// ConfigMap exists so we need to update the existing one with the tokens created in this run. Note this is
+		// a simple merge that will overwrite any existing keys if that situation were to occur
+		for k, v := range tokensCreated {
+			cm.Data[k] = v
+		}
+
+		return c.untilSucceeds("writing config map for ACL tokens",
+			func() error {
+				_, err = c.clientset.CoreV1().ConfigMaps(c.flagK8sNamespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+				return err
+			})
+	}
+
+	// ConfigMap doesn't exist so we can create a new one
+	cm = &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configMapName,
+		},
+		Data: tokensCreated,
+	}
+
+	return c.untilSucceeds("writing config map for ACL tokens",
+		func() error {
+			_, err = c.clientset.CoreV1().ConfigMaps(c.flagK8sNamespace).Create(context.TODO(), cm, metav1.CreateOptions{})
+			return err
+		})
 }
 
 // isPolicyExistsErr returns true if err is due to trying to call the
