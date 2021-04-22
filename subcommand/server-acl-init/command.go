@@ -627,7 +627,7 @@ func (c *Command) Run(args []string) int {
 			}
 
 			// The names in the Helm chart are specified by users and so may not contain
-			// the words "ingress-gateway". We need to create unique names for tokens
+			// the words "terminating-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-terminating-gateway`.
 			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
 			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, consulClient)
