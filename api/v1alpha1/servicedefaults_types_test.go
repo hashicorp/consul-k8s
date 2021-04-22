@@ -26,6 +26,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 			&capi.ServiceConfigEntry{
 				Name: "foo",
 				Kind: capi.ServiceDefaults,
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -39,10 +42,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "https",
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{
@@ -60,6 +63,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "external-sni",
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -87,6 +93,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					},
 				},
 				ExternalSNI: "external-sni",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
+				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -117,9 +126,12 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:        capi.ServiceDefaults,
-				Name:        "my-test-service",
-				Namespace:   "namespace",
+				Kind:      capi.ServiceDefaults,
+				Name:      "my-test-service",
+				Namespace: "namespace",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -136,10 +148,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				},
 				Spec: ServiceDefaultsSpec{
 					Protocol: "http",
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								ListenerPort:  8080,
@@ -156,6 +168,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					ExternalSNI: "sni-value",
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -182,6 +197,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 				ExternalSNI: "sni-value",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
+				},
 			},
 			true,
 		},
@@ -221,10 +239,10 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
 							{
@@ -245,7 +263,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "foobar",
 					},
 				},
@@ -258,7 +276,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "invalid-protocol",
@@ -276,7 +294,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "http",
@@ -288,16 +306,29 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
+		"transparentProxy": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+				},
+			},
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+		},
 		"multi-error": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "invalid-mode",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Paths: []ExposePath{
 							{
 								Protocol: "invalid-protocol",

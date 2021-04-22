@@ -1,12 +1,14 @@
 
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -25,7 +27,9 @@ webhooks:
     resources:
     - ingressgateways
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -44,7 +48,9 @@ webhooks:
     resources:
     - proxydefaults
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -63,7 +69,9 @@ webhooks:
     resources:
     - servicedefaults
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -82,7 +90,9 @@ webhooks:
     resources:
     - serviceintentions
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -101,7 +111,9 @@ webhooks:
     resources:
     - serviceresolvers
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -120,7 +132,9 @@ webhooks:
     resources:
     - servicerouters
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -139,7 +153,9 @@ webhooks:
     resources:
     - servicesplitters
   sideEffects: None
-- admissionReviewVersions: null
+- admissionReviewVersions:
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service

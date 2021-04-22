@@ -28,9 +28,12 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
-				Name:        common.Global,
-				Kind:        capi.ProxyDefaults,
-				Namespace:   "default",
+				Name:      common.Global,
+				Kind:      capi.ProxyDefaults,
+				Namespace: "default",
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -47,10 +50,10 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{
@@ -66,6 +69,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 								Protocol:      "https",
 							},
 						},
+					},
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
 					},
 				},
 			},
@@ -94,6 +100,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							Protocol:      "https",
 						},
 					},
+				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
 				},
 			},
 			Matches: true,
@@ -138,6 +147,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
 				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 0,
+				},
 			},
 		},
 		"every field set": {
@@ -147,10 +159,10 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{
@@ -166,6 +178,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 								Protocol:      "https",
 							},
 						},
+					},
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
 					},
 				},
 			},
@@ -195,6 +210,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							Protocol:      "https",
 						},
 					},
+				},
+				TransparentProxy: &capi.TransparentProxyConfig{
+					OutboundListenerPort: 1000,
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
