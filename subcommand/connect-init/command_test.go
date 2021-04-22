@@ -221,7 +221,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				require.Equal(t, test.expCode, code)
 				return
 			}
-			require.Equal(t, 0, code, ui.ErrorWriter.String())
+			require.Equal(t, test.expCode, code, ui.ErrorWriter.String())
 
 			// Validate the ACL token was written.
 			tokenData, err := ioutil.ReadFile(tokenFile)
