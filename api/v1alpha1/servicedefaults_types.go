@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
@@ -57,6 +59,87 @@ type ServiceDefaultsSpec struct {
 	ExternalSNI string `json:"externalSNI,omitempty"`
 	// TransparentProxy controls configuration specific to proxies in transparent mode.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
+	// Mode can be one of direct or transparent. transparent represents that inbound and outbound
+	// and outbound application traffic is being captured and redirected through the proxy. This
+	// mode does not enable the traffic redirection itself. Instead it signals Consul to configure
+	// Envoy as if traffic is already being redirected. direct represents that the proxy's
+	// listeners must be dialed directly by the local application and other proxies.
+	Mode *ProxyMode `json:"mode,omitempty"`
+	// UpstreamConfig controls default configuration settings that apply across all upstreams,
+	// and per-upstream configuration overrides. Note that per-upstream configuration applies
+	// across all federated datacenters to the pairing of source and upstream destination services.
+	UpstreamConfig *Upstreams `json:"upstreamConfig,omitempty"`
+}
+
+type Upstreams struct {
+	// Defaults contains default configuration for all upstreams of a given
+	// service. The name field must be empty.
+	Defaults *Upstream `json:"defaults,omitempty"`
+	// Overrides is a slice of per-service configuration. The name field is
+	// required.
+	Overrides []*Upstream `json:"overrides,omitempty"`
+}
+
+type Upstream struct {
+	// Name is only accepted within a service-defaults config entry.
+	Name string `json:"name,omitempty"`
+	// Namespace is only accepted within a service-defaults config entry.
+	Namespace string `json:"namespace,omitempty"`
+	// EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
+	// listener.
+	// Note: This escape hatch is NOT compatible with the discovery chain and
+	// will be ignored if a discovery chain is active.
+	EnvoyListenerJSON string `json:"envoyListenerJSON,omitempty"`
+	// EnvoyClusterJSON is a complete override ("escape hatch") for the upstream's
+	// cluster. The Connect client TLS certificate and context will be injected
+	// overriding any TLS settings present.
+	// Note: This escape hatch is NOT compatible with the discovery chain and
+	// will be ignored if a discovery chain is active.
+	EnvoyClusterJSON string `json:"envoyClusterJSON,omitempty"`
+	// Protocol describes the upstream's service protocol. Valid values are "tcp",
+	// "http" and "grpc". Anything else is treated as tcp. The enables protocol
+	// aware features like per-request metrics and connection pooling, tracing,
+	// routing etc.
+	Protocol string `json:"protocol,omitempty"`
+	// ConnectTimeoutMs is the number of milliseconds to timeout making a new
+	// connection to this upstream. Defaults to 5000 (5 seconds) if not set.
+	ConnectTimeoutMs int `json:"connectTimeoutMs,omitempty"`
+	// Limits are the set of limits that are applied to the proxy for a specific upstream of a
+	// service instance.
+	Limits *UpstreamLimits `json:"limits,omitempty"`
+	// PassiveHealthCheck configuration determines how upstream proxy instances will
+	// be monitored for removal from the load balancing pool.
+	PassiveHealthCheck *PassiveHealthCheck `json:"passiveHealthCheck,omitempty"`
+	// MeshGatewayConfig controls how Mesh Gateways are configured and used
+	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
+}
+
+// UpstreamLimits describes the limits that are associated with a specific
+// upstream of a service instance.
+type UpstreamLimits struct {
+	// MaxConnections is the maximum number of connections the local proxy can
+	// make to the upstream service.
+	MaxConnections *int `json:"maxConnections,omitempty"`
+	// MaxPendingRequests is the maximum number of requests that will be queued
+	// waiting for an available connection. This is mostly applicable to HTTP/1.1
+	// clusters since all HTTP/2 requests are streamed over a single
+	// connection.
+	MaxPendingRequests *int `json:"maxPendingRequests,omitempty"`
+	// MaxConcurrentRequests is the maximum number of in-flight requests that will be allowed
+	// to the upstream cluster at a point in time. This is mostly applicable to HTTP/2
+	// clusters since all HTTP/1.1 requests are limited by MaxConnections.
+	MaxConcurrentRequests *int `json:"maxConcurrentRequests,omitempty"`
+}
+
+// PassiveHealthCheck configuration determines how upstream proxy instances will
+// be monitored for removal from the load balancing pool.
+type PassiveHealthCheck struct {
+	// Interval between health check analysis sweeps. Each sweep may remove
+	// hosts or return hosts to the pool.
+	Interval time.Duration `json:"interval,omitempty"`
+	// MaxFailures is the count of consecutive failures that results in a host
+	// being removed from the pool.
+	MaxFailures uint32 `json:"maxFailures,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {
@@ -153,12 +236,20 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
+	validProtocols := []string{"tcp", "http", "http2", "grpc"}
+	if in.Spec.Protocol != "" && !sliceContains(validProtocols, in.Spec.Protocol) {
+		allErrs = append(allErrs, field.Invalid(path.Child("protocol"), in.Spec.Protocol, notInSliceMessage(validProtocols)))
+	}
 	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"))...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 
 	if len(allErrs) > 0 {
@@ -168,6 +259,29 @@ func (in *ServiceDefaults) Validate(namespacesEnabled bool) error {
 	}
 
 	return nil
+}
+
+func (in *Upstreams) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+	var errs field.ErrorList
+	if err := in.Defaults.validate(path.Child("defaults")); err != nil {
+		errs = append(errs, err)
+	}
+	for i, override := range in.Overrides {
+		if err := override.validate(path.Child("overrides").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (in *Upstream) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return nil
+	}
+	return in.MeshGateway.validate(path.Child("meshGateway"))
 }
 
 // DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.

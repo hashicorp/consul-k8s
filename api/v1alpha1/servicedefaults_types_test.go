@@ -257,6 +257,17 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: "",
 		},
+		"protocol": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Protocol: "foo",
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.protocol: Invalid value: "foo": must be one of "tcp", "http", "http2", "grpc"`,
+		},
 		"meshgateway.mode": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -319,12 +330,60 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
+		"mode": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Mode: proxyModeRef("transparent"),
+				},
+			},
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+		},
+		"upstreamConfig.defaults.meshGateway": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							MeshGateway: MeshGateway{
+								Mode: "foo",
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
+		},
+		"upstreamConfig.overrides.meshGateway": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								MeshGateway: MeshGateway{
+									Mode: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
+		},
 		"multi-error": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
 				},
 				Spec: ServiceDefaultsSpec{
+					Protocol: "invalid",
 					MeshGateway: MeshGateway{
 						Mode: "invalid-mode",
 					},
@@ -336,9 +395,13 @@ func TestServiceDefaults_Validate(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+					Mode: proxyModeRef("transparent"),
 				},
 			},
-			`servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.meshGateway.mode: Invalid value: "invalid-mode": must be one of "remote", "local", "none", "", spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"]`,
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: [spec.protocol: Invalid value: \"invalid\": must be one of \"tcp\", \"http\", \"http2\", \"grpc\", spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
 		},
 	}
 
@@ -352,6 +415,11 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func proxyModeRef(mode string) *ProxyMode {
+	proxyMode := ProxyMode(mode)
+	return &proxyMode
 }
 
 func TestServiceDefaults_AddFinalizer(t *testing.T) {
