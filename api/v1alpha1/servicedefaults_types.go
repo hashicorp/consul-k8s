@@ -1,8 +1,6 @@
 package v1alpha1
 
 import (
-	"time"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
@@ -15,6 +13,8 @@ import (
 
 const (
 	ServiceDefaultsKubeKind string = "servicedefaults"
+	defaultUpstream                = "default"
+	overrideUpstream               = "override"
 )
 
 func init() {
@@ -58,12 +58,16 @@ type ServiceDefaultsSpec struct {
 	// to be changed to a non-connect value when federating with an external system.
 	ExternalSNI string `json:"externalSNI,omitempty"`
 	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
-	// Mode can be one of direct or transparent. transparent represents that inbound and outbound
-	// and outbound application traffic is being captured and redirected through the proxy. This
-	// mode does not enable the traffic redirection itself. Instead it signals Consul to configure
-	// Envoy as if traffic is already being redirected. direct represents that the proxy's
-	// listeners must be dialed directly by the local application and other proxies.
+	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
+	// application traffic is being captured and redirected through the proxy. This mode does not
+	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
+	// traffic is already being redirected. "direct" represents that the proxy's listeners must be
+	// dialed directly by the local application and other proxies.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
 	Mode *ProxyMode `json:"mode,omitempty"`
 	// UpstreamConfig controls default configuration settings that apply across all upstreams,
 	// and per-upstream configuration overrides. Note that per-upstream configuration applies
@@ -97,7 +101,7 @@ type Upstream struct {
 	// will be ignored if a discovery chain is active.
 	EnvoyClusterJSON string `json:"envoyClusterJSON,omitempty"`
 	// Protocol describes the upstream's service protocol. Valid values are "tcp",
-	// "http" and "grpc". Anything else is treated as tcp. The enables protocol
+	// "http" and "grpc". Anything else is treated as tcp. This enables protocol
 	// aware features like per-request metrics and connection pooling, tracing,
 	// routing etc.
 	Protocol string `json:"protocol,omitempty"`
@@ -110,7 +114,7 @@ type Upstream struct {
 	// PassiveHealthCheck configuration determines how upstream proxy instances will
 	// be monitored for removal from the load balancing pool.
 	PassiveHealthCheck *PassiveHealthCheck `json:"passiveHealthCheck,omitempty"`
-	// MeshGatewayConfig controls how Mesh Gateways are configured and used
+	// MeshGatewayConfig controls how Mesh Gateways are configured and used.
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 }
 
@@ -136,7 +140,7 @@ type UpstreamLimits struct {
 type PassiveHealthCheck struct {
 	// Interval between health check analysis sweeps. Each sweep may remove
 	// hosts or return hosts to the pool.
-	Interval time.Duration `json:"interval,omitempty"`
+	Interval metav1.Duration `json:"interval,omitempty"`
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
 	MaxFailures uint32 `json:"maxFailures,omitempty"`
@@ -226,6 +230,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Expose:           in.Spec.Expose.toConsul(),
 		ExternalSNI:      in.Spec.ExternalSNI,
 		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		UpstreamConfig:   in.Spec.UpstreamConfig.toConsul(),
 		Meta:             meta(datacenter),
 	}
 }
@@ -266,22 +271,86 @@ func (in *Upstreams) validate(path *field.Path) field.ErrorList {
 		return nil
 	}
 	var errs field.ErrorList
-	if err := in.Defaults.validate(path.Child("defaults")); err != nil {
-		errs = append(errs, err)
+	if err := in.Defaults.validate(path.Child("defaults"), defaultUpstream); err != nil {
+		errs = append(errs, err...)
 	}
 	for i, override := range in.Overrides {
-		if err := override.validate(path.Child("overrides").Index(i)); err != nil {
-			errs = append(errs, err)
+		if err := override.validate(path.Child("overrides").Index(i), overrideUpstream); err != nil {
+			errs = append(errs, err...)
 		}
 	}
 	return errs
 }
 
-func (in *Upstream) validate(path *field.Path) *field.Error {
+func (in *Upstreams) toConsul() *capi.UpstreamConfiguration {
 	if in == nil {
 		return nil
 	}
-	return in.MeshGateway.validate(path.Child("meshGateway"))
+	upstreams := &capi.UpstreamConfiguration{}
+	upstreams.Defaults = in.Defaults.toConsul()
+	for _, override := range in.Overrides {
+		upstreams.Overrides = append(upstreams.Overrides, override.toConsul())
+	}
+	return upstreams
+}
+
+func (in *Upstream) validate(path *field.Path, kind string) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+	if kind == defaultUpstream {
+		if in.Name != "" {
+			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for a default upstream must be \"\""))
+		}
+	} else if kind == overrideUpstream {
+		if in.Name == "" {
+			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for an override upstream cannot be \"\""))
+		}
+	}
+	if err := in.MeshGateway.validate(path.Child("meshGateway")); err != nil {
+		errs = append(errs, err)
+	}
+	return errs
+}
+
+func (in *Upstream) toConsul() *capi.UpstreamConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.UpstreamConfig{
+		Name:               in.Name,
+		Namespace:          in.Namespace,
+		EnvoyListenerJSON:  in.EnvoyListenerJSON,
+		EnvoyClusterJSON:   in.EnvoyClusterJSON,
+		Protocol:           in.Protocol,
+		ConnectTimeoutMs:   in.ConnectTimeoutMs,
+		Limits:             in.Limits.toConsul(),
+		PassiveHealthCheck: in.PassiveHealthCheck.toConsul(),
+		MeshGateway:        in.MeshGateway.toConsul(),
+	}
+}
+
+func (in *UpstreamLimits) toConsul() *capi.UpstreamLimits {
+	if in == nil {
+		return nil
+	}
+	return &capi.UpstreamLimits{
+		MaxConnections:        in.MaxConnections,
+		MaxPendingRequests:    in.MaxPendingRequests,
+		MaxConcurrentRequests: in.MaxConcurrentRequests,
+	}
+}
+
+func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
+	if in == nil {
+		return nil
+	}
+	return &capi.PassiveHealthCheck{
+		Interval:    in.Interval.Duration,
+		MaxFailures: in.MaxFailures,
+	}
 }
 
 // DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.

@@ -81,13 +81,13 @@ spec:
                     type: string
                 type: object
               mode:
-                description: Mode can be one of direct or transparent. transparent represents that inbound and outbound and outbound application traffic is being captured and redirected through the proxy. This mode does not enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if traffic is already being redirected. direct represents that the proxy's listeners must be dialed directly by the local application and other proxies.
+                description: 'Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound application traffic is being captured and redirected through the proxy. This mode does not enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if traffic is already being redirected. "direct" represents that the proxy''s listeners must be dialed directly by the local application and other proxies. Note: This cannot be set using the CRD and should be set using annotations on the services that are part of the mesh.'
                 type: string
               protocol:
                 description: Protocol sets the protocol of the service. This is used by Connect proxies for things like observability features and to unlock usage of the service-splitter and service-router config entries for a service.
                 type: string
               transparentProxy:
-                description: TransparentProxy controls configuration specific to proxies in transparent mode.
+                description: 'TransparentProxy controls configuration specific to proxies in transparent mode. Note: This cannot be set using the CRD and should be set using annotations on the services that are part of the mesh.'
                 properties:
                   outboundListenerPort:
                     description: The port of the listener where outbound application traffic is being redirected to.
@@ -122,7 +122,7 @@ spec:
                             type: integer
                         type: object
                       meshGateway:
-                        description: MeshGatewayConfig controls how Mesh Gateways are configured and used
+                        description: MeshGatewayConfig controls how Mesh Gateways are configured and used.
                         properties:
                           mode:
                             description: Mode is the mode that should be used for the upstream connection. One of none, local, or remote.
@@ -139,15 +139,14 @@ spec:
                         properties:
                           interval:
                             description: Interval between health check analysis sweeps. Each sweep may remove hosts or return hosts to the pool.
-                            format: int64
-                            type: integer
+                            type: string
                           maxFailures:
                             description: MaxFailures is the count of consecutive failures that results in a host being removed from the pool.
                             format: int32
                             type: integer
                         type: object
                       protocol:
-                        description: Protocol describes the upstream's service protocol. Valid values are "tcp", "http" and "grpc". Anything else is treated as tcp. The enables protocol aware features like per-request metrics and connection pooling, tracing, routing etc.
+                        description: Protocol describes the upstream's service protocol. Valid values are "tcp", "http" and "grpc". Anything else is treated as tcp. This enables protocol aware features like per-request metrics and connection pooling, tracing, routing etc.
                         type: string
                     type: object
                   overrides:
@@ -177,7 +176,7 @@ spec:
                               type: integer
                           type: object
                         meshGateway:
-                          description: MeshGatewayConfig controls how Mesh Gateways are configured and used
+                          description: MeshGatewayConfig controls how Mesh Gateways are configured and used.
                           properties:
                             mode:
                               description: Mode is the mode that should be used for the upstream connection. One of none, local, or remote.
@@ -194,15 +193,14 @@ spec:
                           properties:
                             interval:
                               description: Interval between health check analysis sweeps. Each sweep may remove hosts or return hosts to the pool.
-                              format: int64
-                              type: integer
+                              type: string
                             maxFailures:
                               description: MaxFailures is the count of consecutive failures that results in a host being removed from the pool.
                               format: int32
                               type: integer
                           type: object
                         protocol:
-                          description: Protocol describes the upstream's service protocol. Valid values are "tcp", "http" and "grpc". Anything else is treated as tcp. The enables protocol aware features like per-request metrics and connection pooling, tracing, routing etc.
+                          description: Protocol describes the upstream's service protocol. Valid values are "tcp", "http" and "grpc". Anything else is treated as tcp. This enables protocol aware features like per-request metrics and connection pooling, tracing, routing etc.
                           type: string
                       type: object
                     type: array

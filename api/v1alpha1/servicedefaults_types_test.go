@@ -66,6 +66,76 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Name:              "upstream-default",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  10,
+							Limits: &UpstreamLimits{
+								MaxConnections:        intPointer(10),
+								MaxPendingRequests:    intPointer(10),
+								MaxConcurrentRequests: intPointer(10),
+							},
+							PassiveHealthCheck: &PassiveHealthCheck{
+								Interval: metav1.Duration{
+									Duration: 2 * time.Second,
+								},
+								MaxFailures: uint32(20),
+							},
+							MeshGateway: MeshGateway{
+								Mode: "local",
+							},
+						},
+						Overrides: []*Upstream{
+							{
+								Name:              "upstream-override-1",
+								Namespace:         "ns",
+								EnvoyListenerJSON: `{"key": "value"}`,
+								EnvoyClusterJSON:  `{"key": "value"}`,
+								Protocol:          "http2",
+								ConnectTimeoutMs:  15,
+								Limits: &UpstreamLimits{
+									MaxConnections:        intPointer(5),
+									MaxPendingRequests:    intPointer(5),
+									MaxConcurrentRequests: intPointer(5),
+								},
+								PassiveHealthCheck: &PassiveHealthCheck{
+									Interval: metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									MaxFailures: uint32(10),
+								},
+								MeshGateway: MeshGateway{
+									Mode: "remote",
+								},
+							},
+							{
+								Name:              "upstream-default",
+								Namespace:         "ns",
+								EnvoyListenerJSON: `{"key": "value"}`,
+								EnvoyClusterJSON:  `{"key": "value"}`,
+								Protocol:          "http2",
+								ConnectTimeoutMs:  10,
+								Limits: &UpstreamLimits{
+									MaxConnections:        intPointer(2),
+									MaxPendingRequests:    intPointer(2),
+									MaxConcurrentRequests: intPointer(2),
+								},
+								PassiveHealthCheck: &PassiveHealthCheck{
+									Interval: metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									MaxFailures: uint32(10),
+								},
+								MeshGateway: MeshGateway{
+									Mode: "remote",
+								},
+							},
+						},
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -95,6 +165,70 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				ExternalSNI: "external-sni",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+				},
+				UpstreamConfig: &capi.UpstreamConfiguration{
+					Defaults: &capi.UpstreamConfig{
+						Name:              "upstream-default",
+						Namespace:         "ns",
+						EnvoyListenerJSON: `{"key": "value"}`,
+						EnvoyClusterJSON:  `{"key": "value"}`,
+						Protocol:          "http2",
+						ConnectTimeoutMs:  10,
+						Limits: &capi.UpstreamLimits{
+							MaxConnections:        intPointer(10),
+							MaxPendingRequests:    intPointer(10),
+							MaxConcurrentRequests: intPointer(10),
+						},
+						PassiveHealthCheck: &capi.PassiveHealthCheck{
+							Interval:    2 * time.Second,
+							MaxFailures: uint32(20),
+						},
+						MeshGateway: capi.MeshGatewayConfig{
+							Mode: "local",
+						},
+					},
+					Overrides: []*capi.UpstreamConfig{
+						{
+							Name:              "upstream-override-1",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  15,
+							Limits: &capi.UpstreamLimits{
+								MaxConnections:        intPointer(5),
+								MaxPendingRequests:    intPointer(5),
+								MaxConcurrentRequests: intPointer(5),
+							},
+							PassiveHealthCheck: &capi.PassiveHealthCheck{
+								Interval:    2 * time.Second,
+								MaxFailures: uint32(10),
+							},
+							MeshGateway: capi.MeshGatewayConfig{
+								Mode: "remote",
+							},
+						},
+						{
+							Name:              "upstream-default",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  10,
+							Limits: &capi.UpstreamLimits{
+								MaxConnections:        intPointer(2),
+								MaxPendingRequests:    intPointer(2),
+								MaxConcurrentRequests: intPointer(2),
+							},
+							PassiveHealthCheck: &capi.PassiveHealthCheck{
+								Interval:    2 * time.Second,
+								MaxFailures: uint32(10),
+							},
+							MeshGateway: capi.MeshGatewayConfig{
+								Mode: "remote",
+							},
+						},
+					},
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -171,6 +305,76 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Name:              "upstream-default",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  10,
+							Limits: &UpstreamLimits{
+								MaxConnections:        intPointer(10),
+								MaxPendingRequests:    intPointer(10),
+								MaxConcurrentRequests: intPointer(10),
+							},
+							PassiveHealthCheck: &PassiveHealthCheck{
+								Interval: metav1.Duration{
+									Duration: 2 * time.Second,
+								},
+								MaxFailures: uint32(20),
+							},
+							MeshGateway: MeshGateway{
+								Mode: "local",
+							},
+						},
+						Overrides: []*Upstream{
+							{
+								Name:              "upstream-override-1",
+								Namespace:         "ns",
+								EnvoyListenerJSON: `{"key": "value"}`,
+								EnvoyClusterJSON:  `{"key": "value"}`,
+								Protocol:          "http2",
+								ConnectTimeoutMs:  15,
+								Limits: &UpstreamLimits{
+									MaxConnections:        intPointer(5),
+									MaxPendingRequests:    intPointer(5),
+									MaxConcurrentRequests: intPointer(5),
+								},
+								PassiveHealthCheck: &PassiveHealthCheck{
+									Interval: metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									MaxFailures: uint32(10),
+								},
+								MeshGateway: MeshGateway{
+									Mode: "remote",
+								},
+							},
+							{
+								Name:              "upstream-default",
+								Namespace:         "ns",
+								EnvoyListenerJSON: `{"key": "value"}`,
+								EnvoyClusterJSON:  `{"key": "value"}`,
+								Protocol:          "http2",
+								ConnectTimeoutMs:  10,
+								Limits: &UpstreamLimits{
+									MaxConnections:        intPointer(2),
+									MaxPendingRequests:    intPointer(2),
+									MaxConcurrentRequests: intPointer(2),
+								},
+								PassiveHealthCheck: &PassiveHealthCheck{
+									Interval: metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									MaxFailures: uint32(10),
+								},
+								MeshGateway: MeshGateway{
+									Mode: "remote",
+								},
+							},
+						},
+					},
 				},
 			},
 			&capi.ServiceConfigEntry{
@@ -199,6 +403,70 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				ExternalSNI: "sni-value",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+				},
+				UpstreamConfig: &capi.UpstreamConfiguration{
+					Defaults: &capi.UpstreamConfig{
+						Name:              "upstream-default",
+						Namespace:         "ns",
+						EnvoyListenerJSON: `{"key": "value"}`,
+						EnvoyClusterJSON:  `{"key": "value"}`,
+						Protocol:          "http2",
+						ConnectTimeoutMs:  10,
+						Limits: &capi.UpstreamLimits{
+							MaxConnections:        intPointer(10),
+							MaxPendingRequests:    intPointer(10),
+							MaxConcurrentRequests: intPointer(10),
+						},
+						PassiveHealthCheck: &capi.PassiveHealthCheck{
+							Interval:    2 * time.Second,
+							MaxFailures: uint32(20),
+						},
+						MeshGateway: capi.MeshGatewayConfig{
+							Mode: "local",
+						},
+					},
+					Overrides: []*capi.UpstreamConfig{
+						{
+							Name:              "upstream-override-1",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  15,
+							Limits: &capi.UpstreamLimits{
+								MaxConnections:        intPointer(5),
+								MaxPendingRequests:    intPointer(5),
+								MaxConcurrentRequests: intPointer(5),
+							},
+							PassiveHealthCheck: &capi.PassiveHealthCheck{
+								Interval:    2 * time.Second,
+								MaxFailures: uint32(10),
+							},
+							MeshGateway: capi.MeshGatewayConfig{
+								Mode: "remote",
+							},
+						},
+						{
+							Name:              "upstream-default",
+							Namespace:         "ns",
+							EnvoyListenerJSON: `{"key": "value"}`,
+							EnvoyClusterJSON:  `{"key": "value"}`,
+							Protocol:          "http2",
+							ConnectTimeoutMs:  10,
+							Limits: &capi.UpstreamLimits{
+								MaxConnections:        intPointer(2),
+								MaxPendingRequests:    intPointer(2),
+								MaxConcurrentRequests: intPointer(2),
+							},
+							PassiveHealthCheck: &capi.PassiveHealthCheck{
+								Interval:    2 * time.Second,
+								MaxFailures: uint32(10),
+							},
+							MeshGateway: capi.MeshGatewayConfig{
+								Mode: "remote",
+							},
+						},
+					},
 				},
 			},
 			true,
@@ -358,6 +626,21 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
 		},
+		"upstreamConfig.defaults.name": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Defaults: &Upstream{
+							Name: "foobar",
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
+		},
 		"upstreamConfig.overrides.meshGateway": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -367,6 +650,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					UpstreamConfig: &Upstreams{
 						Overrides: []*Upstream{
 							{
+								Name: "override",
 								MeshGateway: MeshGateway{
 									Mode: "foo",
 								},
@@ -376,6 +660,23 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].meshGateway.mode: Invalid value: "foo": must be one of "remote", "local", "none", ""`,
+		},
+		"upstreamConfig.overrides.name": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					UpstreamConfig: &Upstreams{
+						Overrides: []*Upstream{
+							{
+								Name: "",
+							},
+						},
+					},
+				},
+			},
+			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].name: Invalid value: "": upstream.name for an override upstream cannot be ""`,
 		},
 		"multi-error": {
 			&ServiceDefaults{
@@ -527,4 +828,8 @@ func TestServiceDefaults_ObjectMeta(t *testing.T) {
 		ObjectMeta: meta,
 	}
 	require.Equal(t, meta, serviceDefaults.GetObjectMeta())
+}
+
+func intPointer(i int) *int {
+	return &i
 }
