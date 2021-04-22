@@ -59,7 +59,7 @@ func TestValidateProxyDefault(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
 				},
@@ -76,6 +76,21 @@ func TestValidateProxyDefault(t *testing.T) {
 			},
 			expAllow:      false,
 			expErrMessage: "proxydefaults resource name must be \"global\"",
+		},
+		"transparentProxy value set": {
+			existingResources: []runtime.Object{},
+			newResource: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
 	}
 	for name, c := range cases {
