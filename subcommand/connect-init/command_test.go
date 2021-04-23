@@ -66,47 +66,43 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 		serviceName                string
 		includeServiceAccountName  bool
 		serviceAccountNameMismatch bool
-		expCode                    int
+		expFail                    bool
 	}{
 		{
 			name:               "ACLs enabled, no tls",
 			tls:                false,
 			serviceAccountName: "counting",
-			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, tls",
 			tls:                true,
 			serviceAccountName: "counting",
-			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, K8s service name matches service account name",
 			tls:                false,
 			serviceAccountName: "counting",
 			serviceName:        "",
-			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, service name annotation matches service account name",
 			tls:                false,
 			serviceAccountName: "web",
 			serviceName:        "web",
-			expCode:            0,
 		},
 		{
 			name:               "ACLs enabled, service name annotation doesn't match service account name",
 			tls:                false,
 			serviceAccountName: "not-a-match",
 			serviceName:        "web",
-			expCode:            1,
+			expFail:            true,
 		},
 		{
 			name:               "ACLs enabled, K8s service name doesn't match service account name",
 			tls:                false,
 			serviceAccountName: "not-a-match",
 			serviceName:        "",
-			expCode:            1,
+			expFail:            true,
 		},
 	}
 	for _, test := range cases {
@@ -217,11 +213,11 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			}
 			// Run the command.
 			code := cmd.Run(flags)
-			if test.expCode != 0 {
-				require.Equal(t, test.expCode, code)
+			if test.expFail {
+				require.Equal(t, 1, code)
 				return
 			}
-			require.Equal(t, test.expCode, code, ui.ErrorWriter.String())
+			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 			// Validate the ACL token was written.
 			tokenData, err := ioutil.ReadFile(tokenFile)
