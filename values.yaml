@@ -991,7 +991,7 @@ ui:
     # @type: string
     type: null
 
-    # Optionally hardcode the nodePort of the ui service if using a NodePort service.
+    # Optionally set the nodePort value of the ui service if using a NodePort service.
     # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
     nodePort:
@@ -1674,7 +1674,7 @@ meshGateway:
     # The targetPort will be set to meshGateway.containerPort.
     port: 443
 
-    # Optionally hardcode the nodePort of the service if using a NodePort service.
+    # Optionally set the nodePort value of the service if using a NodePort service.
     # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
     # @type: integer
