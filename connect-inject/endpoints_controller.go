@@ -173,7 +173,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 					// Update the TTL health check for the service.
 					// This is required because ServiceRegister() does not update the TTL if the service already exists.
-					reason := getHealthCheckStatusReason(address, healthStatus)
+					reason := getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace)
 					r.Log.Info("updating health check status for service", "name", serviceRegistration.Name, "reason", reason, "status", healthStatus)
 					err = client.Agent().UpdateTTL(getConsulHealthCheckID(pod, serviceRegistration.ID), reason, healthStatus)
 					if err != nil {
@@ -386,23 +386,14 @@ func getConsulHealthCheckID(pod corev1.Pod, serviceID string) string {
 	return fmt.Sprintf("%s/%s/kubernetes-health-check", pod.Namespace, serviceID)
 }
 
-// getHealthCheckStatusReason takes an endpoint address and Consul's health check status (either passing or critical)
-// and returns the reason message. It assumes that the address has a TargetRef pointing to a pod,
-// otherwise it returns an empty string.
-func getHealthCheckStatusReason(address corev1.EndpointAddress, healthCheckStatus string) string {
+// getHealthCheckStatusReason takes an Consul's health check status (either passing or critical)
+// as well as pod name and namespace and returns the reason message.
+func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string) string {
 	if healthCheckStatus == api.HealthPassing {
 		return kubernetesSuccessReasonMsg
 	}
 
-	// Get the pod name from the address if it points to a pod,
-	// otherwise use the IP of the endpoint address in the reason message.
-	if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-		return fmt.Sprintf("Pod \"%s/%s\" is not ready", address.TargetRef.Namespace, address.TargetRef.Name)
-	} else {
-		// If TargetRef is not a pod, the endpoints controller will ignore it and not call this function,
-		// and so we don't need to worry about the reason message in that case.
-		return ""
-	}
+	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
 }
 
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata
