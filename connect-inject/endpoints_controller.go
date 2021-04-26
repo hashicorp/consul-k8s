@@ -115,10 +115,17 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
-		// Do the same thing for all addresses, regardless of whether they're ready.
-		allAddresses := append(subset.Addresses, subset.NotReadyAddresses...)
+		// Combine all addresses to a map, with a value indicating whether an address is ready or not.
+		allAddresses := make(map[corev1.EndpointAddress]string)
+		for _, readyAddress := range subset.Addresses {
+			allAddresses[readyAddress] = api.HealthPassing
+		}
 
-		for _, address := range allAddresses {
+		for _, notReadyAddress := range subset.NotReadyAddresses {
+			allAddresses[notReadyAddress] = api.HealthCritical
+		}
+
+		for address, healthStatus := range allAddresses {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				// Get pod associated with this address.
 				var pod corev1.Pod
@@ -139,7 +146,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					}
 
 					// Get information from the pod to create service instance registrations.
-					serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints)
+					serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
 					if err != nil {
 						r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						return ctrl.Result{}, err
@@ -166,15 +173,11 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 					// Update the TTL health check for the service.
 					// This is required because ServiceRegister() does not update the TTL if the service already exists.
-					status, reason, err := getReadyStatusAndReason(pod)
+					reason := getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace)
+					r.Log.Info("updating health check status for service", "name", serviceRegistration.Name, "reason", reason, "status", healthStatus)
+					err = client.Agent().UpdateTTL(getConsulHealthCheckID(pod, serviceRegistration.ID), reason, healthStatus)
 					if err != nil {
-						r.Log.Error(err, "failed to get status and reason from pod", "name", serviceRegistration.Name)
-						return ctrl.Result{}, err
-					}
-					r.Log.Info("updating TTL health check for service", "name", serviceRegistration.Name, "reason", reason, "status", status)
-					err = client.Agent().UpdateTTL(getConsulHealthCheckID(pod, serviceRegistration.ID), reason, status)
-					if err != nil {
-						r.Log.Error(err, "failed to update TTL health check", "name", serviceRegistration.Name)
+						r.Log.Error(err, "failed to update health check status for service", "name", serviceRegistration.Name)
 						return ctrl.Result{}, err
 					}
 				}
@@ -209,7 +212,7 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
+func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	var servicePort int
@@ -222,7 +225,6 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		}
 	}
 
-	// TODO: remove logic in handler to always set the service name annotation
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
@@ -254,14 +256,6 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		tags = append(tags, strings.Split(raw, ",")...)
 	}
 
-	// We do not set the Notes field with the 'reason' on creation because it does not set the Output field which
-	// gets read by Consul and you'll end up with both Notes and Output set.
-	// Notes (reason) will updated by UpdateTTL() as soon as this function returns.
-	status, _, err := getReadyStatusAndReason(pod)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	service := &api.AgentServiceRegistration{
 		ID:        serviceID,
 		Name:      serviceName,
@@ -273,7 +267,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			CheckID:                getConsulHealthCheckID(pod, serviceID),
 			Name:                   "Kubernetes Health Check",
 			TTL:                    "100000h",
-			Status:                 status,
+			Status:                 healthStatus,
 			SuccessBeforePassing:   1,
 			FailuresBeforeCritical: 1,
 		},
@@ -392,24 +386,14 @@ func getConsulHealthCheckID(pod corev1.Pod, serviceID string) string {
 	return fmt.Sprintf("%s/%s/kubernetes-health-check", pod.Namespace, serviceID)
 }
 
-// getReadyStatusAndReason returns the formatted status string to pass to Consul based on the
-// ready state of the pod along with the reason message which will be passed into the Notes
-// field of the Consul health check.
-func getReadyStatusAndReason(pod corev1.Pod) (string, string, error) {
-	for _, cond := range pod.Status.Conditions {
-		var consulStatus, reason string
-		if cond.Type == corev1.PodReady {
-			if cond.Status != corev1.ConditionTrue {
-				consulStatus = api.HealthCritical
-				reason = cond.Message
-			} else {
-				consulStatus = api.HealthPassing
-				reason = kubernetesSuccessReasonMsg
-			}
-			return consulStatus, reason, nil
-		}
+// getHealthCheckStatusReason takes an Consul's health check status (either passing or critical)
+// as well as pod name and namespace and returns the reason message.
+func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string) string {
+	if healthCheckStatus == api.HealthPassing {
+		return kubernetesSuccessReasonMsg
 	}
-	return "", "", fmt.Errorf("no ready status for pod: %s", pod.Name)
+
+	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
 }
 
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata

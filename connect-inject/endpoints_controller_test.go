@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	testFailureMessage = "Kubernetes pod readiness probe failed"
-	ttl                = "ttl"
+	ttl = "ttl"
 )
 
 func TestShouldIgnore(t *testing.T) {
@@ -496,7 +495,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{},
 						},
 					},
@@ -520,9 +519,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						Namespace: "default",
 					},
 					Subsets: []corev1.EndpointSubset{
-						corev1.EndpointSubset{
+						{
 							Addresses: []corev1.EndpointAddress{
-								corev1.EndpointAddress{
+								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
 									TargetRef: &corev1.ObjectReference{
@@ -572,8 +571,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 			},
@@ -674,8 +673,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 				{
@@ -683,8 +682,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName: "service-created",
 					ServiceID:   "pod2-service-created",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 			},
@@ -783,8 +782,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName: "different-consul-svc-name",
 					ServiceID:   "pod1-different-consul-svc-name",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 			},
@@ -931,10 +930,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true)
-				pod1.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -968,7 +963,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
 						Name:                   "Kubernetes Health Check",
 						TTL:                    "100000h",
-						Status:                 "passing",
+						Status:                 api.HealthCritical,
 						SuccessBeforePassing:   1,
 						FailuresBeforeCritical: 1,
 					},
@@ -1023,7 +1018,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 					Subsets: []corev1.EndpointSubset{
 						{
-							Addresses: []corev1.EndpointAddress{
+							NotReadyAddresses: []corev1.EndpointAddress{
 								{
 									IP:       "1.2.3.4",
 									NodeName: &nodeName,
@@ -1049,7 +1044,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
 						Name:                   "Kubernetes Health Check",
 						TTL:                    "100000h",
-						Status:                 "passing",
+						Status:                 api.HealthPassing,
 						SuccessBeforePassing:   1,
 						FailuresBeforeCritical: 1,
 					},
@@ -1087,7 +1082,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceID:   "pod1-service-updated",
 					Name:        "Kubernetes Health Check",
 					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Output:      "Pod \"default/pod1\" is not ready",
 					Type:        ttl,
 				},
 			},
@@ -1302,8 +1297,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceName: "service-updated",
 					ServiceID:   "pod1-service-updated",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 				{
@@ -1311,8 +1306,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					ServiceName: "service-updated",
 					ServiceID:   "pod2-service-updated",
 					Name:        "Kubernetes Health Check",
-					Status:      api.HealthCritical,
-					Output:      testFailureMessage,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
 					Type:        ttl,
 				},
 			},
@@ -2945,7 +2940,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 				Log:                    logrtest.TestLogger{T: t},
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints, api.HealthPassing)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -2970,12 +2965,6 @@ func createPod(name, ip string, inject bool) *corev1.Pod {
 		Status: corev1.PodStatus{
 			PodIP:  ip,
 			HostIP: "127.0.0.1",
-			Phase:  corev1.PodRunning,
-			Conditions: []corev1.PodCondition{{
-				Type:    corev1.PodReady,
-				Status:  corev1.ConditionFalse,
-				Message: testFailureMessage,
-			}},
 		},
 	}
 	if inject {
