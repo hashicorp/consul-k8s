@@ -92,6 +92,19 @@ func TestValidateProxyDefault(t *testing.T) {
 			expAllow:      false,
 			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
+		"mode value set": {
+			existingResources: []runtime.Object{},
+			newResource: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					Mode: proxyModeRef("transparent"),
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
