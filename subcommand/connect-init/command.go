@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
 
@@ -37,6 +38,7 @@ type Command struct {
 	flagConsulServiceNamespace string // Consul destination namespace for the service.
 	flagServiceAccountName     string // Service account name.
 	flagServiceName            string // Service name.
+	flagLogLevel               string
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -46,8 +48,9 @@ type Command struct {
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
 
-	once sync.Once
-	help string
+	once   sync.Once
+	help   string
+	logger hclog.Logger
 }
 
 func (c *Command) init() {
@@ -59,6 +62,9 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
 	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name as specified via the pod annotation.")
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
 
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile
@@ -76,11 +82,13 @@ func (c *Command) init() {
 	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.http.Flags())
 	c.help = flags.Usage(help, c.flagSet)
+
 }
 
 func (c *Command) Run(args []string) int {
 	var err error
 	c.once.Do(c.init)
+
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
@@ -98,12 +106,21 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// Set up logging.
+	if c.logger == nil {
+		var err error
+		c.logger, err = common.Logger(c.flagLogLevel)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
+	}
 	cfg := api.DefaultConfig()
 	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
 	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to get client connection: %s", err))
+		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
 	}
 
@@ -114,22 +131,22 @@ func (c *Command) Run(args []string) int {
 		err = backoff.Retry(func() error {
 			err := common.ConsulLogin(consulClient, c.bearerTokenFile, c.flagACLAuthMethod, c.tokenSinkFile, c.flagAuthMethodNamespace, loginMeta)
 			if err != nil {
-				c.UI.Error(fmt.Sprintf("Consul login failed; retrying: %s", err))
+				c.logger.Error("Consul login failed; retrying", "error", err)
 			}
 			return err
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Hit maximum retries for consul login: %s", err))
+			c.logger.Error("Hit maximum retries for consul login", "error", err)
 			return 1
 		}
 		// Now update the client so that it will read the ACL token we just fetched.
 		cfg.TokenFile = c.tokenSinkFile
 		consulClient, err = consul.NewClient(cfg)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to update client connection: %s", err))
+			c.logger.Error("Unable to update client connection", "error", err)
 			return 1
 		}
-		c.UI.Info("Consul login complete")
+		c.logger.Info("Consul login complete")
 	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
@@ -140,16 +157,16 @@ func (c *Command) Run(args []string) int {
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to get Agent services: %s", err))
+			c.logger.Error("Unable to get Agent services", "error", err)
 			return err
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
-			c.UI.Info("Unable to find registered services; retrying")
+			c.logger.Info("Unable to find registered services; retrying")
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
-			c.UI.Info(fmt.Sprintf("Registered service has been detected: %s", svc.Service))
+			c.logger.Info("Registered service has been detected", "service", svc.Service)
 			if c.flagACLAuthMethod != "" {
 				if c.flagServiceName != "" && c.flagServiceAccountName != c.flagServiceName {
 					// Set the error but return nil so we don't retry.
@@ -178,20 +195,20 @@ func (c *Command) Run(args []string) int {
 		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Timed out waiting for service registration: %v", err))
+		c.logger.Error("Timed out waiting for service registration", "error", err)
 		return 1
 	}
 	if errServiceNameMismatch != nil {
-		c.UI.Error(errServiceNameMismatch.Error())
+		c.logger.Error(errServiceNameMismatch.Error())
 		return 1
 	}
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
 	err = common.WriteFileWithPerms(c.proxyIDFile, proxyID, os.FileMode(0444))
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to write proxy ID to file: %s", err))
+		c.logger.Error("Unable to write proxy ID to file", "error", err)
 		return 1
 	}
-	c.UI.Info("Connect initialization completed")
+	c.logger.Info("Connect initialization completed")
 	return 0
 }
 
