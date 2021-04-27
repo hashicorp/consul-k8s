@@ -126,7 +126,6 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 
-		// todo: why is upstreams different then basic
 		{
 			"pod with upstreams specified",
 			Handler{
