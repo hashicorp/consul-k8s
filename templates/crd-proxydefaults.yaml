@@ -88,7 +88,7 @@ spec:
                     type: string
                 type: object
               transparentProxy:
-                description: TransparentProxy controls configuration specific to proxies in transparent mode.
+                description: 'TransparentProxy controls configuration specific to proxies in transparent mode. Note: This cannot be set using the CRD and should be set using annotations on the services that are part of the mesh.'
                 properties:
                   outboundListenerPort:
                     description: The port of the listener where outbound application traffic is being redirected to.
