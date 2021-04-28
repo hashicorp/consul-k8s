@@ -1,8 +1,20 @@
 ## Unreleased
 
+FEATURES:
+* CRDs: Update ServiceDefaults with Mode, TransparentProxy and UpstreamConfigs fields. Note: Mode and TransparentProxy should not be set
+  using this CRD but via annotations. [[GH-925](https://github.com/hashicorp/consul-helm/pull/925)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
+* CRDs: Update ProxyDefaults with Mode and TransparentProxy fields. Note: Mode and TransparentProxy should not be set
+  using the CRD but via annotations. [[GH-928](https://github.com/hashicorp/consul-helm/pull/928)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
+* Add support to set the nodePort value in the Consul UI Service. [[GH-878](https://github.com/hashicorp/consul-helm/pull/878)]
+
 BUG FIXES:
 * CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
   `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-921](https://github.com/hashicorp/consul-helm/pull/921)]
+
+BREAKING CHANGES:
+* Remove templates for a demo installation of Grafana in light of recent license changes to Grafana. [[GH-930](https://github.com/hashicorp/consul-helm/pull/930)]
+* Remove support for `admissionregistration.k8s.io/v1beta1` version of MutatingWebhookConfiguration as it is deprecated in Kubernetes 1.16+. Only the `admissionregistration.k8s.io/v1`
+  version will be supported. [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
 
 ## 0.32.0-beta1 (Apr 16, 2021)
 
