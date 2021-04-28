@@ -50,6 +50,8 @@ type MeshGateway struct {
 	Mode string `json:"mode,omitempty"`
 }
 
+type ProxyMode string
+
 func (in MeshGateway) toConsul() capi.MeshGatewayConfig {
 	mode := capi.MeshGatewayMode(in.Mode)
 	switch mode {
@@ -88,7 +90,7 @@ func (in Expose) toConsul() capi.ExposeConfig {
 	}
 }
 
-func (in Expose) validate(path *field.Path) []*field.Error {
+func (in Expose) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	protocols := []string{"http", "http2"}
 	for i, pathCfg := range in.Paths {
@@ -119,6 +121,13 @@ func (in *TransparentProxy) toConsul() *capi.TransparentProxyConfig {
 func (in *TransparentProxy) validate(path *field.Path) *field.Error {
 	if in != nil {
 		return field.Invalid(path, in, "use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port")
+	}
+	return nil
+}
+
+func (in *ProxyMode) validate(path *field.Path) *field.Error {
+	if in != nil {
+		return field.Invalid(path, in, "use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode")
 	}
 	return nil
 }

@@ -63,6 +63,8 @@ type ProxyDefaultsSpec struct {
 	// Expose controls the default expose path configuration for Envoy.
 	Expose Expose `json:"expose,omitempty"`
 	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 }
 
