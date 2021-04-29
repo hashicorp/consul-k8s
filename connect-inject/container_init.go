@@ -46,6 +46,22 @@ type initContainerCommandData struct {
 	// i.e. run consul connect redirect-traffic command and add the required privileges to the
 	// container to do that.
 	EnableTransparentProxy bool
+
+	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeInboundPorts []string
+
+	// TProxyExcludeOutboundPorts is a list of outbound ports to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeOutboundPorts []string
+
+	// TProxyExcludeOutboundCIDRs is a list of outbound CIDRs to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeOutboundCIDRs []string
+
+	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeUIDs []string
 }
 
 // containerInitCopyContainer returns the init container spec for the copy container which places
@@ -84,12 +100,16 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 	}
 
 	data := initContainerCommandData{
-		AuthMethod:                h.AuthMethod,
-		ConsulNamespace:           h.consulNamespace(k8sNamespace),
-		NamespaceMirroringEnabled: h.EnableK8SNSMirroring,
-		ConsulCACert:              h.ConsulCACert,
-		EnableTransparentProxy:    tproxyEnabled,
-		EnvoyUID:                  envoyUserAndGroupID,
+		AuthMethod:                 h.AuthMethod,
+		ConsulNamespace:            h.consulNamespace(k8sNamespace),
+		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
+		ConsulCACert:               h.ConsulCACert,
+		EnableTransparentProxy:     tproxyEnabled,
+		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
+		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
+		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
+		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
+		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
 	if data.AuthMethod != "" {
@@ -213,6 +233,19 @@ func pointerToBool(b bool) *bool {
 	return &b
 }
 
+// splitCommaSeparatedItemsFromAnnotation takes an annotation and a pod
+// and returns the comma-separated value of the annotation as a list of strings.
+func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) []string {
+	var items []string
+	if raw, ok := pod.Annotations[annotation]; ok {
+		for _, item := range strings.Split(raw, ",") {
+			items = append(items, item)
+		}
+	}
+
+	return items
+}
+
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
@@ -271,6 +304,18 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 /consul/connect-inject/consul connect redirect-traffic \
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- range .TProxyExcludeInboundPorts }}
+  -exclude-inbound-port="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeOutboundPorts }}
+  -exclude-outbound-port="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeOutboundCIDRs }}
+  -exclude-outbound-cidr="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeUIDs }}
+  -exclude-uid="{{ . }}" \
   {{- end }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid={{ .EnvoyUID }}
