@@ -10,6 +10,11 @@ FEATURES:
 BUG FIXES:
 * CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
   `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-921](https://github.com/hashicorp/consul-helm/pull/921)]
+* Don't set `-disable-host-node-id=false` on Consul Clients because it causes Clients to
+  not be able to join the cluster on certain hypervisor or Kind setups. This flag was
+  added in 0.30.0 to stop Consul logging an error when a Client pod was force deleted,
+  but this error does not affect the pod restarting so removing the flag will have
+  no real effect. [[GH-936](https://github.com/hashicorp/consul-helm/pull/936)]
 
 BREAKING CHANGES:
 * Remove templates for a demo installation of Grafana in light of recent license changes to Grafana. [[GH-930](https://github.com/hashicorp/consul-helm/pull/930)]
