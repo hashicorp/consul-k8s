@@ -1,10 +1,24 @@
 ## UNRELEASED
 
-FEATURES:
+BREAKING CHANGES:
+* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
+  do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned
+  on scheduling. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
+
+IMPROVEMENTS:
 * CRDs: Update ServiceDefaults with Mode, TransparentProxy and UpstreamConfigs fields. Note: Mode and TransparentProxy should not be set
   using this CRD but via annotations. [[GH-502](https://github.com/hashicorp/consul-k8s/pull/502)], [[GH-485](https://github.com/hashicorp/consul-k8s/pull/485)]
 * CRDs: Update ProxyDefaults with Mode and TransparentProxy fields. Note: Mode and TransparentProxy should not be set
   using the CRD but via annotations. [[GH-505](https://github.com/hashicorp/consul-k8s/pull/505)], [[GH-485](https://github.com/hashicorp/consul-k8s/pull/485)]
+* Connect: Allow exclusion of inbound ports, outbound ports and CIDRs, and additional user IDs when
+  Transparent Proxy is enabled. [[GH-506](https://github.com/hashicorp/consul-k8s/pull/506)]
+
+  The following annotations are supported:
+
+  * `consul.hashicorp.com/transparent-proxy-exclude-inbound-ports` - Comma-separated list of inbound ports to exclude.
+  * `consul.hashicorp.com/transparent-proxy-exclude-outbound-ports` - Comma-separated list of outbound ports to exclude.
+  * `consul.hashicorp.com/transparent-proxy-exclude-outbound-cidrs` - Comma-separated list of IPs or CIDRs to exclude.
+  * `consul.hashicorp.com/transparent-proxy-exclude-uids` - Comma-separated list of Linux user IDs to exclude.
 
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
@@ -12,11 +26,6 @@ BUG FIXES:
   `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-495](https://github.com/hashicorp/consul-k8s/pull/495)]
 * Connect: Fix a bug where health status in Consul is updated incorrectly due to stale pod information in cache.
   [[GH-503](https://github.com/hashicorp/consul-k8s/pull/503)]
-
-BREAKING CHANGES:
-* Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
-  do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned
-  on scheduling. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 
 ## 0.26.0-beta1 (April 16, 2021)
 
