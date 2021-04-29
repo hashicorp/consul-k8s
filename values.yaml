@@ -699,13 +699,6 @@ client:
   # This also changes the clients' advertised IP to the `hostIP` rather than `podIP`.
   exposeGossipPorts: false
 
-  # Disable host node ID 
-  # If true, consul clients will not use information from the host to generate a deterministic node ID
-  # and will instead generate a random node ID which will be persisted in the data directory. 
-  # When two VMs are on the same underlying hardware, they can have node IDs that collide. Setting `disableHostNodeID` to true can work around the collision.
-  # Refer to https://www.consul.io/docs/agent/options#_disable_host_node_id for more info. 
-  disableHostNodeID: false
-
   # Resource settings for Client agents.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
