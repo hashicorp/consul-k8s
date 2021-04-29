@@ -1,7 +1,6 @@
 package connectinject
 
 import (
-	"strconv"
 	"strings"
 	"testing"
 
@@ -143,48 +142,125 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	cases := map[string]struct {
-		globalEnabled     bool
-		annotationEnabled *bool
-		expectEnabled     bool
+		globalEnabled          bool
+		annotations            map[string]string
+		expectedContainsCmd    string
+		expectedNotContainsCmd string
 	}{
 		"enabled globally, annotation not provided": {
 			true,
 			nil,
-			true,
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
 		},
 		"enabled globally, annotation is false": {
 			true,
-			pointerToBool(false),
-			false,
+			map[string]string{
+				annotationTransparentProxy: "false",
+			},
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
 		},
 		"enabled globally, annotation is true": {
 			true,
-			pointerToBool(true),
-			true,
+			map[string]string{
+				annotationTransparentProxy: "true",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
 		},
 		"disabled globally, annotation not provided": {
 			false,
 			nil,
-			false,
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
 		},
 		"disabled globally, annotation is false": {
 			false,
-			pointerToBool(false),
-			false,
+			map[string]string{
+				annotationTransparentProxy: "false",
+			},
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
 		},
 		"disabled globally, annotation is true": {
 			false,
-			pointerToBool(true),
+			map[string]string{
+				annotationTransparentProxy: "true",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+		},
+		"exclude-inbound-ports annotation is provided": {
 			true,
+			map[string]string{
+				annotationTransparentProxy:          "true",
+				annotationTProxyExcludeInboundPorts: "9090,9091",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -exclude-inbound-port="9090" \
+  -exclude-inbound-port="9091" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+		},
+		"exclude-outbound-ports annotation is provided": {
+			true,
+			map[string]string{
+				annotationTransparentProxy:           "true",
+				annotationTProxyExcludeOutboundPorts: "9090,9091",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -exclude-outbound-port="9090" \
+  -exclude-outbound-port="9091" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+		},
+		"exclude-outbound-cidrs annotation is provided": {
+			true,
+			map[string]string{
+				annotationTransparentProxy:           "true",
+				annotationTProxyExcludeOutboundCIDRs: "1.1.1.1,2.2.2.2/24",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -exclude-outbound-cidr="1.1.1.1" \
+  -exclude-outbound-cidr="2.2.2.2/24" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+		},
+		"exclude-uids annotation is provided": {
+			true,
+			map[string]string{
+				annotationTransparentProxy:  "true",
+				annotationTProxyExcludeUIDs: "6000,7000",
+			},
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -exclude-uid="6000" \
+  -exclude-uid="7000" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			h := Handler{EnableTransparentProxy: c.globalEnabled}
 			pod := minimal()
-			if c.annotationEnabled != nil {
-				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
-			}
+			pod.Annotations = c.annotations
 
 			expectedSecurityContext := &corev1.SecurityContext{
 				RunAsUser:  pointerToInt64(0),
@@ -194,19 +270,16 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				},
 				RunAsNonRoot: pointerToBool(false),
 			}
-			expectedCmd := `/consul/connect-inject/consul connect redirect-traffic \
-  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
-  -proxy-uid=5995`
 			container, err := h.containerInit(*pod, k8sNamespace)
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
 
-			if c.expectEnabled {
+			if c.expectedContainsCmd != "" {
 				require.Equal(t, expectedSecurityContext, container.SecurityContext)
-				require.Contains(t, actualCmd, expectedCmd)
+				require.Contains(t, actualCmd, c.expectedContainsCmd)
 			} else {
 				require.Nil(t, container.SecurityContext)
-				require.NotContains(t, actualCmd, expectedCmd)
+				require.NotContains(t, actualCmd, c.expectedNotContainsCmd)
 			}
 		})
 	}

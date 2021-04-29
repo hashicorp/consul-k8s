@@ -88,6 +88,18 @@ const (
 	// This annotation takes a boolean value (true/false).
 	annotationTransparentProxy = "consul.hashicorp.com/transparent-proxy"
 
+	// annotationTProxyExcludeInboundPorts is a comma-separated list of inbound ports to exclude from traffic redirection.
+	annotationTProxyExcludeInboundPorts = "consul.hashicorp.com/transparent-proxy-exclude-inbound-ports"
+
+	// annotationTProxyExcludeOutboundPorts is a comma-separated list of outbound ports to exclude from traffic redirection.
+	annotationTProxyExcludeOutboundPorts = "consul.hashicorp.com/transparent-proxy-exclude-outbound-ports"
+
+	// annotationTProxyExcludeOutboundCIDRs is a comma-separated list of outbound CIDRs to exclude from traffic redirection.
+	annotationTProxyExcludeOutboundCIDRs = "consul.hashicorp.com/transparent-proxy-exclude-outbound-cidrs"
+
+	// annotationTProxyExcludeUIDs is a comma-separated list of additional user IDs to exclude from traffic redirection.
+	annotationTProxyExcludeUIDs = "consul.hashicorp.com/transparent-proxy-exclude-uids"
+
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
 )
