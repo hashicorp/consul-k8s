@@ -255,6 +255,10 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	}
 	pod.Labels[keyInjectStatus] = injected
 
+	// Add the managed-by label since services are now managed by endpoints controller. This is to support upgrading
+	// from consul-k8s without Endpoints controller to consul-k8s with Endpoints controller.
+	pod.Labels[keyManagedBy] = endpointsController
+
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if h.EnableNamespaces {
 		pod.Annotations[annotationConsulNamespace] = h.consulNamespace(req.Namespace)
