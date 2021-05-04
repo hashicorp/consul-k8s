@@ -37,6 +37,28 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-mesh
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-mesh.consul.hashicorp.com
+  rules:
+    - apiGroups:
+      - consul.hashicorp.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - meshes
+  sideEffects: None
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
   admissionReviewVersions:

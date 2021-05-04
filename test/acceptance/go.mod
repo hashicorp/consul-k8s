@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/gruntwork-io/terratest v0.31.2
-	github.com/hashicorp/consul/api v1.4.1-0.20210415000851-62fcf1ff17cd
+	github.com/hashicorp/consul/api v1.4.1-0.20210504212756-347f3d212843
 	github.com/hashicorp/consul/sdk v0.7.0
 	github.com/stretchr/testify v1.5.1
 	gopkg.in/yaml.v2 v2.2.8

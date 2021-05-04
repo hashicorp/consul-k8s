@@ -8,6 +8,7 @@ FEATURES:
   using this CRD but via annotations. [[GH-925](https://github.com/hashicorp/consul-helm/pull/925)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
 * CRDs: Update ProxyDefaults with Mode and TransparentProxy fields. Note: Mode and TransparentProxy should not be set
   using the CRD but via annotations. [[GH-928](https://github.com/hashicorp/consul-helm/pull/928)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
+* CRDs: Add support for MeshConfigEntry. This resource is supported in Consul 1.10+ [[GH-941](https://github.com/hashicorp/consul-helm/pull/941)]
 * Add support to set the nodePort value in the Consul UI Service. [[GH-878](https://github.com/hashicorp/consul-helm/pull/878)]
 
 BUG FIXES:

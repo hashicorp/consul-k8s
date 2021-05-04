@@ -145,7 +145,7 @@ jobs:
                     -kubecontext="kind-dc1" \
                     -secondary-kubecontext="kind-dc2" \
                     -debug-directory="$TEST_RESULTS/debug" \
-                    -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
+                    -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta2" \
                     -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
               then
                 echo "Tests in ${pkg} failed, aborting early"
@@ -224,7 +224,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta2" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -287,7 +287,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta2" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -361,7 +361,7 @@ jobs:
               -kubeconfig="$primary_kubeconfig" \
               -secondary-kubeconfig="$secondary_kubeconfig" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta2" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
@@ -491,7 +491,7 @@ jobs:
               -kubecontext="kind-dc1" \
               -secondary-kubecontext="kind-dc2" \
               -debug-directory="$TEST_RESULTS/debug" \
-              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta1" \
+              -consul-image="hashicorp/consul-enterprise:1.10.0-ent-beta2" \
               -consul-k8s-image="docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:latest"
 
       - store_test_results:
