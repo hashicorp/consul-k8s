@@ -274,49 +274,6 @@ func registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceI
 	return nil
 }
 
-func registerProxyHealthChecks(client *api.Client, pod corev1.Pod, serviceID, proxyServiceID, proxyServiceName string) error {
-	svc, _, _ := client.Agent().Service(proxyServiceID, &api.QueryOptions{})
-	fmt.Printf("REGPROXYHEALTH svc found: %+v", svc)
-	err := client.Agent().CheckRegister(&api.AgentCheckRegistration{
-		ID:        fmt.Sprintf("service:%s:1", proxyServiceID),
-		Name:      "Proxy Public Listener",
-		ServiceID: proxyServiceID,
-		AgentServiceCheck: api.AgentServiceCheck{
-			TCP:                            fmt.Sprintf("%s:20000", pod.Status.PodIP),
-			Interval:                       "10s",
-			DeregisterCriticalServiceAfter: "10m",
-		},
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), fmt.Sprintf("%s\" does not exist", proxyServiceID)) {
-			return fmt.Errorf("service %q not found in Consul: unable to register health check", proxyServiceID)
-		}
-		return fmt.Errorf("registering health check for service %q: %w", proxyServiceID, err)
-	}
-	err = client.Agent().CheckRegister(&api.AgentCheckRegistration{
-		ID:        fmt.Sprintf("service:%s:2", proxyServiceID),
-		Name:      "Destination Alias",
-		ServiceID: proxyServiceID,
-		AgentServiceCheck: api.AgentServiceCheck{
-			AliasService: serviceID,
-		},
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), fmt.Sprintf("%s\" does not exist", proxyServiceID)) {
-			return fmt.Errorf("service %q not found in Consul: unable to register health check", proxyServiceID)
-		}
-		return fmt.Errorf("registering health check for service %q: %w", proxyServiceID, err)
-	}
-
-	checks, _ := client.Agent().Checks()
-	fmt.Printf("\n\nCHECKS: %+v\n", checks)
-	fmt.Printf("0:%+v\n", checks["service:pod1-service-created-sidecar-proxy:1"])
-	fmt.Printf("1:%+v\n", checks["service:pod1-service-created-sidecar-proxy:2"])
-	//_, infos, _ := client.Agent().AgentHealthServiceByName("service-created-sidecar-proxy")
-	//fmt.Printf("infos %+v\n", infos)
-	return nil
-}
-
 // updateConsulHealthCheckStatus updates the consul health check status.
 func (r *EndpointsController) updateConsulHealthCheckStatus(client *api.Client, consulHealthCheckID, status, reason string) error {
 	r.Log.Info("updating health check", "id", consulHealthCheckID)
@@ -330,11 +287,6 @@ func (r *EndpointsController) updateConsulHealthCheckStatus(client *api.Client, 
 // upsertHealthCheck checks if the healthcheck exists for the service, and creates it if it doesn't exist, or updates it
 // if it does.
 func (r *EndpointsController) upsertHealthCheck(pod corev1.Pod, client *api.Client, serviceID, proxyServiceID, proxyServiceName, healthCheckID, status string) error {
-	//err := registerProxyHealthChecks(client, pod, serviceID, proxyServiceID, proxyServiceName)
-	//if err != nil {
-	//	return err
-	//}
-
 	reason := getHealthCheckStatusReason(status, pod.Name, pod.Namespace)
 	// Retrieve the health check that would exist if the service had one registered for this pod.
 	serviceCheck, err := getServiceCheck(client, healthCheckID)
