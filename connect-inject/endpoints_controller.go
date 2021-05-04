@@ -168,7 +168,6 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					// and the connect-proxy service should come after the "main" service
 					// because its alias health check depends on the main service existing.
 					if managedByEndpointsController {
-						//fmt.Println("here")
 						r.Log.Info("registering service with Consul", "name", serviceRegistration.Name)
 						err = client.Agent().ServiceRegister(serviceRegistration)
 						if err != nil {
@@ -199,10 +198,6 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						r.Log.Error(err, "failed to update health check status for service", "name", serviceName)
 						return ctrl.Result{}, err
 					}
-					checks, _ := client.Agent().Checks()
-					fmt.Printf("\n\nCHECKS: %+v\n", checks)
-					fmt.Printf("0:%+v\n", checks["service:pod1-service-created-sidecar-proxy:1"])
-					fmt.Printf("1:%+v\n", checks["service:pod1-service-created-sidecar-proxy:2"])
 				}
 			}
 		}
@@ -244,9 +239,9 @@ func getServiceCheck(client *api.Client, healthCheckID string) (*api.AgentCheck,
 	return checks[healthCheckID], nil
 }
 
-// registerConsulHealthCheck registers a TTL health check for the service on this Agent.
-// The Agent is local to the Pod which has a kubernetes health check.
-// This has the effect of marking the service instance healthy/unhealthy for Consul service mesh traffic.
+// registerConsulHealthCheck registers a TTL health check for the service on this Agent local to the Pod. This will add
+// the Pod's readiness status, which will mark the service instance healthy/unhealthy for Consul service mesh
+// traffic.
 func registerConsulHealthCheck(client *api.Client, consulHealthCheckID, serviceID, status string) error {
 	// Create a TTL health check in Consul associated with this service and pod.
 	// The TTL time is 100000h which should ensure that the check never fails due to timeout
