@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +33,10 @@ const (
 	MetaKeyKubeNS              = "k8s-namespace"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
+
+	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
+	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
+	// TODO: change this to a constant shared with Consul to avoid accidentally changing this.
 	clusterIPTaggedAddressName = "virtual"
 )
 
@@ -215,13 +220,14 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.AgentServiceRegistration, *api.AgentServiceRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
-	var servicePort int
+	// The handler will always set the port annotation if one is not provided on the pod.
+	var consulServicePort int
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
 		if port, err := portValue(pod, raw); port > 0 {
 			if err != nil {
 				return nil, nil, err
 			}
-			servicePort = int(port)
+			consulServicePort = int(port)
 		}
 	}
 
@@ -259,7 +265,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	service := &api.AgentServiceRegistration{
 		ID:        serviceID,
 		Name:      serviceName,
-		Port:      servicePort,
+		Port:      consulServicePort,
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
 		Namespace: r.consulNamespace(pod.Namespace),
@@ -302,9 +308,9 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
-	if servicePort > 0 {
+	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
-		proxyConfig.LocalServicePort = servicePort
+		proxyConfig.LocalServicePort = consulServicePort
 	}
 
 	upstreams, err := r.processUpstreams(pod)
@@ -356,16 +362,43 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		parsedIP := net.ParseIP(k8sService.Spec.ClusterIP)
 		if parsedIP != nil {
 			taggedAddresses := make(map[string]api.ServiceAddress)
-			for _, servicePort := range k8sService.Spec.Ports {
-				taggedAddressKey := clusterIPTaggedAddressName
-				if servicePort.Name != "" {
-					taggedAddressKey = fmt.Sprintf("%s-%s", clusterIPTaggedAddressName, servicePort.Name)
-				}
 
-				taggedAddresses[taggedAddressKey] = api.ServiceAddress{
-					Address: k8sService.Spec.ClusterIP,
-					Port:    int(servicePort.Port),
+			// When a service has multiple ports, we need to choose the port that is registered with Consul
+			// and only set that port as the tagged address because Consul currently does not support multiple port
+			// on a single service.
+			var k8sServicePort int32
+			for _, sp := range k8sService.Spec.Ports {
+				// If target port is a name, then we need to find the port value from the pod.
+				if sp.TargetPort.Type == intstr.String {
+					targetPortValue, err := portValue(pod, sp.TargetPort.StrVal)
+					if err != nil {
+						return nil, nil, err
+					}
+
+					// If the targetPortValue is the consulServicePort, then this is the service port we'll use as the tagged address.
+					if targetPortValue == int32(consulServicePort) {
+						k8sServicePort = sp.Port
+						break
+					}
+				} else if sp.TargetPort.Type == intstr.Int && sp.TargetPort.IntVal != 0 {
+					// If the target port is a non-zero int, we can compare that port directly with the Consul service port.
+					if sp.TargetPort.IntVal == int32(consulServicePort) {
+						k8sServicePort = sp.Port
+						break
+					}
+				} else {
+					// If targetPort is not specified, then the service port is used as the target port,
+					// and we can compare the service port with the Consul service port.
+					if sp.Port == int32(consulServicePort) {
+						k8sServicePort = sp.Port
+						break
+					}
 				}
+			}
+
+			taggedAddresses[clusterIPTaggedAddressName] = api.ServiceAddress{
+				Address: k8sService.Spec.ClusterIP,
+				Port:    int(k8sServicePort),
 			}
 
 			service.TaggedAddresses = taggedAddresses
