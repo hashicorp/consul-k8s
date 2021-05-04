@@ -203,8 +203,10 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
+			// Add the pods namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: test.SourceKubeNS}}
 			// Create fake k8s client.
-			k8sObjects := append(setup.k8sObjects(), fakeClientPod)
+			k8sObjects := append(setup.k8sObjects(), fakeClientPod, &ns)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test Consul server.
@@ -926,8 +928,10 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
 					fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
+					// Add the pods namespace.
+					ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ts.SourceKubeNS}}
 					// Create fake k8s client.
-					k8sObjects := append(tt.k8sObjects(), fakeClientPod)
+					k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
 					fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 					masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
