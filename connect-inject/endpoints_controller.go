@@ -339,7 +339,14 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		proxyService.Tags = tags
 	}
 
-	tproxyEnabled, err := transparentProxyEnabled(pod, r.EnableTransparentProxy)
+	// A user can enable/disable tproxy for an entire namespace.
+	var ns corev1.Namespace
+	err = r.Client.Get(r.Context, types.NamespacedName{Name: pod.Namespace, Namespace: ""}, &ns)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tproxyEnabled, err := transparentProxyEnabled(&ns, pod, r.EnableTransparentProxy)
 	if err != nil {
 		return nil, nil, err
 	}

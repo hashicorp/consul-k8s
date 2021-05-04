@@ -3,6 +3,7 @@ package connectinject
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -507,7 +508,8 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 func minimal() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "minimal",
+			Namespace: namespaces.DefaultNamespace,
+			Name:      "minimal",
 			Annotations: map[string]string{
 				annotationService: "foo",
 			},

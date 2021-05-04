@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -34,6 +35,7 @@ var (
 // Handler is the HTTP handler for admission webhooks.
 type Handler struct {
 	ConsulClient *api.Client
+	Clientset    kubernetes.Interface
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageEnvoy is the container image for Envoy to use.
@@ -136,7 +138,7 @@ type Handler struct {
 // Handle is the admission.Handler implementation that actually handles the
 // webhook request for admission control. This should be registered or
 // served via the controller runtime manager.
-func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Response {
+func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var pod corev1.Pod
 
 	// Decode the pod from the request
@@ -195,9 +197,15 @@ func (h *Handler) Handle(_ context.Context, req admission.Request) admission.Res
 	initCopyContainer := h.containerInitCopyContainer()
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
-	// Add the init container that registers the service and sets up
-	// the Envoy configuration.
-	initContainer, err := h.containerInit(pod, req.Namespace)
+	// A user can enable/disable tproxy for an entire namespace.
+	ns, err := h.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	if err != nil {
+		h.Log.Error(err, "error fetching namespace metadata for init container", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for init container: %s", err))
+	}
+
+	// Add the init container that registers the service and sets up the Envoy configuration.
+	initContainer, err := h.containerInit(ns, pod)
 	if err != nil {
 		h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))

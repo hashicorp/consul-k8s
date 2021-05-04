@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -15,6 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -93,9 +96,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 					}),
@@ -133,9 +138,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -178,9 +185,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -202,9 +211,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
@@ -247,9 +258,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						Spec: basicSpec,
 						ObjectMeta: metav1.ObjectMeta{
@@ -292,9 +305,11 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -340,10 +355,12 @@ func TestHandlerHandle(t *testing.T) {
 					DefaultEnableMetrics:        true,
 					DefaultEnableMetricsMerging: true,
 				},
-				decoder: decoder,
+				decoder:   decoder,
+				Clientset: defaultTestClientWithNamespace(),
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -1176,4 +1193,17 @@ func escapeJSONPointer(s string) string {
 	s = strings.Replace(s, "~", "~0", -1)
 	s = strings.Replace(s, "/", "~1", -1)
 	return s
+}
+
+func defaultTestClientWithNamespace() kubernetes.Interface {
+	return clientWithNamespace("default")
+}
+
+func clientWithNamespace(name string) kubernetes.Interface {
+	ns := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	return fake.NewSimpleClientset(&ns)
 }
