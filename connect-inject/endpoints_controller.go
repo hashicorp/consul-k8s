@@ -378,17 +378,20 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 					// If the targetPortValue is the consulServicePort, then this is the service port we'll use as the tagged address.
 					if targetPortValue == int32(consulServicePort) {
 						k8sServicePort = sp.Port
+						break
 					}
 				} else if sp.TargetPort.Type == intstr.Int && sp.TargetPort.IntVal != 0 {
 					// If the target port is a non-zero int, we can compare that port directly with the Consul service port.
 					if sp.TargetPort.IntVal == int32(consulServicePort) {
 						k8sServicePort = sp.Port
+						break
 					}
 				} else {
 					// If targetPort is not specified, then the service port is used as the target port,
 					// and we can compare the service port with the Consul service port.
 					if sp.Port == int32(consulServicePort) {
 						k8sServicePort = sp.Port
+						break
 					}
 				}
 			}
