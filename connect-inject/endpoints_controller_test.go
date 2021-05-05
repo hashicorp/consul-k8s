@@ -2739,7 +2739,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
 						},
 					},
 				},
@@ -2748,7 +2748,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			expTaggedAddresses: map[string]api.ServiceAddress{
 				"virtual": {
 					Address: "10.0.0.1",
-					Port:    80,
+					Port:    8081,
 				},
 			},
 			namespaceLabels: map[string]string{annotationTransparentProxy: "true"},
