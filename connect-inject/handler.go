@@ -197,11 +197,11 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	initCopyContainer := h.containerInitCopyContainer()
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
-	// A user can enable/disable tproxy for an entire namespace.
+	// A user can enable/disable tproxy for an entire namespace via a label.
 	ns, err := h.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
 	if err != nil {
-		h.Log.Error(err, "error fetching namespace metadata for init container", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for init container: %s", err))
+		h.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
 	// Add the init container that registers the service and sets up the Envoy configuration.
