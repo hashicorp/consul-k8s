@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -2598,7 +2599,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
 						},
 					},
 				},
@@ -2607,7 +2608,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			expTaggedAddresses: map[string]api.ServiceAddress{
 				"virtual": {
 					Address: "10.0.0.1",
-					Port:    80,
+					Port:    8081,
 				},
 			},
 			expErr: "",
@@ -2645,7 +2646,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
 						},
 					},
 				},
@@ -2654,7 +2655,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			expTaggedAddresses: map[string]api.ServiceAddress{
 				"virtual": {
 					Address: "10.0.0.1",
-					Port:    80,
+					Port:    8081,
 				},
 			},
 			expErr: "",
@@ -2713,7 +2714,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
 						},
 					},
 				},
@@ -2722,7 +2723,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			expTaggedAddresses: map[string]api.ServiceAddress{
 				"virtual": {
 					Address: "10.0.0.1",
-					Port:    80,
+					Port:    8081,
 				},
 			},
 			expErr: "",
@@ -2784,7 +2785,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			proxyMode:          api.ProxyModeDefault,
 			expErr:             "services \"test-service\" not found",
 		},
-		"service with a single port without a name": {
+		"service with a single port without a target port": {
 			globalEnabled: true,
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2795,7 +2796,33 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expErr: "",
+		},
+		"service with a single port and a target port that is a port name": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.Parse("tcp"),
 						},
 					},
 				},
@@ -2809,7 +2836,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			},
 			expErr: "",
 		},
-		"service with a single port with a name": {
+		"service with a single port and a target port that is a int": {
 			globalEnabled: true,
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2820,15 +2847,15 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Name: "tcp",
-							Port: 80,
+							Port:       80,
+							TargetPort: intstr.FromInt(8081),
 						},
 					},
 				},
 			},
 			proxyMode: api.ProxyModeTransparent,
 			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual-tcp": {
+				"virtual": {
 					Address: "10.0.0.1",
 					Port:    80,
 				},
@@ -2846,25 +2873,52 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "10.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
-							Name: "tcp",
-							Port: 80,
+							Name:       "tcp",
+							Port:       80,
+							TargetPort: intstr.FromString("tcp"),
 						},
 						{
-							Name: "http",
-							Port: 8080,
+							Name:       "http",
+							Port:       81,
+							TargetPort: intstr.FromString("http"),
 						},
 					},
 				},
 			},
 			proxyMode: api.ProxyModeTransparent,
 			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual-tcp": {
+				"virtual": {
 					Address: "10.0.0.1",
 					Port:    80,
 				},
-				"virtual-http": {
+			},
+			expErr: "",
+		},
+		// When target port is not equal to the port we're registering with Consul,
+		// then we want to register the zero-value for the port. This could happen
+		// for client services that don't have a container port that they're listening on.
+		"target port is not found": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.Parse("http"),
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
 					Address: "10.0.0.1",
-					Port:    8080,
+					Port:    0,
 				},
 			},
 			expErr: "",
@@ -2940,7 +2994,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					ClusterIP: "2001:db8::68",
 					Ports: []corev1.ServicePort{
 						{
-							Port: 80,
+							Port: 8081,
 						},
 					},
 				},
@@ -2949,7 +3003,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			expTaggedAddresses: map[string]api.ServiceAddress{
 				"virtual": {
 					Address: "2001:db8::68",
-					Port:    80,
+					Port:    8081,
 				},
 			},
 			expErr: "",
@@ -2958,10 +3012,26 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			pod := createPod("test-pod-1", "1.2.3.4", false)
+			pod := createPod("test-pod-1", "1.2.3.4", true)
 			if c.annotationEnabled != nil {
 				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
 			}
+			pod.Spec.Containers = []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			}
+			pod.Annotations[annotationPort] = "tcp"
 			endpoints := &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
