@@ -92,7 +92,7 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(namespace *corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
@@ -216,13 +216,13 @@ func (h *Handler) containerInit(namespace *corev1.Namespace, pod corev1.Pod) (co
 // transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
-func transparentProxyEnabled(namespace *corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
 	// First check to see if the pod annotation exists to override the namespace or global settings.
-	if raw, ok := pod.Annotations[annotationTransparentProxy]; ok {
+	if raw, ok := pod.Annotations[keyTransparentProxy]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Next see if the namespace has been defaulted.
-	if raw, ok := namespace.Labels[annotationTransparentProxy]; ok {
+	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.

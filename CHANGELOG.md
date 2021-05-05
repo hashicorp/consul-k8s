@@ -24,10 +24,9 @@ IMPROVEMENTS:
 
 * Connect: Add the ability to set default tproxy mode at namespace level via label. [[GH-501](https://github.com/hashicorp/consul-k8s/pull/510)]
 
-  Setting `consul.hashicorp.com/transparent-proxy` to `true/false` will have the following behaviour:
-  * If set as a `pod annotation` - This will define whether tproxy is enabled/disabled for the pod.
-  * If set as a `namespace label` - This will define the default behaviour for pods in this namespace which do not have their respective annotation set.
-  * If not set on either pod or namespace - The default behaviour will be defined by the `connectInject.transparentProxy.defaultEnabled` helm value.
+  Setting the annotation `consul.hashicorp.com/transparent-proxy` to `true/false` will define whether tproxy is enabled/disabled for the pod.
+  * If a `namespace` has the label `consul.hashicorp.com/transparent-proxy` set to `true/false` - this will define the default behaviour for pods in this namespace which do not also have the respective annotation set.
+  * If not set on both pod and namespace - The default tproxy behaviour will be defined by the value of `-enable-transparent-proxy` to the `consul-k8s inject-connect` command.
 
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]

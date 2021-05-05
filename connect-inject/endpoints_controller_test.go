@@ -2751,7 +2751,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					Port:    8081,
 				},
 			},
-			namespaceLabels: map[string]string{annotationTransparentProxy: "true"},
+			namespaceLabels: map[string]string{keyTransparentProxy: "true"},
 			expErr:          "",
 		},
 		"enabled globally, namespace disabled, no annotation": {
@@ -2772,7 +2772,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			},
 			proxyMode:          api.ProxyModeDefault,
 			expTaggedAddresses: nil,
-			namespaceLabels:    map[string]string{annotationTransparentProxy: "false"},
+			namespaceLabels:    map[string]string{keyTransparentProxy: "false"},
 			expErr:             "",
 		},
 		// This case is impossible since we're always passing an endpoints object to this function,
@@ -3014,7 +3014,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 		t.Run(name, func(t *testing.T) {
 			pod := createPod("test-pod-1", "1.2.3.4", true)
 			if c.annotationEnabled != nil {
-				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
+				pod.Annotations[keyTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
 			}
 			pod.Spec.Containers = []corev1.Container{
 				{

@@ -352,7 +352,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		return nil, nil, err
 	}
 
-	tproxyEnabled, err := transparentProxyEnabled(&ns, pod, r.EnableTransparentProxy)
+	tproxyEnabled, err := transparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
 	if err != nil {
 		return nil, nil, err
 	}

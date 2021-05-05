@@ -84,11 +84,11 @@ const (
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 
-	// annotationTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
+	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
 	// with their own annotation.
 	// This annotation takes a boolean value (true/false).
-	annotationTransparentProxy = "consul.hashicorp.com/transparent-proxy"
+	keyTransparentProxy = "consul.hashicorp.com/transparent-proxy"
 
 	// annotationTProxyExcludeInboundPorts is a comma-separated list of inbound ports to exclude from traffic redirection.
 	annotationTProxyExcludeInboundPorts = "consul.hashicorp.com/transparent-proxy-exclude-inbound-ports"
