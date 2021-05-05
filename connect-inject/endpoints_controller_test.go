@@ -1618,9 +1618,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 				// Add the default namespace.
-				ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 				// Create fake k8s client
-				k8sObjects := append(tt.k8sObjects(), fakeClientPod, ns)
+				k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 				masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
@@ -1794,9 +1794,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Add the default namespace.
-			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod, ns).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod, &ns).Build()
 
 			// Create test consul server
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -3058,9 +3058,9 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			}
 			var fakeClient client.Client
 			if c.service != nil {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(&ns, pod, endpoints, c.service).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, c.service, &ns).Build()
 			} else {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(&ns, pod, endpoints).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, &ns).Build()
 			}
 
 			epCtrl := EndpointsController{
