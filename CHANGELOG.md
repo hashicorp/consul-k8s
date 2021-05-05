@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Connect: Add namespaces get/list/watch to the connect-inject clusterrole to support the ability to fetch namespace labels which can enable/disable tproxy for an entire namespace. [[GH-942](https://github.com/hashicorp/consul-helm/pull/942)]
+
 FEATURES:
 * CRDs: Update ServiceDefaults with Mode, TransparentProxy and UpstreamConfigs fields. Note: Mode and TransparentProxy should not be set
   using this CRD but via annotations. [[GH-925](https://github.com/hashicorp/consul-helm/pull/925)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
