@@ -129,7 +129,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 			h := tt.Handler
 			pod := *tt.Pod(minimal())
-			container, err := h.containerInit(pod, k8sNamespace)
+			container, err := h.containerInit(testNS, pod)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -146,67 +146,66 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		annotations            map[string]string
 		expectedContainsCmd    string
 		expectedNotContainsCmd string
+		namespaceLabel         map[string]string
 	}{
-		"enabled globally, annotation not provided": {
+		"enabled globally, ns not set, annotation not provided": {
 			true,
 			nil,
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
-		"enabled globally, annotation is false": {
+		"enabled globally, ns not set, annotation is false": {
 			true,
-			map[string]string{
-				annotationTransparentProxy: "false",
-			},
+			map[string]string{keyTransparentProxy: "false"},
 			"",
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
+			nil,
 		},
-		"enabled globally, annotation is true": {
+		"enabled globally, ns not set, annotation is true": {
 			true,
-			map[string]string{
-				annotationTransparentProxy: "true",
-			},
+			map[string]string{keyTransparentProxy: "true"},
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
-		"disabled globally, annotation not provided": {
+		"disabled globally, ns not set, annotation not provided": {
 			false,
 			nil,
 			"",
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
+			nil,
 		},
-		"disabled globally, annotation is false": {
+		"disabled globally, ns not set, annotation is false": {
 			false,
-			map[string]string{
-				annotationTransparentProxy: "false",
-			},
+			map[string]string{keyTransparentProxy: "false"},
 			"",
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
+			nil,
 		},
-		"disabled globally, annotation is true": {
+		"disabled globally, ns not set, annotation is true": {
 			false,
-			map[string]string{
-				annotationTransparentProxy: "true",
-			},
+			map[string]string{keyTransparentProxy: "true"},
 			`/consul/connect-inject/consul connect redirect-traffic \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
-		"exclude-inbound-ports annotation is provided": {
+		"exclude-inbound-ports, ns is not set, annotation is provided": {
 			true,
 			map[string]string{
-				annotationTransparentProxy:          "true",
+				keyTransparentProxy:                 "true",
 				annotationTProxyExcludeInboundPorts: "9090,9091",
 			},
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -215,11 +214,12 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
-		"exclude-outbound-ports annotation is provided": {
+		"exclude-outbound-ports, ns is not set, annotation is provided": {
 			true,
 			map[string]string{
-				annotationTransparentProxy:           "true",
+				keyTransparentProxy:                  "true",
 				annotationTProxyExcludeOutboundPorts: "9090,9091",
 			},
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -228,11 +228,12 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
 		"exclude-outbound-cidrs annotation is provided": {
 			true,
 			map[string]string{
-				annotationTransparentProxy:           "true",
+				keyTransparentProxy:                  "true",
 				annotationTProxyExcludeOutboundCIDRs: "1.1.1.1,2.2.2.2/24",
 			},
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -241,11 +242,12 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
 		},
-		"exclude-uids annotation is provided": {
+		"exclude-uids annotation is provided, ns is not set": {
 			true,
 			map[string]string{
-				annotationTransparentProxy:  "true",
+				keyTransparentProxy:         "true",
 				annotationTProxyExcludeUIDs: "6000,7000",
 			},
 			`/consul/connect-inject/consul connect redirect-traffic \
@@ -254,6 +256,25 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 			"",
+			nil,
+		},
+		"disabled globally, ns enabled, annotation not set": {
+			false,
+			nil,
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			"",
+			map[string]string{keyTransparentProxy: "true"},
+		},
+		"enabled globally, ns disabled, annotation not set": {
+			true,
+			nil,
+			"",
+			`/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			map[string]string{keyTransparentProxy: "false"},
 		},
 	}
 	for name, c := range cases {
@@ -270,7 +291,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				},
 				RunAsNonRoot: pointerToBool(false),
 			}
-			container, err := h.containerInit(*pod, k8sNamespace)
+			ns := testNS
+			ns.Labels = c.namespaceLabel
+			container, err := h.containerInit(ns, *pod)
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
 
@@ -529,7 +552,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			require := require.New(t)
 
 			h := tt.Handler
-			container, err := h.containerInit(*tt.Pod(minimal()), k8sNamespace)
+			container, err := h.containerInit(testNS, *tt.Pod(minimal()))
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Equal(tt.Cmd, actual)
@@ -565,7 +588,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 			ServiceAccountName: "foo",
 		},
 	}
-	container, err := h.containerInit(*pod, k8sNamespace)
+	container, err := h.containerInit(testNS, *pod)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -602,7 +625,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(*pod, k8sNamespace)
+	container, err := h.containerInit(testNS, *pod)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -646,7 +669,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(*pod, k8sNamespace)
+	container, err := h.containerInit(testNS, *pod)
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
@@ -674,4 +697,10 @@ func TestHandlerContainerInitCopyContainer(t *testing.T) {
 	require.Equal(container.SecurityContext, expectedSecurityContext)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
+}
+
+var testNS = corev1.Namespace{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: k8sNamespace,
+	},
 }

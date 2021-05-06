@@ -55,6 +55,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -76,6 +77,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("non-default"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -97,6 +99,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -118,6 +121,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("non-default"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -140,6 +144,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -162,6 +167,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("dest"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -185,6 +191,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -208,6 +215,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("dest"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -304,6 +312,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -326,6 +335,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("non-default"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -348,6 +358,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -370,6 +381,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("non-default"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -393,6 +405,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -416,6 +429,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("dest"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -440,6 +454,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  defaultTestClientWithNamespace(),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -464,6 +479,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace("dest"),
 			},
 			Req: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -634,6 +650,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 				K8SNSMirroringPrefix:       c.MirroringPrefix,
 				ConsulClient:               client,
 				decoder:                    decoder,
+				Clientset:                  clientWithNamespace(sourceKubeNS),
 			}
 
 			pod := corev1.Pod{

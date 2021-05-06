@@ -23,6 +23,12 @@ IMPROVEMENTS:
   * `consul.hashicorp.com/transparent-proxy-exclude-outbound-cidrs` - Comma-separated list of IPs or CIDRs to exclude.
   * `consul.hashicorp.com/transparent-proxy-exclude-uids` - Comma-separated list of Linux user IDs to exclude.
 
+* Connect: Add the ability to set default tproxy mode at namespace level via label. [[GH-501](https://github.com/hashicorp/consul-k8s/pull/510)]
+
+  * Setting the annotation `consul.hashicorp.com/transparent-proxy` to `true/false` will define whether tproxy is enabled/disabled for the pod.
+  * Setting the label `consul.hashicorp.com/transparent-proxy` to `true/false` on a namespace will define the default behavior for pods in that namespace, which do not also have the annotation set.
+  * The default tproxy behavior will be defined by the value of `-enable-transparent-proxy` flag to the `consul-k8s inject-connect` command. It can be overridden in a namespace by the the label on the namespace or for a pod using the annotation on the pod.
+
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 * CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because

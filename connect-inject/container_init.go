@@ -92,16 +92,16 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Container, error) {
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
-	tproxyEnabled, err := transparentProxyEnabled(pod, h.EnableTransparentProxy)
+	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,
-		ConsulNamespace:            h.consulNamespace(k8sNamespace),
+		ConsulNamespace:            h.consulNamespace(namespace.Name),
 		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
 		ConsulCACert:               h.ConsulCACert,
 		EnableTransparentProxy:     tproxyEnabled,
@@ -214,12 +214,18 @@ func (h *Handler) containerInit(pod corev1.Pod, k8sNamespace string) (corev1.Con
 }
 
 // transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
-// It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
-func transparentProxyEnabled(pod corev1.Pod, globalEnabled bool) (bool, error) {
-	if raw, ok := pod.Annotations[annotationTransparentProxy]; ok {
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
+// to read the pod's namespace label when it exists.
+func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+	// First check to see if the pod annotation exists to override the namespace or global settings.
+	if raw, ok := pod.Annotations[keyTransparentProxy]; ok {
 		return strconv.ParseBool(raw)
 	}
-
+	// Next see if the namespace has been defaulted.
+	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Else fall back to the global default.
 	return globalEnabled, nil
 }
 
