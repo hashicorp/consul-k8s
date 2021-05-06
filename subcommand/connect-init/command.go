@@ -152,6 +152,7 @@ func (c *Command) Run(args []string) int {
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
 	// which maps to this pod+namespace.
 	var proxyID string
+	loggingRetryCounter := 0
 	var errServiceNameMismatch error
 	err = backoff.Retry(func() error {
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
@@ -162,7 +163,12 @@ func (c *Command) Run(args []string) int {
 		}
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
+			loggingRetryCounter++
 			c.logger.Info("Unable to find registered services; retrying")
+			if loggingRetryCounter%10 == 0 {
+				c.logger.Info("Check to ensure a Kubernetes service has been created for this application, " +
+					"Status of the service registration can be found in the webhook logs.")
+			}
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {

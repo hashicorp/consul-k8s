@@ -161,7 +161,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					// Note: the order of how we register services is important,
 					// and the connect-proxy service should come after the "main" service
 					// because its alias health check depends on the main service existing.
-					r.Log.Info("registering service with Consul", "name", serviceRegistration.Name)
+					r.Log.Info("registering service with Consul", "name", serviceRegistration.Name,
+						"serviceID", serviceRegistration.ID, "agentIP", pod.Status.HostIP)
 					err = client.Agent().ServiceRegister(serviceRegistration)
 					if err != nil {
 						r.Log.Error(err, "failed to register service", "name", serviceRegistration.Name)
