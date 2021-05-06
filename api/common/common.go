@@ -12,7 +12,6 @@ const (
 	TerminatingGateway string = "terminatinggateway"
 
 	Global                 string = "global"
-	Mesh                   string = "mesh"
 	DefaultConsulNamespace string = "default"
 	WildcardNamespace      string = "*"
 
