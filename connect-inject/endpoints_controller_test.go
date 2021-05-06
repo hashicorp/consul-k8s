@@ -799,8 +799,11 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod)
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consul server
@@ -1614,8 +1617,10 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
 				fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
+				// Add the default namespace.
+				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 				// Create fake k8s client
-				k8sObjects := append(tt.k8sObjects(), fakeClientPod)
+				k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 				masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
@@ -1788,8 +1793,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 			// Create fake k8s client
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod, &ns).Build()
 
 			// Create test consul server
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -2577,6 +2584,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 		service            *corev1.Service
 		expTaggedAddresses map[string]api.ServiceAddress
 		proxyMode          api.ProxyMode
+		namespaceLabels    map[string]string
 		expErr             string
 	}{
 		"enabled globally, annotation not provided": {
@@ -2719,6 +2727,53 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 				},
 			},
 			expErr: "",
+		},
+		"disabled globally, namespace enabled, no annotation": {
+			globalEnabled: false,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			proxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			namespaceLabels: map[string]string{keyTransparentProxy: "true"},
+			expErr:          "",
+		},
+		"enabled globally, namespace disabled, no annotation": {
+			globalEnabled: true,
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			proxyMode:          api.ProxyModeDefault,
+			expTaggedAddresses: nil,
+			namespaceLabels:    map[string]string{keyTransparentProxy: "false"},
+			expErr:             "",
 		},
 		// This case is impossible since we're always passing an endpoints object to this function,
 		// and Kubernetes will ensure that there is only an endpoints object if there is a service object.
@@ -2959,7 +3014,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 		t.Run(name, func(t *testing.T) {
 			pod := createPod("test-pod-1", "1.2.3.4", true)
 			if c.annotationEnabled != nil {
-				pod.Annotations[annotationTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
+				pod.Annotations[keyTransparentProxy] = strconv.FormatBool(*c.annotationEnabled)
 			}
 			pod.Spec.Containers = []corev1.Container{
 				{
@@ -2997,11 +3052,15 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 					},
 				},
 			}
+			// Add the pods namespace.
+			ns := corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Namespace, Labels: c.namespaceLabels},
+			}
 			var fakeClient client.Client
 			if c.service != nil {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, c.service).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, c.service, &ns).Build()
 			} else {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints).Build()
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, &ns).Build()
 			}
 
 			epCtrl := EndpointsController{
