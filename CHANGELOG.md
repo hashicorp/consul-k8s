@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.26.0-beta2 (May 06, 2021)
 
 BREAKING CHANGES:
 * Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
