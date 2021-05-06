@@ -171,6 +171,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyDefaults)
 		return 1
 	}
+	if err = (&controller.MeshController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.Mesh),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.Mesh)
+		return 1
+	}
 	if err = (&controller.ServiceRouterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
@@ -249,6 +258,14 @@ func (c *Command) Run(args []string) int {
 				Client:                 mgr.GetClient(),
 				ConsulClient:           consulClient,
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
+			&webhook.Admission{Handler: &v1alpha1.MeshWebhook{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.Mesh),
 				EnableConsulNamespaces: c.flagEnableNamespaces,
 				EnableNSMirroring:      c.flagEnableNSMirroring,
 			}})
