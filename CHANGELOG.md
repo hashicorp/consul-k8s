@@ -10,7 +10,6 @@ IMPROVEMENTS:
   using this CRD but via annotations. [[GH-502](https://github.com/hashicorp/consul-k8s/pull/502)], [[GH-485](https://github.com/hashicorp/consul-k8s/pull/485)]
 * CRDs: Update ProxyDefaults with Mode and TransparentProxy fields. Note: Mode and TransparentProxy should not be set
   using the CRD but via annotations. [[GH-505](https://github.com/hashicorp/consul-k8s/pull/505)], [[GH-485](https://github.com/hashicorp/consul-k8s/pull/485)]
-* CRDs: Add CRD for MeshConfigEntry. Supported in Consul 1.10+ [[GH-494](https://github.com/hashicorp/consul-k8s/pull/494)]
 * Connect: No longer set multiple tagged addresses in Consul when k8s service has multiple ports and Transparent Proxy is enabled.
   [[GH-511](https://github.com/hashicorp/consul-k8s/pull/511)]
 * Connect: Allow exclusion of inbound ports, outbound ports and CIDRs, and additional user IDs when
