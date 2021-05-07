@@ -33,12 +33,12 @@ require (
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
 	golang.org/x/tools v0.0.0-20200616195046-dc31b401abb5 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.1.0
-	k8s.io/api v0.20.2
+	k8s.io/api v0.20.5
 	k8s.io/apiextensions-apiserver v0.20.2 // indirect
-	k8s.io/apimachinery v0.20.2
-	k8s.io/client-go v0.20.2
+	k8s.io/apimachinery v0.20.5
+	k8s.io/client-go v0.20.5
 	k8s.io/klog/v2 v2.4.0
-	sigs.k8s.io/controller-runtime v0.7.2
+	sigs.k8s.io/controller-runtime v0.8.3
 )
 
 go 1.14
