@@ -1,7 +1,7 @@
 apiVersion: v2
 name: consul
-version: 0.32.0-beta1
-appVersion: 1.10.0-beta1
+version: 0.32.0-beta2
+appVersion: 1.10.0-beta2
 kubeVersion: ">=1.16.0-0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
@@ -14,9 +14,9 @@ annotations:
   artifacthub.io/prerelease: true
   artifacthub.io/images: |
     - name: consul
-      image: hashicorp/consul:1.10.0-beta1
+      image: hashicorp/consul:1.10.0-beta2
     - name: consul-k8s
-      image: hashicorp/consul-k8s:0.26.0-beta1
+      image: hashicorp/consul-k8s:0.26.0-beta2
     - name: envoy
       image: envoyproxy/envoy-alpine:v1.16.0
   artifacthub.io/license: MPL-2.0

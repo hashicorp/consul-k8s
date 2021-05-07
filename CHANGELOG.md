@@ -1,4 +1,4 @@
-## Unreleased
+## 0.32.0-beta2 (May 6, 2021)
 
 IMPROVEMENTS:
 * Connect: Add namespaces get/list/watch to the connect-inject clusterrole to support the ability to fetch namespace labels which can enable/disable tproxy for an entire namespace. [[GH-942](https://github.com/hashicorp/consul-helm/pull/942)]
