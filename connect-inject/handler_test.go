@@ -342,6 +342,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels/" + escapeJSONPointer(keyInjectStatus),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels/" + escapeJSONPointer(keyManagedBy),
+				},
 			},
 		},
 
@@ -411,6 +415,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels/" + escapeJSONPointer(keyManagedBy),
 				},
 			},
 		},
