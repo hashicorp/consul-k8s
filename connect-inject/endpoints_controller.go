@@ -156,18 +156,18 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						managedByEndpointsController = true
 					}
 
-					// Get information from the pod to create service instance registrations.
-					serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
-					if err != nil {
-						r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						return ctrl.Result{}, err
-					}
-
-					// Register the service instance with the local agent.
-					// Note: the order of how we register services is important,
-					// and the connect-proxy service should come after the "main" service
-					// because its alias health check depends on the main service existing.
 					if managedByEndpointsController {
+						// Get information from the pod to create service instance registrations.
+						serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
+						if err != nil {
+							r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							return ctrl.Result{}, err
+						}
+
+						// Register the service instance with the local agent.
+						// Note: the order of how we register services is important,
+						// and the connect-proxy service should come after the "main" service
+						// because its alias health check depends on the main service existing.
 						r.Log.Info("registering service with Consul", "name", serviceRegistration.Name)
 						err = client.Agent().ServiceRegister(serviceRegistration)
 						if err != nil {
@@ -184,11 +184,14 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						}
 					}
 
-					// Update the TTL health check for the service.
-					// This is required because ServiceRegister() does not update the TTL if the service already exists.
+					// Update the service TTL health check for both legacy services and services managed by endpoints
+					// controller. The proxy health checks are registered separately by endpoints controller and
+					// lifecycle sidecar for legacy services. Here, we always update the health check for legacy and
+					// newer services idempotently since the service health check is not added as part of the service
+					// registration.
 					reason := getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace)
-					r.Log.Info("updating health check status for service", "name", serviceRegistration.Name, "reason", reason, "status", healthStatus)
 					serviceName := getServiceName(pod, serviceEndpoints)
+					r.Log.Info("updating health check status for service", "name", serviceName, "reason", reason, "status", healthStatus)
 					serviceID := getServiceID(pod, serviceEndpoints)
 					proxyServiceName := getProxyServiceName(pod, serviceEndpoints)
 					proxyServiceID := getProxyServiceID(pod, serviceEndpoints)
