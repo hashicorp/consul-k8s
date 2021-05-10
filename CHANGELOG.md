@@ -34,6 +34,9 @@ IMPROVEMENTS:
 * Connect: support upgrades for services deployed before endpoints controller to
   upgrade to a version of consul-k8s with endpoints controller. [[GH-509](https://github.com/hashicorp/consul-k8s/pull/509)]
 
+* Connect: add additional logging to the endpoints controller and connect-init command to help
+  the user debug if pods arent starting right away. [[GH-514](https://github.com/hashicorp/consul-k8s/pull/514/)]
+
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
 * CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because
