@@ -5,6 +5,12 @@ const (
 	// a pod after an injection is done.
 	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
 
+	// keyManagedBy is the key of the label that is added to pods managed
+	// by the Endpoints controller. This is to support upgrading from consul-k8s
+	// without Endpoints controller to consul-k8s with Endpoints controller
+	// without disrupting services managed the old way.
+	keyManagedBy = "consul.hashicorp.com/connect-inject-managed-by"
+
 	// annotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool
@@ -104,6 +110,9 @@ const (
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
+
+	// endpointsController is the value for keyManagedBy.
+	managedByValue = "consul-k8s-endpoints-controller"
 )
 
 // Annotations used by Prometheus.

@@ -88,8 +88,8 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 		}{
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPodWithNamespace("pod1", test.SourceKubeNS, "1.2.3.4", true)
-				pod2 := createPodWithNamespace("pod2", test.SourceKubeNS, "2.2.3.4", true)
+				pod1 := createPodWithNamespace("pod1", test.SourceKubeNS, "1.2.3.4", true, true)
+				pod2 := createPodWithNamespace("pod2", test.SourceKubeNS, "2.2.3.4", true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -129,7 +129,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceID:      "pod1-service-created",
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS},
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
 					Namespace:      test.ExpConsulNS,
 				},
@@ -137,7 +137,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceID:      "pod2-service-created",
 					ServiceName:    "service-created",
 					ServiceAddress: "2.2.3.4",
-					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS},
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags:    []string{},
 					Namespace:      test.ExpConsulNS,
 				},
@@ -153,7 +153,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
 					Namespace:   test.ExpConsulNS,
 				},
@@ -167,7 +167,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 						DestinationServiceID:   "pod2-service-created",
 						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
-					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
 					Namespace:   test.ExpConsulNS,
 				},
@@ -200,7 +200,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// code gets the agent pods via the label component=client, and
 			// makes requests against the agent API, it will actually hit the
 			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, false)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Add the pods namespace.
@@ -298,6 +298,8 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 				checks := checkInfo.Checks
 				require.Contains(t, expectedChecks, checks[0].Name)
 				require.Contains(t, expectedChecks, checks[1].Name)
+				require.Equal(t, test.ExpConsulNS, checks[0].Namespace)
+				require.Equal(t, test.ExpConsulNS, checks[1].Namespace)
 			}
 
 			// Check that the Consul health check was created for the k8s pod.
@@ -388,12 +390,13 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 			expectedNumSvcInstances    int
 			expectedConsulSvcInstances []*api.CatalogService
 			expectedProxySvcInstances  []*api.CatalogService
+			expectedAgentHealthChecks  []*api.AgentCheck
 		}{
 			{
-				name:          "Endpoints has an updated address (pod IP change).",
+				name:          "Legacy service: Health check is added to the correct namespace",
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
-					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true)
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, false)
 					endpoint := &corev1.Endpoints{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
@@ -403,7 +406,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							{
 								Addresses: []corev1.EndpointAddress{
 									{
-										IP:       "4.4.4.4",
+										IP:       "1.2.3.4",
 										NodeName: &nodeName,
 										TargetRef: &corev1.ObjectReference{
 											Kind:      "Pod",
@@ -443,6 +446,85 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				expectedConsulSvcInstances: []*api.CatalogService{
 					{
 						ServiceID:      "pod1-service-updated",
+						ServiceAddress: "1.2.3.4",
+						Namespace:      ts.ExpConsulNS,
+					},
+				},
+				expectedProxySvcInstances: []*api.CatalogService{
+					{
+						ServiceID:      "pod1-service-updated-sidecar-proxy",
+						ServiceAddress: "1.2.3.4",
+						Namespace:      ts.ExpConsulNS,
+					},
+				},
+				expectedAgentHealthChecks: []*api.AgentCheck{
+					{
+						CheckID:     fmt.Sprintf("%s/pod1-service-updated/kubernetes-health-check", ts.SourceKubeNS),
+						ServiceName: "service-updated",
+						ServiceID:   "pod1-service-updated",
+						Name:        "Kubernetes Health Check",
+						Status:      api.HealthPassing,
+						Output:      kubernetesSuccessReasonMsg,
+						Type:        ttl,
+						Namespace:   ts.ExpConsulNS,
+					},
+				},
+			},
+			{
+				name:          "Endpoints has an updated address (pod IP change).",
+				consulSvcName: "service-updated",
+				k8sObjects: func() []runtime.Object {
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
+					endpoint := &corev1.Endpoints{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "service-updated",
+							Namespace: ts.SourceKubeNS,
+						},
+						Subsets: []corev1.EndpointSubset{
+							{
+								Addresses: []corev1.EndpointAddress{
+									{
+										IP:       "4.4.4.4",
+										NodeName: &nodeName,
+										TargetRef: &corev1.ObjectReference{
+											Kind:      "Pod",
+											Name:      "pod1",
+											Namespace: ts.SourceKubeNS,
+										},
+									},
+								},
+							},
+						},
+					}
+					return []runtime.Object{pod1, endpoint}
+				},
+				initialConsulSvcs: []*api.AgentServiceRegistration{
+					{
+						ID:        "pod1-service-updated",
+						Name:      "service-updated",
+						Port:      80,
+						Address:   "1.2.3.4",
+						Meta:      map[string]string{MetaKeyManagedBy: managedByValue},
+						Namespace: ts.ExpConsulNS,
+					},
+					{
+						Kind:    api.ServiceKindConnectProxy,
+						ID:      "pod1-service-updated-sidecar-proxy",
+						Name:    "service-updated-sidecar-proxy",
+						Port:    20000,
+						Address: "1.2.3.4",
+						Proxy: &api.AgentServiceConnectProxyConfig{
+							DestinationServiceName: "service-updated",
+							DestinationServiceID:   "pod1-service-updated",
+							TransparentProxy:       &api.TransparentProxyConfig{},
+						},
+						Namespace: ts.ExpConsulNS,
+					},
+				},
+				expectedNumSvcInstances: 1,
+				expectedConsulSvcInstances: []*api.CatalogService{
+					{
+						ServiceID:      "pod1-service-updated",
 						ServiceAddress: "4.4.4.4",
 						Namespace:      ts.ExpConsulNS,
 					},
@@ -459,7 +541,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Different Consul service name: Endpoints has an updated address (pod IP change).",
 				consulSvcName: "different-consul-svc-name",
 				k8sObjects: func() []runtime.Object {
-					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true)
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
 					endpoint := &corev1.Endpoints{
 						ObjectMeta: metav1.ObjectMeta{
@@ -490,6 +572,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "1.2.3.4",
+						Meta:      map[string]string{MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -526,8 +609,8 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Endpoints has additional address not in Consul.",
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
-					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true)
-					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "2.2.3.4", true)
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
+					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "2.2.3.4", true, true)
 					endpointWithTwoAddresses := &corev1.Endpoints{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
@@ -566,6 +649,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-updated",
 						Port:      80,
 						Address:   "1.2.3.4",
+						Meta:      map[string]string{MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -612,7 +696,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Consul has instances that are not in the Endpoints addresses.",
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
-					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true)
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					endpoint := &corev1.Endpoints{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
@@ -642,7 +726,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-updated",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -656,7 +740,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-service-updated",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -664,7 +748,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-updated",
 						Port:      80,
 						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -678,7 +762,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod2-service-updated",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -702,7 +786,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses.",
 				consulSvcName: "different-consul-svc-name",
 				k8sObjects: func() []runtime.Object {
-					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true)
+					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					pod1.Annotations[annotationService] = "different-consul-svc-name"
 					endpoint := &corev1.Endpoints{
 						ObjectMeta: metav1.ObjectMeta{
@@ -733,7 +817,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -747,7 +831,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-different-consul-svc-name",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -755,7 +839,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -769,7 +853,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod2-different-consul-svc-name",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -809,7 +893,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-updated",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -823,7 +907,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-service-updated",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -831,7 +915,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-updated",
 						Port:      80,
 						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -845,7 +929,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod2-service-updated",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -873,7 +957,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -887,7 +971,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-different-consul-svc-name",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -895,7 +979,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "2.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -909,7 +993,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod2-different-consul-svc-name",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -925,7 +1009,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					// code gets the agent pods via the label component=client, and
 					// makes requests against the agent API, it will actually hit the
 					// test server we have on localhost.
-					fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
+					fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 					fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 					// Add the pods namespace.
@@ -1022,6 +1106,23 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
 						require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
 					}
+
+					// Check that the Consul health check was created for the k8s pod.
+					if tt.expectedAgentHealthChecks != nil {
+						for i := range tt.expectedConsulSvcInstances {
+							filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
+							newChecks, _ := consulClient.Agent().Checks()
+							for key, value := range newChecks {
+								fmt.Printf("%s:%v\n", key, value)
+							}
+							check, err := consulClient.Agent().ChecksWithFilter(filter)
+							require.NoError(t, err)
+							require.EqualValues(t, 1, len(check))
+							// Ignoring Namespace because the response from ENT includes it and OSS does not.
+							var ignoredFields = []string{"Node", "Definition", "Namespace"}
+							require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+						}
+					}
 				})
 			}
 		}
@@ -1092,7 +1193,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 						Name:      "service-deleted",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -1106,7 +1207,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-service-deleted",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -1120,7 +1221,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 						Name:      "different-consul-svc-name",
 						Port:      80,
 						Address:   "1.2.3.4",
-						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 					{
@@ -1134,7 +1235,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 							DestinationServiceID:   "pod1-different-consul-svc-name",
 							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
-						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS},
+						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
 					},
 				},
@@ -1146,7 +1247,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				// code gets the agent pods via the label component=client, and
 				// makes requests against the agent API, it will actually hit the
 				// test server we have on localhost.
-				fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false)
+				fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 				fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 				// Create fake k8s client.
@@ -1220,7 +1321,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 	}
 }
 
-func createPodWithNamespace(name, namespace, ip string, inject bool) *corev1.Pod {
+func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -1243,6 +1344,9 @@ func createPodWithNamespace(name, namespace, ip string, inject bool) *corev1.Pod
 	if inject {
 		pod.Labels[keyInjectStatus] = injected
 		pod.Annotations[keyInjectStatus] = injected
+	}
+	if managedByEndpointsController {
+		pod.Labels[keyManagedBy] = managedByValue
 	}
 	return pod
 
