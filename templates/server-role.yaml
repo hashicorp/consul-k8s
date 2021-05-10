@@ -9,15 +9,25 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-{{- if .Values.global.enablePodSecurityPolicies }}
+{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
 rules:
+{{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
   resourceNames:
   - {{ template "consul.fullname" . }}-server
   verbs:
   - use
-{{- else }}
+{{- end }}
+{{- if (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts ) }}
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-server
+  verbs:
+  - use
+{{- end }}
+{{- else}}
 rules: []
 {{- end }}
 {{- end }}
