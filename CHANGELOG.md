@@ -1,5 +1,7 @@
 ## UNRELEASED
 
+## 0.26.0-beta2 (May 06, 2021)
+
 BREAKING CHANGES:
 * Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
   do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned
@@ -28,6 +30,9 @@ IMPROVEMENTS:
   * Setting the annotation `consul.hashicorp.com/transparent-proxy` to `true/false` will define whether tproxy is enabled/disabled for the pod.
   * Setting the label `consul.hashicorp.com/transparent-proxy` to `true/false` on a namespace will define the default behavior for pods in that namespace, which do not also have the annotation set.
   * The default tproxy behavior will be defined by the value of `-enable-transparent-proxy` flag to the `consul-k8s inject-connect` command. It can be overridden in a namespace by the the label on the namespace or for a pod using the annotation on the pod.
+
+* Connect: support upgrades for services deployed before endpoints controller to
+  upgrade to a version of consul-k8s with endpoints controller. [[GH-509](https://github.com/hashicorp/consul-k8s/pull/509)]
 
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
