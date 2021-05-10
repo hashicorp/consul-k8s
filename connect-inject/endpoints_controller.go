@@ -152,10 +152,11 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					}
 
 					var managedByEndpointsController bool
-					if raw, ok := pod.Labels[keyManagedBy]; ok && raw == endpointsController {
+					if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
 						managedByEndpointsController = true
 					}
 
+					// For pods managed by this controller, create and register the service instance.
 					if managedByEndpointsController {
 						// Get information from the pod to create service instance registrations.
 						serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
@@ -364,7 +365,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		MetaKeyPodName:         pod.Name,
 		MetaKeyKubeServiceName: serviceEndpoints.Name,
 		MetaKeyKubeNS:          serviceEndpoints.Namespace,
-		MetaKeyManagedBy:       endpointsController,
+		MetaKeyManagedBy:       managedByValue,
 	}
 	for k, v := range pod.Annotations {
 		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
@@ -618,7 +619,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 func serviceInstancesForK8SServiceNameAndNamespace(k8sServiceName, k8sServiceNamespace string, client *api.Client) (map[string]*api.AgentService, error) {
 	return client.Agent().ServicesWithFilter(
 		fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
-			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, endpointsController))
+			MetaKeyKubeServiceName, k8sServiceName, MetaKeyKubeNS, k8sServiceNamespace, MetaKeyManagedBy, managedByValue))
 }
 
 // processUpstreams reads the list of upstreams from the Pod annotation and converts them into a list of api.Upstream

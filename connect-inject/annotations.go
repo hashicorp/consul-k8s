@@ -112,7 +112,7 @@ const (
 	injected = "injected"
 
 	// endpointsController is the value for keyManagedBy.
-	endpointsController = "consul-k8s-endpoints-controller"
+	managedByValue = "consul-k8s-endpoints-controller"
 )
 
 // Annotations used by Prometheus.
