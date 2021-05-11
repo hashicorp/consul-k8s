@@ -140,14 +140,15 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
 					return ctrl.Result{}, err
 				}
+				podHostIP := pod.Status.HostIP
 
 				if hasBeenInjected(pod) {
 					// Build the endpointAddressMap up for deregistering service instances later.
 					endpointAddressMap[pod.Status.PodIP] = true
 					// Create client for Consul agent local to the pod.
-					client, err := r.remoteConsulClient(pod.Status.HostIP, r.consulNamespace(pod.Namespace))
+					client, err := r.remoteConsulClient(podHostIP, r.consulNamespace(pod.Namespace))
 					if err != nil {
-						r.Log.Error(err, "failed to create a new Consul client", "address", pod.Status.HostIP)
+						r.Log.Error(err, "failed to create a new Consul client", "address", podHostIP)
 						return ctrl.Result{}, err
 					}
 
@@ -155,7 +156,6 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					if raw, ok := pod.Labels[keyManagedBy]; ok && raw == managedByValue {
 						managedByEndpointsController = true
 					}
-
 					// For pods managed by this controller, create and register the service instance.
 					if managedByEndpointsController {
 						// Get information from the pod to create service instance registrations.
@@ -169,7 +169,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						// Note: the order of how we register services is important,
 						// and the connect-proxy service should come after the "main" service
 						// because its alias health check depends on the main service existing.
-						r.Log.Info("registering service with Consul", "name", serviceRegistration.Name)
+						r.Log.Info("registering service with Consul", "name", serviceRegistration.Name,
+							"id", serviceRegistration.ID, "agentIP", podHostIP)
 						err = client.Agent().ServiceRegister(serviceRegistration)
 						if err != nil {
 							r.Log.Error(err, "failed to register service", "name", serviceRegistration.Name)
