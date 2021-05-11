@@ -152,8 +152,10 @@ func (c *Command) Run(args []string) int {
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
 	// which maps to this pod+namespace.
 	var proxyID string
+	registrationRetryCount := 0
 	var errServiceNameMismatch error
 	err = backoff.Retry(func() error {
+		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
@@ -163,6 +165,11 @@ func (c *Command) Run(args []string) int {
 		// Wait for the service and the connect-proxy service to be registered.
 		if len(serviceList) != 2 {
 			c.logger.Info("Unable to find registered services; retrying")
+			// Once every 10 times we're going to print this informational message to the pod logs so that
+			// it is not "lost" to the user at the end of the retries when the pod enters a CrashLoop.
+			if registrationRetryCount%10 == 0 {
+				c.logger.Info("Check to ensure a Kubernetes service has been created for this application.")
+			}
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
