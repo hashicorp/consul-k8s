@@ -69,12 +69,12 @@ func TestComponentMetrics(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 	// Server Metrics
-	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
+	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
 	// Client Metrics
-	metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "sh", "-c", "curl http://$HOST_IP:8500/v1/agent/metrics?format=prometheus")
+	metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "sh", "-c", "curl --silent --show-error http://$HOST_IP:8500/v1/agent/metrics?format=prometheus")
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
@@ -133,7 +133,7 @@ func TestAppMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, podList.Items, 1)
 	podIP := podList.Items[0].Status.PodIP
-	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", fmt.Sprintf("http://%s:20200/metrics", podIP))
+	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
 	require.NoError(t, err)
 	// This assertion represents the metrics from the envoy sidecar.
 	require.Contains(t, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
@@ -146,7 +146,7 @@ func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, 
 	require.NoError(t, err)
 	for _, pod := range pods.Items {
 		podIP := pod.Status.PodIP
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", fmt.Sprintf("http://%s:20200/metrics", podIP))
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
 		require.NoError(t, err)
 		require.Contains(t, metricsOutput, metricsAssertion)
 	}
