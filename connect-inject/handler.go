@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -128,6 +129,10 @@ type Handler struct {
 	// This means that the injected init container will apply traffic redirection rules
 	// so that all traffic will go through the Envoy proxy.
 	EnableTransparentProxy bool
+
+	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
+	// to point them to the Envoy proxy.
+	TProxyOverwriteProbes bool
 
 	// Log
 	Log logr.Logger
@@ -264,6 +269,13 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		pod.Annotations[annotationConsulNamespace] = h.consulNamespace(req.Namespace)
 	}
 
+	// Overwrite readiness/liveness probes if needed.
+	err = h.overwriteProbes(*ns, &pod)
+	if err != nil {
+		h.Log.Error(err, "error overwriting readiness or liveness probes", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
+	}
+
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,
 	// sidecars and initContainers appended to it.
 	updatedPodJson, err := json.Marshal(pod)
@@ -292,6 +304,50 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// Return a Patched response along with the patches we intend on applying to the
 	// Pod received by the handler.
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)
+}
+
+// shouldOverwriteProbes returns true if we need to overwrite readiness/liveness probes for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool.
+func shouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
+	if raw, ok := pod.Annotations[annotationTransparentProxyOverwriteProbes]; ok {
+		return strconv.ParseBool(raw)
+	}
+
+	return globalOverwrite, nil
+}
+
+// overwriteProbes overwrites readiness/liveness probes of this pod when
+// both transparent proxy is enabled and overwrite probes is true for the pod.
+func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
+	tproxyEnabled, err := transparentProxyEnabled(ns, *pod, h.EnableTransparentProxy)
+	if err != nil {
+		return err
+	}
+
+	overwriteProbes, err := shouldOverwriteProbes(*pod, h.TProxyOverwriteProbes)
+	if err != nil {
+		return err
+	}
+
+	if tproxyEnabled && overwriteProbes {
+		if cs := pod.Spec.Containers; len(cs) > 0 {
+			// The first container will be the original application container that we need to
+			// modify probes for.
+			appContainer := cs[0]
+			if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
+				// We need to save original port first so that endpoints controller can use it for exposing paths.
+				pod.Annotations[annotationOriginalLivenessProbePort] = appContainer.LivenessProbe.HTTPGet.Port.String()
+				appContainer.LivenessProbe.HTTPGet.Port = intstr.FromInt(defaultExposedPathsListenerPortLiveness)
+
+			}
+			if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
+				// We need to save original port first so that endpoints controller can use it for exposing paths.
+				pod.Annotations[annotationOriginalReadinessProbePort] = appContainer.ReadinessProbe.HTTPGet.Port.String()
+				appContainer.ReadinessProbe.HTTPGet.Port = intstr.FromInt(defaultExposedPathsListenerPortReadiness)
+			}
+		}
+	}
+	return nil
 }
 
 func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
