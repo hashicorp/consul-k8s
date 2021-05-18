@@ -693,7 +693,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		{
 			// This test has 3 addresses, but only 2 are backed by pod resources. This will cause Reconcile to error
 			// on the invalid address but continue and process the other addresses. We check for error specific to
-			// pod3 being non-existant at the end, and validate the other 2 addresses have services.
+			// pod3 being non-existant at the end, and validate the other 2 addresses have service instances.
 			name:          "Endpoints with multiple addresses but one is invalid",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
