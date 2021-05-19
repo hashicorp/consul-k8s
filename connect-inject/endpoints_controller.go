@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,6 +92,7 @@ type EndpointsController struct {
 }
 
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var errs error
 	var serviceEndpoints corev1.Endpoints
 
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -138,7 +140,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
 				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 					r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
-					return ctrl.Result{}, err
+					errs = multierror.Append(errs, err)
 				}
 				podHostIP := pod.Status.HostIP
 
@@ -149,7 +151,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					client, err := r.remoteConsulClient(podHostIP, r.consulNamespace(pod.Namespace))
 					if err != nil {
 						r.Log.Error(err, "failed to create a new Consul client", "address", podHostIP)
-						return ctrl.Result{}, err
+						errs = multierror.Append(errs, err)
 					}
 
 					var managedByEndpointsController bool
@@ -162,7 +164,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
 						if err != nil {
 							r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-							return ctrl.Result{}, err
+							errs = multierror.Append(errs, err)
 						}
 
 						// Register the service instance with the local agent.
@@ -174,7 +176,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						err = client.Agent().ServiceRegister(serviceRegistration)
 						if err != nil {
 							r.Log.Error(err, "failed to register service", "name", serviceRegistration.Name)
-							return ctrl.Result{}, err
+							errs = multierror.Append(errs, err)
 						}
 
 						// Register the proxy service instance with the local agent.
@@ -182,7 +184,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 						err = client.Agent().ServiceRegister(proxyServiceRegistration)
 						if err != nil {
 							r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Name)
-							return ctrl.Result{}, err
+							errs = multierror.Append(errs, err)
 						}
 					}
 
@@ -201,7 +203,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 					err = r.upsertHealthCheck(pod, client, serviceID, proxyServiceID, proxyServiceName, healthCheckID, healthStatus)
 					if err != nil {
 						r.Log.Error(err, "failed to update health check status for service", "name", serviceName)
-						return ctrl.Result{}, err
+						errs = multierror.Append(errs, err)
 					}
 				}
 			}
@@ -213,10 +215,10 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// the registration codepath.
 	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
 		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-		return ctrl.Result{}, err
+		errs = multierror.Append(errs, err)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, errs
 }
 
 func (r *EndpointsController) Logger(name types.NamespacedName) logr.Logger {
