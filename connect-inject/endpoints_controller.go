@@ -555,20 +555,12 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 							return nil, nil, err
 						}
 
-						listenerPort := defaultExposedPathsListenerPortLiveness
-						if raw, ok := pod.Annotations[annotationTransparentProxyLivenessListenerPort]; ok {
-							listenerPort, err = strconv.Atoi(raw)
-							if err != nil {
-								return nil, nil, err
-							}
-						}
 						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  listenerPort,
+							ListenerPort:  appContainer.LivenessProbe.HTTPGet.Port.IntValue(),
 							LocalPathPort: originalLivenessPort,
 							Path:          appContainer.LivenessProbe.HTTPGet.Path,
 						})
 					}
-
 				}
 				if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
 					if raw, ok := pod.Annotations[annotationOriginalReadinessProbePort]; ok {
@@ -576,15 +568,9 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 						if err != nil {
 							return nil, nil, err
 						}
-						listenerPort := defaultExposedPathsListenerPortReadiness
-						if raw, ok := pod.Annotations[annotationTransparentProxyReadinessListenerPort]; ok {
-							listenerPort, err = strconv.Atoi(raw)
-							if err != nil {
-								return nil, nil, err
-							}
-						}
+
 						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  listenerPort,
+							ListenerPort:  appContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
 							LocalPathPort: originalReadinessPort,
 							Path:          appContainer.ReadinessProbe.HTTPGet.Path,
 						})

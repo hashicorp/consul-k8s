@@ -1289,6 +1289,7 @@ func TestOverwriteProbes(t *testing.T) {
 		expReadinessPort         int
 		expOriginalLivenessPort  int
 		expOriginalReadinessPort int
+		additionalAnnotations    map[string]string
 	}{
 		"transparent proxy disabled; overwrites probes disabled": {
 			tproxyEnabled: false,
@@ -1375,6 +1376,32 @@ func TestOverwriteProbes(t *testing.T) {
 			expReadinessPort:         defaultExposedPathsListenerPortReadiness,
 			expOriginalReadinessPort: 8080,
 		},
+		"readiness and liveness listener port annotations provided": {
+			tproxyEnabled:   true,
+			overwriteProbes: true,
+			livenessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8081),
+					},
+				},
+			},
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			additionalAnnotations: map[string]string{
+				annotationTransparentProxyLivenessListenerPort:  "22000",
+				annotationTransparentProxyReadinessListenerPort: "22001",
+			},
+			expLivenessPort:          22000,
+			expOriginalLivenessPort:  8081,
+			expReadinessPort:         22001,
+			expOriginalReadinessPort: 8080,
+		},
 	}
 
 	for name, c := range cases {
@@ -1387,6 +1414,9 @@ func TestOverwriteProbes(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{Name: "test"}},
 				},
+			}
+			if c.additionalAnnotations != nil {
+				pod.ObjectMeta.Annotations = c.additionalAnnotations
 			}
 			if c.readinessProbe != nil {
 				pod.Spec.Containers[0].ReadinessProbe = c.readinessProbe
@@ -1407,7 +1437,7 @@ func TestOverwriteProbes(t *testing.T) {
 					require.Equal(t, strconv.Itoa(c.expOriginalReadinessPort), pod.Annotations[annotationOriginalReadinessProbePort])
 				}
 			}
-			if c.livenessProbe != nil && c.expLivenessPort != 0 {
+			if c.livenessProbe != nil {
 				require.Equal(t, c.expLivenessPort, pod.Spec.Containers[0].LivenessProbe.HTTPGet.Port.IntValue())
 				if c.expOriginalLivenessPort != 0 {
 					require.Equal(t, strconv.Itoa(c.expOriginalLivenessPort), pod.Annotations[annotationOriginalLivenessProbePort])

@@ -3645,14 +3645,16 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			podLivenessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						// We expect that the port of the liveness probe is overwritten by the webhook.
+						Port: intstr.FromInt(23000),
 					},
 				},
 			},
 			podReadinessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8081),
+						// We expect that the port of the readiness probe is overwritten by the webhook.
+						Port: intstr.FromInt(23001),
 					},
 				},
 			},

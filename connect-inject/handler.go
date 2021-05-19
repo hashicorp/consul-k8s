@@ -337,13 +337,27 @@ func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 			if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
 				// We need to save original port first so that endpoints controller can use it for exposing paths.
 				pod.Annotations[annotationOriginalLivenessProbePort] = appContainer.LivenessProbe.HTTPGet.Port.String()
-				appContainer.LivenessProbe.HTTPGet.Port = intstr.FromInt(defaultExposedPathsListenerPortLiveness)
+				listenerPort := defaultExposedPathsListenerPortLiveness
+				if raw, ok := pod.Annotations[annotationTransparentProxyLivenessListenerPort]; ok {
+					listenerPort, err = strconv.Atoi(raw)
+					if err != nil {
+						return err
+					}
+				}
+				appContainer.LivenessProbe.HTTPGet.Port = intstr.FromInt(listenerPort)
 
 			}
 			if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
 				// We need to save original port first so that endpoints controller can use it for exposing paths.
 				pod.Annotations[annotationOriginalReadinessProbePort] = appContainer.ReadinessProbe.HTTPGet.Port.String()
-				appContainer.ReadinessProbe.HTTPGet.Port = intstr.FromInt(defaultExposedPathsListenerPortReadiness)
+				listenerPort := defaultExposedPathsListenerPortReadiness
+				if raw, ok := pod.Annotations[annotationTransparentProxyReadinessListenerPort]; ok {
+					listenerPort, err = strconv.Atoi(raw)
+					if err != nil {
+						return err
+					}
+				}
+				appContainer.ReadinessProbe.HTTPGet.Port = intstr.FromInt(listenerPort)
 			}
 		}
 	}
