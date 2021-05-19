@@ -484,6 +484,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedAgentHealthChecks  []*api.AgentCheck
+		expErr                     string
 	}{
 		{
 			name:          "Empty endpoints",
@@ -689,6 +690,132 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			},
 		},
 		{
+			// This test has 3 addresses, but only 2 are backed by pod resources. This will cause Reconcile to error
+			// on the invalid address but continue and process the other addresses. We check for error specific to
+			// pod3 being non-existant at the end, and validate the other 2 addresses have service instances.
+			name:          "Endpoints with multiple addresses but one is invalid",
+			consulSvcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				endpointWithTwoAddresses := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								// This is an invalid address because pod3 will not exist in k8s.
+								{
+									IP:       "9.9.9.9",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod3",
+										Namespace: "default",
+									},
+								},
+								// The next two are valid addresses.
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+								{
+									IP:       "2.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod2",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, pod2, endpointWithTwoAddresses}
+			},
+			initialConsulSvcs:       []*api.AgentServiceRegistration{},
+			expectedNumSvcInstances: 2,
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created",
+					ServiceName:    "service-created",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    0,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+				},
+				{
+					ServiceID:      "pod2-service-created",
+					ServiceName:    "service-created",
+					ServiceAddress: "2.2.3.4",
+					ServicePort:    0,
+					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags:    []string{},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created-sidecar-proxy",
+					ServiceName:    "service-created-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-created",
+						DestinationServiceID:   "pod1-service-created",
+						LocalServiceAddress:    "",
+						LocalServicePort:       0,
+						TransparentProxy:       &api.TransparentProxyConfig{},
+					},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags: []string{},
+				},
+				{
+					ServiceID:      "pod2-service-created-sidecar-proxy",
+					ServiceName:    "service-created-sidecar-proxy",
+					ServiceAddress: "2.2.3.4",
+					ServicePort:    20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-created",
+						DestinationServiceID:   "pod2-service-created",
+						LocalServiceAddress:    "",
+						LocalServicePort:       0,
+						TransparentProxy:       &api.TransparentProxyConfig{},
+					},
+					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
+					ServiceTags: []string{},
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod2-service-created/kubernetes-health-check",
+					ServiceName: "service-created",
+					ServiceID:   "pod2-service-created",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+			},
+			expErr: "1 error occurred:\n\t* pods \"pod3\" not found\n\n",
+		},
+		{
 			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
@@ -850,7 +977,11 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
-			require.NoError(t, err)
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should have the service with the correct number of instances

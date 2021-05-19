@@ -4,6 +4,9 @@ IMPROVEMENTS:
 * Connect: Overwrite Kubernetes HTTP readiness and/or liveness probes to point to Envoy proxy when
   transparent proxy is enabled. [[GH-517](https://github.com/hashicorp/consul-k8s/pull/517)]
 
+BUG FIXES:
+* Connect: Process every Address in an Endpoints object before returning an error. This ensures an address that isn't reconciled successfully doesn't prevent the remaining addresses from getting reconciled. [[GH-519](https://github.com/hashicorp/consul-k8s/pull/519)]
+
 ## 0.26.0-beta2 (May 06, 2021)
 
 BREAKING CHANGES:
@@ -37,6 +40,9 @@ IMPROVEMENTS:
 
 * Connect: support upgrades for services deployed before endpoints controller to
   upgrade to a version of consul-k8s with endpoints controller. [[GH-509](https://github.com/hashicorp/consul-k8s/pull/509)]
+
+* Connect: add additional logging to the endpoints controller and connect-init command to help
+  the user debug if pods arent starting right away. [[GH-514](https://github.com/hashicorp/consul-k8s/pull/514/)]
 
 BUG FIXES:
 * Connect: Use `runAsNonRoot: false` for connect-init's container when tproxy is enabled. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
