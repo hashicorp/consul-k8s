@@ -3365,7 +3365,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			podLivenessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
 					},
 				},
 			},
@@ -3408,7 +3408,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			podLivenessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
 					},
 				},
 			},
@@ -3477,7 +3477,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			podReadinessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt(defaultExposedPathsListenerPortReadiness),
 					},
 				},
 			},
@@ -3515,19 +3515,19 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 			overwriteProbes:     true,
 			podAnnotations: map[string]string{
 				annotationOriginalLivenessProbePort:  "8080",
-				annotationOriginalReadinessProbePort: "8080",
+				annotationOriginalReadinessProbePort: "8081",
 			},
 			podLivenessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
 					},
 				},
 			},
 			podReadinessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt(defaultExposedPathsListenerPortReadiness),
 					},
 				},
 			},
@@ -3559,7 +3559,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 				},
 				{
 					ListenerPort:  defaultExposedPathsListenerPortReadiness,
-					LocalPathPort: 8080,
+					LocalPathPort: 8081,
 				},
 			},
 			expErr: "",
