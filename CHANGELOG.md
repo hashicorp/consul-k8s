@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Connect: Overwrite Kubernetes HTTP readiness and/or liveness probes to point to Envoy proxy when
+  transparent proxy is enabled. [[GH-517](https://github.com/hashicorp/consul-k8s/pull/517)]
+
 ## 0.26.0-beta2 (May 06, 2021)
 
 BREAKING CHANGES:
