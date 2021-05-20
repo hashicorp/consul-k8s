@@ -22,12 +22,12 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 	t.Helper()
 
 	if t.Failed() {
-		// Create k8s client from kubectl options
+		// Create k8s client from kubectl options.
 		client := helpers.KubernetesClientFromOptions(t, kubectlOptions)
 
 		contextName := helpers.KubernetesContextFromOptions(t, kubectlOptions)
 
-		// Create a directory for the test
+		// Create a directory for the test.
 		testDebugDirectory := filepath.Join(debugDirectory, t.Name(), contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
