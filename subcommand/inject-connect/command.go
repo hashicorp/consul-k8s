@@ -88,8 +88,9 @@ type Command struct {
 	flagInitContainerMemoryLimit   string
 	flagInitContainerMemoryRequest string
 
-	// Transparent proxy flag(s).
-	flagEnableTransparentProxy bool
+	// Transparent proxy flags.
+	flagDefaultEnableTransparentProxy          bool
+	flagTransparentProxyDefaultOverwriteProbes bool
 
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
@@ -153,8 +154,10 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
-	c.flagSet.BoolVar(&c.flagEnableTransparentProxy, "enable-transparent-proxy", true,
-		"Enable transparent proxy mode for all Consul service mesh applications.")
+	c.flagSet.BoolVar(&c.flagDefaultEnableTransparentProxy, "default-enable-transparent-proxy", true,
+		"Enable transparent proxy mode for all Consul service mesh applications by default.")
+	c.flagSet.BoolVar(&c.flagTransparentProxyDefaultOverwriteProbes, "transparent-proxy-default-overwrite-probes", true,
+		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -403,7 +406,8 @@ func (c *Command) Run(args []string) int {
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
-		EnableTransparentProxy:     c.flagEnableTransparentProxy,
+		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
+		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
@@ -441,7 +445,8 @@ func (c *Command) Run(args []string) int {
 			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
 			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:     c.flagEnableTransparentProxy,
+			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
+			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
 		}})
 

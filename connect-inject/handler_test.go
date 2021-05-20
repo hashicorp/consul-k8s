@@ -3,6 +3,7 @@ package connectinject
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -422,6 +424,92 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"tproxy with overwriteProbes is enabled",
+			Handler{
+				Log:                    logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				decoder:                decoder,
+				Clientset:              defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+							// We're setting an existing annotation so that we can assert on the
+							// specific annotations that are set as a result of probes being overwritten.
+							Annotations: map[string]string{"foo": "bar"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+									LivenessProbe: &corev1.Probe{
+										Handler: corev1.Handler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8080),
+											},
+										},
+									},
+									ReadinessProbe: &corev1.Probe{
+										Handler: corev1.Handler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8081),
+											},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalLivenessProbePort),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalReadinessProbePort),
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/livenessProbe/httpGet/port",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/readinessProbe/httpGet/port",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -721,17 +809,17 @@ func TestHandlerPortValue(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									Name:          "http",
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -747,16 +835,16 @@ func TestHandlerPortValue(t *testing.T) {
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name: "web",
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									ContainerPort: 8080,
 								},
 							},
 						},
 
-						corev1.Container{
+						{
 							Name: "web-side",
 						},
 					},
@@ -886,7 +974,7 @@ func TestConsulNamespace(t *testing.T) {
 	}
 }
 
-// Test shouldInject function
+// Test shouldInject function.
 func TestShouldInject(t *testing.T) {
 	cases := []struct {
 		Name                  string
@@ -1185,6 +1273,176 @@ func TestShouldInject(t *testing.T) {
 
 			require.Equal(nil, err)
 			require.Equal(tt.Expected, injected)
+		})
+	}
+}
+
+func TestOverwriteProbes(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		tproxyEnabled            bool
+		overwriteProbes          bool
+		livenessProbe            *corev1.Probe
+		readinessProbe           *corev1.Probe
+		expLivenessPort          int
+		expReadinessPort         int
+		expOriginalLivenessPort  int
+		expOriginalReadinessPort int
+		additionalAnnotations    map[string]string
+	}{
+		"transparent proxy disabled; overwrites probes disabled": {
+			tproxyEnabled: false,
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			expReadinessPort:         8080,
+			expOriginalReadinessPort: 0,
+		},
+		"transparent proxy enabled; overwrite probes disabled": {
+			tproxyEnabled: true,
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			expReadinessPort:         8080,
+			expOriginalReadinessPort: 0,
+		},
+		"transparent proxy disabled; overwrite probes enabled": {
+			tproxyEnabled:   false,
+			overwriteProbes: true,
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			expReadinessPort:         8080,
+			expOriginalReadinessPort: 0,
+		},
+		"just the readiness probe": {
+			tproxyEnabled:   true,
+			overwriteProbes: true,
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			expReadinessPort:         defaultExposedPathsListenerPortReadiness,
+			expOriginalReadinessPort: 8080,
+		},
+		"just the liveness probe": {
+			tproxyEnabled:   true,
+			overwriteProbes: true,
+			livenessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8081),
+					},
+				},
+			},
+			expLivenessPort:         defaultExposedPathsListenerPortLiveness,
+			expOriginalLivenessPort: 8081,
+		},
+		"both readiness and liveness probes": {
+			tproxyEnabled:   true,
+			overwriteProbes: true,
+			livenessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8081),
+					},
+				},
+			},
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			expLivenessPort:          defaultExposedPathsListenerPortLiveness,
+			expOriginalLivenessPort:  8081,
+			expReadinessPort:         defaultExposedPathsListenerPortReadiness,
+			expOriginalReadinessPort: 8080,
+		},
+		"readiness and liveness listener port annotations provided": {
+			tproxyEnabled:   true,
+			overwriteProbes: true,
+			livenessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8081),
+					},
+				},
+			},
+			readinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(8080),
+					},
+				},
+			},
+			additionalAnnotations: map[string]string{
+				annotationTransparentProxyLivenessListenerPort:  "22000",
+				annotationTransparentProxyReadinessListenerPort: "22001",
+			},
+			expLivenessPort:          22000,
+			expOriginalLivenessPort:  8081,
+			expReadinessPort:         22001,
+			expOriginalReadinessPort: 8080,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{},
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "test"}},
+				},
+			}
+			if c.additionalAnnotations != nil {
+				pod.ObjectMeta.Annotations = c.additionalAnnotations
+			}
+			if c.readinessProbe != nil {
+				pod.Spec.Containers[0].ReadinessProbe = c.readinessProbe
+			}
+			if c.livenessProbe != nil {
+				pod.Spec.Containers[0].LivenessProbe = c.livenessProbe
+			}
+
+			h := Handler{
+				EnableTransparentProxy: c.tproxyEnabled,
+				TProxyOverwriteProbes:  c.overwriteProbes,
+			}
+			err := h.overwriteProbes(corev1.Namespace{}, pod)
+			require.NoError(t, err)
+			if c.readinessProbe != nil {
+				require.Equal(t, c.expReadinessPort, pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Port.IntValue())
+				if c.expOriginalReadinessPort != 0 {
+					require.Equal(t, strconv.Itoa(c.expOriginalReadinessPort), pod.Annotations[annotationOriginalReadinessProbePort])
+				}
+			}
+			if c.livenessProbe != nil {
+				require.Equal(t, c.expLivenessPort, pod.Spec.Containers[0].LivenessProbe.HTTPGet.Port.IntValue())
+				if c.expOriginalLivenessPort != 0 {
+					require.Equal(t, strconv.Itoa(c.expOriginalLivenessPort), pod.Annotations[annotationOriginalLivenessProbePort])
+				}
+			}
 		})
 	}
 }

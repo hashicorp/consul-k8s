@@ -1,7 +1,11 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Connect: Overwrite Kubernetes HTTP readiness and/or liveness probes to point to Envoy proxy when
+  transparent proxy is enabled. [[GH-517](https://github.com/hashicorp/consul-k8s/pull/517)]
+
 BUG FIXES:
-* Connect: Process every Address in and Endpoints object before returning an error. This ensures an address that isn't reconciled successfully doesn't prevent the remaining addresses from getting reconciled. [[GH-519](https://github.com/hashicorp/consul-k8s/pull/519)]
+* Connect: Process every Address in an Endpoints object before returning an error. This ensures an address that isn't reconciled successfully doesn't prevent the remaining addresses from getting reconciled. [[GH-519](https://github.com/hashicorp/consul-k8s/pull/519)]
 
 ## 0.26.0-beta2 (May 06, 2021)
 
