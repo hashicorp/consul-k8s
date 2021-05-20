@@ -93,7 +93,7 @@ const (
 	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
 	// with their own annotation.
-	// This annotation takes a boolean value (true/false).
+	// This annotation/label takes a boolean value (true/false).
 	keyTransparentProxy = "consul.hashicorp.com/transparent-proxy"
 
 	// annotationTProxyExcludeInboundPorts is a comma-separated list of inbound ports to exclude from traffic redirection.
@@ -107,6 +107,26 @@ const (
 
 	// annotationTProxyExcludeUIDs is a comma-separated list of additional user IDs to exclude from traffic redirection.
 	annotationTProxyExcludeUIDs = "consul.hashicorp.com/transparent-proxy-exclude-uids"
+
+	// annotationTransparentProxyOverwriteProbes controls whether the Kubernetes probes should be overwritten
+	// to point to the Envoy proxy when running in Transparent Proxy mode.
+	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
+
+	// annotationTransparentProxyReadinessListenerPort is the port for the readiness probe
+	// that we will expose through Envoy when overwrite probes is enabled.
+	annotationTransparentProxyReadinessListenerPort = "consul.hashicorp.com/transparent-proxy-readiness-listener-port"
+
+	// annotationTransparentProxyLivenessListenerPort is the port for the liveness probe
+	// that we will expose through Envoy when overwrite probes is enabled.
+	annotationTransparentProxyLivenessListenerPort = "consul.hashicorp.com/transparent-proxy-liveness-listener-port"
+
+	// annotationOriginalLivenessProbePort is the value of the port originally defined on the liveness probe
+	// of the pod before we overwrote it.
+	annotationOriginalLivenessProbePort = "consul.hashicorp.com/original-liveness-probe-port"
+
+	// annotationOriginalReadinessProbePort is the value of the port originally defined on the readiness probe
+	// of the pod before we overwrote it.
+	annotationOriginalReadinessProbePort = "consul.hashicorp.com/original-readiness-probe-port"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"

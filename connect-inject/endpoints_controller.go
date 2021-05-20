@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/deckarep/golang-set"
@@ -40,6 +41,14 @@ const (
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
 	// TODO: change this to a constant shared with Consul to avoid accidentally changing this.
 	clusterIPTaggedAddressName = "virtual"
+
+	// defaultExposedPathsListenerPortLiveness is the default port that we will use as the ListenerPort
+	// for the Expose configuration of the proxy registration for a liveness probe.
+	defaultExposedPathsListenerPortLiveness = 20300
+
+	// defaultExposedPathsListenerPortReadiness is the default port that we will use as the ListenerPort
+	// for the Expose configuration of the proxy registration for a readiness probe.
+	defaultExposedPathsListenerPortReadiness = 20301
 )
 
 type EndpointsController struct {
@@ -83,11 +92,14 @@ type EndpointsController struct {
 	// EnableTransparentProxy controls whether transparent proxy should be enabled
 	// for all proxy service registrations.
 	EnableTransparentProxy bool
+	// TProxyOverwriteProbes controls whether the endpoints controller should expose pod's HTTP probes
+	// via Envoy proxy.
+	TProxyOverwriteProbes bool
 
 	MetricsConfig MetricsConfig
 	Log           logr.Logger
-	Scheme        *runtime.Scheme
 
+	Scheme *runtime.Scheme
 	context.Context
 }
 
@@ -529,6 +541,45 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			proxyService.Proxy.Mode = api.ProxyModeTransparent
 		} else {
 			r.Log.Info("skipping syncing service cluster IP to Consul", "name", k8sService.Name, "ns", k8sService.Namespace, "ip", k8sService.Spec.ClusterIP)
+		}
+
+		// Expose k8s probes as Envoy listeners if needed.
+		overwriteProbes, err := shouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
+		if err != nil {
+			return nil, nil, err
+		}
+		if overwriteProbes {
+			if cs := pod.Spec.Containers; len(cs) > 0 {
+				appContainer := cs[0]
+				if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
+					if raw, ok := pod.Annotations[annotationOriginalLivenessProbePort]; ok {
+						originalLivenessPort, err := strconv.Atoi(raw)
+						if err != nil {
+							return nil, nil, err
+						}
+
+						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+							ListenerPort:  appContainer.LivenessProbe.HTTPGet.Port.IntValue(),
+							LocalPathPort: originalLivenessPort,
+							Path:          appContainer.LivenessProbe.HTTPGet.Path,
+						})
+					}
+				}
+				if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
+					if raw, ok := pod.Annotations[annotationOriginalReadinessProbePort]; ok {
+						originalReadinessPort, err := strconv.Atoi(raw)
+						if err != nil {
+							return nil, nil, err
+						}
+
+						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+							ListenerPort:  appContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
+							LocalPathPort: originalReadinessPort,
+							Path:          appContainer.ReadinessProbe.HTTPGet.Path,
+						})
+					}
+				}
+			}
 		}
 	}
 
