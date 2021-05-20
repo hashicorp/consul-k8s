@@ -32,8 +32,9 @@ func TestComponentMetrics(t *testing.T) {
 		"connectInject.enabled": "true",
 		"controller.enabled":    "true",
 
-		"meshGateway.enabled":  "true",
-		"meshGateway.replicas": "1",
+		"meshGateway.enabled":      "true",
+		"meshGateway.replicas":     "1",
+		"meshGateway.service.type": "ClusterIP",
 
 		"ingressGateways.enabled":              "true",
 		"ingressGateways.gateways[0].name":     "ingress-gateway",
@@ -49,11 +50,6 @@ func TestComponentMetrics(t *testing.T) {
 		"ingressGateways.defaults.resources.requests.cpu":     "50m",
 		"terminatingGateways.defaults.resources.requests.cpu": "50m",
 		"meshGateway.resources.requests.cpu":                  "50m",
-	}
-
-	if cfg.UseKind {
-		helmValues["meshGateway.service.type"] = "NodePort"
-		helmValues["meshGateway.service.nodePort"] = "30000"
 	}
 
 	releaseName := helpers.RandomName()

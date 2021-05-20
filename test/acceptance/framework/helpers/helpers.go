@@ -128,19 +128,19 @@ func KubernetesContextFromOptions(t *testing.T, options *terratestk8s.KubectlOpt
 
 // IsReady returns true if pod is ready.
 func IsReady(pod corev1.Pod) bool {
-	if len(pod.Status.ContainerStatuses) == 0 {
+	if pod.Status.Phase == corev1.PodPending {
 		return false
 	}
 
-	for _, contStatus := range pod.Status.InitContainerStatuses {
-		if !contStatus.Ready {
-			return false
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady {
+			if cond.Status == corev1.ConditionTrue {
+				return true
+			} else {
+				return false
+			}
 		}
 	}
-	for _, contStatus := range pod.Status.ContainerStatuses {
-		if !contStatus.Ready {
-			return false
-		}
-	}
-	return true
+
+	return false
 }
