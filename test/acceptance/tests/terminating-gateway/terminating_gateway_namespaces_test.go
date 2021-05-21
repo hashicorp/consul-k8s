@@ -121,7 +121,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, "http://localhost:1234")
 		})
 	}
 }
@@ -229,7 +229,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ns2K8SOptions, "http://localhost:1234")
 		})
 	}
 }

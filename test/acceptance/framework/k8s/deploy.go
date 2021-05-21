@@ -16,6 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
+const staticClientName = "static-client"
+
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
 // sets up a cleanup function and waits for the deployment to become available.
 func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, filepath string) {
@@ -75,17 +77,10 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 // to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckStaticServerConnection(
-	t *testing.T,
-	options *k8s.KubectlOptions,
-	expectSuccess bool,
-	deploymentName string,
-	failureMessages []string,
-	curlArgs ...string,
-) {
+func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, curlArgs ...string) {
 	t.Helper()
 
-	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, deploymentName, failureMessages, curlArgs...)
+	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, failureMessages, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
@@ -95,19 +90,12 @@ func CheckStaticServerConnection(
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions. If multiple failureMessages are provided it will assert
 // on the existence of any of them.
-func CheckStaticServerConnectionMultipleFailureMessages(
-	t *testing.T,
-	options *k8s.KubectlOptions,
-	expectSuccess bool,
-	deploymentName string,
-	failureMessages []string,
-	curlArgs ...string,
-) {
+func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, curlArgs ...string) {
 	t.Helper()
 
 	retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
 
-	args := []string{"exec", "deploy/" + deploymentName, "-c", deploymentName, "--", "curl", "-vvvsSf"}
+	args := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
@@ -132,26 +120,21 @@ func CheckStaticServerConnectionMultipleFailureMessages(
 
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
-func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, true, deploymentName, nil, curlArgs...)
+	CheckStaticServerConnection(t, options, true, nil, curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
 // CheckStaticServerConnectionFailing is just like CheckStaticServerConnection
 // but it always expects a failing connection with various errors.
-func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, deploymentName string, curlArgs ...string) {
+func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, curlArgs ...string) {
 	t.Helper()
-	CheckStaticServerConnection(t,
-		options,
-		false,
-		deploymentName,
-		[]string{
-			"curl: (52) Empty reply from server",
-			"curl: (7) Failed to connect",
-		},
-		curlArgs...)
+	CheckStaticServerConnection(t, options, false, []string{
+		"curl: (52) Empty reply from server",
+		"curl: (7) Failed to connect",
+	}, curlArgs...)
 }
 
 // labelMapToString takes a label map[string]string

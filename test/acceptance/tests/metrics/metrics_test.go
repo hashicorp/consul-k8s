@@ -62,7 +62,7 @@ func TestComponentMetrics(t *testing.T) {
 	// This simulates queries that would be made by a prometheus server that runs externally to the consul
 	// components in the cluster.
 	logger.Log(t, "creating static-client")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	// Server Metrics
 	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
@@ -96,14 +96,6 @@ func TestAppMetrics(t *testing.T) {
 		"global.datacenter":      "dc1",
 		"global.metrics.enabled": "true",
 
-		// This image is required till Consul 1.10 is released and the CI config is updated.
-		// Note we need to set ent license to empty explicitly so that if tests have ent license
-		// globally provided this test won't try to apply it because this image is not an enterprise image.
-		// TODO: Remove this setting and ent license settings once the Helm chart with Consul 1.10 is released.
-		"global.image":                        "docker.mirror.hashicorp.services/hashicorp/consul:1.10.0-alpha",
-		"server.enterpriseLicense.secretName": "",
-		"server.enterpriseLicense.secretKey":  "",
-
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
 	}
@@ -122,7 +114,7 @@ func TestAppMetrics(t *testing.T) {
 	// This simulates queries that would be made by a prometheus server that runs externally to the consul
 	// components in the cluster.
 	logger.Log(t, "creating static-client")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	// Merged App Metrics
 	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-metrics-app"})

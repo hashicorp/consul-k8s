@@ -26,6 +26,8 @@ type TestFlags struct {
 
 	flagEnablePodSecurityPolicies bool
 
+	flagEnableTransparentProxy bool
+
 	flagConsulImage    string
 	flagConsulK8sImage string
 
@@ -78,6 +80,10 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnablePodSecurityPolicies, "enable-pod-security-policies", false,
 		"If true, the test suite will run tests with pod security policies enabled.")
 
+	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
+		"If true, the test suite will run tests with transparent proxy enabled. "+
+			"This applies only to tests that enable connectInject.")
+
 	flag.BoolVar(&t.flagNoCleanupOnFailure, "no-cleanup-on-failure", false,
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
@@ -125,6 +131,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnableOpenshift: t.flagEnableOpenshift,
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
+
+		EnableTransparentProxy: t.flagEnableTransparentProxy,
 
 		ConsulImage:    t.flagConsulImage,
 		ConsulK8SImage: t.flagConsulK8sImage,

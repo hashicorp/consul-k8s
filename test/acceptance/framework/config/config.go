@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
-// The path to the helm chart.
+// HelmChartPath is the path to the helm chart.
 // Note: this will need to be changed if this file is moved.
 const HelmChartPath = "../../../.."
 
-// TestConfig holds configuration for the test suite
+// TestConfig holds configuration for the test suite.
 type TestConfig struct {
 	Kubeconfig    string
 	KubeContext   string
@@ -33,6 +34,8 @@ type TestConfig struct {
 
 	EnablePodSecurityPolicies bool
 
+	EnableTransparentProxy bool
+
 	ConsulImage    string
 	ConsulK8SImage string
 
@@ -45,7 +48,7 @@ type TestConfig struct {
 }
 
 // HelmValuesFromConfig returns a map of Helm values
-// that includes any non-empty values from the TestConfig
+// that includes any non-empty values from the TestConfig.
 func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	helmValues := map[string]string{}
 
@@ -71,6 +74,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	if t.EnablePodSecurityPolicies {
 		setIfNotEmpty(helmValues, "global.enablePodSecurityPolicies", "true")
 	}
+
+	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
 
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
@@ -112,7 +117,7 @@ func (t *TestConfig) entImage() (string, error) {
 	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent%s", appVersion, preRelease), nil
 }
 
-// setIfNotEmpty sets key to val in map m if value is not empty
+// setIfNotEmpty sets key to val in map m if value is not empty.
 func setIfNotEmpty(m map[string]string, key, val string) {
 	if val != "" {
 		m[key] = val
