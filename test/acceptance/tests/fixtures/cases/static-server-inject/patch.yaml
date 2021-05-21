@@ -17,6 +17,12 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
           readinessProbe:
             exec:
               command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
