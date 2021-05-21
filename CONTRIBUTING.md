@@ -96,6 +96,9 @@ Below is the list of available flags:
     If true, the tests will automatically add Openshift Helm value for each Helm install.
 -enable-pod-security-policies
     If true, the test suite will run tests with pod security policies enabled.
+-enable-transparent-proxy
+    If true, the test suite will run tests with transparent proxy enabled.
+    This applies only to tests that enable connectInject.
 -enterprise-license-secret-name
     The name of the Kubernetes secret containing the enterprise license.
 -enterprise-license-secret-key

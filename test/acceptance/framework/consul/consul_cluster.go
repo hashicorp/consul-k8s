@@ -69,9 +69,6 @@ func NewHelmCluster(
 		"server.bootstrapExpect":       "1",
 		"connectInject.envoyExtraArgs": "--log-level debug",
 		"connectInject.logLevel":       "debug",
-		// Disable default tproxy mode for tests because we instead selectively choose which
-		// tests should have it enabled.
-		"connectInject.transparentProxy.defaultEnabled": "false",
 	}
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)

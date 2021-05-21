@@ -36,7 +36,10 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"global.federation.createFederationSecret": "true",
 
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
+		// Temporarily disable tproxy regardless of the global setting.
+		// This should be removed once multi-cluster is working with explicit upstreams.
+		"connectInject.transparentProxy.defaultEnabled": "false",
+		"controller.enabled":                            "true",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -87,6 +90,9 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"server.enterpriseLicense.secretKey":  "",
 
 		"connectInject.enabled": "true",
+		// Temporarily disable tproxy regardless of the global setting.
+		// This should be removed once multi-cluster is working with explicit upstreams.
+		"connectInject.transparentProxy.defaultEnabled": "false",
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
@@ -125,7 +131,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 	logger.Log(t, "checking that connection is successful")
-	k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
+	k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), "http://localhost:1234")
 }
 
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
@@ -165,7 +171,10 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"global.federation.createFederationSecret": "true",
 
 				"connectInject.enabled": "true",
-				"controller.enabled":    "true",
+				// Temporarily disable tproxy regardless of the global setting.
+				// This should be removed once multi-cluster is working with explicit upstreams.
+				"connectInject.transparentProxy.defaultEnabled": "false",
+				"controller.enabled":                            "true",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -221,6 +230,9 @@ func TestMeshGatewaySecure(t *testing.T) {
 				"server.enterpriseLicense.secretKey":  "",
 
 				"connectInject.enabled": "true",
+				// Temporarily disable tproxy regardless of the global setting.
+				// This should be removed once multi-cluster is working with explicit upstreams.
+				"connectInject.transparentProxy.defaultEnabled": "false",
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
@@ -267,7 +279,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), staticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), "http://localhost:1234")
 		})
 	}
 }

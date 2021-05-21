@@ -19,21 +19,29 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		{
 			"returns empty map by default",
 			TestConfig{},
-			map[string]string{},
+			map[string]string{
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
 		},
 		{
 			"sets consul image",
 			TestConfig{
 				ConsulImage: "consul:test-version",
 			},
-			map[string]string{"global.image": "consul:test-version"},
+			map[string]string{
+				"global.image": "consul:test-version",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
 		},
 		{
 			"sets consul-k8s image",
 			TestConfig{
 				ConsulK8SImage: "consul-k8s:test-version",
 			},
-			map[string]string{"global.imageK8S": "consul-k8s:test-version"},
+			map[string]string{
+				"global.imageK8S": "consul-k8s:test-version",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
 		},
 		{
 			"sets both images",
@@ -44,6 +52,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			map[string]string{
 				"global.image":    "consul:test-version",
 				"global.imageK8S": "consul-k8s:test-version",
+				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
 		{
@@ -53,8 +62,9 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				EnterpriseLicenseSecretKey:  "key",
 			},
 			map[string]string{
-				"server.enterpriseLicense.secretName": "ent-license",
-				"server.enterpriseLicense.secretKey":  "key",
+				"server.enterpriseLicense.secretName":           "ent-license",
+				"server.enterpriseLicense.secretKey":            "key",
+				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
 		{
@@ -62,14 +72,18 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			TestConfig{
 				EnterpriseLicenseSecretName: "ent-license",
 			},
-			map[string]string{},
+			map[string]string{
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
 		},
 		{
 			"doesn't set ent license secret when only secret key is set",
 			TestConfig{
 				EnterpriseLicenseSecretKey: "key",
 			},
-			map[string]string{},
+			map[string]string{
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
 		},
 		{
 			"sets openshift value when EnableOpenshift is set",
@@ -77,7 +91,8 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				EnableOpenshift: true,
 			},
 			map[string]string{
-				"global.openshift.enabled": "true",
+				"global.openshift.enabled":                      "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
 		{
@@ -86,7 +101,17 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				EnablePodSecurityPolicies: true,
 			},
 			map[string]string{
-				"global.enablePodSecurityPolicies": "true",
+				"global.enablePodSecurityPolicies":              "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
+		{
+			"sets transparentProxy.defaultEnabled helm value to true when -enable-transparent-proxy is set",
+			TestConfig{
+				EnableTransparentProxy: true,
+			},
+			map[string]string{
+				"connectInject.transparentProxy.defaultEnabled": "true",
 			},
 		},
 	}
