@@ -1314,6 +1314,14 @@ connectInject:
     # This value is overridable via the "consul.hashicorp.com/transparent-proxy" pod annotation.
     defaultEnabled: true
 
+    # If true, we will overwrite Kubernetes HTTP probes of the pod to point to the Envoy proxy instead.
+    # This setting is recommended because with traffic being enforced to go through the Envoy proxy,
+    # the probes on the pod will fail because kube-proxy doesn't have the right certificates
+    # to talk to Envoy.
+    # This value is also overridable via the "consul.hashicorp.com/transparent-proxy-overwrite-probes" annotation.
+    # Note: This value has no effect if transparent proxy is disabled on the pod.
+    defaultOverwriteProbes: true
+
   # Configures metrics for Consul Connect services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:

@@ -91,9 +91,14 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -listen=:8080 \
                 {{- if .Values.connectInject.transparentProxy.defaultEnabled }}
-                -enable-transparent-proxy=true \
+                -default-enable-transparent-proxy=true \
                 {{- else }}
-                -enable-transparent-proxy=false \
+                -default-enable-transparent-proxy=false \
+                {{- end }}
+                {{- if .Values.connectInject.transparentProxy.defaultOverwriteProbes }}
+                -transparent-proxy-default-overwrite-probes=true \
+                {{- else }}
+                -transparent-proxy-default-overwrite-probes=false \
                 {{- end }}
                 {{- if .Values.connectInject.logLevel }}
                 -log-level={{ .Values.connectInject.logLevel }} \

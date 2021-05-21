@@ -1387,7 +1387,7 @@ EOF
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: can be disabled by setting connectInject.transparentProxy.defaultEnabled=false" {
+@test "connectInject/Deployment: transparent proxy can be disabled by setting connectInject.transparentProxy.defaultEnabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1395,6 +1395,29 @@ EOF
       --set 'connectInject.transparentProxy.defaultEnabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-transparent-proxy=false"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: overwrite probes is enabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-transparent-proxy-default-overwrite-probes=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: overwrite probes can be disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.transparentProxy.defaultOverwriteProbes=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-transparent-proxy-default-overwrite-probes=false"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
