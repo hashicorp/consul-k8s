@@ -690,10 +690,7 @@ func TestHandlerInitCopyContainer(t *testing.T) {
 
 	for _, openShiftEnabled := range openShiftEnabledCases {
 		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
-			h := Handler{}
-			if openShiftEnabled {
-				h.EnableOpenShift = true
-			}
+			h := Handler{EnableOpenShift: openShiftEnabled}
 
 			container := h.initCopyContainer()
 

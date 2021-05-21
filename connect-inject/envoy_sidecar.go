@@ -42,15 +42,15 @@ func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod) (core
 		Command: cmd,
 	}
 
-	// If not running in transparent proxy mode and in an OpenShift environment,
-	// skip setting the security context and let OpenShift set it for us.
-	// When transparent proxy is enabled, then Envoy needs to run as our specific user
-	// so that traffic redirection will work.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
+	// If not running in transparent proxy mode and in an OpenShift environment,
+	// skip setting the security context and let OpenShift set it for us.
+	// When transparent proxy is enabled, then Envoy needs to run as our specific user
+	// so that traffic redirection will work.
 	if tproxyEnabled || !h.EnableOpenShift {
 		if pod.Spec.SecurityContext != nil {
 			// User container and Envoy container cannot have the same UID.
