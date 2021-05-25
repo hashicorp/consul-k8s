@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -684,19 +685,31 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 }
 
 // Test that the init copy container has the correct command and SecurityContext.
-func TestHandlerContainerInitCopyContainer(t *testing.T) {
-	require := require.New(t)
-	h := Handler{}
-	container := h.containerInitCopyContainer()
-	expectedSecurityContext := &corev1.SecurityContext{
-		RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
-		RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
-		RunAsNonRoot:           pointerToBool(true),
-		ReadOnlyRootFilesystem: pointerToBool(true),
+func TestHandlerInitCopyContainer(t *testing.T) {
+	openShiftEnabledCases := []bool{false, true}
+
+	for _, openShiftEnabled := range openShiftEnabledCases {
+		t.Run(fmt.Sprintf("openshift enabled: %t", openShiftEnabled), func(t *testing.T) {
+			h := Handler{EnableOpenShift: openShiftEnabled}
+
+			container := h.initCopyContainer()
+
+			if openShiftEnabled {
+				require.Nil(t, container.SecurityContext)
+			} else {
+				expectedSecurityContext := &corev1.SecurityContext{
+					RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
+					RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
+					RunAsNonRoot:           pointerToBool(true),
+					ReadOnlyRootFilesystem: pointerToBool(true),
+				}
+				require.Equal(t, expectedSecurityContext, container.SecurityContext)
+			}
+
+			actual := strings.Join(container.Command, " ")
+			require.Contains(t, actual, `cp /bin/consul /consul/connect-inject/consul`)
+		})
 	}
-	require.Equal(container.SecurityContext, expectedSecurityContext)
-	actual := strings.Join(container.Command, " ")
-	require.Contains(actual, `cp /bin/consul /consul/connect-inject/consul`)
 }
 
 var testNS = corev1.Namespace{

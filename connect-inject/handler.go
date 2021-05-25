@@ -134,6 +134,11 @@ type Handler struct {
 	// to point them to the Envoy proxy.
 	TProxyOverwriteProbes bool
 
+	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
+	// containers should not be added because OpenShift sets a random user for those and will not allow
+	// those containers to be created otherwise.
+	EnableOpenShift bool
+
 	// Log
 	Log logr.Logger
 
@@ -199,7 +204,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	}
 
 	// Add the init container which copies the Consul binary to /consul/connect-inject/.
-	initCopyContainer := h.containerInitCopyContainer()
+	initCopyContainer := h.initCopyContainer()
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initCopyContainer)
 
 	// A user can enable/disable tproxy for an entire namespace via a label.
@@ -218,7 +223,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 	// Add the Envoy sidecar.
-	envoySidecar, err := h.envoySidecar(pod)
+	envoySidecar, err := h.envoySidecar(*ns, pod)
 	if err != nil {
 		h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))

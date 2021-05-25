@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
+func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	resources, err := h.envoySidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
@@ -19,21 +19,6 @@ func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
 	cmd, err := h.getContainerSidecarCommand(pod)
 	if err != nil {
 		return corev1.Container{}, err
-	}
-
-	if pod.Spec.SecurityContext != nil {
-		// User container and Envoy container cannot have the same UID.
-		if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == envoyUserAndGroupID {
-			return corev1.Container{}, fmt.Errorf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID)
-		}
-	}
-	// Ensure that none of the user's containers have the same UID as Envoy. At this point in injection the handler
-	// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
-	for _, c := range pod.Spec.Containers {
-		// User container and Envoy container cannot have the same UID.
-		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == envoyUserAndGroupID {
-			return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", c.Name, envoyUserAndGroupID)
-		}
 	}
 
 	container := corev1.Container{
@@ -55,13 +40,40 @@ func (h *Handler) envoySidecar(pod corev1.Pod) (corev1.Container, error) {
 			},
 		},
 		Command: cmd,
-		SecurityContext: &corev1.SecurityContext{
+	}
+
+	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	// If not running in transparent proxy mode and in an OpenShift environment,
+	// skip setting the security context and let OpenShift set it for us.
+	// When transparent proxy is enabled, then Envoy needs to run as our specific user
+	// so that traffic redirection will work.
+	if tproxyEnabled || !h.EnableOpenShift {
+		if pod.Spec.SecurityContext != nil {
+			// User container and Envoy container cannot have the same UID.
+			if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == envoyUserAndGroupID {
+				return corev1.Container{}, fmt.Errorf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID)
+			}
+		}
+		// Ensure that none of the user's containers have the same UID as Envoy. At this point in injection the handler
+		// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
+		for _, c := range pod.Spec.Containers {
+			// User container and Envoy container cannot have the same UID.
+			if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == envoyUserAndGroupID {
+				return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", c.Name, envoyUserAndGroupID)
+			}
+		}
+		container.SecurityContext = &corev1.SecurityContext{
 			RunAsUser:              pointerToInt64(envoyUserAndGroupID),
 			RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
 			RunAsNonRoot:           pointerToBool(true),
 			ReadOnlyRootFilesystem: pointerToBool(true),
-		},
+		}
 	}
+
 	return container, nil
 }
 func (h *Handler) getContainerSidecarCommand(pod corev1.Pod) ([]string, error) {

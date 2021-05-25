@@ -64,12 +64,12 @@ type initContainerCommandData struct {
 	TProxyExcludeUIDs []string
 }
 
-// containerInitCopyContainer returns the init container spec for the copy container which places
+// initCopyContainer returns the init container spec for the copy container which places
 // the consul binary into the shared volume.
-func (h *Handler) containerInitCopyContainer() corev1.Container {
+func (h *Handler) initCopyContainer() corev1.Container {
 	// Copy the Consul binary from the image to the shared volume.
 	cmd := "cp /bin/consul /consul/connect-inject/consul"
-	return corev1.Container{
+	container := corev1.Container{
 		Name:      InjectInitCopyContainerName,
 		Image:     h.ImageConsul,
 		Resources: h.InitContainerResources,
@@ -80,14 +80,18 @@ func (h *Handler) containerInitCopyContainer() corev1.Container {
 			},
 		},
 		Command: []string{"/bin/sh", "-ec", cmd},
-		SecurityContext: &corev1.SecurityContext{
+	}
+	// If running on OpenShift, don't set the security context and instead let OpenShift set a random user/group for us.
+	if !h.EnableOpenShift {
+		container.SecurityContext = &corev1.SecurityContext{
 			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
 			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
 			RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
 			RunAsNonRoot:           pointerToBool(true),
 			ReadOnlyRootFilesystem: pointerToBool(true),
-		},
+		}
 	}
+	return container
 }
 
 // containerInit returns the init container spec for registering the Consul
