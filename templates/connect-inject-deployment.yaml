@@ -95,6 +95,9 @@ spec:
                 {{- else }}
                 -default-enable-transparent-proxy=false \
                 {{- end }}
+                {{- if .Values.global.openshift.enabled }}
+                -enable-openshift \
+                {{- end }}
                 {{- if .Values.connectInject.transparentProxy.defaultOverwriteProbes }}
                 -transparent-proxy-default-overwrite-probes=true \
                 {{- else }}
