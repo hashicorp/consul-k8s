@@ -34,6 +34,7 @@ type Command struct {
 	flagTLSServerName   string
 	flagPollingInterval time.Duration
 	flagLogLevel        string
+	flagLogOutputJSON   bool
 
 	once sync.Once
 	help string
@@ -58,6 +59,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
+		"Toggle for logging to be output in JSON format.")
 
 	c.help = flags.Usage(help, c.flags)
 }
@@ -82,7 +85,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	logger, err := common.Logger(c.flagLogLevel)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

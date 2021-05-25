@@ -80,8 +80,9 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
-	flagLogLevel string
-	flagTimeout  time.Duration
+	flagLogLevel      string
+	flagLogOutputJSON bool
+	flagTimeout       time.Duration
 
 	clientset kubernetes.Interface
 
@@ -197,6 +198,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
+		"Toggle for logging to be output in JSON format.")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -271,7 +274,7 @@ func (c *Command) Run(args []string) int {
 	defer cancel()
 
 	var err error
-	c.log, err = common.Logger(c.flagLogLevel)
+	c.log, err = common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

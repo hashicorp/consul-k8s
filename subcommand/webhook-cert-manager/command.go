@@ -41,8 +41,9 @@ type Command struct {
 	flagSet *flag.FlagSet
 	k8s     *flags.K8SFlags
 
-	flagConfigFile string
-	flagLogLevel   string
+	flagConfigFile    string
+	flagLogLevel      string
+	flagLogOutputJSON bool
 
 	clientset kubernetes.Interface
 
@@ -62,6 +63,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
+		"Toggle for logging to be output in JSON format.")
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flagSet, c.k8s.Flags())
@@ -108,7 +111,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.logger == nil {
 		var err error
-		c.logger, err = common.Logger(c.flagLogLevel)
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
 		if err != nil {
 			c.UI.Error(err.Error())
 			return 1

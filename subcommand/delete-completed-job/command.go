@@ -18,16 +18,16 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
-const logLevel = "info"
-
 // Command is the command for deleting completed jobs.
 type Command struct {
 	UI cli.Ui
 
-	flags         *flag.FlagSet
-	k8s           *flags.K8SFlags
-	flagNamespace string
-	flagTimeout   string
+	flags             *flag.FlagSet
+	k8s               *flags.K8SFlags
+	flagNamespace     string
+	flagTimeout       string
+	flagLogLevel      string
+	flagLogOutputJSON bool
 
 	once      sync.Once
 	help      string
@@ -45,6 +45,11 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where the job is deployed")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "30m",
 		"How long we'll wait for the job to complete before timing out, e.g. 1ms, 2s, 3m")
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
+		"Toggle for logging to be output in JSON format.")
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 
@@ -96,7 +101,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	logger, err := common.Logger(logLevel)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

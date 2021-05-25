@@ -16,12 +16,12 @@ import (
 )
 
 func TestLogger_InvalidLogLevel(t *testing.T) {
-	_, err := Logger("invalid")
+	_, err := Logger("invalid", false)
 	require.EqualError(t, err, "unknown log level: invalid")
 }
 
 func TestLogger(t *testing.T) {
-	lgr, err := Logger("debug")
+	lgr, err := Logger("debug", false)
 	require.NoError(t, err)
 	require.NotNil(t, lgr)
 	require.True(t, lgr.IsDebug())
