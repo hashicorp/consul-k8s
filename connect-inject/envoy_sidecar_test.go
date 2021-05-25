@@ -28,7 +28,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(pod)
+	container, err := h.envoySidecar(testNS, pod)
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -41,6 +41,76 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			MountPath: "/consul/connect-inject",
 		},
 	})
+}
+
+func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
+	cases := map[string]struct {
+		tproxyEnabled      bool
+		openShiftEnabled   bool
+		expSecurityContext *corev1.SecurityContext
+	}{
+		"tproxy disabled; openshift disabled": {
+			tproxyEnabled:    false,
+			openShiftEnabled: false,
+			expSecurityContext: &corev1.SecurityContext{
+				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointerToBool(true),
+				ReadOnlyRootFilesystem: pointerToBool(true),
+			},
+		},
+		"tproxy enabled; openshift disabled": {
+			tproxyEnabled:    true,
+			openShiftEnabled: false,
+			expSecurityContext: &corev1.SecurityContext{
+				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointerToBool(true),
+				ReadOnlyRootFilesystem: pointerToBool(true),
+			},
+		},
+		"tproxy disabled; openshift enabled": {
+			tproxyEnabled:      false,
+			openShiftEnabled:   true,
+			expSecurityContext: nil,
+		},
+		"tproxy enabled; openshift enabled": {
+			tproxyEnabled:    true,
+			openShiftEnabled: true,
+			expSecurityContext: &corev1.SecurityContext{
+				RunAsUser:              pointerToInt64(envoyUserAndGroupID),
+				RunAsGroup:             pointerToInt64(envoyUserAndGroupID),
+				RunAsNonRoot:           pointerToBool(true),
+				ReadOnlyRootFilesystem: pointerToBool(true),
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := Handler{
+				EnableTransparentProxy: c.tproxyEnabled,
+				EnableOpenShift:        c.openShiftEnabled,
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationService: "foo",
+					},
+				},
+
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
+			ec, err := h.envoySidecar(testNS, pod)
+			require.NoError(t, err)
+			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
+		})
+	}
 }
 
 // Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
@@ -60,7 +130,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 			},
 		},
 	}
-	_, err := h.envoySidecar(pod)
+	_, err := h.envoySidecar(testNS, pod)
 	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
 }
 
@@ -89,7 +159,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 			},
 		},
 	}
-	_, err := h.envoySidecar(pod)
+	_, err := h.envoySidecar(testNS, pod)
 	require.Error(err, fmt.Sprintf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", pod.Spec.Containers[1].Name, envoyUserAndGroupID))
 }
 
@@ -177,7 +247,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(*tc.pod)
+			c, err := h.envoySidecar(testNS, *tc.pod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
@@ -351,7 +421,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.envoySidecar(pod)
+			container, err := c.handler.envoySidecar(testNS, pod)
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)
