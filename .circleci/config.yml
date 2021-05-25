@@ -16,7 +16,7 @@ commands:
           command: |
             go get gotest.tools/gotestsum
 
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.0/kind-linux-amd64
             chmod +x ./kind
             sudo mv ./kind /usr/local/bin/kind
 
@@ -176,7 +176,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.19.4"
+          version: "v1.20.7"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "test/acceptance/go.mod" }}
@@ -208,7 +208,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.19.4"
+          version: "v1.20.7"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "test/acceptance/go.mod" }}
@@ -229,7 +229,7 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
-  acceptance-gke-1-16:
+  acceptance-gke-1-17:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -303,7 +303,7 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-18:
+  acceptance-aks-1-19:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -358,7 +358,7 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-17:
+  acceptance-eks-1-18:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -469,7 +469,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-20:
+  acceptance-kind-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -479,7 +479,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.20.2"
+          version: "v1.21.1"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "test/acceptance/go.mod" }}
@@ -500,7 +500,7 @@ jobs:
           path: /tmp/test-results
       - slack/status:
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.20 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.21 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   go-fmt-and-vet-helm-gen:
     executor: go
@@ -640,10 +640,10 @@ workflows:
                 - master
     jobs:
       # - acceptance-openshift >> disabled because OpenShift 4.4 was too flaky. Can possibly re-enable when latest OpenShift version is released.
-      - acceptance-gke-1-16
-      - acceptance-eks-1-17
-      - acceptance-aks-1-18
-      - acceptance-kind-1-20
+      - acceptance-gke-1-17
+      - acceptance-eks-1-18
+      - acceptance-aks-1-19
+      - acceptance-kind-1-21
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:

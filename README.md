@@ -12,7 +12,7 @@ use Consul with Kubernetes, please see the
 
 ## Prerequisites
   * **Helm 3.0+** (Helm 2 is not supported)
-  * **Kubernetes 1.16+** - This is the earliest version of Kubernetes tested.
+  * **Kubernetes 1.17+** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions but it is
     untested.
 
