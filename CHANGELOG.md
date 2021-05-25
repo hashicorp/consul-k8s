@@ -2,6 +2,8 @@
 IMPROVEMENTS:
 * Connect: Allow overwriting Kubernetes HTTP probes when running with transparent proxy enabled.
   [[GH-953](https://github.com/hashicorp/consul-helm/pull/953)]
+* Connect: Enable OpenShift for the connect-injector so that we can support running with transparent
+  proxy enabled. [[GH-972](https://github.com/hashicorp/consul-helm/pull/972)]
 
 BUG FIXES:
 * OpenShift: support `server.exposeGossipAndRPCPorts`. [[GH-932](https://github.com/hashicorp/consul-helm/issues/932)]

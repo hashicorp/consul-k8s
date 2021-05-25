@@ -1421,3 +1421,29 @@ EOF
 
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# openshift
+
+@test "connectInject/Deployment: openshift is is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-openshift"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-openshift is set when global.openshift.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-openshift"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
