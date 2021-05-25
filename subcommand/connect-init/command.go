@@ -66,8 +66,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
-		"Toggle for logging to be output in JSON format.")
+	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	if c.bearerTokenFile == "" {
 		c.bearerTokenFile = defaultBearerTokenFile

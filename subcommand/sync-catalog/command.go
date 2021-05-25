@@ -123,8 +123,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
-		"Toggle for logging to be output in JSON format.")
+	c.flags.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")

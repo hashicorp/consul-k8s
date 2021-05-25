@@ -68,8 +68,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\". Defaults to info.")
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
-		"Toggle for logging to be output in JSON format.")
+	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	c.flagSet.BoolVar(&c.flagEnableMetricsMerging, "enable-metrics-merging", false, "Enables consul sidecar to run a merged metrics endpoint. Defaults to false.")
 	// -merged-metrics-port, -service-metrics-port, and -service-metrics-path

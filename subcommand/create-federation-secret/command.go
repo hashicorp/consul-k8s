@@ -90,8 +90,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogOutputJSON, "log-output-json", false,
-		"Toggle for logging to be output in JSON format.")
+	c.flags.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	c.http = &flags.HTTPFlags{}
 	c.k8s = &flags.K8SFlags{}
