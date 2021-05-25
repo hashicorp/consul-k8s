@@ -5,6 +5,8 @@ IMPROVEMENTS:
   transparent proxy is enabled. [[GH-517](https://github.com/hashicorp/consul-k8s/pull/517)]
 * Connect: Don't set security context for the Envoy proxy when on OpenShift and transparent proxy is disabled.
   [[GH-521](https://github.com/hashicorp/consul-k8s/pull/521)]
+* Connect: `consul-connect-inject-init` run with `privileged: true` when transparent proxy is enabled.
+  [[GH-524](https://github.com/hashicorp/consul-k8s/pull/524)]
 
 BUG FIXES:
 * Connect: Process every Address in an Endpoints object before returning an error. This ensures an address that isn't reconciled successfully doesn't prevent the remaining addresses from getting reconciled. [[GH-519](https://github.com/hashicorp/consul-k8s/pull/519)]

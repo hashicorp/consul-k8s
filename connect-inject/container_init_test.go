@@ -287,6 +287,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			expectedSecurityContext := &corev1.SecurityContext{
 				RunAsUser:  pointerToInt64(0),
 				RunAsGroup: pointerToInt64(0),
+				Privileged: pointerToBool(true),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
