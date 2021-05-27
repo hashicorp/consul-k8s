@@ -9,6 +9,15 @@ load _helpers
       .
 }
 
+@test "server/EnterpriseLicense: disabled if autoload is true (default) {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/enterprise-license-job.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      .
+}
+
 @test "server/EnterpriseLicense: disabled when servers are disabled" {
   cd `chart_dir`
   assert_empty helm template \
@@ -16,6 +25,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -24,6 +34,7 @@ load _helpers
   assert_empty helm template \
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -32,15 +43,17 @@ load _helpers
   assert_empty helm template \
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
-@test "server/EnterpriseLicense: enabled when secretName and secretKey is provided" {
+@test "server/EnterpriseLicense: enabled when secretName, secretKey is provided and autoload is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -55,6 +68,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
@@ -67,6 +81,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
@@ -89,6 +104,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
@@ -101,6 +117,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes | length' | tee /dev/stderr)
@@ -113,6 +130,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
@@ -125,6 +143,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts | length' | tee /dev/stderr)
@@ -137,6 +156,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
@@ -149,6 +169,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
@@ -161,6 +182,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT") | .value' | tee /dev/stderr)
@@ -173,6 +195,7 @@ load _helpers
       -s templates/enterprise-license-job.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \

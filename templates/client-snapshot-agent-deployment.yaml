@@ -37,7 +37,7 @@ spec:
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey)) }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
       volumes:
         {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
         - name: snapshot-config
@@ -50,6 +50,12 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: aclconfig
           emptyDir: {}
+        {{- else }}
+        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        - name: consul-license
+          secret:
+            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+        {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}
         {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
@@ -94,6 +100,11 @@ spec:
                 secretKeyRef:
                   name: "{{ template "consul.fullname" . }}-client-snapshot-agent-acl-token"
                   key: "token"
+            {{- else }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: CONSUL_LICENSE_PATH
+              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
+            {{- end }}
             {{- end}}
           command:
             - "/bin/sh"
@@ -111,7 +122,7 @@ spec:
                 {{- if .Values.global.acls.manageSystemACLs }}
                 -config-dir=/consul/aclconfig \
                 {{- end }}
-          {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) ) }}
+          {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
           volumeMounts:
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             - name: snapshot-config
@@ -121,6 +132,12 @@ spec:
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: aclconfig
               mountPath: /consul/aclconfig
+            {{- else }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             {{- if .Values.global.tls.enableAutoEncrypt}}

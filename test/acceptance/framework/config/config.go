@@ -13,7 +13,11 @@ import (
 
 // HelmChartPath is the path to the helm chart.
 // Note: this will need to be changed if this file is moved.
-const HelmChartPath = "../../../.."
+const (
+	HelmChartPath     = "../../../.."
+	LicenseSecretName = "license"
+	LicenseSecretKey  = "key"
+)
 
 // TestConfig holds configuration for the test suite.
 type TestConfig struct {
@@ -26,9 +30,8 @@ type TestConfig struct {
 	SecondaryKubeContext   string
 	SecondaryKubeNamespace string
 
-	EnableEnterprise            bool
-	EnterpriseLicenseSecretName string
-	EnterpriseLicenseSecretKey  string
+	EnableEnterprise  bool
+	EnterpriseLicense string
 
 	EnableOpenshift bool
 
@@ -62,9 +65,9 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "global.image", entImage)
 	}
 
-	if t.EnterpriseLicenseSecretName != "" && t.EnterpriseLicenseSecretKey != "" {
-		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretName", t.EnterpriseLicenseSecretName)
-		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretKey", t.EnterpriseLicenseSecretKey)
+	if t.EnterpriseLicense != "" {
+		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretName", LicenseSecretName)
+		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretKey", LicenseSecretKey)
 	}
 
 	if t.EnableOpenshift {

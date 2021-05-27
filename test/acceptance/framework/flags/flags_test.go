@@ -11,8 +11,9 @@ func TestFlags_validate(t *testing.T) {
 		flagEnableMultiCluster   bool
 		flagSecondaryKubeconfig  string
 		flagSecondaryKubecontext string
-		flagEntLicenseSecretName string
-		flagEntLicenseSecretKey  string
+
+		flagEnableEnt  bool
+		flagEntLicense string
 	}
 	tests := []struct {
 		name       string
@@ -81,26 +82,18 @@ func TestFlags_validate(t *testing.T) {
 			"",
 		},
 		{
-			"enterprise license: error when only -enterprise-license-secret-name is provided",
+			"enterprise license: error when only -enable-enterprise is true but env CONSUL_ENT_LICENSE is not provided",
 			fields{
-				flagEntLicenseSecretName: "secret",
+				flagEnableEnt: true,
 			},
 			true,
-			"both of -enterprise-license-secret-name and -enterprise-license-secret-name flags must be provided; not just one",
+			"-enable-enterprise provided without setting env var CONSUL_ENT_LICENSE with consul license",
 		},
 		{
-			"enterprise license: error when only -enterprise-license-secret-key is provided",
+			"enterprise license: no error when both -enable-enterprise and env CONSUL_ENT_LICENSE are provided",
 			fields{
-				flagEntLicenseSecretKey: "key",
-			},
-			true,
-			"both of -enterprise-license-secret-name and -enterprise-license-secret-name flags must be provided; not just one",
-		},
-		{
-			"enterprise license: no error when both -enterprise-license-secret-name and -enterprise-license-secret-key are provided",
-			fields{
-				flagEntLicenseSecretName: "secret",
-				flagEntLicenseSecretKey:  "key",
+				flagEnableEnt:  true,
+				flagEntLicense: "license",
 			},
 			false,
 			"",
@@ -109,11 +102,11 @@ func TestFlags_validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tf := &TestFlags{
-				flagEnableMultiCluster:          tt.fields.flagEnableMultiCluster,
-				flagSecondaryKubeconfig:         tt.fields.flagSecondaryKubeconfig,
-				flagSecondaryKubecontext:        tt.fields.flagSecondaryKubecontext,
-				flagEnterpriseLicenseSecretName: tt.fields.flagEntLicenseSecretName,
-				flagEnterpriseLicenseSecretKey:  tt.fields.flagEntLicenseSecretKey,
+				flagEnableMultiCluster:   tt.fields.flagEnableMultiCluster,
+				flagSecondaryKubeconfig:  tt.fields.flagSecondaryKubeconfig,
+				flagSecondaryKubecontext: tt.fields.flagSecondaryKubecontext,
+				flagEnableEnterprise:     tt.fields.flagEnableEnt,
+				flagEnterpriseLicense:    tt.fields.flagEntLicense,
 			}
 			err := tf.Validate()
 			if tt.wantErr {

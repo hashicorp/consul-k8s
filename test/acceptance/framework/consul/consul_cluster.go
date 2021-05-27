@@ -63,6 +63,10 @@ func NewHelmCluster(
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
+	if cfg.EnterpriseLicense != "" {
+		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+	}
+
 	// Deploy with the following defaults unless helmValues overwrites it.
 	values := map[string]string{
 		"server.replicas":              "1",
@@ -430,6 +434,28 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 		client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
 		client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
 		client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+	})
+}
+
+func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), config.LicenseSecretName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: config.LicenseSecretName,
+			},
+			StringData: map[string]string{
+				config.LicenseSecretKey: cfg.EnterpriseLicense,
+			},
+			Type: corev1.SecretTypeOpaque,
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{})
 	})
 }
 

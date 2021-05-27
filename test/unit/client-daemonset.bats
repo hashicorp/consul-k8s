@@ -1206,3 +1206,75 @@ rollingUpdate:
   local actual=$(echo $security_context | jq -r .privileged)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# license-autoload
+
+@test "client/DaemonSet: adds volume for license secret when enterprise license secret name and key are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = '{"name":"consul-license","secret":{"secretName":"foo"}}' ]
+}
+
+@test "client/DaemonSet: adds volume mount for license secret when enterprise license secret name and key are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = '{"name":"consul-license","mountPath":"/consul/license","readOnly":true}' ]
+}
+
+@test "client/DaemonSet: adds env var for license path when enterprise license secret name and key are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
+}
+
+@test "client/DaemonSet: does not add license secret volume if manageSystemACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/DaemonSet: does not add license secret volume mount if manageSystemACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}
+
+@test "client/DaemonSet: does not add license env if manageSystemACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      [ "${actual}" = "" ]
+}

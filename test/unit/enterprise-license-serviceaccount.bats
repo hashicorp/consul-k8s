@@ -9,6 +9,15 @@ load _helpers
       .
 }
 
+@test "enterpriseLicense/ServiceAccount: disabled if autoload is true (default)" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/enterprise-license-serviceaccount.yaml  \
+      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.secretKey=bar' \
+      .
+}
+
 @test "enterpriseLicense/ServiceAccount: disabled with server=false, ent secret defined" {
   cd `chart_dir`
   assert_empty helm template \
@@ -16,6 +25,7 @@ load _helpers
       --set 'server.enabled=false' \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -24,6 +34,7 @@ load _helpers
   assert_empty helm template \
       -s templates/enterprise-license-serviceaccount.yaml  \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -32,6 +43,7 @@ load _helpers
   assert_empty helm template \
       -s templates/enterprise-license-serviceaccount.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -41,6 +53,7 @@ load _helpers
       -s templates/enterprise-license-serviceaccount.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -55,6 +68,7 @@ load _helpers
       -s templates/enterprise-license-serviceaccount.yaml  \
       --set 'server.enterpriseLicense.secretName=foo' \
       --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
       . | tee /dev/stderr)

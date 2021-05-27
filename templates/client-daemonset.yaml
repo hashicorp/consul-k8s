@@ -127,6 +127,12 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: aclconfig
           emptyDir: {}
+        {{- else }}
+        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        - name: consul-license
+          secret:
+            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+        {{- end }}
         {{- end }}
       containers:
         - name: consul
@@ -164,6 +170,10 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.global.gossipEncryption.secretName }}
                   key: {{ .Values.global.gossipEncryption.secretKey }}
+            {{- end }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            - name: CONSUL_LICENSE_PATH
+              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -271,6 +281,12 @@ spec:
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: aclconfig
               mountPath: /consul/aclconfig
+            {{- else }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
             {{- end }}
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}

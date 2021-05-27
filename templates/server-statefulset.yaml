@@ -97,6 +97,11 @@ spec:
           secret:
             secretName: {{ template "consul.fullname" . }}-server-cert
         {{- end }}
+        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        - name: consul-license
+          secret:
+            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -152,6 +157,10 @@ spec:
               value: https://localhost:8501
             - name: CONSUL_CACERT
               value: /consul/tls/ca/tls.crt
+            {{- end }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: CONSUL_LICENSE_PATH
+              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
             {{- end }}
             {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
             - name: ACL_REPLICATION_TOKEN
@@ -236,6 +245,11 @@ spec:
               readOnly: true
             - name: consul-server-cert
               mountPath: /consul/tls/server
+              readOnly: true
+            {{- end }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: consul-license
+              mountPath: /consul/license
               readOnly: true
             {{- end }}
             {{- range .Values.server.extraVolumes }}

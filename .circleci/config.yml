@@ -269,14 +269,6 @@ jobs:
             echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
             echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-      - run:
-          name: Create enterprise license secret
-          command: |
-            # Create an enterprise license secret in the primary cluster.
-            # This license is set as a CircleCI project env variable.
-            # The license expires 15-Oct-2025.
-            KUBECONFIG=$primary_kubeconfig kubectl create secret generic ent-license --from-literal=key="${CONSUL_ENT_LICENSE}"
-
       # Restore go module cache if there is one
       - restore_cache:
           keys:
@@ -285,7 +277,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enterprise-license-secret-name=ent-license -enterprise-license-secret-key=key -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
 
       - store_test_results:
           path: /tmp/test-results
