@@ -1,9 +1,14 @@
-## Unreleased
+## 0.32.0-beta3 (May 27, 2021)
+KNOWN ISSUES:
+* This beta release does not work when Pod Security Policies are enabled. This will be fixed in the upcoming release.
+
 IMPROVEMENTS:
 * Connect: Allow overwriting Kubernetes HTTP probes when running with transparent proxy enabled.
   [[GH-953](https://github.com/hashicorp/consul-helm/pull/953)]
 * Connect: Enable OpenShift for the connect-injector so that we can support running with transparent
   proxy enabled. [[GH-972](https://github.com/hashicorp/consul-helm/pull/972)]
+* Updated the default envoy image to `envoyproxy/envoy-alpine:v1.18.3`.
+
 
 FEATURES:
 * License Autoloading [Enterprise]: Consul Enterprise 1.10+ now requires the enterprise license for Consul to be provided as a Kubernetes secret. Once created, the secret can be

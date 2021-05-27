@@ -26,7 +26,7 @@ resource "google_container_cluster" "cluster" {
   node_version       = data.google_container_engine_versions.main.latest_master_version
 
   pod_security_policy_config {
-    enabled = true
+    enabled = false # Helm does not currently work with pod security policies enabled, the acceptance tests fail with this enabled. Re-enable after fixing.
   }
 
   resource_labels = var.labels
