@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.26.0-beta3 (May 27, 2021)
 
 IMPROVEMENTS:
 * Connect: Overwrite Kubernetes HTTP readiness and/or liveness probes to point to Envoy proxy when
