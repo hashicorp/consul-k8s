@@ -5,8 +5,29 @@ IMPROVEMENTS:
 * Connect: Enable OpenShift for the connect-injector so that we can support running with transparent
   proxy enabled. [[GH-972](https://github.com/hashicorp/consul-helm/pull/972)]
 
+FEATURES:
+* License Autoloading [Enterprise]: Consul Enterprise 1.10+ now requires the enterprise license for Consul to be provided as a Kubernetes secret. Once created, the secret can be
+  configured in the helm chart with the following values:
+```yaml
+server:
+  enterpriseLicense:
+    secretName: <name-of-kubernetes-secret>
+    secretKey: <name-of-key-whose-value-is-the-license>
+```
+
 BUG FIXES:
 * OpenShift: support `server.exposeGossipAndRPCPorts`. [[GH-932](https://github.com/hashicorp/consul-helm/issues/932)]
+
+BREAKING CHANGES:
+* [Enterprise] For versions of Consul Enterprise <1.10, if the license was provided as a Kubernetes secret, the key `server.enterpriseLicense.enableLicenseAutoload` needs to explicitly
+  set to false in order for the license job to run.
+```yaml
+server:
+  enterpriseLicense:
+    secretName: <name-of-kubernetes-secret>
+    secretKey: <name-of-key-whose-value-is-the-license>
+    enableLicenseAutoload: false
+```
 
 ## 0.32.0-beta2 (May 6, 2021)
 

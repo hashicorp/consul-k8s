@@ -3,6 +3,7 @@ package flags
 import (
 	"errors"
 	"flag"
+	"os"
 	"sync"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
@@ -18,9 +19,8 @@ type TestFlags struct {
 	flagSecondaryKubecontext string
 	flagSecondaryNamespace   string
 
-	flagEnableEnterprise            bool
-	flagEnterpriseLicenseSecretName string
-	flagEnterpriseLicenseSecretKey  string
+	flagEnableEnterprise  bool
+	flagEnterpriseLicense string
 
 	flagEnableOpenshift bool
 
@@ -68,11 +68,9 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagEnableEnterprise, "enable-enterprise", false,
 		"If true, the test suite will run tests for enterprise features. "+
-			"Note that some features may require setting the enterprise license flags below.")
-	flag.StringVar(&t.flagEnterpriseLicenseSecretName, "enterprise-license-secret-name", "",
-		"The name of the Kubernetes secret containing the enterprise license.")
-	flag.StringVar(&t.flagEnterpriseLicenseSecretKey, "enterprise-license-secret-key", "",
-		"The key of the Kubernetes secret containing the enterprise license.")
+			"Note that some features may require setting the enterprise license flag below or the env var CONSUL_ENT_LICENSE")
+	flag.StringVar(&t.flagEnterpriseLicense, "enterprise-license", "",
+		"The enterprise license for Consul.")
 
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
@@ -93,6 +91,10 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
 		"If true, the tests will assume they are running against a local kind cluster(s).")
+
+	if t.flagEnterpriseLicense == "" {
+		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
+	}
 }
 
 func (t *TestFlags) Validate() error {
@@ -102,12 +104,9 @@ func (t *TestFlags) Validate() error {
 		}
 	}
 
-	onlyEntSecretNameSet := t.flagEnterpriseLicenseSecretName != "" && t.flagEnterpriseLicenseSecretKey == ""
-	onlyEntSecretKeySet := t.flagEnterpriseLicenseSecretName == "" && t.flagEnterpriseLicenseSecretKey != ""
-	if onlyEntSecretNameSet || onlyEntSecretKeySet {
-		return errors.New("both of -enterprise-license-secret-name and -enterprise-license-secret-name flags must be provided; not just one")
+	if t.flagEnableEnterprise && t.flagEnterpriseLicense == "" {
+		return errors.New("-enable-enterprise provided without setting env var CONSUL_ENT_LICENSE with consul license")
 	}
-
 	return nil
 }
 
@@ -124,9 +123,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		SecondaryKubeContext:   t.flagSecondaryKubecontext,
 		SecondaryKubeNamespace: t.flagSecondaryNamespace,
 
-		EnableEnterprise:            t.flagEnableEnterprise,
-		EnterpriseLicenseSecretName: t.flagEnterpriseLicenseSecretName,
-		EnterpriseLicenseSecretKey:  t.flagEnterpriseLicenseSecretKey,
+		EnableEnterprise:  t.flagEnableEnterprise,
+		EnterpriseLicense: t.flagEnterpriseLicense,
 
 		EnableOpenshift: t.flagEnableOpenshift,
 

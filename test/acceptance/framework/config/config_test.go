@@ -58,28 +58,18 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		{
 			"sets ent license secret",
 			TestConfig{
-				EnterpriseLicenseSecretName: "ent-license",
-				EnterpriseLicenseSecretKey:  "key",
+				EnterpriseLicense: "ent-license",
 			},
 			map[string]string{
-				"server.enterpriseLicense.secretName":           "ent-license",
+				"server.enterpriseLicense.secretName":           "license",
 				"server.enterpriseLicense.secretKey":            "key",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
 		{
-			"doesn't set ent license secret when only secret name is set",
+			"doesn't set ent license if license is empty",
 			TestConfig{
-				EnterpriseLicenseSecretName: "ent-license",
-			},
-			map[string]string{
-				"connectInject.transparentProxy.defaultEnabled": "false",
-			},
-		},
-		{
-			"doesn't set ent license secret when only secret key is set",
-			TestConfig{
-				EnterpriseLicenseSecretKey: "key",
+				EnterpriseLicense: "",
 			},
 			map[string]string{
 				"connectInject.transparentProxy.defaultEnabled": "false",

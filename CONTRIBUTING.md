@@ -89,7 +89,7 @@ Below is the list of available flags:
 -debug-directory
     The directory where to write debug information about failed test runs, such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.
 -enable-enterprise
-    If true, the test suite will run tests for enterprise features. Note that some features may require setting the enterprise license flags below.
+    If true, the test suite will run tests for enterprise features. Note that some features may require setting the enterprise license flag below or the env var CONSUL_ENT_LICENSE.
 -enable-multi-cluster
     If true, the tests that require multiple Kubernetes clusters will be run. At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.
 -enable-openshift
@@ -99,10 +99,8 @@ Below is the list of available flags:
 -enable-transparent-proxy
     If true, the test suite will run tests with transparent proxy enabled.
     This applies only to tests that enable connectInject.
--enterprise-license-secret-name
-    The name of the Kubernetes secret containing the enterprise license.
--enterprise-license-secret-key
-    The key of the Kubernetes secret containing the enterprise license.
+-enterprise-license
+    The enterprise license for Consul.
 -kubeconfig string
     The path to a kubeconfig file. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
 -kubecontext string
