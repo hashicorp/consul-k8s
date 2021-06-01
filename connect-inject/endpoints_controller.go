@@ -180,7 +180,7 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 		).Complete(r)
 }
 
-// registerServicesAndHealthCheck create Consul registrations for the service and proxy and register them with Consul.
+// registerServicesAndHealthCheck creates Consul registrations for the service and proxy and register them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
 func (r *EndpointsController) registerServicesAndHealthCheck(ctx context.Context, serviceEndpoints corev1.Endpoints, address corev1.EndpointAddress, healthStatus string, endpointAddressMap map[string]bool) error {
 	// Get pod associated with this address.
