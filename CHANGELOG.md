@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
+  and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
+
 ## 0.26.0-beta3 (May 27, 2021)
 
 IMPROVEMENTS:
