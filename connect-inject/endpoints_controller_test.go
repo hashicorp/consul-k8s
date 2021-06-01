@@ -3993,10 +3993,12 @@ func TestRegisterServicesAndHealthCheck_skipsWhenDuplicateServiceFound(t *testin
 
 			// Check that the service is not registered with Consul.
 			_, _, err = consulClient.Agent().Service("test-pod-test-service", nil)
-			require.EqualError(t, err, "Unexpected response code: 404 (unknown service ID: test-pod-test-service)")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Unexpected response code: 404 (unknown service ID")
 
 			_, _, err = consulClient.Agent().Service("test-pod-test-service-sidecar-proxy", nil)
-			require.EqualError(t, err, "Unexpected response code: 404 (unknown service ID: test-pod-test-service-sidecar-proxy)")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Unexpected response code: 404 (unknown service ID")
 		})
 	}
 }
