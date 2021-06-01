@@ -225,10 +225,10 @@ spec:
             {{- end }}
           resources:
             requests:
-              memory: "25Mi"
+              memory: "50Mi"
               cpu: "50m"
             limits:
-              memory: "25Mi"
+              memory: "50Mi"
               cpu: "50m"
       containers:
         - name: mesh-gateway

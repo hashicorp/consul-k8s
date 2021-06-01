@@ -103,6 +103,9 @@ spec:
                 {{- else }}
                 -transparent-proxy-default-overwrite-probes=false \
                 {{- end }}
+                {{- if .Values.global.openshift.enabled }}
+                -enable-openshift \
+                {{- end }}
                 {{- if .Values.connectInject.logLevel }}
                 -log-level={{ .Values.connectInject.logLevel }} \
                 {{- end }}
