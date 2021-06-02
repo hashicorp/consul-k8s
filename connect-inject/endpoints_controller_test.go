@@ -424,7 +424,7 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test consul server
+			// Create test consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.NodeName = nodeName
 			})
@@ -950,7 +950,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
 
-			// Register service and proxy in consul
+			// Register service and proxy in consul.
 			for _, svc := range tt.initialConsulSvcs {
 				err = consulClient.Agent().ServiceRegister(svc)
 				require.NoError(t, err)
@@ -1405,6 +1405,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 					Check: &api.AgentServiceCheck{
 						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
 						Name:                   "Kubernetes Health Check",
@@ -1420,6 +1421,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated-sidecar-proxy",
 					Port:    20000,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
@@ -1486,6 +1488,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 					Check: &api.AgentServiceCheck{
 						CheckID:                "default/pod1-service-updated/kubernetes-health-check",
 						Name:                   "Kubernetes Health Check",
@@ -1501,6 +1504,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated-sidecar-proxy",
 					Port:    20000,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
@@ -1567,6 +1571,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -1574,6 +1579,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated-sidecar-proxy",
 					Port:    20000,
 					Address: "1.2.3.4",
+					Meta:    map[string]string{MetaKeyKubeNS: "default"},
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
@@ -1630,7 +1636,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{MetaKeyManagedBy: managedByValue},
+					Meta:    map[string]string{MetaKeyManagedBy: managedByValue, MetaKeyKubeNS: "default"},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -3051,7 +3057,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 	}
 }
 
-func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *testing.T) {
+func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 	t.Parallel()
 
 	const serviceName = "test-service"
@@ -3890,7 +3896,7 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 				Log:                    logrtest.TestLogger{T: t},
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints, api.HealthPassing)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -3901,6 +3907,98 @@ func TestEndpointsController_createServiceRegistrations_withTransparentProxy(t *
 				require.Equal(t, c.expTaggedAddresses, proxyServiceRegistration.TaggedAddresses)
 				require.Equal(t, c.expExposePaths, proxyServiceRegistration.Proxy.Expose.Paths)
 			}
+		})
+	}
+}
+
+func TestRegisterServicesAndHealthCheck_skipsWhenDuplicateServiceFound(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		consulServiceMeta map[string]string
+	}{
+		"different k8s namespace meta": {
+			consulServiceMeta: map[string]string{MetaKeyKubeNS: "some-other-ns"},
+		},
+		"no k8s namespace meta": {
+			consulServiceMeta: nil,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			nodeName := "test-node"
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+
+			consul.WaitForServiceIntentions(t)
+			httpAddr := consul.HTTPAddr
+			clientConfig := &api.Config{
+				Address: httpAddr,
+			}
+			consulClient, err := api.NewClient(clientConfig)
+			require.NoError(t, err)
+			addr := strings.Split(httpAddr, ":")
+			consulPort := addr[1]
+
+			existingService := &api.AgentServiceRegistration{
+				ID:      "test-service",
+				Name:    "test-service",
+				Port:    1234,
+				Address: "1.2.3.4",
+				Meta:    c.consulServiceMeta,
+			}
+			err = consulClient.Agent().ServiceRegister(existingService)
+			require.NoError(t, err)
+			pod := createPod("test-pod", "1.1.1.1", true, true)
+
+			endpointsAddress := corev1.EndpointAddress{
+				IP:       "1.2.3.4",
+				NodeName: &nodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+				},
+			}
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{endpointsAddress},
+					},
+				},
+			}
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(ns, pod, endpoints).Build()
+
+			ep := &EndpointsController{
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				ConsulClientCfg:       clientConfig,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				Client:                fakeClient,
+			}
+
+			err = ep.registerServicesAndHealthCheck(context.Background(), *endpoints, endpointsAddress, api.HealthPassing, make(map[string]bool))
+
+			// Check that the service is not registered with Consul.
+			_, _, err = consulClient.Agent().Service("test-pod-test-service", nil)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Unexpected response code: 404 (unknown service ID")
+
+			_, _, err = consulClient.Agent().Service("test-pod-test-service-sidecar-proxy", nil)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Unexpected response code: 404 (unknown service ID")
 		})
 	}
 }

@@ -208,6 +208,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 			RunAsGroup: pointerToInt64(rootUserAndGroupID),
 			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
 			RunAsNonRoot: pointerToBool(false),
+			Privileged:   pointerToBool(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{netAdminCapability},
 			},
