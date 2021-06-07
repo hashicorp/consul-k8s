@@ -57,3 +57,27 @@ load _helpers
       yq -r '.imagePullSecrets[1].name' | tee /dev/stderr)
   [ "${actual}" = "my-secret2" ]
 }
+
+#--------------------------------------------------------------------
+# client.snapshotAgent.serviceAccount.annotations
+
+@test "client/SnapshotAgentServiceAccount: no annotations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-serviceaccount.yaml \
+      --set 'client.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.metadata.annotations | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/SnapshotAgentServiceAccount: annotations when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-snapshot-agent-serviceaccount.yaml \
+      --set 'client.snapshotAgent.enabled=true' \
+      --set "client.snapshotAgent.serviceAccount.annotations=foo: bar" \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

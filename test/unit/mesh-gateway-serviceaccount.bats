@@ -42,3 +42,28 @@ load _helpers
   [ "${actual}" = "my-secret2" ]
 }
 
+#--------------------------------------------------------------------
+# meshGateway.serviceAccount.annotations
+
+@test "meshGateway/ServiceAccount: no annotations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-serviceaccount.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.metadata.annotations | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/ServiceAccount: annotations when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-serviceaccount.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set "meshGateway.serviceAccount.annotations=foo: bar" \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
