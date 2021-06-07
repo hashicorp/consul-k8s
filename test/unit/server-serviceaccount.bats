@@ -67,3 +67,25 @@ load _helpers
       yq -r '.imagePullSecrets[1].name' | tee /dev/stderr)
   [ "${actual}" = "my-secret2" ]
 }
+
+#--------------------------------------------------------------------
+# server.serviceAccount.annotations
+
+@test "server/ServiceAccount: no annotations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-serviceaccount.yaml  \
+      . | tee /dev/stderr |
+      yq '.metadata.annotations | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ServiceAccount: annotations when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-serviceaccount.yaml  \
+      --set "server.serviceAccount.annotations=foo: bar" \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

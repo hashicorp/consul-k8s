@@ -373,6 +373,19 @@ server:
   # by setting the `server.extraConfig` value.
   connect: true
 
+  serviceAccount:
+    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
+    # string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # The resource requests (CPU, memory, etc.)
   # for each of the server agents. This should be a YAML map corresponding to a Kubernetes
   # ResourceRequirements (https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#resourcerequirements-v1-core)
@@ -701,6 +714,19 @@ client:
   # This also changes the clients' advertised IP to the `hostIP` rather than `podIP`.
   exposeGossipPorts: false
 
+  serviceAccount:
+    # This value defines additional annotations for the client service account. This should be formatted as a multi-line
+    # string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Resource settings for Client agents.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
@@ -905,6 +931,19 @@ client:
       secretName: null
       # The key of the Kubernetes secret.
       secretKey: null
+
+    serviceAccount:
+      # This value defines additional annotations for the snapshot agent service account. This should be formatted as a 
+      # multi-line string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      annotations: null
 
     # Resource settings for snapshot agent pods.
     # @recurse: false
@@ -1260,6 +1299,19 @@ syncCatalog:
   # @type: string
   tolerations: null
 
+  serviceAccount:
+    # This value defines additional annotations for the mesh gateways' service account. This should be formatted as a
+    # multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Resource settings for sync catalog pods.
   # @recurse: false
   # @type: map
@@ -1378,6 +1430,19 @@ connectInject:
 
   # Log verbosity level. One of "debug", "info", "warn", or "error".
   logLevel: info
+
+  serviceAccount:
+    # This value defines additional annotations for the injector service account. This should be formatted as a 
+    # multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
 
   # Resource settings for connect inject pods.
   # @recurse: false
@@ -1565,6 +1630,19 @@ controller:
   # Log verbosity level. One of "debug", "info", "warn", or "error".
   logLevel: info
 
+  serviceAccount:
+    # This value defines additional annotations for the controller service account. This should be formatted as a 
+    # multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Resource settings for controller pods.
   # @recurse: false
   # @type: map
@@ -1724,6 +1802,19 @@ meshGateway:
   # @type: integer
   hostPort: null
 
+  serviceAccount:
+    # This value defines additional annotations for the mesh gateways' service account. This should be formatted as a
+    # multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Resource settings for mesh gateway pods.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
@@ -1843,6 +1934,19 @@ ingressGateways:
       # Optional YAML string that will be appended to the Service spec.
       # @type: string
       additionalSpec: null
+
+    serviceAccount:
+      # This value defines additional annotations for the ingress gateways' service account. This should be formatted 
+      # as a multi-line string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      annotations: null
 
     # Resource limits for all ingress gateway pods
     # @recurse: false
@@ -2015,6 +2119,19 @@ terminatingGateways:
     # ```
     # @type: string
     annotations: null
+
+    serviceAccount:
+      # This value defines additional annotations for the terminating gateways' service account. This should be 
+      # formatted as a multi-line string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      annotations: null
 
     # [Enterprise Only] `consulNamespace` defines the Consul namespace to register
     # the gateway into. Requires `global.enableConsulNamespaces` to be true and

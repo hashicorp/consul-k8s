@@ -66,3 +66,27 @@ load _helpers
       yq -r '.imagePullSecrets[1].name' | tee /dev/stderr)
   [ "${actual}" = "my-secret2" ]
 }
+
+#--------------------------------------------------------------------
+# syncCatalog.serviceAccount.annotations
+
+@test "syncCatalog/ServiceAccount: no annotations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-serviceaccount.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.metadata.annotations | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/ServiceAccount: annotations when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-serviceaccount.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set "syncCatalog.serviceAccount.annotations=foo: bar" \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
