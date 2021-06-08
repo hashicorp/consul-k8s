@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -68,7 +67,7 @@ type ServiceResolverSpec struct {
 	Failover ServiceResolverFailoverMap `json:"failover,omitempty"`
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
-	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
+	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
@@ -181,7 +180,7 @@ type CookieConfig struct {
 	Session bool `json:"session,omitempty"`
 
 	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
-	TTL time.Duration `json:"ttl,omitempty"`
+	TTL metav1.Duration `json:"ttl,omitempty"`
 
 	// Path is the path to set for the cookie.
 	Path string `json:"path,omitempty"`
@@ -270,7 +269,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Subsets:        in.Spec.Subsets.toConsul(),
 		Redirect:       in.Spec.Redirect.toConsul(),
 		Failover:       in.Spec.Failover.toConsul(),
-		ConnectTimeout: in.Spec.ConnectTimeout,
+		ConnectTimeout: in.Spec.ConnectTimeout.Duration,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
 		Meta:           meta(datacenter),
 	}
@@ -419,7 +418,7 @@ func (in *CookieConfig) toConsul() *capi.CookieConfig {
 	}
 	return &capi.CookieConfig{
 		Session: in.Session,
-		TTL:     in.TTL,
+		TTL:     in.TTL.Duration,
 		Path:    in.Path,
 	}
 }
@@ -429,7 +428,7 @@ func (in *CookieConfig) validate(path *field.Path) *field.Error {
 		return nil
 	}
 
-	if in.Session && in.TTL > 0 {
+	if in.Session && in.TTL.Duration > 0 {
 		asJSON, _ := json.Marshal(in)
 		return field.Invalid(path, string(asJSON), "cannot set both session and ttl")
 	}
