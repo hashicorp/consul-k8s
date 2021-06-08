@@ -70,8 +70,7 @@ spec:
                           type: string
                         requestTimeout:
                           description: RequestTimeout is the total amount of time permitted for the entire downstream request (and retries) to be processed.
-                          format: int64
-                          type: integer
+                          type: string
                         retryOnConnectFailure:
                           description: RetryOnConnectFailure allows for connection failure errors to trigger a retry.
                           type: boolean
