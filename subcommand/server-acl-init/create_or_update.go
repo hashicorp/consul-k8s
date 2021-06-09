@@ -31,9 +31,9 @@ func (c *Command) createGlobalACL(name, rules, dc string, consulClient *api.Clie
 func (c *Command) createACL(name, rules string, localToken bool, dc string, consulClient *api.Client) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", name)
-	if c.flagACLReplicationTokenFile != "" {
+	if c.flagFederation && !c.primary {
 		// If performing ACL replication, we must ensure policy names are
-		// globally unique so we append the datacenter name.
+		// globally unique so we append the datacenter name but only in secondary datacenters..
 		policyName += fmt.Sprintf("-%s", dc)
 	}
 	var datacenters []string
