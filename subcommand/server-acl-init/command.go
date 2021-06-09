@@ -83,6 +83,13 @@ type Command struct {
 	flagLogLevel string
 	flagTimeout  time.Duration
 
+	// flagFederation and primary are used to determine which ACL policies to write and whether or not to provide suffixing
+	// to the policy names when creating the policy in cases where federation is used.
+	// flagFederation indicates if federation has been enabled in the cluster.
+	flagFederation bool
+	// primary indicates this DC is the primary datacenter.
+	primary bool
+
 	clientset kubernetes.Interface
 
 	// cmdTimeout is cancelled when the command timeout is reached.
@@ -187,6 +194,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for ACL replication between datacenters.")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
+
+	c.flags.BoolVar(&c.flagFederation, "federation", false, "Toggle for when federation has been enabled.")
 
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
@@ -360,13 +369,13 @@ func (c *Command) Run(args []string) int {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
-
-	consulDC, err := c.consulDatacenter(consulClient)
+	consulDC, primaryDC, err := c.consulDatacenter(consulClient)
 	if err != nil {
 		c.log.Error("Error getting datacenter name", "err", err)
 		return 1
 	}
-	c.log.Info("Current datacenter", "datacenter", consulDC)
+	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
+	c.primary = consulDC == primaryDC
 
 	// With the addition of namespaces, the ACL policies associated
 	// with the server tokens may need to be updated if Enterprise Consul
@@ -732,9 +741,9 @@ func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }
 
-// consulDatacenter returns the current datacenter name using the
+// consulDatacenter returns the current datacenter name and the primary datacenter using the
 // /agent/self API endpoint.
-func (c *Command) consulDatacenter(client *api.Client) (string, error) {
+func (c *Command) consulDatacenter(client *api.Client) (string, string, error) {
 	var agentCfg map[string]map[string]interface{}
 	err := c.untilSucceeds("calling /agent/self to get datacenter",
 		func() error {
@@ -743,34 +752,41 @@ func (c *Command) consulDatacenter(client *api.Client) (string, error) {
 			return opErr
 		})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if _, ok := agentCfg["Config"]; !ok {
-		return "", fmt.Errorf("/agent/self response did not contain Config key: %s", agentCfg)
+		return "", "", fmt.Errorf("/agent/self response did not contain Config key: %s", agentCfg)
 	}
 	if _, ok := agentCfg["Config"]["Datacenter"]; !ok {
-		return "", fmt.Errorf("/agent/self response did not contain Config.Datacenter key: %s", agentCfg)
+		return "", "", fmt.Errorf("/agent/self response did not contain Config.Datacenter key: %s", agentCfg)
 	}
 	dc, ok := agentCfg["Config"]["Datacenter"].(string)
 	if !ok {
-		return "", fmt.Errorf("could not cast Config.Datacenter as string: %s", agentCfg)
+		return "", "", fmt.Errorf("could not cast Config.Datacenter as string: %s", agentCfg)
 	}
 	if dc == "" {
-		return "", fmt.Errorf("value of Config.Datacenter was empty string: %s", agentCfg)
+		return "", "", fmt.Errorf("value of Config.Datacenter was empty string: %s", agentCfg)
 	}
-	return dc, nil
+	primaryDC, ok := agentCfg["DebugConfig"]["PrimaryDatacenter"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("could not cast DebugConfig.PrimaryDatacenter as string: %s", agentCfg)
+	}
+	if primaryDC == "" {
+		return "", "", fmt.Errorf("value of DebugConfig.PrimaryDatacenter was empty string: %s", agentCfg)
+	}
+	return dc, primaryDC, nil
 }
 
 // createAnonymousPolicy returns whether we should create a policy for the
 // anonymous ACL token, i.e. queries without ACL tokens.
 func (c *Command) createAnonymousPolicy() bool {
-	// If c.flagACLReplicationTokenFile is set then we're in a secondary DC.
+	// If c.primary is not set then we're in a secondary DC.
 	// In this case we assume that the primary datacenter has already created
 	// the anonymous policy and attached it to the anonymous token.
 	// We don't want to modify the anonymous policy in secondary datacenters
 	// because it is global and we can't create separate tokens for each
 	// secondary datacenter because the anonymous token is global.
-	return c.flagACLReplicationTokenFile == "" &&
+	return c.primary &&
 		// Consul DNS requires the anonymous policy because DNS queries don't
 		// have ACL tokens.
 		(c.flagAllowDNS ||
@@ -781,7 +797,7 @@ func (c *Command) createAnonymousPolicy() bool {
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectToken && c.flagCreateACLReplicationToken))
+			(c.flagCreateInjectToken && c.flagFederation))
 }
 
 func (c *Command) validateFlags() error {
