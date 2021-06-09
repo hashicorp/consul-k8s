@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Allow setting annotations on service accounts for: server, client, client
+  snapshot agent, connect inject, controller, ingressGateways, meshGateway,
+  syncCatalog, and terminatingGateways. [[GH-964](https://github.com/hashicorp/consul-helm/pull/964)]
+
 BUG FIXES:
 * CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from int64 to string.
   This allows a user to set these values as a duration string on the resource ex '5s'.
