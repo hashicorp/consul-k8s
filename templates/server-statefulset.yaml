@@ -233,6 +233,9 @@ spec:
                 -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
                 {{- end }}
                 -serf-lan-port={{ .Values.server.ports.serflan.port }} \
+                {{- range $value := .Values.global.recursors }}
+                -recursor={{ quote $value }} \
+                {{- end }}
                 -server
           volumeMounts:
             - name: data-{{ .Release.Namespace }}

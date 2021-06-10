@@ -1246,3 +1246,14 @@ load _helpers
       yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
 }
+
+
+@test "server/StatefulSet: -recursor can be set by global.recursors" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.recursors[0]=1.2.3.4' \
+      . | tee /dev/stderr |
+      yq -r -c '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

@@ -1278,3 +1278,16 @@ rollingUpdate:
       yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
+
+#--------------------------------------------------------------------
+# recursors
+
+@test "client/DaemonSet: -recursor can be set by global.recursors" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.recursors[0]=1.2.3.4' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
