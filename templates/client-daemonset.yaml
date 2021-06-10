@@ -257,6 +257,9 @@ spec:
                 {{- end }}
                 {{- end }}
                 {{- end }}
+                {{- range $value := .Values.global.recursors }}
+                -recursor={{ quote $value }} \
+                {{- end }}
                 -domain={{ .Values.global.domain }}
           volumeMounts:
             - name: data
