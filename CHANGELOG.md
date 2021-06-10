@@ -4,6 +4,7 @@ IMPROVEMENTS:
 * Allow setting annotations on service accounts for: server, client, client
   snapshot agent, connect inject, controller, ingressGateways, meshGateway,
   syncCatalog, and terminatingGateways. [[GH-964](https://github.com/hashicorp/consul-helm/pull/964)]
+* Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-987](https://github.com/hashicorp/consul-helm/pull/987)]
 
 BUG FIXES:
 * CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from int64 to string.
