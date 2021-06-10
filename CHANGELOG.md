@@ -3,6 +3,7 @@
 IMPROVEMENTS:
 * Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
   and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
+* Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-530](https://github.com/hashicorp/consul-k8s/pull/530)]
 
 BUG FIXES:
 * CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from time.Duration to metav1.Duration.
