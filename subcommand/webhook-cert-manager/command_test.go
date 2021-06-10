@@ -13,8 +13,10 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -26,11 +28,23 @@ func TestRun_ExitsCleanlyOnSignals(t *testing.T) {
 
 func testSignalHandling(sig os.Signal) func(*testing.T) {
 	return func(t *testing.T) {
+		deploymentName := "deployment"
+		deploymentNamespace := "deploy-ns"
+		uid := types.UID("this-is-a-uid")
+
 		webhookConfigOneName := "webhookOne"
 		webhookConfigTwoName := "webhookTwo"
 
 		caBundleOne := []byte("bootstrapped-CA-one")
 		caBundleTwo := []byte("bootstrapped-CA-two")
+
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deploymentName,
+				Namespace: deploymentNamespace,
+				UID:       uid,
+			},
+		}
 
 		webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -65,7 +79,7 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 			},
 		}
 
-		k8s := fake.NewSimpleClientset(webhookOne, webhookTwo)
+		k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, deployment)
 		ui := cli.NewMockUi()
 		cmd := Command{
 			UI:        ui,
@@ -82,6 +96,8 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 
 		exitCh := runCommandAsynchronously(&cmd, []string{
 			"-config-file", file.Name(),
+			"-deployment-name", deploymentName,
+			"-deployment-namespace", deploymentNamespace,
 		})
 		cmd.sendSignal(sig)
 
@@ -107,6 +123,14 @@ func TestRun_FlagValidation(t *testing.T) {
 			flags:  nil,
 			expErr: "-config-file must be set",
 		},
+		{
+			flags:  []string{"-config-file", "foo"},
+			expErr: "-deployment-name must be set",
+		},
+		{
+			flags:  []string{"-config-file", "foo", "-deployment-name", "bar"},
+			expErr: "-deployment-namespace must be set",
+		},
 	}
 
 	for _, c := range cases {
@@ -124,6 +148,10 @@ func TestRun_FlagValidation(t *testing.T) {
 
 func TestRun_SecretDoesNotExist(t *testing.T) {
 	t.Parallel()
+	deploymentName := "deployment"
+	deploymentNamespace := "deploy-ns"
+	uid := types.UID("this-is-a-uid")
+
 	secretOneName := "secret-deploy-1"
 	secretTwoName := "secret-deploy-2"
 
@@ -132,6 +160,14 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 
 	caBundleOne := []byte("bootstrapped-CA-one")
 	caBundleTwo := []byte("bootstrapped-CA-two")
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: deploymentNamespace,
+			UID:       uid,
+		},
+	}
 
 	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -166,7 +202,7 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 		},
 	}
 
-	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo)
+	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, deployment)
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
@@ -183,6 +219,8 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
+		"-deployment-name", deploymentName,
+		"-deployment-namespace", deploymentNamespace,
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
@@ -192,10 +230,14 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 		secretOne, err := k8s.CoreV1().Secrets("default").Get(ctx, secretOneName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, secretOne.Type, v1.SecretTypeTLS)
+		require.Equal(r, deploymentName, secretOne.OwnerReferences[0].Name)
+		require.Equal(r, uid, secretOne.OwnerReferences[0].UID)
 
 		secretTwo, err := k8s.CoreV1().Secrets("default").Get(ctx, secretTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, secretTwo.Type, v1.SecretTypeTLS)
+		require.Equal(r, deploymentName, secretTwo.OwnerReferences[0].Name)
+		require.Equal(r, uid, secretTwo.OwnerReferences[0].UID)
 
 		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
 		require.NoError(r, err)
@@ -211,6 +253,10 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 
 func TestRun_SecretExists(t *testing.T) {
 	t.Parallel()
+	deploymentName := "deployment"
+	deploymentNamespace := "deploy-ns"
+	uid := types.UID("this-is-a-uid")
+
 	secretOneName := "secret-deploy-1"
 	secretTwoName := "secret-deploy-2"
 
@@ -219,6 +265,14 @@ func TestRun_SecretExists(t *testing.T) {
 
 	caBundleOne := []byte("bootstrapped-CA-one")
 	caBundleTwo := []byte("bootstrapped-CA-two")
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: deploymentNamespace,
+			UID:       uid,
+		},
+	}
 
 	secretOne := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -274,7 +328,7 @@ func TestRun_SecretExists(t *testing.T) {
 		},
 	}
 
-	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, secretOne, secretTwo)
+	k8s := fake.NewSimpleClientset(webhookOne, webhookTwo, secretOne, secretTwo, deployment)
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:        ui,
@@ -291,6 +345,8 @@ func TestRun_SecretExists(t *testing.T) {
 
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
+		"-deployment-name", deploymentName,
+		"-deployment-namespace", deploymentNamespace,
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
@@ -301,11 +357,15 @@ func TestRun_SecretExists(t *testing.T) {
 		require.NoError(r, err)
 		require.NotEqual(r, secretOne.Data[v1.TLSCertKey], []byte("cert-1"))
 		require.NotEqual(r, secretOne.Data[v1.TLSPrivateKeyKey], []byte("private-key-1"))
+		require.Equal(r, deploymentName, secretOne.OwnerReferences[0].Name)
+		require.Equal(r, uid, secretOne.OwnerReferences[0].UID)
 
 		secretTwo, err := k8s.CoreV1().Secrets("default").Get(ctx, secretTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, secretTwo.Data[v1.TLSCertKey], []byte("cert-2"))
 		require.NotEqual(r, secretTwo.Data[v1.TLSPrivateKeyKey], []byte("private-key-2"))
+		require.Equal(r, deploymentName, secretTwo.OwnerReferences[0].Name)
+		require.Equal(r, uid, secretTwo.OwnerReferences[0].UID)
 
 		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
 		require.NoError(r, err)
@@ -321,11 +381,23 @@ func TestRun_SecretExists(t *testing.T) {
 
 func TestRun_SecretUpdates(t *testing.T) {
 	t.Parallel()
+	deploymentName := "deployment"
+	deploymentNamespace := "deploy-ns"
+	uid := types.UID("this-is-a-uid")
+
 	secretOne := "secret-deploy-1"
 
 	webhookConfigOne := "webhookOne"
 
 	caBundleOne := []byte("bootstrapped-CA-one")
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: deploymentNamespace,
+			UID:       uid,
+		},
+	}
 
 	secret1 := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -352,7 +424,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 		},
 	}
 
-	k8s := fake.NewSimpleClientset(webhookOne, secret1)
+	k8s := fake.NewSimpleClientset(webhookOne, secret1, deployment)
 	ui := cli.NewMockUi()
 	oneSec := 1 * time.Second
 
@@ -372,6 +444,8 @@ func TestRun_SecretUpdates(t *testing.T) {
 
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
+		"-deployment-name", deploymentName,
+		"-deployment-namespace", deploymentNamespace,
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
@@ -385,6 +459,8 @@ func TestRun_SecretUpdates(t *testing.T) {
 		require.NoError(r, err)
 		require.NotEqual(r, secret1.Data[v1.TLSCertKey], []byte("cert-1"))
 		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], []byte("private-key-1"))
+		require.Equal(r, deploymentName, secret1.OwnerReferences[0].Name)
+		require.Equal(r, uid, secret1.OwnerReferences[0].UID)
 
 		certificate = secret1.Data[v1.TLSCertKey]
 		key = secret1.Data[v1.TLSPrivateKeyKey]
@@ -404,6 +480,8 @@ func TestRun_SecretUpdates(t *testing.T) {
 		require.NoError(r, err)
 		require.NotEqual(r, secret1.Data[v1.TLSCertKey], certificate)
 		require.NotEqual(r, secret1.Data[v1.TLSPrivateKeyKey], key)
+		require.Equal(r, deploymentName, secret1.OwnerReferences[0].Name)
+		require.Equal(r, uid, secret1.OwnerReferences[0].UID)
 	})
 }
 
@@ -425,9 +503,20 @@ func TestCertWatcher(t *testing.T) {
 			},
 		},
 	}
+
+	deploymentName := "deployment"
+	deploymentNamespace := "deploy-ns"
+	uid := types.UID("this-is-a-uid")
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: deploymentNamespace,
+			UID:       uid,
+		},
+	}
 	certSource := &mocks.MockCertSource{}
 
-	k8s := fake.NewSimpleClientset(webhook)
+	k8s := fake.NewSimpleClientset(webhook, deployment)
 	ui := cli.NewMockUi()
 
 	cmd := Command{
@@ -446,6 +535,8 @@ func TestCertWatcher(t *testing.T) {
 
 	exitCh := runCommandAsynchronously(&cmd, []string{
 		"-config-file", file.Name(),
+		"-deployment-name", deploymentName,
+		"-deployment-namespace", deploymentNamespace,
 	})
 	defer stopCommand(t, &cmd, exitCh)
 
