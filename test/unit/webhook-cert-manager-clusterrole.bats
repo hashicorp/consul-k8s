@@ -50,6 +50,6 @@ load _helpers
       --set 'controller.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
+      yq -r '.rules[3].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "podsecuritypolicies" ]
 }
