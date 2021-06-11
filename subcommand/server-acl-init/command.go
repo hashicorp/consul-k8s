@@ -797,7 +797,9 @@ func (c *Command) createAnonymousPolicy() bool {
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectToken && c.flagFederation))
+			(c.flagCreateInjectToken && c.flagFederation) ||
+			// OR to maintain back compat
+			(c.flagCreateInjectToken && c.flagCreateACLReplicationToken))
 }
 
 func (c *Command) validateFlags() error {
