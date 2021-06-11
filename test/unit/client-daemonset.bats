@@ -1284,7 +1284,7 @@ rollingUpdate:
 
 @test "client/DaemonSet: -recursor can be set by global.recursors" {
   cd `chart_dir`
-  local object=$(helm template \
+  local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'global.recursors[0]=1.2.3.4' \
       . | tee /dev/stderr |
