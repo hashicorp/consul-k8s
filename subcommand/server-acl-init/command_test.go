@@ -426,6 +426,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-federation",
 				"-timeout=1m",
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
@@ -622,6 +623,16 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 		"auth method, primary dc, no replication (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method"},
 			SecondaryDC:        false,
+			ExpAnonymousPolicy: false,
+		},
+		"auth method, primary dc, with federation": {
+			Flags:              []string{"-create-inject-auth-method", "-federation"},
+			SecondaryDC:        false,
+			ExpAnonymousPolicy: true,
+		},
+		"auth method, secondary dc, with federation": {
+			Flags:              []string{"-create-inject-auth-method", "-federation"},
+			SecondaryDC:        true,
 			ExpAnonymousPolicy: false,
 		},
 		"auth method, primary dc, with replication (deprecated)": {
@@ -1279,7 +1290,8 @@ func TestRun_NoLeader(t *testing.T) {
 			}
 			numACLBootCalls++
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			// TODO: PrimaryDatacenter will eventually be moved to Config as DebugConfig is not stable.
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}, "DebugConfig": {"PrimaryDatacenter": "dc1"}}`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1394,7 +1406,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			}
 			numPolicyCalls++
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			// TODO: PrimaryDatacenter will eventually be moved to Config as DebugConfig is not stable.
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}, "DebugConfig": {"PrimaryDatacenter": "dc1"}}`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1479,7 +1492,8 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		})
 		switch r.URL.Path {
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			// TODO: PrimaryDatacenter will eventually be moved to Config as DebugConfig is not stable.
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}, "DebugConfig": {"PrimaryDatacenter": "dc1"}}`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1574,7 +1588,8 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 		})
 		switch r.URL.Path {
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			// TODO: PrimaryDatacenter will eventually be moved to Config as DebugConfig is not stable.
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}, "DebugConfig": {"PrimaryDatacenter": "dc1"}}`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1699,6 +1714,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	}
 	secondaryCmd.init()
 	secondaryCmdArgs := []string{
+		"-federation",
 		"-timeout=1m",
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(secondaryAddr, ":")[0],
@@ -1971,6 +1987,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 			"-server-address", strings.Split(primarySvr.HTTPAddr, ":")[0],
 			"-server-port", strings.Split(primarySvr.HTTPAddr, ":")[1],
 			"-resource-prefix=" + resourcePrefix,
+			"-federation",
 			"-create-acl-replication-token",
 		}
 		responseCode := primaryCmd.Run(primaryCmdArgs)
