@@ -4,6 +4,7 @@ IMPROVEMENTS:
 * Allow setting annotations on service accounts for: server, client, client
   snapshot agent, connect inject, controller, ingressGateways, meshGateway,
   syncCatalog, and terminatingGateways. [[GH-964](https://github.com/hashicorp/consul-helm/pull/964)]
+* Add support for `global.recursors` to set Consul's [`-recursor` flag](https://www.consul.io/docs/agent/options#_recursor) [[GH-985](https://github.com/hashicorp/consul-helm/pull/985)].
 * Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-987](https://github.com/hashicorp/consul-helm/pull/987)]
 
 BUG FIXES:
