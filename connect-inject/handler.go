@@ -172,7 +172,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// Setup the default annotation values that are used for the container.
 	// This MUST be done before shouldInject is called since that function
 	// uses these annotations.
-	if err := h.defaultAnnotations(&pod); err != nil {
+	if err := h.defaultAnnotations(&pod, string(origPodJson)); err != nil {
 		h.Log.Error(err, "error creating default annotations", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating default annotations: %s", err))
 	}
@@ -335,34 +335,19 @@ func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		if cs := pod.Spec.Containers; len(cs) > 0 {
-			// The first container will be the original application container that we need to
-			// modify probes for.
-			appContainer := cs[0]
-			if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
-				// We need to save original port first so that endpoints controller can use it for exposing paths.
-				pod.Annotations[annotationOriginalLivenessProbePort] = appContainer.LivenessProbe.HTTPGet.Port.String()
-				listenerPort := defaultExposedPathsListenerPortLiveness
-				if raw, ok := pod.Annotations[annotationTransparentProxyLivenessListenerPort]; ok {
-					listenerPort, err = strconv.Atoi(raw)
-					if err != nil {
-						return err
-					}
-				}
-				appContainer.LivenessProbe.HTTPGet.Port = intstr.FromInt(listenerPort)
-
+		for i, container := range pod.Spec.Containers {
+			// skip the "envoy-sidecar" container from having it's probes overridden
+			if container.Name == envoySidecarContainer {
+				continue
 			}
-			if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
-				// We need to save original port first so that endpoints controller can use it for exposing paths.
-				pod.Annotations[annotationOriginalReadinessProbePort] = appContainer.ReadinessProbe.HTTPGet.Port.String()
-				listenerPort := defaultExposedPathsListenerPortReadiness
-				if raw, ok := pod.Annotations[annotationTransparentProxyReadinessListenerPort]; ok {
-					listenerPort, err = strconv.Atoi(raw)
-					if err != nil {
-						return err
-					}
-				}
-				appContainer.ReadinessProbe.HTTPGet.Port = intstr.FromInt(listenerPort)
+			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
+				container.LivenessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsLivenessPortsRangeStart + i)
+			}
+			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
+				container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsReadinessPortsRangeStart + i)
+			}
+			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
+				container.StartupProbe.HTTPGet.Port = intstr.FromInt(exposedPathsStartupPortsRangeStart + i)
 			}
 		}
 	}
@@ -401,7 +386,7 @@ func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
 	return !h.RequireAnnotation, nil
 }
 
-func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
+func (h *Handler) defaultAnnotations(pod *corev1.Pod, podJson string) error {
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
@@ -418,6 +403,7 @@ func (h *Handler) defaultAnnotations(pod *corev1.Pod) error {
 			}
 		}
 	}
+	pod.Annotations[annotationOriginalPod] = podJson
 
 	return nil
 }

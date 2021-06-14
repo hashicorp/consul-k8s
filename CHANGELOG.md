@@ -9,6 +9,11 @@ BUG FIXES:
 * CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from time.Duration to metav1.Duration.
   This allows a user to set these values as a duration string on the resource. Existing resources that had set a specific integer
   duration will continue to function with a duration with 'n' nanoseconds, 'n' being the set value.
+* Connect: Support overwriting startup, readiness and/or liveness probes to point to the Envoy proxy across all the containers
+  in the pod when transparent proxy is enabled. [[GH-534](https://github.com/hashicorp/consul-k8s/pull/534)]
+  This change removes support for the following annotations from the service pods:
+  - "consul.hashicorp.com/transparent-proxy-readiness-listener-port"
+  - "consul.hashicorp.com/transparent-proxy-liveness-listener-port"
 
 ## 0.26.0-beta3 (May 27, 2021)
 
