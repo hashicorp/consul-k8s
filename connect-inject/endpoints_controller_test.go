@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -3065,9 +3066,8 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 	cases := map[string]struct {
 		tproxyGlobalEnabled bool
 		overwriteProbes     bool
+		podContainers       []corev1.Container
 		podAnnotations      map[string]string
-		podLivenessProbe    *corev1.Probe
-		podReadinessProbe   *corev1.Probe
 		namespaceLabels     map[string]string
 		service             *corev1.Service
 		expTaggedAddresses  map[string]api.ServiceAddress
@@ -3077,6 +3077,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 	}{
 		"enabled globally, annotation not provided": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3103,6 +3118,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"enabled globally, annotation is false": {
 			tproxyGlobalEnabled: true,
 			podAnnotations:      map[string]string{keyTransparentProxy: "false"},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3124,6 +3154,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"enabled globally, annotation is true": {
 			tproxyGlobalEnabled: true,
 			podAnnotations:      map[string]string{keyTransparentProxy: "true"},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3171,6 +3216,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"disabled globally, annotation is false": {
 			tproxyGlobalEnabled: false,
 			podAnnotations:      map[string]string{keyTransparentProxy: "false"},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3191,7 +3251,22 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"disabled globally, annotation is true": {
 			tproxyGlobalEnabled: false,
-			podAnnotations:      map[string]string{keyTransparentProxy: "true"},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
+			podAnnotations: map[string]string{keyTransparentProxy: "true"},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3217,6 +3292,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"disabled globally, namespace enabled, no annotation": {
 			tproxyGlobalEnabled: false,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3274,6 +3364,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"service with a single port without a target port": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3299,6 +3404,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"service with a single port and a target port that is a port name": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3325,6 +3445,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"service with a single port and a target port that is a int": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3351,6 +3486,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"service with a multiple ports": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3386,6 +3536,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		// for client services that don't have a container port that they're listening on.
 		"target port is not found": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3472,6 +3637,21 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		},
 		"service with an IPv6 clusterIP": {
 			tproxyGlobalEnabled: true,
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
 			service: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
@@ -3498,11 +3678,28 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"overwrite probes enabled globally": {
 			tproxyGlobalEnabled: true,
 			overwriteProbes:     true,
-			podAnnotations:      map[string]string{annotationOriginalLivenessProbePort: "8080"},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"},\"annotations\":{\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
+							},
+						},
 					},
 				},
 			},
@@ -3529,7 +3726,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			},
 			expExposePaths: []api.ExposePath{
 				{
-					ListenerPort:  defaultExposedPathsListenerPortLiveness,
+					ListenerPort:  exposedPathsLivenessPortsRangeStart,
 					LocalPathPort: 8080,
 				},
 			},
@@ -3540,12 +3737,27 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			overwriteProbes:     false,
 			podAnnotations: map[string]string{
 				annotationTransparentProxyOverwriteProbes: "true",
-				annotationOriginalLivenessProbePort:       "8080",
+				annotationOriginalPod:                     "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"},\"annotations\":{\"consul.hashicorp.com/transparent-proxy-overwrite-probes\":\"true\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
 			},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
+							},
+						},
 					},
 				},
 			},
@@ -3572,7 +3784,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			},
 			expExposePaths: []api.ExposePath{
 				{
-					ListenerPort:  defaultExposedPathsListenerPortLiveness,
+					ListenerPort:  exposedPathsLivenessPortsRangeStart,
 					LocalPathPort: 8080,
 				},
 			},
@@ -3581,11 +3793,28 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"overwrite probes enabled globally, tproxy disabled": {
 			tproxyGlobalEnabled: false,
 			overwriteProbes:     true,
-			podAnnotations:      map[string]string{annotationOriginalLivenessProbePort: "8080"},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(8080),
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"},\"annotations\":{\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
+							},
+						},
 					},
 				},
 			},
@@ -3610,233 +3839,10 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 		"readiness only probe provided": {
 			tproxyGlobalEnabled: true,
 			overwriteProbes:     true,
-			podAnnotations:      map[string]string{annotationOriginalReadinessProbePort: "8080"},
-			podReadinessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(defaultExposedPathsListenerPortReadiness),
-					},
-				},
-			},
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: "default",
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
-					Ports: []corev1.ServicePort{
-						{
-							Port: 8081,
-						},
-					},
-				},
-			},
-			expProxyMode: api.ProxyModeTransparent,
-			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual": {
-					Address: "10.0.0.1",
-					Port:    8081,
-				},
-			},
-			expExposePaths: []api.ExposePath{
-				{
-					ListenerPort:  defaultExposedPathsListenerPortReadiness,
-					LocalPathPort: 8080,
-				},
-			},
-			expErr: "",
-		},
-		"both liveness and readiness probes provided": {
-			tproxyGlobalEnabled: true,
-			overwriteProbes:     true,
 			podAnnotations: map[string]string{
-				annotationOriginalLivenessProbePort:  "8080",
-				annotationOriginalReadinessProbePort: "8081",
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"readinessProbe\":{\"httpGet\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
 			},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(defaultExposedPathsListenerPortLiveness),
-					},
-				},
-			},
-			podReadinessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(defaultExposedPathsListenerPortReadiness),
-					},
-				},
-			},
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: "default",
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
-					Ports: []corev1.ServicePort{
-						{
-							Port: 8081,
-						},
-					},
-				},
-			},
-			expProxyMode: api.ProxyModeTransparent,
-			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual": {
-					Address: "10.0.0.1",
-					Port:    8081,
-				},
-			},
-			expExposePaths: []api.ExposePath{
-				{
-					ListenerPort:  defaultExposedPathsListenerPortLiveness,
-					LocalPathPort: 8080,
-				},
-				{
-					ListenerPort:  defaultExposedPathsListenerPortReadiness,
-					LocalPathPort: 8081,
-				},
-			},
-			expErr: "",
-		},
-		"non-http probe": {
-			tproxyGlobalEnabled: true,
-			overwriteProbes:     true,
-			podAnnotations:      map[string]string{annotationOriginalLivenessProbePort: "8080"},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8080),
-					},
-				},
-			},
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: "default",
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
-					Ports: []corev1.ServicePort{
-						{
-							Port: 8081,
-						},
-					},
-				},
-			},
-			expProxyMode: api.ProxyModeTransparent,
-			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual": {
-					Address: "10.0.0.1",
-					Port:    8081,
-				},
-			},
-			expExposePaths: nil,
-			expErr:         "",
-		},
-		"no original port annotations": {
-			tproxyGlobalEnabled: true,
-			overwriteProbes:     true,
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8080),
-					},
-				},
-			},
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: "default",
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
-					Ports: []corev1.ServicePort{
-						{
-							Port: 8081,
-						},
-					},
-				},
-			},
-			expProxyMode: api.ProxyModeTransparent,
-			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual": {
-					Address: "10.0.0.1",
-					Port:    8081,
-				},
-			},
-			expExposePaths: nil,
-			expErr:         "",
-		},
-		"liveness and readiness port annotations provided": {
-			tproxyGlobalEnabled: true,
-			overwriteProbes:     true,
-			podAnnotations: map[string]string{
-				annotationOriginalLivenessProbePort:             "8080",
-				annotationOriginalReadinessProbePort:            "8081",
-				annotationTransparentProxyLivenessListenerPort:  "23000",
-				annotationTransparentProxyReadinessListenerPort: "23001",
-			},
-			podLivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						// We expect that the port of the liveness probe is overwritten by the webhook.
-						Port: intstr.FromInt(23000),
-					},
-				},
-			},
-			podReadinessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						// We expect that the port of the readiness probe is overwritten by the webhook.
-						Port: intstr.FromInt(23001),
-					},
-				},
-			},
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: "default",
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
-					Ports: []corev1.ServicePort{
-						{
-							Port: 8081,
-						},
-					},
-				},
-			},
-			expProxyMode: api.ProxyModeTransparent,
-			expTaggedAddresses: map[string]api.ServiceAddress{
-				"virtual": {
-					Address: "10.0.0.1",
-					Port:    8081,
-				},
-			},
-			expExposePaths: []api.ExposePath{
-				{
-					ListenerPort:  23000,
-					LocalPathPort: 8080,
-				},
-				{
-					ListenerPort:  23001,
-					LocalPathPort: 8081,
-				},
-			},
-			expErr: "",
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			pod := createPod("test-pod-1", "1.2.3.4", true, true)
-			if c.podAnnotations != nil {
-				pod.Annotations = c.podAnnotations
-			}
-			pod.Spec.Containers = []corev1.Container{
+			podContainers: []corev1.Container{
 				{
 					Name: "test",
 					Ports: []corev1.ContainerPort{
@@ -3849,15 +3855,386 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 							ContainerPort: 8080,
 						},
 					},
+					ReadinessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsReadinessPortsRangeStart),
+							},
+						},
+					},
 				},
+			},
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			expProxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expExposePaths: []api.ExposePath{
+				{
+					ListenerPort:  exposedPathsReadinessPortsRangeStart,
+					LocalPathPort: 8080,
+				},
+			},
+			expErr: "",
+		},
+		"startup only probe provided": {
+			tproxyGlobalEnabled: true,
+			overwriteProbes:     true,
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"startupProbe\":{\"httpGet\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					StartupProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsStartupPortsRangeStart),
+							},
+						},
+					},
+				},
+			},
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			expProxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expExposePaths: []api.ExposePath{
+				{
+					ListenerPort:  exposedPathsStartupPortsRangeStart,
+					LocalPathPort: 8080,
+				},
+			},
+			expErr: "",
+		},
+		"all probes provided": {
+			tproxyGlobalEnabled: true,
+			overwriteProbes:     true,
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8080}},\"readinessProbe\":{\"httpGet\":{\"port\":8081}},\"startupProbe\":{\"httpGet\":{\"port\":8081}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
+							},
+						},
+					},
+					ReadinessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsReadinessPortsRangeStart),
+							},
+						},
+					},
+					StartupProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsStartupPortsRangeStart),
+							},
+						},
+					},
+				},
+			},
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			expProxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expExposePaths: []api.ExposePath{
+				{
+					ListenerPort:  exposedPathsLivenessPortsRangeStart,
+					LocalPathPort: 8080,
+				},
+				{
+					ListenerPort:  exposedPathsReadinessPortsRangeStart,
+					LocalPathPort: 8081,
+				},
+				{
+					ListenerPort:  exposedPathsStartupPortsRangeStart,
+					LocalPathPort: 8081,
+				},
+			},
+			expErr: "",
+		},
+		"multiple containers with all probes provided": {
+			tproxyGlobalEnabled: true,
+			overwriteProbes:     true,
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8080}},\"readinessProbe\":{\"httpGet\":{\"port\":8081}},\"startupProbe\":{\"httpGet\":{\"port\":8081}}},{\"name\":\"test-2\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8083},{\"name\":\"http\",\"containerPort\":8082}],\"resources\":{},\"livenessProbe\":{\"httpGet\":{\"port\":8082}},\"readinessProbe\":{\"httpGet\":{\"port\":8083}},\"startupProbe\":{\"httpGet\":{\"port\":8083}}},{\"name\":\"envoy-sidecar\",\"ports\":[{\"name\":\"http\",\"containerPort\":20000}],\"resources\":{}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
+							},
+						},
+					},
+					ReadinessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsReadinessPortsRangeStart),
+							},
+						},
+					},
+					StartupProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsStartupPortsRangeStart),
+							},
+						},
+					},
+				},
+				{
+					Name: "test-2",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8083,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8082,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart + 1),
+							},
+						},
+					},
+					ReadinessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsReadinessPortsRangeStart + 1),
+							},
+						},
+					},
+					StartupProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Port: intstr.FromInt(exposedPathsStartupPortsRangeStart + 1),
+							},
+						},
+					},
+				},
+				{
+					Name: envoySidecarContainer,
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 20000,
+						},
+					},
+				},
+			},
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			expProxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expExposePaths: []api.ExposePath{
+				{
+					ListenerPort:  exposedPathsLivenessPortsRangeStart,
+					LocalPathPort: 8080,
+				},
+				{
+					ListenerPort:  exposedPathsReadinessPortsRangeStart,
+					LocalPathPort: 8081,
+				},
+				{
+					ListenerPort:  exposedPathsStartupPortsRangeStart,
+					LocalPathPort: 8081,
+				},
+				{
+					ListenerPort:  exposedPathsLivenessPortsRangeStart + 1,
+					LocalPathPort: 8082,
+				},
+				{
+					ListenerPort:  exposedPathsReadinessPortsRangeStart + 1,
+					LocalPathPort: 8083,
+				},
+				{
+					ListenerPort:  exposedPathsStartupPortsRangeStart + 1,
+					LocalPathPort: 8083,
+				},
+			},
+			expErr: "",
+		},
+		"non-http probe": {
+			tproxyGlobalEnabled: true,
+			overwriteProbes:     true,
+			podAnnotations: map[string]string{
+				annotationOriginalPod: "{\"metadata\":{\"name\":\"test-pod-1\",\"namespace\":\"default\",\"creationTimestamp\":null,\"labels\":{\"consul.hashicorp.com/connect-inject-managed-by\":\"consul-k8s-endpoints-controller\",\"consul.hashicorp.com/connect-inject-status\":\"injected\"}},\"spec\":{\"containers\":[{\"name\":\"test\",\"ports\":[{\"name\":\"tcp\",\"containerPort\":8081},{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{},\"livenessProbe\":{\"tcpSocket\":{\"port\":8080}}}]},\"status\":{\"hostIP\":\"127.0.0.1\",\"podIP\":\"1.2.3.4\"}}\n",
+			},
+			podContainers: []corev1.Container{
+				{
+					Name: "test",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "tcp",
+							ContainerPort: 8081,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 8080,
+						},
+					},
+					LivenessProbe: &corev1.Probe{
+						Handler: corev1.Handler{
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.FromInt(8080),
+							},
+						},
+					},
+				},
+			},
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			expProxyMode: api.ProxyModeTransparent,
+			expTaggedAddresses: map[string]api.ServiceAddress{
+				"virtual": {
+					Address: "10.0.0.1",
+					Port:    8081,
+				},
+			},
+			expExposePaths: nil,
+			expErr:         "",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := createPod("test-pod-1", "1.2.3.4", true, true)
+			if c.podAnnotations != nil {
+				pod.Annotations = c.podAnnotations
 			}
+			if c.podContainers != nil {
+				pod.Spec.Containers = c.podContainers
+			}
+
+			marshalledPod, err := json.Marshal(pod)
+			fmt.Println(string(marshalledPod))
+			require.NoError(t, err)
+
+			// We set these annotations explicitly as these are set by the handler and we
+			// need these values to determine which port to use for the service registration.
 			pod.Annotations[annotationPort] = "tcp"
-			if c.podLivenessProbe != nil {
-				pod.Spec.Containers[0].LivenessProbe = c.podLivenessProbe
-			}
-			if c.podReadinessProbe != nil {
-				pod.Spec.Containers[0].ReadinessProbe = c.podReadinessProbe
-			}
+
 			endpoints := &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
