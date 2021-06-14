@@ -48,14 +48,14 @@ type MeshSpec struct {
 
 // TransparentProxyMeshConfig controls configuration specific to proxies in "transparent" mode. Added in v1.10.0.
 type TransparentProxyMeshConfig struct {
-	// CatalogDestinationsOnly determines whether sidecar proxies operating in "transparent" mode can proxy traffic
+	// MeshDestinationsOnly determines whether sidecar proxies operating in "transparent" mode can proxy traffic
 	// to IP addresses not registered in Consul's catalog. If enabled, traffic will only be proxied to upstreams
 	// with service registrations in the catalog.
-	CatalogDestinationsOnly bool `json:"catalogDestinationsOnly,omitempty"`
+	MeshDestinationsOnly bool `json:"meshDestinationsOnly,omitempty"`
 }
 
 func (in *TransparentProxyMeshConfig) toConsul() capi.TransparentProxyMeshConfig {
-	return capi.TransparentProxyMeshConfig{CatalogDestinationsOnly: in.CatalogDestinationsOnly}
+	return capi.TransparentProxyMeshConfig{MeshDestinationsOnly: in.MeshDestinationsOnly}
 }
 
 func (in *Mesh) GetObjectMeta() metav1.ObjectMeta {

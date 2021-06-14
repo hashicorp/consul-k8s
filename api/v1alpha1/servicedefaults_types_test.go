@@ -28,6 +28,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				Kind: capi.ServiceDefaults,
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 0,
+					DialedDirectly:       false,
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -65,6 +66,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					ExternalSNI: "external-sni",
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
+						DialedDirectly:       true,
 					},
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
@@ -165,6 +167,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				ExternalSNI: "external-sni",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+					DialedDirectly:       true,
 				},
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
@@ -265,6 +268,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				Namespace: "namespace",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 0,
+					DialedDirectly:       false,
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -304,6 +308,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					ExternalSNI: "sni-value",
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
+						DialedDirectly:       true,
 					},
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
@@ -403,6 +408,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				ExternalSNI: "sni-value",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+					DialedDirectly:       true,
 				},
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
@@ -585,7 +591,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			`servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
-		"transparentProxy": {
+		"transparentProxy.outboundListenerPort": {
 			&ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service",
@@ -596,7 +602,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
 		"mode": {
 			&ServiceDefaults{
@@ -702,7 +708,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: [spec.protocol: Invalid value: \"invalid\": must be one of \"tcp\", \"http\", \"http2\", \"grpc\", spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy: Invalid value: v1alpha1.TransparentProxy{OutboundListenerPort:1000}: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
+			"servicedefaults.consul.hashicorp.com \"my-service\" is invalid: [spec.protocol: Invalid value: \"invalid\": must be one of \"tcp\", \"http\", \"http2\", \"grpc\", spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
 		},
 	}
 
