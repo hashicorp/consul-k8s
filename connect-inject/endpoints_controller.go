@@ -2,9 +2,9 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/deckarep/golang-set"
@@ -36,19 +36,24 @@ const (
 	MetaKeyManagedBy           = "managed-by"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
+	envoySidecarContainer      = "envoy-sidecar"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
 	// TODO: change this to a constant shared with Consul to avoid accidentally changing this.
 	clusterIPTaggedAddressName = "virtual"
 
-	// defaultExposedPathsListenerPortLiveness is the default port that we will use as the ListenerPort
-	// for the Expose configuration of the proxy registration for a liveness probe.
-	defaultExposedPathsListenerPortLiveness = 20300
+	// exposedPathsLivenessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a liveness probe.
+	exposedPathsLivenessPortsRangeStart = 20300
 
-	// defaultExposedPathsListenerPortReadiness is the default port that we will use as the ListenerPort
-	// for the Expose configuration of the proxy registration for a readiness probe.
-	defaultExposedPathsListenerPortReadiness = 20301
+	// exposedPathsReadinessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a readiness probe.
+	exposedPathsReadinessPortsRangeStart = 20400
+
+	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
+	exposedPathsStartupPortsRangeStart = 20500
 )
 
 type EndpointsController struct {
@@ -578,34 +583,36 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			return nil, nil, err
 		}
 		if overwriteProbes {
-			if cs := pod.Spec.Containers; len(cs) > 0 {
-				appContainer := cs[0]
-				if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
-					if raw, ok := pod.Annotations[annotationOriginalLivenessProbePort]; ok {
-						originalLivenessPort, err := strconv.Atoi(raw)
-						if err != nil {
-							return nil, nil, err
-						}
+			var originalPod corev1.Pod
+			err := json.Unmarshal([]byte(pod.Annotations[annotationOriginalPod]), &originalPod)
+			if err != nil {
+				return nil, nil, err
+			}
 
-						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  appContainer.LivenessProbe.HTTPGet.Port.IntValue(),
-							LocalPathPort: originalLivenessPort,
-							Path:          appContainer.LivenessProbe.HTTPGet.Path,
-						})
-					}
-				}
-				if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
-					if raw, ok := pod.Annotations[annotationOriginalReadinessProbePort]; ok {
-						originalReadinessPort, err := strconv.Atoi(raw)
-						if err != nil {
-							return nil, nil, err
+			for _, container := range pod.Spec.Containers {
+				for _, c := range originalPod.Spec.Containers {
+					if c.Name == container.Name {
+						if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  container.LivenessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: c.LivenessProbe.HTTPGet.Port.IntValue(),
+								Path:          container.LivenessProbe.HTTPGet.Path,
+							})
 						}
-
-						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  appContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
-							LocalPathPort: originalReadinessPort,
-							Path:          appContainer.ReadinessProbe.HTTPGet.Path,
-						})
+						if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  container.ReadinessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: c.ReadinessProbe.HTTPGet.Port.IntValue(),
+								Path:          container.ReadinessProbe.HTTPGet.Path,
+							})
+						}
+						if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  container.StartupProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: c.StartupProbe.HTTPGet.Port.IntValue(),
+								Path:          container.StartupProbe.HTTPGet.Path,
+							})
+						}
 					}
 				}
 			}
