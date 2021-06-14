@@ -160,7 +160,7 @@ workflows:
             - go-fmt-and-vet
             - linters
       - build-distro:
-          OS: "darwin freebsd linux windows"
+          OS: "freebsd linux windows"
           ARCH: "386"
           name: build-distros-386
           requires:
