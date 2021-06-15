@@ -790,16 +790,13 @@ func (c *Command) createAnonymousPolicy() bool {
 		// Consul DNS requires the anonymous policy because DNS queries don't
 		// have ACL tokens.
 		(c.flagAllowDNS ||
-			// If connect is enabled and the ACL replication token is being
-			// created then we know we're using multi-dc Connect.
+			// If connect is enabled and federation is enabled then we know we're using multi-dc Connect.
 			// In this case the anonymous policy is required because Connect
 			// services in Kubernetes have local tokens which are stripped
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectToken && c.flagFederation) ||
-			// OR to maintain back compat
-			(c.flagCreateInjectToken && c.flagCreateACLReplicationToken))
+			(c.flagCreateInjectToken && c.flagFederation))
 }
 
 func (c *Command) validateFlags() error {
