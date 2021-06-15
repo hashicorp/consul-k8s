@@ -449,7 +449,7 @@ func (h *Handler) validatePod(pod corev1.Pod) error {
 }
 
 func portValue(pod corev1.Pod, value string) (int32, error) {
-	// First search for the named port
+	// First search for the named port.
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
 			if p.Name == value {
@@ -458,7 +458,7 @@ func portValue(pod corev1.Pod, value string) (int32, error) {
 		}
 	}
 
-	// Named port not found, return the parsed value
+	// Named port not found, return the parsed value.
 	raw, err := strconv.ParseInt(value, 0, 32)
 	return int32(raw), err
 }
