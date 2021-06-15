@@ -14,6 +14,7 @@ BUG FIXES:
   This change removes support for the following annotations from the service pods:
   - "consul.hashicorp.com/transparent-proxy-readiness-listener-port"
   - "consul.hashicorp.com/transparent-proxy-liveness-listener-port"
+* Connect: Support overwriting probes when the port is a named port and transparent proxy is enabled. [[GH-535](https://github.com/hashicorp/consul-k8s/pull/535)]
 
 ## 0.26.0-beta3 (May 27, 2021)
 
