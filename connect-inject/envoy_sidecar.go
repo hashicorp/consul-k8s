@@ -22,7 +22,7 @@ func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod) (core
 	}
 
 	container := corev1.Container{
-		Name:  "envoy-sidecar",
+		Name:  envoySidecarContainer,
 		Image: h.ImageEnvoy,
 		Env: []corev1.EnvVar{
 			{
