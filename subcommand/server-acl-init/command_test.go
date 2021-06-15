@@ -635,11 +635,6 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			SecondaryDC:        true,
 			ExpAnonymousPolicy: false,
 		},
-		"auth method, primary dc, with replication (deprecated)": {
-			Flags:              []string{"-create-inject-auth-method", "-create-acl-replication-token"},
-			SecondaryDC:        false,
-			ExpAnonymousPolicy: true,
-		},
 		"auth method, secondary dc (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method"},
 			SecondaryDC:        true,
@@ -649,11 +644,6 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			Flags:              []string{"-create-inject-token"},
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: false,
-		},
-		"auth method, primary dc, with replication": {
-			Flags:              []string{"-create-inject-token", "-create-acl-replication-token"},
-			SecondaryDC:        false,
-			ExpAnonymousPolicy: true,
 		},
 		"auth method, secondary dc": {
 			Flags:              []string{"-create-inject-token"},
@@ -1983,11 +1973,11 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 		primaryCmd.init()
 		primaryCmdArgs := []string{
+			"-federation",
 			"-k8s-namespace=" + ns,
 			"-server-address", strings.Split(primarySvr.HTTPAddr, ":")[0],
 			"-server-port", strings.Split(primarySvr.HTTPAddr, ":")[1],
 			"-resource-prefix=" + resourcePrefix,
-			"-federation",
 			"-create-acl-replication-token",
 		}
 		responseCode := primaryCmd.Run(primaryCmdArgs)
