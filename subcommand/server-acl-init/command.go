@@ -369,7 +369,7 @@ func (c *Command) Run(args []string) int {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
-	consulDC, primaryDC, err := c.consulDatacenter(consulClient)
+	consulDC, primaryDC, err := c.consulDatacenterList(consulClient)
 	if err != nil {
 		c.log.Error("Error getting datacenter name", "err", err)
 		return 1
@@ -741,9 +741,9 @@ func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }
 
-// consulDatacenter returns the current datacenter name and the primary datacenter using the
+// consulDatacenterList returns the current datacenter name and the primary datacenter using the
 // /agent/self API endpoint.
-func (c *Command) consulDatacenter(client *api.Client) (string, string, error) {
+func (c *Command) consulDatacenterList(client *api.Client) (string, string, error) {
 	var agentCfg map[string]map[string]interface{}
 	err := c.untilSucceeds("calling /agent/self to get datacenter",
 		func() error {
