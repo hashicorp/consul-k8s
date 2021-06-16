@@ -532,28 +532,19 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			taggedAddresses := make(map[string]api.ServiceAddress)
 
 			// When a service has multiple ports, we need to choose the port that is registered with Consul
-			// and only set that port as the tagged address because Consul currently does not support multiple port
+			// and only set that port as the tagged address because Consul currently does not support multiple ports
 			// on a single service.
 			var k8sServicePort int32
 			for _, sp := range k8sService.Spec.Ports {
-				// If target port is a name, then we need to find the port value from the pod.
-				if sp.TargetPort.Type == intstr.String {
-					targetPortValue, err := portValue(pod, sp.TargetPort.StrVal)
-					if err != nil {
-						return nil, nil, err
-					}
+				targetPortValue, err := portValueFromIntOrString(pod, sp.TargetPort)
+				if err != nil {
+					return nil, nil, err
+				}
 
-					// If the targetPortValue is the consulServicePort, then this is the service port we'll use as the tagged address.
-					if targetPortValue == int32(consulServicePort) {
-						k8sServicePort = sp.Port
-						break
-					}
-				} else if sp.TargetPort.Type == intstr.Int && sp.TargetPort.IntVal != 0 {
-					// If the target port is a non-zero int, we can compare that port directly with the Consul service port.
-					if sp.TargetPort.IntVal == int32(consulServicePort) {
-						k8sServicePort = sp.Port
-						break
-					}
+				// If the targetPortValue is not zero and is the consulServicePort, then this is the service port we'll use as the tagged address.
+				if targetPortValue != 0 && targetPortValue == consulServicePort {
+					k8sServicePort = sp.Port
+					break
 				} else {
 					// If targetPort is not specified, then the service port is used as the target port,
 					// and we can compare the service port with the Consul service port.
@@ -589,28 +580,40 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				return nil, nil, err
 			}
 
-			for _, container := range pod.Spec.Containers {
-				for _, c := range originalPod.Spec.Containers {
-					if c.Name == container.Name {
-						if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
+			for _, mutatedContainer := range pod.Spec.Containers {
+				for _, originalContainer := range originalPod.Spec.Containers {
+					if originalContainer.Name == mutatedContainer.Name {
+						if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
+							originalLivenessPort, err := portValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
 							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-								ListenerPort:  container.LivenessProbe.HTTPGet.Port.IntValue(),
-								LocalPathPort: c.LivenessProbe.HTTPGet.Port.IntValue(),
-								Path:          container.LivenessProbe.HTTPGet.Path,
+								ListenerPort:  mutatedContainer.LivenessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalLivenessPort,
+								Path:          mutatedContainer.LivenessProbe.HTTPGet.Path,
 							})
 						}
-						if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
+						if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
+							originalReadinessPort, err := portValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
 							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-								ListenerPort:  container.ReadinessProbe.HTTPGet.Port.IntValue(),
-								LocalPathPort: c.ReadinessProbe.HTTPGet.Port.IntValue(),
-								Path:          container.ReadinessProbe.HTTPGet.Path,
+								ListenerPort:  mutatedContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalReadinessPort,
+								Path:          mutatedContainer.ReadinessProbe.HTTPGet.Path,
 							})
 						}
-						if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
+						if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
+							originalStartupPort, err := portValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
 							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-								ListenerPort:  container.StartupProbe.HTTPGet.Port.IntValue(),
-								LocalPathPort: c.StartupProbe.HTTPGet.Port.IntValue(),
-								Path:          container.StartupProbe.HTTPGet.Path,
+								ListenerPort:  mutatedContainer.StartupProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalStartupPort,
+								Path:          mutatedContainer.StartupProbe.HTTPGet.Path,
 							})
 						}
 					}
@@ -620,6 +623,22 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 
 	return service, proxyService, nil
+}
+
+// portValueFromIntOrString returns the integer port value from the port that can be
+// a named port, an integer string (e.g. "80"), or an integer. If the port is a named port,
+// this function will attempt to find the value from the containers of the pod.
+func portValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (int, error) {
+	if port.Type == intstr.Int {
+		return port.IntValue(), nil
+	}
+
+	// Otherwise, find named port or try to parse the string as an int.
+	portVal, err := portValue(pod, port.StrVal)
+	if err != nil {
+		return 0, err
+	}
+	return int(portVal), nil
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent
