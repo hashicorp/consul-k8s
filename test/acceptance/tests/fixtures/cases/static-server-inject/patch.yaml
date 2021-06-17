@@ -23,6 +23,12 @@ spec:
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
           readinessProbe:
             exec:
               command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
