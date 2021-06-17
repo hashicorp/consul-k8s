@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// This file contains structs that are shared between multiple config entries.
+
 type MeshGatewayMode string
 
 // Expose describes HTTP paths to expose through Envoy outside of Connect.
@@ -38,8 +40,14 @@ type ExposePath struct {
 }
 
 type TransparentProxy struct {
-	// The port of the listener where outbound application traffic is being redirected to.
+	// OutboundListenerPort is the port of the listener where outbound application
+	// traffic is being redirected to.
 	OutboundListenerPort int `json:"outboundListenerPort,omitempty"`
+
+	// DialedDirectly indicates whether transparent proxies can dial this proxy instance directly.
+	// The discovery chain is not considered when dialing a service instance directly.
+	// This setting is useful when addressing stateful services, such as a database cluster with a leader node.
+	DialedDirectly bool `json:"dialedDirectly,omitempty"`
 }
 
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
@@ -115,12 +123,18 @@ func (in *TransparentProxy) toConsul() *capi.TransparentProxyConfig {
 	if in == nil {
 		return &capi.TransparentProxyConfig{OutboundListenerPort: 0}
 	}
-	return &capi.TransparentProxyConfig{OutboundListenerPort: in.OutboundListenerPort}
+	return &capi.TransparentProxyConfig{
+		OutboundListenerPort: in.OutboundListenerPort,
+		DialedDirectly:       in.DialedDirectly,
+	}
 }
 
 func (in *TransparentProxy) validate(path *field.Path) *field.Error {
-	if in != nil {
-		return field.Invalid(path, in, "use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port")
+	if in == nil {
+		return nil
+	}
+	if in.OutboundListenerPort != 0 {
+		return field.Invalid(path.Child("outboundListenerPort"), in.OutboundListenerPort, "use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port")
 	}
 	return nil
 }

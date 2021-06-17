@@ -151,7 +151,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-created",
 						DestinationServiceID:   "pod1-service-created",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -165,7 +164,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-created",
 						DestinationServiceID:   "pod2-service-created",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: test.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -437,7 +435,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Namespace: ts.ExpConsulNS,
 					},
@@ -516,7 +513,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Namespace: ts.ExpConsulNS,
 					},
@@ -584,7 +580,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "different-consul-svc-name",
 							DestinationServiceID:   "pod1-different-consul-svc-name",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Namespace: ts.ExpConsulNS,
 					},
@@ -661,7 +656,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Namespace: ts.ExpConsulNS,
 					},
@@ -738,7 +732,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -760,7 +753,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod2-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -829,7 +821,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "different-consul-svc-name",
 							DestinationServiceID:   "pod1-different-consul-svc-name",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -851,7 +842,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "different-consul-svc-name",
 							DestinationServiceID:   "pod2-different-consul-svc-name",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -905,7 +895,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod1-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -927,7 +916,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
 							DestinationServiceID:   "pod2-service-updated",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -969,7 +957,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "different-consul-svc-name",
 							DestinationServiceID:   "pod1-different-consul-svc-name",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -991,7 +978,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "different-consul-svc-name",
 							DestinationServiceID:   "pod2-different-consul-svc-name",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,
@@ -1205,7 +1191,6 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-deleted",
 							DestinationServiceID:   "pod1-service-deleted",
-							TransparentProxy:       &api.TransparentProxyConfig{},
 						},
 						Meta:      map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": ts.SourceKubeNS, MetaKeyManagedBy: managedByValue},
 						Namespace: ts.ExpConsulNS,

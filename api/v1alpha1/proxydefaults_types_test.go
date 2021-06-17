@@ -33,6 +33,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Namespace: "default",
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 0,
+					DialedDirectly:       false,
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -72,6 +73,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					},
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
+						DialedDirectly:       true,
 					},
 				},
 			},
@@ -103,6 +105,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				},
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+					DialedDirectly:       true,
 				},
 			},
 			Matches: true,
@@ -149,6 +152,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				},
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 0,
+					DialedDirectly:       false,
 				},
 			},
 		},
@@ -181,6 +185,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					},
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
+						DialedDirectly:       true,
 					},
 				},
 			},
@@ -213,6 +218,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				},
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
+					DialedDirectly:       true,
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -227,6 +233,124 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 			proxyDefaults, ok := act.(*capi.ProxyConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, proxyDefaults)
+		})
+	}
+}
+
+// Test validation for fields other than Config. Config is tested
+// in separate tests below.
+func TestProxyDefaults_Validate(t *testing.T) {
+	cases := map[string]struct {
+		input          *ProxyDefaults
+		expectedErrMsg string
+	}{
+		"meshgateway.mode": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					MeshGateway: MeshGateway{
+						Mode: "foobar",
+					},
+				},
+			},
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
+		},
+		"expose.paths[].protocol": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					Expose: Expose{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "/valid-path",
+							},
+						},
+					},
+				},
+			},
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
+		},
+		"expose.paths[].path": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					Expose: Expose{
+						Paths: []ExposePath{
+							{
+								Protocol: "http",
+								Path:     "invalid-path",
+							},
+						},
+					},
+				},
+			},
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+		},
+		"transparentProxy.outboundListenerPort": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+		},
+		"mode": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					Mode: proxyModeRef("transparent"),
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+		},
+		"multi-error": {
+			&ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					MeshGateway: MeshGateway{
+						Mode: "invalid-mode",
+					},
+					Expose: Expose{
+						Paths: []ExposePath{
+							{
+								Protocol: "invalid-protocol",
+								Path:     "invalid-path",
+							},
+						},
+					},
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+					Mode: proxyModeRef("transparent"),
+				},
+			},
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: [spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate(false)
+			if testCase.expectedErrMsg != "" {
+				require.EqualError(t, err, testCase.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

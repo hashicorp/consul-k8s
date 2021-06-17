@@ -43,13 +43,13 @@ func TestMesh_MatchesConsul(t *testing.T) {
 				},
 				Spec: MeshSpec{
 					TransparentProxy: TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},
 			Theirs: &capi.MeshConfigEntry{
 				TransparentProxy: capi.TransparentProxyMeshConfig{
-					CatalogDestinationsOnly: true,
+					MeshDestinationsOnly: true,
 				},
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -107,13 +107,13 @@ func TestMesh_ToConsul(t *testing.T) {
 				},
 				Spec: MeshSpec{
 					TransparentProxy: TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},
 			Exp: &capi.MeshConfigEntry{
 				TransparentProxy: capi.TransparentProxyMeshConfig{
-					CatalogDestinationsOnly: true,
+					MeshDestinationsOnly: true,
 				},
 				Namespace: "",
 				Meta: map[string]string{

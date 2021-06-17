@@ -140,7 +140,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				},
 				Spec: v1alpha1.MeshSpec{
 					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},
@@ -157,7 +157,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
 				mesh, ok := consulEntry.(*capi.MeshConfigEntry)
 				require.True(t, ok, "cast error")
-				require.True(t, mesh.TransparentProxy.CatalogDestinationsOnly)
+				require.True(t, mesh.TransparentProxy.MeshDestinationsOnly)
 			},
 		},
 		{
@@ -588,7 +588,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				},
 				Spec: v1alpha1.MeshSpec{
 					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},
@@ -604,12 +604,12 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			},
 			updateF: func(resource common.ConfigEntryResource) {
 				mesh := resource.(*v1alpha1.Mesh)
-				mesh.Spec.TransparentProxy.CatalogDestinationsOnly = false
+				mesh.Spec.TransparentProxy.MeshDestinationsOnly = false
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
 				meshConfigEntry, ok := consulEntry.(*capi.MeshConfigEntry)
 				require.True(t, ok, "cast error")
-				require.False(t, meshConfigEntry.TransparentProxy.CatalogDestinationsOnly)
+				require.False(t, meshConfigEntry.TransparentProxy.MeshDestinationsOnly)
 			},
 		},
 		{
@@ -1054,7 +1054,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				},
 				Spec: v1alpha1.MeshSpec{
 					TransparentProxy: v1alpha1.TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},
