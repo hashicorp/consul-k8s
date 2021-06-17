@@ -46,7 +46,7 @@ func TestValidateMesh(t *testing.T) {
 				},
 				Spec: MeshSpec{
 					TransparentProxy: TransparentProxyMeshConfig{
-						CatalogDestinationsOnly: true,
+						MeshDestinationsOnly: true,
 					},
 				},
 			},

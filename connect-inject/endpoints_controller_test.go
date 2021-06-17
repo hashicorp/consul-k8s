@@ -561,7 +561,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -648,7 +647,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -663,7 +661,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod2-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -773,7 +770,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -788,7 +784,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod2-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
 					ServiceTags: []string{},
@@ -883,7 +878,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-different-consul-svc-name",
 						LocalServiceAddress:    "127.0.0.1",
 						LocalServicePort:       1234,
-						TransparentProxy:       &api.TransparentProxyConfig{},
 						Upstreams: []api.Upstream{
 							{
 								DestinationType: api.UpstreamDestTypeService,
@@ -1108,7 +1102,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1181,7 +1174,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1262,7 +1254,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1343,7 +1334,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1426,7 +1416,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1509,7 +1498,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1584,7 +1572,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1648,7 +1635,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1721,7 +1707,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 				},
 			},
@@ -1812,7 +1797,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -1832,7 +1816,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod2-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -1897,7 +1880,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -1917,7 +1899,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod2-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -1967,7 +1948,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -1987,7 +1967,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod2-service-updated",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -2027,7 +2006,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -2047,7 +2025,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod2-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -2204,7 +2181,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-deleted",
 						DestinationServiceID:   "pod1-service-deleted",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
 				},
@@ -2230,7 +2206,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-deleted",
 						DestinationServiceID:   "pod1-service-deleted",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -2256,7 +2231,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
@@ -2982,7 +2956,6 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "foo",
 						DestinationServiceID:   "foo1",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": k8sSvc, "k8s-namespace": k8sNS},
 				},
@@ -3007,7 +2980,6 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "foo",
 						DestinationServiceID:   "foo1",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": c.k8sNamespaceMeta},
 				},
@@ -3025,7 +2997,6 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "k8s-service-different-ns",
 						DestinationServiceID:   "k8s-service-different-ns-id",
-						TransparentProxy:       &api.TransparentProxyConfig{},
 					},
 					Meta: map[string]string{"k8s-service-name": c.k8sServiceNameMeta, "k8s-namespace": "different-ns"},
 				},
