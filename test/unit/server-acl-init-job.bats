@@ -1431,3 +1431,20 @@ load _helpers
       yq '.spec.template.spec.containers[0].command | any(contains("create-controller-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.federation.enabled
+
+@test "serverACLInit/Job: ensure federation is passed when federation is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-federation"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
