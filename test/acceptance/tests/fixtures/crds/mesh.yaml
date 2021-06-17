@@ -4,4 +4,4 @@ metadata:
   name: mesh
 spec:
   transparentProxy:
-    catalogDestinationsOnly: true
+    meshDestinationsOnly: true

@@ -158,7 +158,7 @@ func TestControllerNamespaces(t *testing.T) {
 					require.NoError(r, err)
 					meshEntry, ok := entry.(*api.MeshConfigEntry)
 					require.True(r, ok, "could not cast to MeshConfigEntry")
-					require.True(r, meshEntry.TransparentProxy.CatalogDestinationsOnly)
+					require.True(r, meshEntry.TransparentProxy.MeshDestinationsOnly)
 
 					// service-router
 					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", queryOpts)
@@ -221,7 +221,7 @@ func TestControllerNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
 
 				logger.Log(t, "patching mesh custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"catalogDestinationsOnly": %t}}}`, false), "--type=merge")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
 
 				logger.Log(t, "patching service-router custom resource")
 				patchPathPrefix := "/baz"
@@ -269,7 +269,7 @@ func TestControllerNamespaces(t *testing.T) {
 					require.NoError(r, err)
 					meshEntry, ok := entry.(*api.MeshConfigEntry)
 					require.True(r, ok, "could not cast to MeshConfigEntry")
-					require.False(r, meshEntry.TransparentProxy.CatalogDestinationsOnly)
+					require.False(r, meshEntry.TransparentProxy.MeshDestinationsOnly)
 
 					// service-router
 					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", queryOpts)
