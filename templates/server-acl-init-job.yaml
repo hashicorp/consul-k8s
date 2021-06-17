@@ -199,6 +199,10 @@ spec:
                 -create-acl-replication-token=true \
                 {{- end }}
 
+                {{- if .Values.global.federation.enabled }}
+                -federation=true \
+                {{- end }}
+
                 {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
                 -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
                 {{- else if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
