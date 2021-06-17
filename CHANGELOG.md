@@ -6,6 +6,7 @@ IMPROVEMENTS:
   syncCatalog, and terminatingGateways. [[GH-964](https://github.com/hashicorp/consul-helm/pull/964)]
 * Add support for `global.recursors` to set Consul's [`-recursor` flag](https://www.consul.io/docs/agent/options#_recursor) [[GH-985](https://github.com/hashicorp/consul-helm/pull/985)].
 * Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-987](https://github.com/hashicorp/consul-helm/pull/987)]
+* Add support for `DialedDirectly` field in `ServiceDefaults` and `ProxyDefaults`. [[GH-992](https://github.com/hashicorp/consul-helm/pull/992)]
 
 BUG FIXES:
 * CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from int64 to string.
