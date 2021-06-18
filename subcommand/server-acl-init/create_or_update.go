@@ -13,25 +13,25 @@ import (
 
 // createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
 // the policy is only valid for this datacenter and the token is a local token.
-func (c *Command) createLocalACL(name, rules, dc string, consulClient *api.Client) error {
-	return c.createACL(name, rules, true, dc, consulClient)
+func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, true, dc, isPrimary, consulClient)
 }
 
 // createGlobalACL creates a global policy and acl token. The policy is valid
 // for all datacenters and the token is global. dc must be passed because the
 // policy name may have the datacenter name appended.
-func (c *Command) createGlobalACL(name, rules, dc string, consulClient *api.Client) error {
-	return c.createACL(name, rules, false, dc, consulClient)
+func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, false, dc, isPrimary, consulClient)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then
 // the token will be a local token and the policy will be scoped to only dc.
 // If localToken is false, the policy will be global.
 // The token will be written to a Kubernetes secret.
-func (c *Command) createACL(name, rules string, localToken bool, dc string, consulClient *api.Client) error {
+func (c *Command) createACL(name, rules string, localToken bool, dc string, isPrimary bool, consulClient *api.Client) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", name)
-	if c.flagFederation && !c.primary {
+	if c.flagFederation && !isPrimary {
 		// If performing ACL replication, we must ensure policy names are
 		// globally unique so we append the datacenter name but only in secondary datacenters..
 		policyName += fmt.Sprintf("-%s", dc)
