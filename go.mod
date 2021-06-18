@@ -27,7 +27,7 @@ require (
 	github.com/mitchellh/cli v1.1.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-testing-interface v1.14.0 // indirect
-	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/mitchellh/mapstructure v1.4.1
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.17.0
 	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273 // indirect
