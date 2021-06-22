@@ -24,7 +24,7 @@ const (
 	ACLTokenSecretKey = "token"
 )
 
-// Logger returns an hclog instance or an error if level is invalid and enables JSON logging if requested.
+// Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
 func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
 	parsedLevel := hclog.LevelFromString(level)
 	if parsedLevel == hclog.NoLevel {
