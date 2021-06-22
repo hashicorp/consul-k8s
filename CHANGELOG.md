@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.26.0 (June 22, 2021)
 
 FEATURES:
 * Connect: Support Transparent Proxy. [[GH-481](https://github.com/hashicorp/consul-k8s/pull/481)]
