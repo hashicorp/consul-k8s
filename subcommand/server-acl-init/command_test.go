@@ -3,6 +3,7 @@ package serveraclinit
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -22,6 +23,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -426,6 +428,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			}
 			cmd.init()
 			cmdArgs := append([]string{
+				"-federation",
 				"-timeout=1m",
 				"-k8s-namespace=" + ns,
 				"-acl-replication-token-file", tokenFile,
@@ -624,10 +627,15 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: false,
 		},
-		"auth method, primary dc, with replication (deprecated)": {
-			Flags:              []string{"-create-inject-auth-method", "-create-acl-replication-token"},
+		"auth method, primary dc, with federation": {
+			Flags:              []string{"-create-inject-auth-method", "-federation"},
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: true,
+		},
+		"auth method, secondary dc, with federation": {
+			Flags:              []string{"-create-inject-auth-method", "-federation"},
+			SecondaryDC:        true,
+			ExpAnonymousPolicy: false,
 		},
 		"auth method, secondary dc (deprecated)": {
 			Flags:              []string{"-create-inject-auth-method"},
@@ -638,11 +646,6 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			Flags:              []string{"-create-inject-token"},
 			SecondaryDC:        false,
 			ExpAnonymousPolicy: false,
-		},
-		"auth method, primary dc, with replication": {
-			Flags:              []string{"-create-inject-token", "-create-acl-replication-token"},
-			SecondaryDC:        false,
-			ExpAnonymousPolicy: true,
 		},
 		"auth method, secondary dc": {
 			Flags:              []string{"-create-inject-token"},
@@ -1279,7 +1282,7 @@ func TestRun_NoLeader(t *testing.T) {
 			}
 			numACLBootCalls++
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1361,6 +1364,103 @@ func TestRun_NoLeader(t *testing.T) {
 	}, consulAPICalls)
 }
 
+func TestConsulDatacenterList(t *testing.T) {
+	cases := map[string]struct {
+		agentSelfResponse map[string]map[string]interface{}
+		expDC             string
+		expPrimaryDC      string
+		expErr            string
+	}{
+		"empty map": {
+			agentSelfResponse: make(map[string]map[string]interface{}),
+			expErr:            "/agent/self response did not contain Config.Datacenter key: map[]",
+		},
+		"Config.Datacenter not string": {
+			agentSelfResponse: map[string]map[string]interface{}{
+				"Config": {
+					"Datacenter": 10,
+				},
+			},
+			expErr: "1 error(s) decoding:\n\n* 'Config.Datacenter' expected type 'string', got unconvertible type 'float64', value: '10'",
+		},
+		"Config.PrimaryDatacenter and DebugConfig.PrimaryDatacenter empty": {
+			agentSelfResponse: map[string]map[string]interface{}{
+				"Config": {
+					"Datacenter": "dc",
+				},
+			},
+			expErr: "both Config.PrimaryDatacenter and DebugConfig.PrimaryDatacenter are empty: map[Config:map[Datacenter:dc]]",
+		},
+		"Config.PrimaryDatacenter set": {
+			agentSelfResponse: map[string]map[string]interface{}{
+				"Config": {
+					"Datacenter":        "dc",
+					"PrimaryDatacenter": "primary",
+				},
+			},
+			expDC:        "dc",
+			expPrimaryDC: "primary",
+		},
+		"DebugConfig.PrimaryDatacenter set": {
+			agentSelfResponse: map[string]map[string]interface{}{
+				"Config": {
+					"Datacenter": "dc",
+				},
+				"DebugConfig": {
+					"PrimaryDatacenter": "primary",
+				},
+			},
+			expDC:        "dc",
+			expPrimaryDC: "primary",
+		},
+		"both Config.PrimaryDatacenter and DebugConfig.PrimaryDatacenter set": {
+			agentSelfResponse: map[string]map[string]interface{}{
+				"Config": {
+					"Datacenter":        "dc",
+					"PrimaryDatacenter": "primary",
+				},
+				"DebugConfig": {
+					"PrimaryDatacenter": "primary",
+				},
+			},
+			expDC:        "dc",
+			expPrimaryDC: "primary",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			jsonResponse, err := json.Marshal(c.agentSelfResponse)
+			require.NoError(t, err)
+
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v1/agent/self":
+					fmt.Fprintln(w, string(jsonResponse))
+				default:
+					t.Fatalf("unexpected request to %s", r.URL.Path)
+				}
+			}))
+			defer consulServer.Close()
+
+			consulClient, err := api.NewClient(&api.Config{Address: consulServer.URL})
+			require.NoError(t, err)
+
+			command := Command{
+				log:        hclog.New(hclog.DefaultOptions),
+				cmdTimeout: context.Background(),
+			}
+			actDC, actPrimaryDC, err := command.consulDatacenterList(consulClient)
+			if c.expErr != "" {
+				require.EqualError(t, err, c.expErr)
+			} else {
+				require.Equal(t, c.expDC, actDC)
+				require.Equal(t, c.expPrimaryDC, actPrimaryDC)
+			}
+		})
+	}
+}
+
 // Test that if creating client tokens fails at first, we retry.
 func TestRun_ClientTokensRetry(t *testing.T) {
 	t.Parallel()
@@ -1394,7 +1494,7 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			}
 			numPolicyCalls++
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1479,7 +1579,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		})
 		switch r.URL.Path {
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1574,7 +1674,7 @@ func TestRun_SkipBootstrapping_WhenBootstrapTokenIsProvided(t *testing.T) {
 		})
 		switch r.URL.Path {
 		case "/v1/agent/self":
-			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1"}}`)
+			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1699,6 +1799,7 @@ func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	}
 	secondaryCmd.init()
 	secondaryCmdArgs := []string{
+		"-federation",
 		"-timeout=1m",
 		"-k8s-namespace=" + ns,
 		"-server-address", strings.Split(secondaryAddr, ":")[0],
@@ -1967,6 +2068,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 		primaryCmd.init()
 		primaryCmdArgs := []string{
+			"-federation",
 			"-k8s-namespace=" + ns,
 			"-server-address", strings.Split(primarySvr.HTTPAddr, ":")[0],
 			"-server-port", strings.Split(primarySvr.HTTPAddr, ":")[1],

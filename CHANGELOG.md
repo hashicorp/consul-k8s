@@ -3,6 +3,19 @@
 IMPROVEMENTS:
 * Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
   and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
+* Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-530](https://github.com/hashicorp/consul-k8s/pull/530)]
+* Add support for `DialedDirectly` field in `ServiceDefaults` and `ProxyDefaults`. [[GH-533](https://github.com/hashicorp/consul-k8s/pull/533)]
+
+BUG FIXES:
+* CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from time.Duration to metav1.Duration.
+  This allows a user to set these values as a duration string on the resource. Existing resources that had set a specific integer
+  duration will continue to function with a duration with 'n' nanoseconds, 'n' being the set value.
+* Connect: Support overwriting startup, readiness and/or liveness probes to point to the Envoy proxy across all the containers
+  in the pod when transparent proxy is enabled. [[GH-534](https://github.com/hashicorp/consul-k8s/pull/534)]
+  This change removes support for the following annotations from the service pods:
+  - "consul.hashicorp.com/transparent-proxy-readiness-listener-port"
+  - "consul.hashicorp.com/transparent-proxy-liveness-listener-port"
+* Connect: Support overwriting probes when the port is a named port and transparent proxy is enabled. [[GH-535](https://github.com/hashicorp/consul-k8s/pull/535)]
 
 ## 0.26.0-beta3 (May 27, 2021)
 

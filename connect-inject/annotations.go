@@ -112,21 +112,9 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	annotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
-	// annotationTransparentProxyReadinessListenerPort is the port for the readiness probe
-	// that we will expose through Envoy when overwrite probes is enabled.
-	annotationTransparentProxyReadinessListenerPort = "consul.hashicorp.com/transparent-proxy-readiness-listener-port"
-
-	// annotationTransparentProxyLivenessListenerPort is the port for the liveness probe
-	// that we will expose through Envoy when overwrite probes is enabled.
-	annotationTransparentProxyLivenessListenerPort = "consul.hashicorp.com/transparent-proxy-liveness-listener-port"
-
-	// annotationOriginalLivenessProbePort is the value of the port originally defined on the liveness probe
-	// of the pod before we overwrote it.
-	annotationOriginalLivenessProbePort = "consul.hashicorp.com/original-liveness-probe-port"
-
-	// annotationOriginalReadinessProbePort is the value of the port originally defined on the readiness probe
-	// of the pod before we overwrote it.
-	annotationOriginalReadinessProbePort = "consul.hashicorp.com/original-readiness-probe-port"
+	// annotationOriginalPod is the value of the pod before being overwritten by the consul
+	// webhook/handler.
+	annotationOriginalPod = "consul.hashicorp.com/original-pod"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"

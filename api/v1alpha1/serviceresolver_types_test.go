@@ -74,7 +74,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -90,7 +90,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -243,7 +243,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -259,7 +259,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -634,7 +634,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 								FieldValue: "cookiename",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     100,
+									TTL:     metav1.Duration{Duration: 100},
 								},
 							},
 						},
@@ -643,7 +643,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":\"100ns\"}": cannot set both session and ttl`,
 			},
 		},
 		"namespaces disabled: redirect namespace specified": {

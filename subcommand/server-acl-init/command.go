@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"github.com/mitchellh/mapstructure"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -83,6 +84,11 @@ type Command struct {
 	flagLogLevel      string
 	flagLogOutputJSON bool
 	flagTimeout       time.Duration
+
+	// flagFederation is used to determine which ACL policies to write and whether or not to provide suffixing
+	// to the policy names when creating the policy in cases where federation is used.
+	// flagFederation indicates if federation has been enabled in the cluster.
+	flagFederation bool
 
 	clientset kubernetes.Interface
 
@@ -188,6 +194,8 @@ func (c *Command) init() {
 		"Toggle for creating a token for ACL replication between datacenters.")
 	c.flags.StringVar(&c.flagACLReplicationTokenFile, "acl-replication-token-file", "",
 		"Path to file containing ACL token to be used for ACL replication. If set, ACL replication is enabled.")
+
+	c.flags.BoolVar(&c.flagFederation, "federation", false, "Toggle for when federation has been enabled.")
 
 	c.flags.StringVar(&c.flagBootstrapTokenFile, "bootstrap-token-file", "",
 		"Path to file containing ACL token for creating policies and tokens. This token must have 'acl:write' permissions."+
@@ -363,13 +371,13 @@ func (c *Command) Run(args []string) int {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
 	}
-
-	consulDC, err := c.consulDatacenter(consulClient)
+	consulDC, primaryDC, err := c.consulDatacenterList(consulClient)
 	if err != nil {
 		c.log.Error("Error getting datacenter name", "err", err)
 		return 1
 	}
-	c.log.Info("Current datacenter", "datacenter", consulDC)
+	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
+	isPrimary := consulDC == primaryDC
 
 	// With the addition of namespaces, the ACL policies associated
 	// with the server tokens may need to be updated if Enterprise Consul
@@ -434,14 +442,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		err = c.createLocalACL("client", agentRules, consulDC, consulClient)
+		err = c.createLocalACL("client", agentRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
 	}
 
-	if c.createAnonymousPolicy() {
+	if c.createAnonymousPolicy(isPrimary) {
 		err := c.configureAnonymousPolicy(consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
@@ -459,9 +467,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token needs to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, consulClient)
+			err = c.createGlobalACL("catalog-sync", syncRules, consulDC, isPrimary, consulClient)
 		} else {
-			err = c.createLocalACL("catalog-sync", syncRules, consulDC, consulClient)
+			err = c.createLocalACL("catalog-sync", syncRules, consulDC, isPrimary, consulClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -486,9 +494,9 @@ func (c *Command) Run(args []string) int {
 		// If namespaces are enabled, the policy and token need to be global
 		// to be allowed to create namespaces.
 		if c.flagEnableNamespaces {
-			err = c.createGlobalACL("connect-inject", injectRules, consulDC, consulClient)
+			err = c.createGlobalACL("connect-inject", injectRules, consulDC, isPrimary, consulClient)
 		} else {
-			err = c.createLocalACL("connect-inject", injectRules, consulDC, consulClient)
+			err = c.createLocalACL("connect-inject", injectRules, consulDC, isPrimary, consulClient)
 		}
 
 		if err != nil {
@@ -498,7 +506,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateEntLicenseToken {
-		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, consulClient)
+		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -506,7 +514,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateSnapshotAgentToken {
-		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, consulClient)
+		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -522,7 +530,7 @@ func (c *Command) Run(args []string) int {
 
 		// Mesh gateways require a global policy/token because they must
 		// discover services in other datacenters.
-		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, consulClient)
+		err = c.createGlobalACL("mesh-gateway", meshGatewayRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -577,7 +585,7 @@ func (c *Command) Run(args []string) int {
 			// the words "ingress-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-ingress-gateway`.
 			tokenName := fmt.Sprintf("%s-ingress-gateway", name)
-			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, consulClient)
+			err = c.createLocalACL(tokenName, ingressGatewayRules, consulDC, isPrimary, consulClient)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -633,7 +641,7 @@ func (c *Command) Run(args []string) int {
 			// the words "ingress-gateway". We need to create unique names for tokens
 			// across all gateway types and so must suffix with `-terminating-gateway`.
 			tokenName := fmt.Sprintf("%s-terminating-gateway", name)
-			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, consulClient)
+			err = c.createLocalACL(tokenName, terminatingGatewayRules, consulDC, isPrimary, consulClient)
 			if err != nil {
 				c.log.Error(err.Error())
 				return 1
@@ -649,7 +657,7 @@ func (c *Command) Run(args []string) int {
 		}
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
-		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, consulClient)
+		err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -665,7 +673,7 @@ func (c *Command) Run(args []string) int {
 		// Controller token must be global because config entry writes all
 		// go to the primary datacenter. This means secondary datacenters need
 		// a token that is known by the primary datacenters.
-		err = c.createGlobalACL("controller", rules, consulDC, consulClient)
+		err = c.createGlobalACL("controller", rules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -735,9 +743,9 @@ func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
 }
 
-// consulDatacenter returns the current datacenter name using the
+// consulDatacenterList returns the current datacenter name and the primary datacenter using the
 // /agent/self API endpoint.
-func (c *Command) consulDatacenter(client *api.Client) (string, error) {
+func (c *Command) consulDatacenterList(client *api.Client) (string, string, error) {
 	var agentCfg map[string]map[string]interface{}
 	err := c.untilSucceeds("calling /agent/self to get datacenter",
 		func() error {
@@ -746,45 +754,56 @@ func (c *Command) consulDatacenter(client *api.Client) (string, error) {
 			return opErr
 		})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	if _, ok := agentCfg["Config"]; !ok {
-		return "", fmt.Errorf("/agent/self response did not contain Config key: %s", agentCfg)
+	var agentConfig AgentConfig
+	err = mapstructure.Decode(agentCfg, &agentConfig)
+	if err != nil {
+		return "", "", err
 	}
-	if _, ok := agentCfg["Config"]["Datacenter"]; !ok {
-		return "", fmt.Errorf("/agent/self response did not contain Config.Datacenter key: %s", agentCfg)
+	if agentConfig.Config.Datacenter == "" {
+		return "", "", fmt.Errorf("/agent/self response did not contain Config.Datacenter key: %s", agentCfg)
 	}
-	dc, ok := agentCfg["Config"]["Datacenter"].(string)
-	if !ok {
-		return "", fmt.Errorf("could not cast Config.Datacenter as string: %s", agentCfg)
+	if agentConfig.Config.PrimaryDatacenter == "" && agentConfig.DebugConfig.PrimaryDatacenter == "" {
+		return "", "", fmt.Errorf("both Config.PrimaryDatacenter and DebugConfig.PrimaryDatacenter are empty: %s", agentCfg)
 	}
-	if dc == "" {
-		return "", fmt.Errorf("value of Config.Datacenter was empty string: %s", agentCfg)
+	if agentConfig.Config.PrimaryDatacenter != "" {
+		return agentConfig.Config.Datacenter, agentConfig.Config.PrimaryDatacenter, nil
+	} else {
+		return agentConfig.Config.Datacenter, agentConfig.DebugConfig.PrimaryDatacenter, nil
 	}
-	return dc, nil
+}
+
+type AgentConfig struct {
+	Config      Config
+	DebugConfig Config
+}
+
+type Config struct {
+	Datacenter        string `mapstructure:"Datacenter"`
+	PrimaryDatacenter string `mapstructure:"PrimaryDatacenter"`
 }
 
 // createAnonymousPolicy returns whether we should create a policy for the
 // anonymous ACL token, i.e. queries without ACL tokens.
-func (c *Command) createAnonymousPolicy() bool {
-	// If c.flagACLReplicationTokenFile is set then we're in a secondary DC.
+func (c *Command) createAnonymousPolicy(isPrimary bool) bool {
+	// If isPrimary is not set then we're in a secondary DC.
 	// In this case we assume that the primary datacenter has already created
 	// the anonymous policy and attached it to the anonymous token.
 	// We don't want to modify the anonymous policy in secondary datacenters
 	// because it is global and we can't create separate tokens for each
 	// secondary datacenter because the anonymous token is global.
-	return c.flagACLReplicationTokenFile == "" &&
+	return isPrimary &&
 		// Consul DNS requires the anonymous policy because DNS queries don't
 		// have ACL tokens.
 		(c.flagAllowDNS ||
-			// If connect is enabled and the ACL replication token is being
-			// created then we know we're using multi-dc Connect.
+			// If connect is enabled and federation is enabled then we know we're using multi-dc Connect.
 			// In this case the anonymous policy is required because Connect
 			// services in Kubernetes have local tokens which are stripped
 			// on cross-dc API calls. The cross-dc API calls thus use the anonymous
 			// token. Cross-dc API calls are needed by the Connect proxies to talk
 			// cross-dc.
-			(c.flagCreateInjectToken && c.flagCreateACLReplicationToken))
+			(c.flagCreateInjectToken && c.flagFederation))
 }
 
 func (c *Command) validateFlags() error {

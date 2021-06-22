@@ -45,6 +45,9 @@ type Command struct {
 	flagLogLevel      string
 	flagLogOutputJSON bool
 
+	flagDeploymentName      string
+	flagDeploymentNamespace string
+
 	clientset kubernetes.Interface
 
 	once   sync.Once
@@ -60,6 +63,10 @@ func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagConfigFile, "config-file", "",
 		"Path to a config file to read webhook configs from. This file must be in JSON format.")
+	c.flagSet.StringVar(&c.flagDeploymentName, "deployment-name", "",
+		"Name of deployment that the cert-manager pod is managed by.")
+	c.flagSet.StringVar(&c.flagDeploymentNamespace, "deployment-namespace", "",
+		"Namespace of deployment that the cert-manager pod is managed by.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -92,6 +99,16 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagConfigFile == "" {
 		c.UI.Error(fmt.Sprintf("-config-file must be set"))
+		return 1
+	}
+
+	if c.flagDeploymentName == "" {
+		c.UI.Error(fmt.Sprintf("-deployment-name must be set"))
+		return 1
+	}
+
+	if c.flagDeploymentNamespace == "" {
+		c.UI.Error(fmt.Sprintf("-deployment-namespace must be set"))
 		return 1
 	}
 
@@ -217,11 +234,24 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernetes.Interface, bundle cert.MetaBundle, log hclog.Logger) error {
 	iterLog := log.With("mutatingwebhookconfig", bundle.WebhookConfigName, "secret", bundle.SecretName, "secretNS", bundle.SecretNamespace)
 
+	deployment, err := clientset.AppsV1().Deployments(c.flagDeploymentNamespace).Get(ctx, c.flagDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
 	certSecret, err := clientset.CoreV1().Secrets(bundle.SecretNamespace).Get(ctx, bundle.SecretName, metav1.GetOptions{})
 	if err != nil && k8serrors.IsNotFound(err) {
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: bundle.SecretName,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       deployment.Name,
+						UID:        deployment.UID,
+					},
+				},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       bundle.Cert,
@@ -254,6 +284,16 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 
 	certSecret.Data[corev1.TLSCertKey] = bundle.Cert
 	certSecret.Data[corev1.TLSPrivateKeyKey] = bundle.Key
+	// Update the Owner Reference on an existing secret in case the secret
+	// already existed in the cluster and was not created by this job.
+	certSecret.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+			Name:       deployment.Name,
+			UID:        deployment.UID,
+		},
+	}
 
 	iterLog.Info("Updating secret with new certificate")
 	_, err = clientset.CoreV1().Secrets(bundle.SecretNamespace).Update(ctx, certSecret, metav1.UpdateOptions{})

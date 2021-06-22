@@ -2,9 +2,9 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/deckarep/golang-set"
@@ -36,19 +36,24 @@ const (
 	MetaKeyManagedBy           = "managed-by"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
+	envoySidecarContainer      = "envoy-sidecar"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
 	// TODO: change this to a constant shared with Consul to avoid accidentally changing this.
 	clusterIPTaggedAddressName = "virtual"
 
-	// defaultExposedPathsListenerPortLiveness is the default port that we will use as the ListenerPort
-	// for the Expose configuration of the proxy registration for a liveness probe.
-	defaultExposedPathsListenerPortLiveness = 20300
+	// exposedPathsLivenessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a liveness probe.
+	exposedPathsLivenessPortsRangeStart = 20300
 
-	// defaultExposedPathsListenerPortReadiness is the default port that we will use as the ListenerPort
-	// for the Expose configuration of the proxy registration for a readiness probe.
-	defaultExposedPathsListenerPortReadiness = 20301
+	// exposedPathsReadinessPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a readiness probe.
+	exposedPathsReadinessPortsRangeStart = 20400
+
+	// exposedPathsStartupPortsRangeStart is the start of the port range that we will use as
+	// the ListenerPort for the Expose configuration of the proxy registration for a startup probe.
+	exposedPathsStartupPortsRangeStart = 20500
 )
 
 type EndpointsController struct {
@@ -527,28 +532,19 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			taggedAddresses := make(map[string]api.ServiceAddress)
 
 			// When a service has multiple ports, we need to choose the port that is registered with Consul
-			// and only set that port as the tagged address because Consul currently does not support multiple port
+			// and only set that port as the tagged address because Consul currently does not support multiple ports
 			// on a single service.
 			var k8sServicePort int32
 			for _, sp := range k8sService.Spec.Ports {
-				// If target port is a name, then we need to find the port value from the pod.
-				if sp.TargetPort.Type == intstr.String {
-					targetPortValue, err := portValue(pod, sp.TargetPort.StrVal)
-					if err != nil {
-						return nil, nil, err
-					}
+				targetPortValue, err := portValueFromIntOrString(pod, sp.TargetPort)
+				if err != nil {
+					return nil, nil, err
+				}
 
-					// If the targetPortValue is the consulServicePort, then this is the service port we'll use as the tagged address.
-					if targetPortValue == int32(consulServicePort) {
-						k8sServicePort = sp.Port
-						break
-					}
-				} else if sp.TargetPort.Type == intstr.Int && sp.TargetPort.IntVal != 0 {
-					// If the target port is a non-zero int, we can compare that port directly with the Consul service port.
-					if sp.TargetPort.IntVal == int32(consulServicePort) {
-						k8sServicePort = sp.Port
-						break
-					}
+				// If the targetPortValue is not zero and is the consulServicePort, then this is the service port we'll use as the tagged address.
+				if targetPortValue != 0 && targetPortValue == consulServicePort {
+					k8sServicePort = sp.Port
+					break
 				} else {
 					// If targetPort is not specified, then the service port is used as the target port,
 					// and we can compare the service port with the Consul service port.
@@ -578,34 +574,48 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			return nil, nil, err
 		}
 		if overwriteProbes {
-			if cs := pod.Spec.Containers; len(cs) > 0 {
-				appContainer := cs[0]
-				if appContainer.LivenessProbe != nil && appContainer.LivenessProbe.HTTPGet != nil {
-					if raw, ok := pod.Annotations[annotationOriginalLivenessProbePort]; ok {
-						originalLivenessPort, err := strconv.Atoi(raw)
-						if err != nil {
-							return nil, nil, err
-						}
+			var originalPod corev1.Pod
+			err := json.Unmarshal([]byte(pod.Annotations[annotationOriginalPod]), &originalPod)
+			if err != nil {
+				return nil, nil, err
+			}
 
-						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  appContainer.LivenessProbe.HTTPGet.Port.IntValue(),
-							LocalPathPort: originalLivenessPort,
-							Path:          appContainer.LivenessProbe.HTTPGet.Path,
-						})
-					}
-				}
-				if appContainer.ReadinessProbe != nil && appContainer.ReadinessProbe.HTTPGet != nil {
-					if raw, ok := pod.Annotations[annotationOriginalReadinessProbePort]; ok {
-						originalReadinessPort, err := strconv.Atoi(raw)
-						if err != nil {
-							return nil, nil, err
+			for _, mutatedContainer := range pod.Spec.Containers {
+				for _, originalContainer := range originalPod.Spec.Containers {
+					if originalContainer.Name == mutatedContainer.Name {
+						if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
+							originalLivenessPort, err := portValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  mutatedContainer.LivenessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalLivenessPort,
+								Path:          mutatedContainer.LivenessProbe.HTTPGet.Path,
+							})
 						}
-
-						proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
-							ListenerPort:  appContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
-							LocalPathPort: originalReadinessPort,
-							Path:          appContainer.ReadinessProbe.HTTPGet.Path,
-						})
+						if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
+							originalReadinessPort, err := portValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  mutatedContainer.ReadinessProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalReadinessPort,
+								Path:          mutatedContainer.ReadinessProbe.HTTPGet.Path,
+							})
+						}
+						if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
+							originalStartupPort, err := portValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+							if err != nil {
+								return nil, nil, err
+							}
+							proxyConfig.Expose.Paths = append(proxyConfig.Expose.Paths, api.ExposePath{
+								ListenerPort:  mutatedContainer.StartupProbe.HTTPGet.Port.IntValue(),
+								LocalPathPort: originalStartupPort,
+								Path:          mutatedContainer.StartupProbe.HTTPGet.Path,
+							})
+						}
 					}
 				}
 			}
@@ -613,6 +623,22 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 
 	return service, proxyService, nil
+}
+
+// portValueFromIntOrString returns the integer port value from the port that can be
+// a named port, an integer string (e.g. "80"), or an integer. If the port is a named port,
+// this function will attempt to find the value from the containers of the pod.
+func portValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (int, error) {
+	if port.Type == intstr.Int {
+		return port.IntValue(), nil
+	}
+
+	// Otherwise, find named port or try to parse the string as an int.
+	portVal, err := portValue(pod, port.StrVal)
+	if err != nil {
+		return 0, err
+	}
+	return int(portVal), nil
 }
 
 // getConsulHealthCheckID deterministically generates a health check ID that will be unique to the Agent

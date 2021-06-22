@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -135,7 +134,7 @@ type ServiceRouteDestination struct {
 	PrefixRewrite string `json:"prefixRewrite,omitempty"`
 	// RequestTimeout is the total amount of time permitted for the entire
 	// downstream request (and retries) to be processed.
-	RequestTimeout time.Duration `json:"requestTimeout,omitempty"`
+	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
 	// NumRetries is the number of times to retry the request when a retryable result occurs
 	NumRetries uint32 `json:"numRetries,omitempty"`
 	// RetryOnConnectFailure allows for connection failure errors to trigger a retry.
@@ -326,7 +325,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		ServiceSubset:         in.ServiceSubset,
 		Namespace:             in.Namespace,
 		PrefixRewrite:         in.PrefixRewrite,
-		RequestTimeout:        in.RequestTimeout,
+		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
