@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"io/ioutil"
 	"net"
 	"sync"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
