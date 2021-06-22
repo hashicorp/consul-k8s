@@ -26,13 +26,13 @@ global:
   # Examples:
   #
   # ```yaml
-  # # Consul 1.5.0
-  # image: "consul:1.5.0"
-  # # Consul Enterprise 1.5.0
-  # image: "hashicorp/consul-enterprise:1.5.0-ent"
+  # # Consul 1.10.0
+  # image: "consul:1.10.0"
+  # # Consul Enterprise 1.10.0
+  # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.10.0-rc2"
+  image: "hashicorp/consul:1.10.0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s Docker image.
@@ -52,7 +52,7 @@ global:
   # Docker image that is used for functionality such the catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s:<latest version>
-  imageK8S: "hashicorp/consul-k8s:0.26.0-beta3"
+  imageK8S: "hashicorp/consul-k8s:0.26.0"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -332,7 +332,7 @@ server:
     secretName: null
     # The key within the Kubernetes secret that holds the enterprise license.
     secretKey: null
-    # Manages license autoload. Supported in Consul 1.10+
+    # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
 
   # Exposes the servers' gossip and RPC ports as hostPorts. To enable a client

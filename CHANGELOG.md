@@ -1,16 +1,123 @@
-## UNRELEASED
+## 0.32.0 (June 22, 2021)
+
+FEATURES:
+* Connect: Support transparent proxy. [[GH-905](https://github.com/hashicorp/consul-helm/pull/905)]
+  This feature allows users to reach other services on the Consul Service Mesh by using KubeDNS instead of using `localhost` and enforces all inbound and outbound traffic within a pod to go through the Envoy proxy.
+  Please see [Transparent Proxy](https://www.consul.io/docs/connect/transparent-proxy ) docs for more information.
+
+  **Note: This feature requires Consul 1.10.0 or higher and consul-k8s `v0.26.0` or higher.**
+
+  Transparent proxy is enabled by default for all Consul service mesh application. You can disable it for the
+  entire Helm installation by setting:
+
+  ```yaml
+  connectInject:
+    transparentProxy:
+      defaultEnabled: false
+  ```
+
+  Alternatively, you can enable or disable it for each individual application by using
+  the `consul.hashicorp.com/transparent-proxy` pod annotation:
+
+  ```yaml
+  ...
+  metadata:
+    name: example
+    labels:
+      app: example
+    annotations:
+      "consul.hashicorp.com/transparent-proxy": "true"
+  ...
+  ```
+* Connect: Allow overwriting Kubernetes HTTP probes when running with transparent proxy enabled. [[GH-953](https://github.com/hashicorp/consul-helm/pull/953)]
+* Connect: Enable OpenShift for the connect-injector so that we can support running with transparent proxy enabled. [[GH-972](https://github.com/hashicorp/consul-helm/pull/972)]
+* Add support for `global.recursors` to set Consul's [`-recursor` flag](https://www.consul.io/docs/agent/options#_recursor) [[GH-985](https://github.com/hashicorp/consul-helm/pull/985)].
 
 IMPROVEMENTS:
-* Allow setting annotations on service accounts for: server, client, client
-  snapshot agent, connect inject, controller, ingressGateways, meshGateway,
+* CRDs: Update `ServiceDefaults` with `Mode`, `TransparentProxy`, `DialedDirectly` and `UpstreamConfigs` fields. Note: Mode and TransparentProxy should not be set using this CRD but via annotations. [[GH-925](https://github.com/hashicorp/consul-helm/pull/925)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)], [[GH-992](https://github.com/hashicorp/consul-helm/pull/992)]
+* CRDs: Update `ProxyDefaults` with `Mode`, `DialedDirectly` and `TransparentProxy` fields. Note: Mode and TransparentProxy should not be set
+  using the CRD but via annotations. [[GH-928](https://github.com/hashicorp/consul-helm/pull/928)], [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)], [[GH-992](https://github.com/hashicorp/consul-helm/pull/992)]
+* CRDs: Add support for MeshConfigEntry. This resource is supported in Consul 1.10+ [[GH-941](https://github.com/hashicorp/consul-helm/pull/941)]
+* CRDs: Update the CRD version itself from v1beta1 to v1. Note: This is the version of the definition itself, not the underlying resources; those are still at `consul.hashicorp.com/v1alpha1`. This update requires no action on the behalf of users. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+* Connect: Support high availability of the connect-inject deployment. [[GH-903](https://github.com/hashicorp/consul-helm/pull/903)]
+* Enterprise: Support applying Consul Enterprise license when security context defaults to non-root users. [[GH-880](https://github.com/hashicorp/consul-helm/pull/880)]
+* License Autoloading [Enterprise]: Support Consul Enterprise license autoloading for Consul Enterprise 1.10+. If running Consul <1.10 see `BREAKING CHANGES` section for upgrade instructions.
+* Sync Catalog: add new `syncCatalog.extraLabels` Helm value for configuring labels on sync catalog pods. [[GH-892](https://github.com/hashicorp/consul-helm/pull/892)]
+* Updated the default envoy image to `envoyproxy/envoy-alpine:v1.18.3`.
+* Add support to set the nodePort value in the Consul UI Service. [[GH-878](https://github.com/hashicorp/consul-helm/pull/878)]
+* Allow setting annotations on service accounts for: server, client, client snapshot agent, connect inject, controller, ingressGateways, meshGateway,
   syncCatalog, and terminatingGateways. [[GH-964](https://github.com/hashicorp/consul-helm/pull/964)]
-* Add support for `global.recursors` to set Consul's [`-recursor` flag](https://www.consul.io/docs/agent/options#_recursor) [[GH-985](https://github.com/hashicorp/consul-helm/pull/985)].
 * Delete secrets created by webhook-cert-manager when the deployment is deleted. [[GH-987](https://github.com/hashicorp/consul-helm/pull/987)]
-* Add support for `DialedDirectly` field in `ServiceDefaults` and `ProxyDefaults`. [[GH-992](https://github.com/hashicorp/consul-helm/pull/992)]
+* Connect: connect webhook deployment now uses `webhook-cert-manager` to bootstrap the webhook certificates instead of generating them inside of the webhook. [[GH-861](https://github.com/hashicorp/consul-helm/pull/861)]
+
+BREAKING CHANGES
+* Connect: Kubernetes Services are now required for all connect injected applications.
+  The Kubernetes service name will be used as the service name to register with Consul unless the annotation `consul.hashicorp.com/connect-service` is provided to the pod to override this.
+  If using ACLs the ServiceAccountName must match the service name used with Consul.
+
+  Example Service:
+  ```yaml
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: sample-app
+  spec:
+    selector:
+      app: sample-app
+    ports:
+    - port: 80
+      targetPort: 9090
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: sample-app
+    name: sample-app
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: sample-app
+    template:
+      metadata:
+        annotations:
+          'consul.hashicorp.com/connect-inject': 'true'
+        labels:
+          app: sample-app
+      spec:
+        containers:
+        - name: sample-app
+          image: sample-app:0.1.0
+          ports:
+          - containerPort: 9090
+  ```
+  **Note: if you're already using a Kubernetes service, no changes are required.**
+* [Enterprise] For versions of Consul Enterprise 1.9 <v1.9.7 and Consul Enterprise 1.8 <v1.8.12 , if the license was provided as a Kubernetes secret, the key `server.enterpriseLicense.enableLicenseAutoload`
+  needs to explicitly be set to `false`in order for the license job to run.
+```yaml
+server:
+  enterpriseLicense:
+    secretName: <name-of-kubernetes-secret>
+    secretKey: <name-of-key-whose-value-is-the-license>
+    enableLicenseAutoload: false
+```
+See https://consul.io/docs/upgrading/instructions/upgrade-to-1-10-x for more details.
+* Remove templates for a demo installation of Grafana in light of recent license changes to Grafana's licensing. If you were previously setting `grafana.enabled` to `true` you must now install Grafana through their Helm chart (https://artifacthub.io/packages/helm/grafana/grafana). [[GH-930](https://github.com/hashicorp/consul-helm/pull/930)]
+* Remove support for `admissionregistration.k8s.io/v1beta1` version of MutatingWebhookConfiguration as it is deprecated in Kubernetes 1.16+. Only the `admissionregistration.k8s.io/v1`
+  version will be supported. [[GH-914](https://github.com/hashicorp/consul-helm/pull/914)]
+* Update supported kubeVersion in Chart.yaml from >=1.13.0-0 to >=1.16.0-0. [[GH-883](https://github.com/hashicorp/consul-helm/pull/883)]
+* Connect: The Helm values for health checks and cleanup controller have been removed: `connectInject.healthChecks` and `connectInject.cleanupController`. This functionality is now enabled by default. You can delete these keys or leave them as they will no longer have any effect. [[GH-899](https://github.com/hashicorp/consul-helm/pull/899)]
 
 BUG FIXES:
-* CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from int64 to string.
-  This allows a user to set these values as a duration string on the resource ex '5s'.
+* CRDs: Update the type of connectTimeout and TTL in ServiceResolver and ServiceRouter from int64 to string. This allows a user to set these values as a duration string on the resource ex '5s'.
+* OpenShift: support `server.exposeGossipAndRPCPorts`. [[GH-932](https://github.com/hashicorp/consul-helm/issues/932)]
+* CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR was not synced to Consul because `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-921](https://github.com/hashicorp/consul-helm/pull/921)]
+* Don't set `-disable-host-node-id=false` on Consul Clients because it causes Clients to not be able to join the cluster on certain hypervisor or Kind setups. This flag was added in 0.30.0 to stop Consul logging an error when a Client pod was force deleted, but this error does not affect the pod restarting so removing the flag will have no real effect. [[GH-936](https://github.com/hashicorp/consul-helm/pull/936)]
+
+KNOWN ISSUES:
+* This release does not work when Pod Security Policies are enabled. This will be fixed in the upcoming release.
 
 ## 0.32.0-beta3 (May 27, 2021)
 KNOWN ISSUES:
