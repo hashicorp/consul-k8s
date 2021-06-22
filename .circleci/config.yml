@@ -612,6 +612,34 @@ jobs:
           fail_only: true
           failure_message: "Failed to trigger an update to the helm charts index. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  cleanup-azure-resources:
+    docker:
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+    steps:
+      - run:
+          name: cleanup leftover resources
+          command: |
+            az login --service-principal -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null
+            resource_groups=$(az group list -o json  | jq -r '.[] | select(.name | test("^consul-k8s-\\d+$")) | .name')
+            for group in $resource_groups; do
+              echo "Deleting $group resource group"
+              az group delete -n $group --yes
+            done
+
+  cleanup-gcp-resources:
+    docker:
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+    steps:
+      - run:
+          name: cleanup leftover resources
+          command: |
+            echo "${GOOGLE_CREDENTIALS}" | gcloud auth activate-service-account --key-file=-
+            clusters=$(gcloud container clusters list --zone us-central1-a --project ${CLOUDSDK_CORE_PROJECT} --format json  | jq -r '.[] | select(.name | test("^consul-k8s-\\d+$")) | .name')
+            for cluster in $clusters; do
+              echo "Deleting $cluster GKE cluster"
+              gcloud container clusters delete $cluster --zone us-central1-a --project ${CLOUDSDK_CORE_PROJECT} --quiet
+            done
+
 workflows:
   version: 2
   test:
@@ -643,10 +671,18 @@ workflows:
               only:
                 - master
     jobs:
-      - acceptance-openshift
-      - acceptance-gke-1-17
+      - cleanup-gcp-resources
+      - cleanup-azure-resources
+      - acceptance-openshift:
+          requires:
+          - cleanup-azure-resources
+      - acceptance-gke-1-17:
+          requires:
+            - cleanup-gcp-resources
       - acceptance-eks-1-18
-      - acceptance-aks-1-19
+      - acceptance-aks-1-19:
+          requires:
+            - cleanup-azure-resources
       - acceptance-kind-1-21
   update-helm-charts-index:
     jobs:
