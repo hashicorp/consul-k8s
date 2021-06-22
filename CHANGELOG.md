@@ -21,19 +21,8 @@ FEATURES:
   * Add new `consul.hashicorp.com/transparent-proxy` pod annotation to allow enabling and disabling transparent
     proxy for individual services.
 * CRDs: Add CRD for MeshConfigEntry. Supported in Consul 1.10+ [[GH-513](https://github.com/hashicorp/consul-k8s/pull/513)]
-
-IMPROVEMENTS:
-* Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
-  and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
-* Add support for `DialedDirectly` field in `ServiceDefaults` and `ProxyDefaults`. [[GH-533](https://github.com/hashicorp/consul-k8s/pull/533)]
 * Connect: Overwrite Kubernetes HTTP readiness and/or liveness probes to point to Envoy proxy when
   transparent proxy is enabled. [[GH-517](https://github.com/hashicorp/consul-k8s/pull/517)]
-* Connect: Don't set security context for the Envoy proxy when on OpenShift and transparent proxy is disabled.
-  [[GH-521](https://github.com/hashicorp/consul-k8s/pull/521)]
-* Connect: `consul-connect-inject-init` run with `privileged: true` when transparent proxy is enabled.
-  [[GH-524](https://github.com/hashicorp/consul-k8s/pull/524)]
-* Connect: No longer set multiple tagged addresses in Consul when k8s service has multiple ports and Transparent Proxy is enabled.
-  [[GH-511](https://github.com/hashicorp/consul-k8s/pull/511)]
 * Connect: Allow exclusion of inbound ports, outbound ports and CIDRs, and additional user IDs when
   Transparent Proxy is enabled. [[GH-506](https://github.com/hashicorp/consul-k8s/pull/506)]
 
@@ -42,18 +31,14 @@ IMPROVEMENTS:
   * `consul.hashicorp.com/transparent-proxy-exclude-outbound-ports` - Comma-separated list of outbound ports to exclude.
   * `consul.hashicorp.com/transparent-proxy-exclude-outbound-cidrs` - Comma-separated list of IPs or CIDRs to exclude.
   * `consul.hashicorp.com/transparent-proxy-exclude-uids` - Comma-separated list of Linux user IDs to exclude.
-
 * Connect: Add the ability to set default tproxy mode at namespace level via label. [[GH-501](https://github.com/hashicorp/consul-k8s/pull/510)]
   * Setting the annotation `consul.hashicorp.com/transparent-proxy` to `true/false` will define whether tproxy is enabled/disabled for the pod.
   * Setting the label `consul.hashicorp.com/transparent-proxy` to `true/false` on a namespace will define the default behavior for pods in that namespace, which do not also have the annotation set.
   * The default tproxy behavior will be defined by the value of `-enable-transparent-proxy` flag to the `consul-k8s inject-connect` command. It can be overridden in a namespace by the the label on the namespace or for a pod using the annotation on the pod.
 * Connect: support upgrades for services deployed before endpoints controller to
   upgrade to a version of consul-k8s with endpoints controller. [[GH-509](https://github.com/hashicorp/consul-k8s/pull/509)]
-* Connect: add additional logging to the endpoints controller and connect-init command to help
-  the user debug if pods arent starting right away. [[GH-514](https://github.com/hashicorp/consul-k8s/pull/514/)]
-* Connect: the `consul-connect-inject-init` container has been split into two init containers. [[GH-441](https://github.com/hashicorp/consul-k8s/pull/441)]
-* Connect: A new internal command `consul-k8s connect-init` has been added.
-  It replaces the existing init container logic for ACL login and Envoy bootstrapping and introduces a polling wait for service registration,
+* Connect: A new command `consul-k8s connect-init` has been added.
+  It replaces the existing init-container logic for ACL login and Envoy bootstrapping and introduces a polling wait for service registration,
   see `Endpoints Controller` for more information.
   [[GH-446](https://github.com/hashicorp/consul-k8s/pull/446)], [[GH-452](https://github.com/hashicorp/consul-k8s/pull/452)], [[GH-459](https://github.com/hashicorp/consul-k8s/pull/459)]
 * Connect: A new controller `Endpoints Controller` has been added which is responsible for managing service endpoints and service registration.
@@ -67,11 +52,14 @@ IMPROVEMENTS:
     [[GH-476](https://github.com/hashicorp/consul-k8s/pull/476)], [[GH-454](https://github.com/hashicorp/consul-k8s/pull/454)]
   - Merged metrics configuration support is now partially managed by the endpoints controller.
     [[GH-469](https://github.com/hashicorp/consul-k8s/pull/469)]
-* Connect: Leader election support for connect webhook and controller deployment. [[GH-479](https://github.com/hashicorp/consul-k8s/pull/479)]
-* Connect: Connect webhook no longer generates its own certificates and relies on them being provided as files on the disk.
+
+IMPROVEMENTS:
+* Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
+  and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
+* Connect: Leader election support for connect-inject deployment. [[GH-479](https://github.com/hashicorp/consul-k8s/pull/479)]
+* Connect: the `consul-connect-inject-init` container has been split into two init containers. [[GH-441](https://github.com/hashicorp/consul-k8s/pull/441)]
+ Connect: Connect webhook no longer generates its own certificates and relies on them being provided as files on the disk.
   [[GH-454](https://github.com/hashicorp/consul-k8s/pull/454)]]
-* Connect: Connect pods and their Envoy sidecars no longer have a preStop hook as service deregistration is managed by the endpoints controller.
-  [[GH-467](https://github.com/hashicorp/consul-k8s/pull/467)]
 * CRDs: Update `ServiceDefaults` with `Mode`, `TransparentProxy`, `DialedDirectly` and `UpstreamConfigs` fields. Note: `Mode` and `TransparentProxy` should not be set
   using this CRD but via annotations. [[GH-502](https://github.com/hashicorp/consul-k8s/pull/502)], [[GH-485](https://github.com/hashicorp/consul-k8s/pull/485)], [[GH-533](https://github.com/hashicorp/consul-k8s/pull/533)]
 * CRDs: Update `ProxyDefaults` with `Mode`, `DialedDirectly` and `TransparentProxy` fields. Note: `Mode` and `TransparentProxy` should not be set
@@ -84,59 +72,57 @@ BUG FIXES:
   This allows a user to set these values as a duration string on the resource. Existing resources that had set a specific integer
   duration will continue to function with a duration with 'n' nanoseconds, 'n' being the set value.
 * CRDs: Fix a bug where the `config` field in `ProxyDefaults` CR failed syncing to Consul because `apiextensions.k8s.io/v1` requires CRD spec to have structured schema. [[GH-495](https://github.com/hashicorp/consul-k8s/pull/495)]
-* Connect: Fix a bug where health status in Consul is updated incorrectly due to stale pod information in cache.
-  [[GH-503](https://github.com/hashicorp/consul-k8s/pull/503)]
 * CRDs: make `lastSyncedTime` a pointer to prevent setting last synced time Reconcile errors. [[GH-466](https://github.com/hashicorp/consul-k8s/pull/466)]
 
 BREAKING CHANGES:
 * Connect: Add a security context to the init copy container and the envoy sidecar and ensure they
-  do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned
-  on scheduling. [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
-* Connect: Kubernetes Services are now required for all Consul Service Mesh applications.
+  do not run as root. If a pod container shares the same `runAsUser` (5995) as Envoy an error is returned.
+  [[GH-493](https://github.com/hashicorp/consul-k8s/pull/493)]
+* Connect: Kubernetes Services are required for all Consul Service Mesh applications.
   The Kubernetes service name will be used as the service name to register with Consul
   unless the annotation `consul.hashicorp.com/connect-service` is provided to the deployment/pod to override this.
   If using ACLs, the ServiceAccountName must match the service name used with Consul.
 
   *Note*: if you're already using a Kubernetes service, no changes required.
 
-Example Service:
-```yaml
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sample-app
-spec:
-  selector:
-    app: sample-app
-  ports:
-    - port: 80
-      targetPort: 9090
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: sample-app
-  name: sample-app
-spec:
-  replicas: 1
-  selector:
-     matchLabels:
-       app: sample-app
-  template:
-    metadata:
-      annotations:
-        'consul.hashicorp.com/connect-inject': 'true'
-      labels:
-        app: sample-app
-    spec:
-      containers:
-      - name: sample-app
-        image: sample-app:0.1.0
-        ports:
-        - containerPort: 9090
-```
+  Example Service:
+  ```yaml
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: sample-app
+  spec:
+    selector:
+      app: sample-app
+    ports:
+      - port: 80
+        targetPort: 9090
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: sample-app
+    name: sample-app
+  spec:
+    replicas: 1
+    selector:
+       matchLabels:
+         app: sample-app
+    template:
+      metadata:
+        annotations:
+          'consul.hashicorp.com/connect-inject': 'true'
+        labels:
+          app: sample-app
+      spec:
+        containers:
+        - name: sample-app
+          image: sample-app:0.1.0
+          ports:
+          - containerPort: 9090
+  ```
 * Connect: `consul.hashicorp.com/connect-sync-period` annotation is no longer supported.
   This annotation used to configure the sync period of the `consul-sidecar` (aka `lifecycle-sidecar`).
   Since we no longer inject the `consul-sidecar` to keep services registered in Consul, this annotation has
