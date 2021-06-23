@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controller"
@@ -32,6 +33,7 @@ type Command struct {
 	flagEnableWebhooks       bool
 	flagDatacenter           string
 	flagLogLevel             string
+	flagLogOutputJSON        bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -81,6 +83,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
+	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	c.httpFlags = &flags.HTTPFlags{}
 	flags.Merge(c.flagSet, c.httpFlags.Flags())
@@ -111,18 +115,22 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
 		return 1
 	}
-	// We set UseDevMode to true because we don't want our logs json
-	// formatted.
-	logger := zap.New(zap.UseDevMode(true), zap.Level(zapLevel))
-	ctrl.SetLogger(logger)
-	klog.SetLogger(logger)
+
+	var zapLogger logr.Logger
+	if c.flagLogOutputJSON {
+		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.JSONEncoder())
+	} else {
+		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.ConsoleEncoder())
+	}
+	ctrl.SetLogger(zapLogger)
+	klog.SetLogger(zapLogger)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		Port:             9443,
 		LeaderElection:   c.flagEnableLeaderElection,
 		LeaderElectionID: "consul.hashicorp.com",
-		Logger:           logger,
+		Logger:           zapLogger,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
