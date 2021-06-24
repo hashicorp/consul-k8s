@@ -4,7 +4,7 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/circleci/golang:1.14
+      - image: docker.mirror.hashicorp.services/circleci/golang:1.16
     environment:
       - TEST_RESULTS: /tmp/test-results
 
@@ -14,7 +14,14 @@ commands:
       - run:
           name: Install gotestsum, kind, kubectl, and helm
           command: |
-            go get gotest.tools/gotestsum
+            wget https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
+            rm go1.16.5.linux-amd64.tar.gz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
+
+            wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
+            sudo tar -C /usr/local/bin -xzf gotestsum_1.6.4_linux_amd64.tar.gz
+            rm gotestsum_1.6.4_linux_amd64.tar.gz
 
             curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.0/kind-linux-amd64
             chmod +x ./kind
@@ -101,7 +108,7 @@ commands:
 jobs:
   unit-helm:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.1
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
     steps:
       - checkout
@@ -134,6 +141,7 @@ jobs:
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
           name: check go fmt
+          working_directory: test/acceptance
           command: |
             files=$(go fmt ./...)
             if [ -n "$files" ]; then
@@ -239,7 +247,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
     steps:
       - run:
@@ -305,7 +313,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
     steps:
       - checkout
@@ -360,7 +368,7 @@ jobs:
       - TEST_RESULTS: /tmp/test-results
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
     steps:
       - checkout
@@ -427,7 +435,7 @@ jobs:
     parallelism: 3
     docker:
       # This image is built from test/docker/Test.dockerfile
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
     steps:
       - checkout
@@ -530,6 +538,7 @@ jobs:
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
           name: check go fmt
+          working_directory: hack/helm-reference-gen
           command: |
             files=$(go fmt ./...)
             if [ -n "$files" ]; then
@@ -614,7 +623,7 @@ jobs:
 
   cleanup-azure-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
     steps:
       - run:
           name: cleanup leftover resources
@@ -628,7 +637,7 @@ jobs:
 
   cleanup-gcp-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
     steps:
       - run:
           name: cleanup leftover resources
