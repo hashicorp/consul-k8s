@@ -139,6 +139,11 @@ type Handler struct {
 	// those containers to be created otherwise.
 	EnableOpenShift bool
 
+	// ConsulClientPort needs to be set to the ports the Consul client is using.
+	ConsulClientPortHTTP  string
+	ConsulClientPortHTTPS string
+	ConsulClientPortGRPC  string
+
 	// Log
 	Log logr.Logger
 	// Log settings for consul-sidecar

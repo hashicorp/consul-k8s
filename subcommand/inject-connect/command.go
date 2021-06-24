@@ -94,6 +94,11 @@ type Command struct {
 
 	flagEnableOpenShift bool
 
+	// Consul client ports
+	flagConsulClientPortHTTP  string
+	flagConsulClientPortHTTPS string
+	flagConsulClientPortGRPC  string
+
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
 
@@ -162,6 +167,12 @@ func (c *Command) init() {
 		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
+	c.flagSet.StringVar(&c.flagConsulClientPortHTTP, "consul-client-port-http", "8500",
+		"Consul client HTTP port, defaults to 8500.")
+	c.flagSet.StringVar(&c.flagConsulClientPortHTTPS, "consul-client-port-https", "8501",
+		"Consul client HTTPS port, defaults to 8501.")
+	c.flagSet.StringVar(&c.flagConsulClientPortGRPC, "consul-client-port-grpc", "8502",
+		"Consul client GRPC port, defaults to 8502.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -283,6 +294,23 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	err = common.ValidateUnprivilegedPort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
+	// Validate ports in Consul client flags
+	err = common.ValidateUnprivilegedPort("-consul-client-port-http", c.flagConsulClientPortHTTP)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+	err = common.ValidateUnprivilegedPort("-consul-client-port-https", c.flagConsulClientPortHTTPS)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+	err = common.ValidateUnprivilegedPort("-consul-client-port-grpc", c.flagConsulClientPortGRPC)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -452,6 +480,9 @@ func (c *Command) Run(args []string) int {
 			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
 			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 			EnableOpenShift:            c.flagEnableOpenShift,
+			ConsulClientPortHTTP:       c.flagConsulClientPortHTTP,
+			ConsulClientPortHTTPS:      c.flagConsulClientPortHTTPS,
+			ConsulClientPortGRPC:       c.flagConsulClientPortGRPC,
 			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                   c.flagLogLevel,
 			LogJSON:                    c.flagLogJSON,
