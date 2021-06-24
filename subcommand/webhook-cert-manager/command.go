@@ -41,9 +41,9 @@ type Command struct {
 	flagSet *flag.FlagSet
 	k8s     *flags.K8SFlags
 
-	flagConfigFile    string
-	flagLogLevel      string
-	flagLogOutputJSON bool
+	flagConfigFile string
+	flagLogLevel   string
+	flagLogJson    bool
 
 	flagDeploymentName      string
 	flagDeploymentNamespace string
@@ -70,7 +70,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.k8s = &flags.K8SFlags{}
@@ -128,7 +128,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.logger == nil {
 		var err error
-		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJson)
 		if err != nil {
 			c.UI.Error(err.Error())
 			return 1

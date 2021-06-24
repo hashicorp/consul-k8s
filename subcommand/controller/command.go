@@ -33,7 +33,7 @@ type Command struct {
 	flagEnableWebhooks       bool
 	flagDatacenter           string
 	flagLogLevel             string
-	flagLogOutputJSON        bool
+	flagLogJson              bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -83,7 +83,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.httpFlags = &flags.HTTPFlags{}
@@ -117,7 +117,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var zapLogger logr.Logger
-	if c.flagLogOutputJSON {
+	if c.flagLogJson {
 		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.JSONEncoder())
 	} else {
 		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.ConsoleEncoder())

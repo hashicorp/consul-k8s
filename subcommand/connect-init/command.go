@@ -39,7 +39,7 @@ type Command struct {
 	flagServiceAccountName     string // Service account name.
 	flagServiceName            string // Service name.
 	flagLogLevel               string
-	flagLogOutputJSON          bool
+	flagLogJson                bool
 
 	bearerTokenFile                    string // Location of the bearer token. Default is /var/run/secrets/kubernetes.io/serviceaccount/token.
 	tokenSinkFile                      string // Location to write the output token. Default is defaultTokenSinkFile.
@@ -66,7 +66,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	if c.bearerTokenFile == "" {
@@ -112,7 +112,7 @@ func (c *Command) Run(args []string) int {
 	// Set up logging.
 	if c.logger == nil {
 		var err error
-		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJson)
 		if err != nil {
 			c.UI.Error(err.Error())
 			return 1

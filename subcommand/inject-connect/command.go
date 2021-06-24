@@ -49,7 +49,7 @@ type Command struct {
 	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
 	flagLogLevel             string
-	flagLogOutputJSON        bool
+	flagLogJson              bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -167,7 +167,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	// Proxy sidecar resource setting flags.
@@ -364,10 +364,10 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var zapLogger logr.Logger
-	if c.flagLogOutputJSON {
-		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.JSONEncoder())
+	if c.flagLogJson {
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
 	} else {
-		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.ConsoleEncoder())
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
 	}
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)

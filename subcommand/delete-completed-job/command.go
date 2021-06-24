@@ -22,12 +22,12 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags             *flag.FlagSet
-	k8s               *flags.K8SFlags
-	flagNamespace     string
-	flagTimeout       string
-	flagLogLevel      string
-	flagLogOutputJSON bool
+	flags         *flag.FlagSet
+	k8s           *flags.K8SFlags
+	flagNamespace string
+	flagTimeout   string
+	flagLogLevel  string
+	flagLogJson   bool
 
 	once      sync.Once
 	help      string
@@ -48,7 +48,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -101,7 +101,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	logger, err := common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJson)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

@@ -34,7 +34,7 @@ type Command struct {
 	flagSyncPeriod                time.Duration
 	flagSet                       *flag.FlagSet
 	flagLogLevel                  string
-	flagLogOutputJSON             bool
+	flagLogJson                   bool
 
 	// Flags to configure metrics merging
 	flagEnableMetricsMerging bool
@@ -68,7 +68,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\". Defaults to info.")
-	c.flagSet.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.flagSet.BoolVar(&c.flagEnableMetricsMerging, "enable-metrics-merging", false, "Enables consul sidecar to run a merged metrics endpoint. Defaults to false.")
@@ -112,7 +112,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	logger, err := common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJson)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

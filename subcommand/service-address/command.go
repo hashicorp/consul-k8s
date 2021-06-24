@@ -33,7 +33,7 @@ type Command struct {
 	flagOutputFile       string
 	flagResolveHostnames bool
 	flagLogLevel         string
-	flagLogOutputJSON    bool
+	flagLogJson          bool
 
 	retryDuration time.Duration
 	k8sClient     kubernetes.Interface
@@ -54,7 +54,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.k8sFlags = &k8sflags.K8SFlags{}
@@ -86,7 +86,7 @@ func (c *Command) Run(args []string) int {
 	if c.retryDuration == 0 {
 		c.retryDuration = 1 * time.Second
 	}
-	logger, err := common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJson)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

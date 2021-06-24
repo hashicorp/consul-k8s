@@ -81,9 +81,9 @@ type Command struct {
 	// Flag to support a custom bootstrap token
 	flagBootstrapTokenFile string
 
-	flagLogLevel      string
-	flagLogOutputJSON bool
-	flagTimeout       time.Duration
+	flagLogLevel string
+	flagLogJson  bool
+	flagTimeout  time.Duration
 
 	// flagFederation is used to determine which ACL policies to write and whether or not to provide suffixing
 	// to the policy names when creating the policy in cases where federation is used.
@@ -206,7 +206,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogOutputJSON, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.k8s = &k8sflags.K8SFlags{}
@@ -282,7 +282,7 @@ func (c *Command) Run(args []string) int {
 	defer cancel()
 
 	var err error
-	c.log, err = common.Logger(c.flagLogLevel, c.flagLogOutputJSON)
+	c.log, err = common.Logger(c.flagLogLevel, c.flagLogJson)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
