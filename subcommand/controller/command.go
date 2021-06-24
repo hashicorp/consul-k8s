@@ -118,9 +118,9 @@ func (c *Command) Run(args []string) int {
 
 	var zapLogger logr.Logger
 	if c.flagLogJson {
-		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.JSONEncoder())
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
 	} else {
-		zapLogger = zap.New(zap.UseDevMode(true), zap.Level(zapLevel), zap.ConsoleEncoder())
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
 	}
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)
