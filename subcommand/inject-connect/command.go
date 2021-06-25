@@ -358,6 +358,11 @@ func (c *Command) Run(args []string) int {
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
 	var zapLevel zapcore.Level
+	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
+	// we will assume they meant debug here and not fail.
+	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
+		c.flagLogLevel = "debug"
+	}
 	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
 		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
 		return 1

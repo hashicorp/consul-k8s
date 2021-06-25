@@ -117,6 +117,11 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var zapLogger logr.Logger
+	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
+	// we will assume they meant debug here and not fail.
+	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
+		c.flagLogLevel = "debug"
+	}
 	if c.flagLogJson {
 		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
 	} else {
