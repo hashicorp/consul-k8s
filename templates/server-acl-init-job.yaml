@@ -121,6 +121,9 @@ spec:
                 {{- if not .Values.externalServers.enabled }}
                 -server-port=8501 \
                 {{- end }}
+                {{- if .Values.externalServers.tlsServerName }}
+                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                {{- end }}
                 {{- end }}
 
                 {{- if .Values.syncCatalog.enabled }}

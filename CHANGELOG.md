@@ -1,3 +1,8 @@
+## Unreleased
+
+BUG FIXES:
+* ACLs: Support connecting to external Consul servers with an SNI header. [[GH-1005](https://github.com/hashicorp/consul-helm/pull/1005)]
+
 ## 0.32.0 (June 22, 2021)
 
 FEATURES:
