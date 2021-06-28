@@ -111,17 +111,17 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var zapLevel zapcore.Level
+	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
+	// we will assume they meant debug here and not fail.
+	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
+		c.flagLogLevel = "debug"
+	}
 	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
 		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
 		return 1
 	}
 
 	var zapLogger logr.Logger
-	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
-	// we will assume they meant debug here and not fail.
-	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
-		c.flagLogLevel = "debug"
-	}
 	if c.flagLogJson {
 		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
 	} else {
