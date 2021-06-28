@@ -40,7 +40,7 @@ spec:
             port:
               number: 80
         path: {{ . }}
-        pathType: Prefix
+        pathType: {{ $.Values.ui.ingress.pathType }}
       {{- end }}
       {{- if $global.tls.enabled }}
       - backend:
@@ -49,7 +49,7 @@ spec:
             port:
               number: 443
         path: {{ . }}
-        pathType: Prefix
+        pathType: {{ $.Values.ui.ingress.pathType }}
       {{- end }}
       {{- end }}
   {{- end }}

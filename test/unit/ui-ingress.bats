@@ -202,3 +202,29 @@ load _helpers
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }
+
+#--------------------------------------------------------------------
+# pathtype
+
+@test "ui/Ingress: default PathType Prefix" {
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    --set 'global.tls.enabled=false' \
+    --set 'ui.ingress.hosts[0].host=foo.com' \
+    . | tee /dev/stderr |
+    yq -r '.spec.rules[0].http.paths[0].pathType' | tee /dev/stderr)
+  [ "${actual}" = "Prefix" ]
+}
+
+@test "ui/Ingress: set PathType ImplementationSpecific" {
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    --set 'ui.ingress.pathType=ImplementationSpecific' \
+    --set 'global.tls.enabled=false' \
+    --set 'ui.ingress.hosts[0].host=foo.com' \
+    . | tee /dev/stderr |
+    yq -r '.spec.rules[0].http.paths[0].pathType' | tee /dev/stderr)
+  [ "${actual}" = "ImplementationSpecific" ]
+}
