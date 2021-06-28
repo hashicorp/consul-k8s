@@ -1244,6 +1244,18 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "serverACLInit/Job: sets TLS server name if externalServers.tlsServerName is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.tlsServerName=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-tls-server-name=foo"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
