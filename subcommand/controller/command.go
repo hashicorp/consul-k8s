@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 
 	zapLogger, err := cmdCommon.ZapLogger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error setting up logging:  %s", c.flagLogLevel, err.Error()))
+		c.UI.Error(fmt.Sprintf("Error setting up logging: %s", err.Error()))
 		return 1
 	}
 	ctrl.SetLogger(zapLogger)
