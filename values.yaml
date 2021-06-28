@@ -1088,6 +1088,9 @@ ui:
     # @type: boolean
     enabled: false
 
+    # pathType override - see: https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
+    pathType: Prefix
+
     # hosts is a list of host name to create Ingress rules.
     #
     # ```yaml
