@@ -59,7 +59,7 @@ type Command struct {
 	flagResourcePrefix         string
 	flagK8sNamespace           string
 	flagLogLevel               string
-	flagLogJson                bool
+	flagLogJSON                bool
 	flagMeshGatewayServiceName string
 
 	k8sClient    kubernetes.Interface
@@ -90,7 +90,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.http = &flags.HTTPFlags{}
@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	logger, err := common.Logger(c.flagLogLevel, c.flagLogJson)
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

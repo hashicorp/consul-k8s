@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/go-logr/logr"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -49,7 +47,7 @@ type Command struct {
 	flagConsulCACert         string // [Deprecated] Path to CA Certificate to use when communicating with Consul clients
 	flagEnvoyExtraArgs       string // Extra envoy args when starting envoy
 	flagLogLevel             string
-	flagLogJson              bool
+	flagLogJSON              bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -167,7 +165,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
-	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	// Proxy sidecar resource setting flags.
@@ -357,22 +355,10 @@ func (c *Command) Run(args []string) int {
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
-	var zapLevel zapcore.Level
-	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
-	// we will assume they meant debug here and not fail.
-	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
-		c.flagLogLevel = "debug"
-	}
-	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
-		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
+	zapLogger, err := common.ZapLogger(c.flagLogLevel, c.flagLogJSON)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error setting up logging:  %s", c.flagLogLevel, err.Error()))
 		return 1
-	}
-
-	var zapLogger logr.Logger
-	if c.flagLogJson {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
-	} else {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
 	}
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)
@@ -467,6 +453,8 @@ func (c *Command) Run(args []string) int {
 			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 			EnableOpenShift:            c.flagEnableOpenShift,
 			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
+			LogLevel:                   c.flagLogLevel,
+			LogJSON:                    c.flagLogJSON,
 		}})
 
 	if err := mgr.Start(ctx); err != nil {

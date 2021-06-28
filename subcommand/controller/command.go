@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/controller"
+	cmdCommon "github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -17,7 +17,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -33,7 +32,7 @@ type Command struct {
 	flagEnableWebhooks       bool
 	flagDatacenter           string
 	flagLogLevel             string
-	flagLogJson              bool
+	flagLogJSON              bool
 
 	// Flags to support Consul Enterprise namespaces.
 	flagEnableNamespaces           bool
@@ -83,7 +82,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
-	c.flagSet.BoolVar(&c.flagLogJson, "log-json", false,
+	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.httpFlags = &flags.HTTPFlags{}
@@ -110,22 +109,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var zapLevel zapcore.Level
-	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
-	// we will assume they meant debug here and not fail.
-	if c.flagLogLevel == "trace" || c.flagLogLevel == "TRACE" {
-		c.flagLogLevel = "debug"
-	}
-	if err := zapLevel.UnmarshalText([]byte(c.flagLogLevel)); err != nil {
-		c.UI.Error(fmt.Sprintf("Error parsing -log-level %q: %s", c.flagLogLevel, err.Error()))
+	zapLogger, err := cmdCommon.ZapLogger(c.flagLogLevel, c.flagLogJSON)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error setting up logging:  %s", c.flagLogLevel, err.Error()))
 		return 1
-	}
-
-	var zapLogger logr.Logger
-	if c.flagLogJson {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
-	} else {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
 	}
 	ctrl.SetLogger(zapLogger)
 	klog.SetLogger(zapLogger)

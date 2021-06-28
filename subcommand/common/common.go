@@ -9,8 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -35,6 +38,26 @@ func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
 		Level:      parsedLevel,
 		Output:     os.Stderr,
 	}), nil
+}
+
+// ZapLogger returns a logr.Logger instance with log level set and JSON logging enabled/disabled, or an error if the level is invalid.
+func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
+	var zapLevel zapcore.Level
+	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
+	// we will assume they meant debug here and not fail.
+	if level == "trace" || level == "TRACE" {
+		level = "debug"
+	}
+	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
+		return nil, fmt.Errorf(fmt.Sprintf("Error parsing -log-level %q: %s", level, err.Error()))
+	}
+	var zapLogger logr.Logger
+	if jsonLogging {
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
+	} else {
+		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
+	}
+	return zapLogger, nil
 }
 
 // ValidateUnprivilegedPort converts flags representing ports into integer and validates

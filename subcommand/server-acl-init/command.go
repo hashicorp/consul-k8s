@@ -82,7 +82,7 @@ type Command struct {
 	flagBootstrapTokenFile string
 
 	flagLogLevel string
-	flagLogJson  bool
+	flagLogJSON  bool
 	flagTimeout  time.Duration
 
 	// flagFederation is used to determine which ACL policies to write and whether or not to provide suffixing
@@ -206,7 +206,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.k8s = &k8sflags.K8SFlags{}
@@ -282,7 +282,7 @@ func (c *Command) Run(args []string) int {
 	defer cancel()
 
 	var err error
-	c.log, err = common.Logger(c.flagLogLevel, c.flagLogJson)
+	c.log, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1

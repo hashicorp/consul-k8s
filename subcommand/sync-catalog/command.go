@@ -52,7 +52,7 @@ type Command struct {
 	flagNodePortSyncType      string
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
-	flagLogJson               bool
+	flagLogJSON               bool
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -123,7 +123,7 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogJson, "log-json", false,
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
@@ -203,7 +203,7 @@ func (c *Command) Run(args []string) int {
 	// Set up logging
 	if c.logger == nil {
 		var err error
-		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJson)
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 		if err != nil {
 			c.UI.Error(err.Error())
 			return 1
