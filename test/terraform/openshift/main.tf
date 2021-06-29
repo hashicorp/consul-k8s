@@ -46,7 +46,7 @@ resource "azurerm_subnet" "master-subnet" {
   resource_group_name                           = azurerm_resource_group.test[count.index].name
   virtual_network_name                          = azurerm_virtual_network.test[count.index].name
   address_prefixes                              = ["10.0.0.0/23"]
-  enforce_private_link_service_network_policies = false
+  enforce_private_link_service_network_policies = true
   service_endpoints                             = ["Microsoft.ContainerRegistry"]
 }
 
