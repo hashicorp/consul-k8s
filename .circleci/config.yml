@@ -682,9 +682,9 @@ workflows:
     jobs:
       - cleanup-gcp-resources
       - cleanup-azure-resources
-      - acceptance-openshift:
-          requires:
-          - cleanup-azure-resources
+#      - acceptance-openshift: <-- Disabled until we can make them less flakey.
+#          requires:
+#          - cleanup-azure-resources
       - acceptance-gke-1-17:
           requires:
             - cleanup-gcp-resources
