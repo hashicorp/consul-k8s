@@ -141,6 +141,9 @@ type Handler struct {
 
 	// Log
 	Log logr.Logger
+	// Log settings for consul-sidecar
+	LogLevel string
+	LogJSON  bool
 
 	decoder *admission.Decoder
 }

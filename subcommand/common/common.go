@@ -9,8 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -24,16 +27,34 @@ const (
 	ACLTokenSecretKey = "token"
 )
 
-// Logger returns an hclog instance or an error if level is invalid.
-func Logger(level string) (hclog.Logger, error) {
+// Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
+func Logger(level string, jsonLogging bool) (hclog.Logger, error) {
 	parsedLevel := hclog.LevelFromString(level)
 	if parsedLevel == hclog.NoLevel {
 		return nil, fmt.Errorf("unknown log level: %s", level)
 	}
 	return hclog.New(&hclog.LoggerOptions{
-		Level:  parsedLevel,
-		Output: os.Stderr,
+		JSONFormat: jsonLogging,
+		Level:      parsedLevel,
+		Output:     os.Stderr,
 	}), nil
+}
+
+// ZapLogger returns a logr.Logger instance with log level set and JSON logging enabled/disabled, or an error if the level is invalid.
+func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
+	var zapLevel zapcore.Level
+	// It is possible that a user passes in "trace" from global.logLevel, until we standardize on one logging framework
+	// we will assume they meant debug here and not fail.
+	if level == "trace" || level == "TRACE" {
+		level = "debug"
+	}
+	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
+		return nil, fmt.Errorf("unknown log level %q: %s", level, err.Error())
+	}
+	if jsonLogging {
+		return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder()), nil
+	}
+	return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder()), nil
 }
 
 // ValidateUnprivilegedPort converts flags representing ports into integer and validates
