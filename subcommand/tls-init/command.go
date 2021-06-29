@@ -52,6 +52,7 @@ type Command struct {
 	// log
 	log          hclog.Logger
 	flagLogLevel string
+	flagLogJSON  bool
 
 	ctx context.Context
 
@@ -77,7 +78,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var err error
-	c.log, err = common.Logger(c.flagLogLevel)
+	c.log, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -293,6 +294,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 	c.k8sFlags = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8sFlags.Flags())
 	c.help = flags.Usage(help, c.flags)

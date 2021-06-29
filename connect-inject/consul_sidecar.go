@@ -24,6 +24,8 @@ func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 		fmt.Sprintf("-merged-metrics-port=%s", metricsPorts.mergedPort),
 		fmt.Sprintf("-service-metrics-port=%s", metricsPorts.servicePort),
 		fmt.Sprintf("-service-metrics-path=%s", metricsPorts.servicePath),
+		fmt.Sprintf("-log-level=%s", h.LogLevel),
+		fmt.Sprintf("-log-json=%t", h.LogJSON),
 	}
 
 	return corev1.Container{

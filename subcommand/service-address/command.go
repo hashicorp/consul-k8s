@@ -12,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
@@ -31,6 +32,8 @@ type Command struct {
 	flagServiceName      string
 	flagOutputFile       string
 	flagResolveHostnames bool
+	flagLogLevel         string
+	flagLogJSON          bool
 
 	retryDuration time.Duration
 	k8sClient     kubernetes.Interface
@@ -48,6 +51,11 @@ func (c *Command) init() {
 		"Path to file to write load balancer address")
 	c.flags.BoolVar(&c.flagResolveHostnames, "resolve-hostnames", false,
 		"If true we will resolve any hostnames and use their first IP address")
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 
 	c.k8sFlags = &k8sflags.K8SFlags{}
 	flags.Merge(c.flags, c.k8sFlags.Flags())
@@ -78,7 +86,11 @@ func (c *Command) Run(args []string) int {
 	if c.retryDuration == 0 {
 		c.retryDuration = 1 * time.Second
 	}
-	logger := hclog.Default()
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJSON)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	// Run until we get an address from the service.
 	var address string
@@ -125,7 +137,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write the address to file.
-	err := ioutil.WriteFile(c.flagOutputFile, []byte(address), 0600)
+	err = ioutil.WriteFile(c.flagOutputFile, []byte(address), 0600)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to write address to file: %s", err))
 		return 1
