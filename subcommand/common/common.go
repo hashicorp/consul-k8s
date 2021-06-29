@@ -51,13 +51,10 @@ func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
 	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("Error parsing -log-level %q: %s", level, err.Error()))
 	}
-	var zapLogger logr.Logger
 	if jsonLogging {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
-	} else {
-		zapLogger = zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
+		return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder())
 	}
-	return zapLogger, nil
+	return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.ConsoleEncoder())
 }
 
 // ValidateUnprivilegedPort converts flags representing ports into integer and validates
