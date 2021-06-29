@@ -22,7 +22,7 @@ func TestLogger_InvalidLogLevel(t *testing.T) {
 
 func TestZapLogger_InvalidLogLevel(t *testing.T) {
 	_, err := ZapLogger("invalid", false)
-	require.EqualError(t, err, "Error parsing -log-level \"invalid\": unrecognized level: \"invalid\"")
+	require.EqualError(t, err, "unknown log level \"invalid\": unrecognized level: \"invalid\"")
 }
 
 // ZapLogger should convert "trace" log level to "debug"
