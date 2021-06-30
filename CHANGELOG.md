@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Allow setting global.logLevel and global.logJSON and propogate this to all consul-k8s commands. [[GH-980](https://github.com/hashicorp/consul-helm/pull/980)]
+
 ## 0.32.1 (June 29, 2021)
 
 BUG FIXES:

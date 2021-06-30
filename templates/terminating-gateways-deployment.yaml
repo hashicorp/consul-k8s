@@ -367,6 +367,8 @@ spec:
           command:
             - consul-k8s
             - consul-sidecar
+            - -log-level={{ $root.Values.global.logLevel }}
+            - -log-json={{ $root.Values.global.logJSON }}
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
             {{- if $root.Values.global.acls.manageSystemACLs }}

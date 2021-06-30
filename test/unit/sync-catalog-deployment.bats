@@ -947,3 +947,34 @@ load _helpers
 
   [ "${actual}" = "bar" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "syncCatalog/Deployment: logLevel info by default from global" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "syncCatalog/Deployment: logLevel can be overridden" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
