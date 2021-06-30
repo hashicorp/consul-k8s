@@ -59,10 +59,11 @@ spec:
         - "-ec"
         - |
           consul-k8s controller \
+            -log-level={{ default .Values.global.logLevel .Values.controller.logLevel }} \
+            -log-json={{ .Values.global.logJSON }} \
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
             -datacenter={{ .Values.global.datacenter }} \
             -enable-leader-election \
-            -log-level={{ .Values.controller.logLevel | quote }} \
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \
             {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}

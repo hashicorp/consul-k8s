@@ -83,6 +83,8 @@ spec:
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
               consul-k8s inject-connect \
+                -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
                 -envoy-image="{{ .Values.global.imageEnvoy }}" \
@@ -105,9 +107,6 @@ spec:
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \
-                {{- end }}
-                {{- if .Values.connectInject.logLevel }}
-                -log-level={{ .Values.connectInject.logLevel }} \
                 {{- end }}
                 {{- if (or (and (ne (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.connectInject.metrics.defaultEnabled) (and (eq (.Values.connectInject.metrics.defaultEnabled | toString) "-") .Values.global.metrics.enabled)) }}
                 -default-enable-metrics=true \

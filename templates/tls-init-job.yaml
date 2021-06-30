@@ -61,6 +61,8 @@ spec:
               # and use * at the start of the dns name when setting -additional-dnsname.
               set -o noglob
               consul-k8s tls-init \
+                -log-level={{ .Values.global.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
                 -domain={{ .Values.global.domain }} \
                 -days=730 \
                 -name-prefix={{ template "consul.fullname" . }} \

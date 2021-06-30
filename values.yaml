@@ -9,6 +9,16 @@ global:
   # setting `server.enabled` to true.
   enabled: true
 
+  # The default log level to apply to all components which do not otherwise override this setting.
+  # It is recommended to generally not set this below "info" unless actively debugging due to logging verbosity.
+  # One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: "info"
+
+  # Enable all component logs to be output in JSON format.
+  # @type: boolean
+  logJSON: false
+
   # Set the prefix used for all resources in the Helm chart. If not set,
   # the prefix will be `<helm release name>-consul`.
   # @type: string
@@ -1330,8 +1340,9 @@ syncCatalog:
       memory: "50Mi"
       cpu: "50m"
 
-  # Log verbosity level. One of "trace", "debug", "info", "warn", or "error".
-  logLevel: info
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # Override the default interval to perform syncing operations creating Consul services.
   # @type: string
@@ -1435,8 +1446,9 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Log verbosity level. One of "debug", "info", "warn", or "error".
-  logLevel: info
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   serviceAccount:
     # This value defines additional annotations for the injector service account. This should be formatted as a
@@ -1635,7 +1647,8 @@ controller:
   replicas: 1
 
   # Log verbosity level. One of "debug", "info", "warn", or "error".
-  logLevel: info
+  # @type: string
+  logLevel: ""
 
   serviceAccount:
     # This value defines additional annotations for the controller service account. This should be formatted as a

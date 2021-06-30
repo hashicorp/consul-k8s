@@ -816,6 +816,8 @@ key2: value2' \
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
@@ -871,6 +873,8 @@ EOF
   -token-sink-file=/consul/service/acl-token
 
 consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
@@ -923,6 +927,8 @@ EOF
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
@@ -1200,6 +1206,8 @@ EOF
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
@@ -1317,6 +1325,8 @@ EOF
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt
@@ -1367,6 +1377,8 @@ EOF
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
   exp='consul-k8s service-address \
+  -log-level=info \
+  -log-json=false \
   -k8s-namespace=default \
   -name=RELEASE-NAME-consul-mesh-gateway \
   -output-file=/tmp/address.txt

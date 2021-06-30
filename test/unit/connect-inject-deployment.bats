@@ -1346,7 +1346,7 @@ EOF
 #--------------------------------------------------------------------
 # logLevel
 
-@test "connectInject/Deployment: logLevel info by default" {
+@test "connectInject/Deployment: logLevel info by default from global" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -1359,7 +1359,7 @@ EOF
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: logLevel can be set" {
+@test "connectInject/Deployment: logLevel can be overridden" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml  \

@@ -113,6 +113,8 @@ spec:
             - "-ec"
             - |
               consul-k8s sync-catalog \
+                -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
                 -k8s-default-sync={{ .Values.syncCatalog.default }} \
                 {{- if (not .Values.syncCatalog.toConsul) }}
                 -to-consul=false \
@@ -142,9 +144,6 @@ spec:
                 {{- end }}
                 {{- if .Values.syncCatalog.consulWriteInterval }}
                 -consul-write-interval={{ .Values.syncCatalog.consulWriteInterval }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.logLevel }}
-                -log-level={{ .Values.syncCatalog.logLevel }} \
                 {{- end }}
                 {{- if .Values.syncCatalog.k8sTag }}
                 -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \

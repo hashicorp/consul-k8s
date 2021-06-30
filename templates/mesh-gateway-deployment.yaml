@@ -147,6 +147,8 @@ spec:
                 WAN_ADDR="${NODE_NAME}"
                 {{- else if and (eq $source "Service") (or (eq $serviceType "ClusterIP") (eq $serviceType "LoadBalancer")) }}
                 consul-k8s service-address \
+                  -log-level={{ .Values.global.logLevel }} \
+                  -log-json={{ .Values.global.logJSON }} \
                   -k8s-namespace={{ .Release.Namespace }} \
                   -name={{ template "consul.fullname" . }}-mesh-gateway \
                   -output-file=/tmp/address.txt
@@ -365,6 +367,8 @@ spec:
           command:
             - consul-k8s
             - consul-sidecar
+            - -log-level={{ .Values.global.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
             - -service-config=/consul/service/service.hcl
             - -consul-binary=/consul-bin/consul
             {{- if .Values.global.acls.manageSystemACLs }}

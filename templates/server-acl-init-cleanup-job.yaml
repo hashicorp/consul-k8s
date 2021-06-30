@@ -50,6 +50,8 @@ spec:
             - consul-k8s
           args:
             - delete-completed-job
+            - -log-level={{ .Values.global.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
             - -k8s-namespace={{ .Release.Namespace }}
             - {{ template "consul.fullname" . }}-server-acl-init
           resources:
