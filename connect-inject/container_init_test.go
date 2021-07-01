@@ -688,6 +688,46 @@ export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
 }
 
+// If Consul CA cert is set and custom Consul client ports are used,
+// Consul addresses should use HTTPS
+// and CA cert should be set as env variable
+func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		ConsulCACert:          "consul-ca-cert",
+		ConsulClientPortHTTPS: "9501",
+		ConsulClientPortGRPC:  "9502",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(testNS, *pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:9501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:9502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+consul-ca-cert
+EOF`)
+	require.NotContains(actual, `
+export CONSUL_HTTP_ADDR="${HOST_IP}:9500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:9502"`)
+}
+
 func TestHandlerContainerInit_Resources(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
