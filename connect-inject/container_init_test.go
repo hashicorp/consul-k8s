@@ -73,6 +73,28 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 		},
 
 		{
+			"Whole template, custom ports",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				ConsulClientPortHTTP: "9500",
+				ConsulClientPortGRPC: "9502",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:9500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:9502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
+		},
+
+		{
 			"When auth method is set -service-account-name and -service-name are passed in",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
