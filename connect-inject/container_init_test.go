@@ -56,7 +56,10 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{},
+			Handler{
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
+			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
@@ -83,7 +86,9 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				return pod
 			},
 			Handler{
-				AuthMethod: "an-auth-method",
+				AuthMethod:           "an-auth-method",
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -113,7 +118,10 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
-			Handler{},
+			Handler{
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
+			},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
@@ -357,6 +365,8 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -380,6 +390,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -404,6 +416,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -433,6 +447,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -461,6 +477,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -491,6 +509,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -523,6 +543,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -610,7 +632,9 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		ConsulCACert: "consul-ca-cert",
+		ConsulCACert:          "consul-ca-cert",
+		ConsulClientPortHTTPS: "8501",
+		ConsulClientPortGRPC:  "8502",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
