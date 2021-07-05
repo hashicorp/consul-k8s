@@ -3,6 +3,8 @@
 BREAKING CHANGES:
 * Control Plane
   * Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
+  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics were
+    scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
 
 IMPROVEMENTS:
 * CLI
@@ -16,6 +18,8 @@ IMPROVEMENTS:
 BUG FIXES:
 * Control Plane:
   * Add a workaround to check that the ACL token is replicated to other Consul servers. [[GH-862](https://github.com/hashicorp/consul-k8s/issues/862)]
+  * Return 500 on prometheus response if unable to get metrics from Envoy. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+  * Don't include body of failed service metrics calls in merged metrics response. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
 * Helm Chart
   * Admin Partitions **(Consul Enterprise only)**: Do not mount Consul CA certs to partition-init job if `externalServers.useSystemRoots` is `true`. [[GH-885](https://github.com/hashicorp/consul-k8s/pull/885)]
 
