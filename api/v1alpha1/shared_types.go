@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -121,7 +122,7 @@ func (in Expose) validate(path *field.Path) field.ErrorList {
 
 func (in *TransparentProxy) toConsul() *capi.TransparentProxyConfig {
 	if in == nil {
-		return &capi.TransparentProxyConfig{OutboundListenerPort: 0}
+		return nil
 	}
 	return &capi.TransparentProxyConfig{
 		OutboundListenerPort: in.OutboundListenerPort,
@@ -168,4 +169,30 @@ func meta(datacenter string) map[string]string {
 		common.SourceKey:     common.SourceValue,
 		common.DatacenterKey: datacenter,
 	}
+}
+
+// transparentProxyConfigComparer compares two TransparentProxyConfig pointers.
+// It returns whether they are equal but will treat an empty struct and a nil
+// pointer as equal. This is needed to fix a bug in the Consul API in Consul
+// 1.10.0 (https://github.com/hashicorp/consul/issues/10595) where Consul will
+// always return the empty struct for the TransparentProxy key even if it was
+// written as a nil pointer. With the default comparator, a nil pointer and
+// empty struct are treated as different and so we would always treat the
+// CRD as not synced and would continually try and write it to Consul.
+func transparentProxyConfigComparer(a, b *capi.TransparentProxyConfig) bool {
+	empty := capi.TransparentProxyConfig{}
+	if a == nil && b == nil {
+		return true
+	}
+	// If one is a nil pointer and the other is the empty struct
+	// then treat them as equal.
+	if a == nil && *b == empty {
+		return true
+	}
+	if b == nil && *a == empty {
+		return true
+	}
+
+	// Otherwise compare as normal.
+	return cmp.Equal(a, b)
 }
