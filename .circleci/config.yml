@@ -65,6 +65,12 @@ commands:
               working_directory: test/acceptance/tests
               no_output_timeout: 2h
               command: |
+                # Enterprise tests can't run on fork PRs because they require
+                # a secret.
+                if [ -z "$CIRCLE_PR_NUMBER" ]; then
+                  ENABLE_ENTERPRISE=true
+                fi
+
                 # We have to run the tests for each package separately so that we can
                 # exit early if any test fails (-failfast only works within a single
                 # package).
@@ -76,7 +82,7 @@ commands:
                 do
                   if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
                         << parameters.additional-flags >> \
-                        -enable-enterprise \
+                        ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                         -enable-multi-cluster \
                         -debug-directory="$TEST_RESULTS/debug" \
                         -consul-k8s-image=<< parameters.consul-k8s-image >>
@@ -97,12 +103,18 @@ commands:
                 working_directory: test/acceptance/tests
                 no_output_timeout: 2h
                 command: |
+                  # Enterprise tests can't run on fork PRs because they require
+                  # a secret.
+                  if [ -z "$CIRCLE_PR_NUMBER" ]; then
+                    ENABLE_ENTERPRISE=true
+                  fi
+
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $pkgs"
                   gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
                       << parameters.additional-flags >> \
                       -enable-multi-cluster \
-                      -enable-enterprise \
+                      ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 jobs:
