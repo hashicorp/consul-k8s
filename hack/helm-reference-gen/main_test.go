@@ -20,21 +20,27 @@ func Test(t *testing.T) {
 # Line 1
 # Line 2
 key: value`,
-			Exp: `- $key$ ((#v-key)) ($string: value$) - Line 1\n  Line 2`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: value$) - Line 1\n  Line 2`,
 		},
 		"integer value": {
 			Input: `---
 # Line 1
 # Line 2
 replicas: 3`,
-			Exp: `- $replicas$ ((#v-replicas)) ($integer: 3$) - Line 1\n  Line 2`,
+			Exp: `### replicas
+
+- $replicas$ ((#v-replicas)) ($integer: 3$) - Line 1\n  Line 2`,
 		},
 		"boolean value": {
 			Input: `---
 # Line 1
 # Line 2
 enabled: true`,
-			Exp: `- $enabled$ ((#v-enabled)) ($boolean: true$) - Line 1\n  Line 2`,
+			Exp: `### enabled
+
+- $enabled$ ((#v-enabled)) ($boolean: true$) - Line 1\n  Line 2`,
 		},
 		"map": {
 			Input: `---
@@ -44,7 +50,9 @@ map:
   # Key line 1
   # Key line 2
   key: value`,
-			Exp: `- $map$ ((#v-map)) - Map line 1\n  Map line 2
+			Exp: `### map
+
+- $map$ ((#v-map)) - Map line 1\n  Map line 2
 
   - $key$ ((#v-map-key)) ($string: value$) - Key line 1\n    Key line 2`,
 		},
@@ -60,7 +68,9 @@ map:
   int: 1
   # Bool docs
   bool: true`,
-			Exp: `- $map$ ((#v-map)) - Map line 1\n  Map line 2
+			Exp: `### map
+
+- $map$ ((#v-map)) - Map line 1\n  Map line 2
 
   - $key$ ((#v-map-key)) ($string: value$) - Key line 1
     Key line 2
@@ -74,7 +84,9 @@ map:
 # key docs
 # @type: string
 key: null`,
-			Exp: `- $key$ ((#v-key)) ($string: null$) - key docs`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: null$) - key docs`,
 		},
 		"description with empty line": {
 			Input: `---
@@ -82,7 +94,9 @@ key: null`,
 #
 # line 2
 key: value`,
-			Exp: `- $key$ ((#v-key)) ($string: value$) - line 1\n\n  line 2`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: value$) - line 1\n\n  line 2`,
 		},
 		"array of strings": {
 			Input: `---
@@ -90,7 +104,9 @@ key: value`,
 # @type: array<string>
 serverAdditionalDNSSANs: []
 `,
-			Exp: `- $serverAdditionalDNSSANs$ ((#v-serveradditionaldnssans)) ($array<string>: []$) - line 1`,
+			Exp: `### serverAdditionalDNSSANs
+
+- $serverAdditionalDNSSANs$ ((#v-serveradditionaldnssans)) ($array<string>: []$) - line 1`,
 		},
 		"map with empty string values": {
 			Input: `---
@@ -101,7 +117,9 @@ gossipEncryption:
   # secretKey
   secretKey: ""
 `,
-			Exp: `- $gossipEncryption$ ((#v-gossipencryption)) - gossipEncryption
+			Exp: `### gossipEncryption
+
+- $gossipEncryption$ ((#v-gossipencryption)) - gossipEncryption
 
   - $secretName$ ((#v-gossipencryption-secretname)) ($string: ""$) - secretName
 
@@ -115,7 +133,9 @@ bootstrapToken:
   # @type: string
   secretKey: null
 `,
-			Exp: `- $bootstrapToken$ ((#v-bootstraptoken))
+			Exp: `### bootstrapToken
+
+- $bootstrapToken$ ((#v-bootstraptoken))
 
   - $secretName$ ((#v-bootstraptoken-secretname)) ($string: null$)
 
@@ -147,7 +167,9 @@ lifecycleSidecarContainer:
       memory: "50Mi"
       cpu: "20m"
 `,
-			Exp: `- $lifecycleSidecarContainer$ ((#v-lifecyclesidecarcontainer)) - lifecycle
+			Exp: `### lifecycleSidecarContainer
+
+- $lifecycleSidecarContainer$ ((#v-lifecyclesidecarcontainer)) - lifecycle
 
   - $resources$ ((#v-lifecyclesidecarcontainer-resources)) - The resource requests and limits (CPU, memory, etc.)
     for each of the lifecycle sidecar containers. This should be a YAML map of a Kubernetes
@@ -186,7 +208,9 @@ server:
   # @type: boolean
   enabled: "-"
 `,
-			Exp: `- $server$ ((#v-server))
+			Exp: `### server
+
+- $server$ ((#v-server))
 
   - $enabled$ ((#v-server-enabled)) ($boolean: global.enabled$) - If true, the chart will install all the resources necessary for a
     Consul server cluster. If you're running Consul externally and want agents
@@ -197,7 +221,9 @@ server:
 extraConfig: |
   {}
 `,
-			Exp: `- $extraConfig$ ((#v-extraconfig)) ($string: {}$)`,
+			Exp: `### extraConfig
+
+- $extraConfig$ ((#v-extraconfig)) ($string: {}$)`,
 		},
 		"affinity": {
 			Input: `---
@@ -212,26 +238,34 @@ affinity: |
             component: server
         topologyKey: kubernetes.io/hostname
 `,
-			Exp: `- $affinity$ ((#v-affinity)) ($string$) - Affinity Settings`,
+			Exp: `### affinity
+
+- $affinity$ ((#v-affinity)) ($string$) - Affinity Settings`,
 		},
 		"k8sAllowNamespaces": {
 			Input: `---
 # @type: array<string>
 k8sAllowNamespaces: ["*"]`,
-			Exp: `- $k8sAllowNamespaces$ ((#v-k8sallownamespaces)) ($array<string>: ["*"]$)`,
+			Exp: `### k8sAllowNamespaces
+
+- $k8sAllowNamespaces$ ((#v-k8sallownamespaces)) ($array<string>: ["*"]$)`,
 		},
 		"k8sDenyNamespaces": {
 			Input: `---
 # @type: array<string>
 k8sDenyNamespaces: ["kube-system", "kube-public"]`,
-			Exp: `- $k8sDenyNamespaces$ ((#v-k8sdenynamespaces)) ($array<string>: ["kube-system", "kube-public"]$)`,
+			Exp: `### k8sDenyNamespaces
+
+- $k8sDenyNamespaces$ ((#v-k8sdenynamespaces)) ($array<string>: ["kube-system", "kube-public"]$)`,
 		},
 		"gateways": {
 			Input: `---
 # @type: array<map>
 gateways:
   - name: ingress-gateway`,
-			Exp: `- $gateways$ ((#v-gateways)) ($array<map>$)
+			Exp: `### gateways
+
+- $gateways$ ((#v-gateways)) ($array<map>$)
 
   - $name$ ((#v-gateways-name)) ($string: ingress-gateway$)`,
 		},
@@ -241,7 +275,9 @@ gateways:
 # line 2
 key: value
 `,
-			Exp: `- $key$ ((#v-key)) ($string: value$) - <EnterpriseAlert inline /> line 1\n  line 2`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: value$) - <EnterpriseAlert inline /> line 1\n  line 2`,
 		},
 		"yaml comments in examples": {
 			Input: `---
@@ -255,7 +291,9 @@ key: value
 # $$$
 key: value
 `,
-			Exp: `- $key$ ((#v-key)) ($string: value$) - Examples:
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: value$) - Examples:
 
   $$$yaml
   # Consul 1.5.0
@@ -270,7 +308,9 @@ key: value
 # @type: override-2
 key: value
 `,
-			Exp: `- $key$ ((#v-key)) ($override-2: value$)`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($override-2: value$)`,
 		},
 		"recurse false": {
 			Input: `---
@@ -284,7 +324,11 @@ ports:
 - port: 8443
   nodePort: null
 `,
-			Exp: `- $key$ ((#v-key)) ($string: value$)
+			Exp: `### key
+
+- $key$ ((#v-key)) ($string: value$)
+
+### ports
 
 - $ports$ ((#v-ports)) ($array<map>$) - port docs`,
 		},
@@ -293,14 +337,18 @@ ports:
 # @type: map
 key: null
 `,
-			Exp: `- $key$ ((#v-key)) ($map$)`,
+			Exp: `### key
+
+- $key$ ((#v-key)) ($map$)`,
 		},
 		"if of type map and not annotated with @type": {
 			Input: `---
 key:
   foo: bar
 `,
-			Exp: `- $key$ ((#v-key))
+			Exp: `### key
+
+- $key$ ((#v-key))
 
   - $foo$ ((#v-key-foo)) ($string: bar$)`,
 		},

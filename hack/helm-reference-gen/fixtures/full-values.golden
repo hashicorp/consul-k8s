@@ -1,3 +1,5 @@
+### global
+
 - `global` ((#v-global)) - Holds values that affect multiple components of the chart.
 
   - `enabled` ((#v-global-enabled)) (`boolean: true`) - The master enabled/disabled setting. If true, servers,
@@ -223,6 +225,8 @@
     - `enabled` ((#v-global-openshift-enabled)) (`boolean: false`) - If true, the Helm chart will create necessary configuration for running
       its components on OpenShift.
 
+### server
+
 - `server` ((#v-server)) - Server, when enabled, configures a server cluster to run. This should
   be disabled if you plan on connecting to a Consul cluster external to
   the Kube cluster.
@@ -435,6 +439,8 @@
     feature, in case kubernetes cluster is behind egress http proxies. Additionally,
     it could be used to configure custom consul parameters.
 
+### externalServers
+
 - `externalServers` ((#v-externalservers)) - Configuration for Consul servers when the servers are running outside of Kubernetes.
   When running external servers, configuring these values is recommended
   if setting `global.tls.enableAutoEncrypt` to true (requires consul-k8s >= 0.13.0)
@@ -476,6 +482,8 @@
     kubectl config view \
       -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
     ```
+
+### client
 
 - `client` ((#v-client)) - Values that configure running a Consul client on Kubernetes nodes.
 
@@ -684,6 +692,8 @@
         ...
       ```
 
+### dns
+
 - `dns` ((#v-dns)) - Configuration for DNS configuration within the Kubernetes cluster.
   This creates a service that routes to all agents (client or server)
   for serving DNS requests. This DOES NOT automatically configure kube-dns
@@ -708,6 +718,8 @@
   - `additionalSpec` ((#v-dns-additionalspec)) (`string: null`) - Additional ServiceSpec values
     This should be a multi-line string mapping directly to a Kubernetes
     ServiceSpec object.
+
+### ui
 
 - `ui` ((#v-ui)) - Values that configure the Consul UI.
 
@@ -740,6 +752,8 @@
     - `additionalSpec` ((#v-ui-service-additionalspec)) (`string: null`) - Additional ServiceSpec values
       This should be a multi-line string mapping directly to a Kubernetes
       ServiceSpec object.
+
+### syncCatalog
 
 - `syncCatalog` ((#v-synccatalog)) - syncCatalog will run the catalog sync process to sync K8S with Consul
   services. This can run bidirectional (default) or unidirectionally (Consul
@@ -903,6 +917,8 @@
   - `logLevel` ((#v-synccatalog-loglevel)) (`string: info`) - Log verbosity level. One of "trace", "debug", "info", "warn", or "error".
 
   - `consulWriteInterval` ((#v-synccatalog-consulwriteinterval)) (`string: null`) - Override the default interval to perform syncing operations creating Consul services.
+
+### connectInject
 
 - `connectInject` ((#v-connectinject)) - ConnectInject will enable the automatic Connect sidecar injector.
 
@@ -1134,6 +1150,8 @@
 
         - `cpu` ((#v-connectinject-initcontainer-resources-limits-cpu)) (`string: 50m`)
 
+### controller
+
 - `controller` ((#v-controller)) - Controller handles config entry custom resources.
   Requires consul >= 1.8.4.
   ServiceIntentions require consul 1.9+.
@@ -1166,6 +1184,8 @@
     This should be a multi-line string matching the affinity object
 
   - `priorityClassName` ((#v-controller-priorityclassname)) (`string: ""`) - Optional priorityClassName.
+
+### meshGateway
 
 - `meshGateway` ((#v-meshgateway)) - Mesh Gateways enable Consul Connect to work across Consul datacenters.
 
@@ -1314,6 +1334,8 @@
         "annotation-key": "annotation-value"
     ```
 
+### ingressGateways
+
 - `ingressGateways` ((#v-ingressgateways)) - Configuration options for ingress gateways. Default values for all
   ingress gateways are defined in `ingressGateways.defaults`. Any of
   these values may be overridden in `ingressGateways.gateways` for a
@@ -1418,6 +1440,8 @@
 
     - `name` ((#v-ingressgateways-gateways-name)) (`string: ingress-gateway`)
 
+### terminatingGateways
+
 - `terminatingGateways` ((#v-terminatinggateways)) - Configuration options for terminating gateways. Default values for all
   terminating gateways are defined in `terminatingGateways.defaults`. Any of
   these values may be overridden in `terminatingGateways.gateways` for a
@@ -1510,6 +1534,8 @@
     case of annotations where both will be applied.
 
     - `name` ((#v-terminatinggateways-gateways-name)) (`string: terminating-gateway`)
+
+### tests
 
 - `tests` ((#v-tests)) - Control whether a test Pod manifest is generated when running helm template.
   When using helm install, the test Pod is not submitted to the cluster so this
