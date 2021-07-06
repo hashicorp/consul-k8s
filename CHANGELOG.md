@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Connect: Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
+
 BUG FIXES:
 * Connect: Fix bug where environment variables `<NAME>_CONNECT_SERVICE_HOST` and
   `<NAME>_CONNECT_SERVICE_PORT` weren't being set when the upstream annotation was used. [[GH-549](https://github.com/hashicorp/consul-k8s/issues/549)]
@@ -60,7 +63,6 @@ FEATURES:
     [[GH-469](https://github.com/hashicorp/consul-k8s/pull/469)]
 
 IMPROVEMENTS:
-* Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
 * Connect: skip service registration when a service with the same name but in a different Kubernetes namespace is found
   and Consul namespaces are not enabled. [[GH-527](https://github.com/hashicorp/consul-k8s/pull/527)]
 * Connect: Leader election support for connect-inject deployment. [[GH-479](https://github.com/hashicorp/consul-k8s/pull/479)]
