@@ -1,7 +1,7 @@
 ## UNRELEASED
 
 IMPROVEMENTS:
-* Connect: Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
+* Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
 
 BUG FIXES:
 * Connect: Fix bug where environment variables `<NAME>_CONNECT_SERVICE_HOST` and
