@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Connect: Fix bug where environment variables `<NAME>_CONNECT_SERVICE_HOST` and
+  `<NAME>_CONNECT_SERVICE_PORT` weren't being set when the upstream annotation was used. [[GH-549](https://github.com/hashicorp/consul-k8s/issues/549)]
+
 ## 0.26.0 (June 22, 2021)
 
 FEATURES:

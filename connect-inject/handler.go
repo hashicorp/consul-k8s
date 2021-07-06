@@ -198,12 +198,12 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// Add the upstream services as environment variables for easy
 	// service discovery.
 	containerEnvVars := h.containerEnvVars(pod)
-	for _, container := range pod.Spec.InitContainers {
-		container.Env = append(container.Env, containerEnvVars...)
+	for i := range pod.Spec.InitContainers {
+		pod.Spec.InitContainers[i].Env = append(pod.Spec.InitContainers[i].Env, containerEnvVars...)
 	}
 
-	for _, container := range pod.Spec.Containers {
-		container.Env = append(container.Env, containerEnvVars...)
+	for i := range pod.Spec.Containers {
+		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
 	}
 
 	// Add the init container which copies the Consul binary to /consul/connect-inject/.

@@ -180,6 +180,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/containers/1",
 				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
 			},
 		},
 
