@@ -53,6 +53,17 @@ func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEn
 	return kenv
 }
 
+func NewKubernetesEnvironmentFromContext(context *kubernetesContext) *KubernetesEnvironment {
+	// Create a kubernetes environment with default context.
+	kenv := &KubernetesEnvironment{
+		contexts: map[string]*kubernetesContext{
+			DefaultContextName: context,
+		},
+	}
+
+	return kenv
+}
+
 func (k *KubernetesEnvironment) Context(t *testing.T, name string) TestContext {
 	ctx, ok := k.contexts[name]
 	require.Truef(t, ok, fmt.Sprintf("requested context %s not found", name))
