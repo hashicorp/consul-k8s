@@ -15,6 +15,8 @@ labels: bug
 
 <!--- Thank you for keeping this note for the community --->
 
+---
+
 <!--- When filing a bug, please include the following headings if possible. Any example text in this template can be deleted. --->
 
 ### Overview of the Issue
