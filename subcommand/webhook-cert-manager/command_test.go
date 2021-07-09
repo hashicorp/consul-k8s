@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,33 +46,33 @@ func testSignalHandling(sig os.Signal) func(*testing.T) {
 			},
 		}
 
-		webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
+		webhookOne := &admissionv1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: webhookConfigOneName,
 			},
-			Webhooks: []admissionv1beta1.MutatingWebhook{
+			Webhooks: []admissionv1.MutatingWebhook{
 				{
 					Name: "webhook-under-test",
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionv1.WebhookClientConfig{
 						CABundle: caBundleOne,
 					},
 				},
 			},
 		}
-		webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
+		webhookTwo := &admissionv1.MutatingWebhookConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: webhookConfigTwoName,
 			},
-			Webhooks: []admissionv1beta1.MutatingWebhook{
+			Webhooks: []admissionv1.MutatingWebhook{
 				{
 					Name: "webhookOne-under-test",
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionv1.WebhookClientConfig{
 						CABundle: caBundleTwo,
 					},
 				},
 				{
 					Name: "webhookTwo-under-test",
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionv1.WebhookClientConfig{
 						CABundle: caBundleTwo,
 					},
 				},
@@ -169,33 +169,33 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 		},
 	}
 
-	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookOne := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigOneName,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name: "webhook-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleOne,
 				},
 			},
 		},
 	}
-	webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookTwo := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigTwoName,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name: "webhookOne-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleTwo,
 				},
 			},
 			{
 				Name: "webhookTwo-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleTwo,
 				},
 			},
@@ -239,11 +239,11 @@ func TestRun_SecretDoesNotExist(t *testing.T) {
 		require.Equal(r, deploymentName, secretTwo.OwnerReferences[0].Name)
 		require.Equal(r, uid, secretTwo.OwnerReferences[0].UID)
 
-		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
+		webhookConfigOne, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, webhookConfigOne.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 
-		webhookConfigTwo, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
+		webhookConfigTwo, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
 		require.NotEqual(r, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
@@ -295,33 +295,33 @@ func TestRun_SecretExists(t *testing.T) {
 		Type: v1.SecretTypeTLS,
 	}
 
-	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookOne := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigOneName,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name: "webhook-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleOne,
 				},
 			},
 		},
 	}
-	webhookTwo := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookTwo := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigTwoName,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name: "webhookOne-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleTwo,
 				},
 			},
 			{
 				Name: "webhookTwo-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleTwo,
 				},
 			},
@@ -367,11 +367,11 @@ func TestRun_SecretExists(t *testing.T) {
 		require.Equal(r, deploymentName, secretTwo.OwnerReferences[0].Name)
 		require.Equal(r, uid, secretTwo.OwnerReferences[0].UID)
 
-		webhookConfigOne, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
+		webhookConfigOne, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOneName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, webhookConfigOne.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 
-		webhookConfigTwo, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
+		webhookConfigTwo, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigTwoName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, webhookConfigTwo.Webhooks[0].ClientConfig.CABundle, caBundleTwo)
 		require.NotEqual(r, webhookConfigTwo.Webhooks[1].ClientConfig.CABundle, caBundleTwo)
@@ -410,14 +410,14 @@ func TestRun_SecretUpdates(t *testing.T) {
 		Type: v1.SecretTypeTLS,
 	}
 
-	webhookOne := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookOne := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigOne,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name: "webhook-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionv1.WebhookClientConfig{
 					CABundle: caBundleOne,
 				},
 			},
@@ -465,7 +465,7 @@ func TestRun_SecretUpdates(t *testing.T) {
 		certificate = secret1.Data[v1.TLSCertKey]
 		key = secret1.Data[v1.TLSPrivateKeyKey]
 
-		webhookConfig1, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOne, metav1.GetOptions{})
+		webhookConfig1, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigOne, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.NotEqual(r, webhookConfig1.Webhooks[0].ClientConfig.CABundle, caBundleOne)
 	})
@@ -492,14 +492,14 @@ func TestCertWatcher(t *testing.T) {
 	t.Parallel()
 
 	webhookName := "webhookOne"
-	webhook := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhook := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookName,
 		},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionv1.MutatingWebhook{
 			{
 				Name:         "webhook-under-test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{},
+				ClientConfig: admissionv1.WebhookClientConfig{},
 			},
 		},
 	}
@@ -543,21 +543,21 @@ func TestCertWatcher(t *testing.T) {
 	ctx := context.Background()
 	timer := &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
+		webhookConfig, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
 		require.NoError(r, err)
 		// Verify that the CA cert has been initally set on the MWC.
 		require.Contains(r, string(webhookConfig.Webhooks[0].ClientConfig.CABundle), "ca-certificate-string")
 	})
 	// Update the CA bundle on the MWC to `""` to replicate a helm upgrade
 	webhook.Webhooks[0].ClientConfig.CABundle = []byte("")
-	_, err = k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Update(ctx, webhook, metav1.UpdateOptions{})
+	_, err = k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, webhook, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
 	// If this test passes, it implies that the system has recovered from the MWC
 	// getting updated to have the correct CA within a reasonable time window
 	timer = &retry.Timer{Timeout: 5 * time.Second, Wait: 500 * time.Millisecond}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		webhookConfig, err := k8s.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
+		webhookConfig, err := k8s.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookName, metav1.GetOptions{})
 		require.NoError(r, err)
 		// Verify that the CA cert has been updated with the correct CA.
 		require.Contains(r, string(webhookConfig.Webhooks[0].ClientConfig.CABundle), "ca-certificate-string")
@@ -566,7 +566,7 @@ func TestCertWatcher(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	t.Parallel()
-	webhook := &admissionv1beta1.MutatingWebhookConfiguration{
+	webhook := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "webhook-config-name",
 		},
