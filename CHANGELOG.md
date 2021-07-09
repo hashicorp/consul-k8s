@@ -4,6 +4,7 @@ IMPROVEMENTS:
 * Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
 
 BUG FIXES:
+* Connect: Use `AdmissionregistrationV1` instead of `AdmissionregistrationV1beta1` API as it was deprecated in k8s 1.16. [[GH-558](https://github.com/hashicorp/consul-k8s/pull/558)]
 * Connect: Fix bug where environment variables `<NAME>_CONNECT_SERVICE_HOST` and
   `<NAME>_CONNECT_SERVICE_PORT` weren't being set when the upstream annotation was used. [[GH-549](https://github.com/hashicorp/consul-k8s/issues/549)]
 
