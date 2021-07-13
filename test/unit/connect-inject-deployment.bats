@@ -1447,3 +1447,30 @@ EOF
 
   [ "${actual}" = "true" ]
 }
+
+
+#--------------------------------------------------------------------
+# replicas
+
+@test "connectInject/Deployment: replicas defaults to 2" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.replicas' | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "connectInject/Deployment: replicas can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.replicas=3' \
+      . | tee /dev/stderr |
+      yq '.spec.replicas' | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
+}

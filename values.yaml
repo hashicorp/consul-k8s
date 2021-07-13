@@ -1376,6 +1376,9 @@ connectInject:
   # global.enabled.
   enabled: false
 
+  # The number of deployment replicas.
+  replicas: 2
+
   # Image for consul-k8s that contains the injector
   # @type: string
   image: null
