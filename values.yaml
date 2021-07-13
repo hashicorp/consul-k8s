@@ -1485,6 +1485,14 @@ connectInject:
       memory: "50Mi"
       cpu: "50m"
 
+  # Sets the failurePolicy for the mutating webhook. By default this will cause pods not part of the consul installation to fail scheduling while the webhook
+  # is offline. This prevents a pod from skipping mutation if the webhook were to be momentarily offline.
+  # Once the webhook is back online the pod will be scheduled.
+  # In some environments such as Kind this may have an undesirable effect as it may prevent volume provisioner pods from running
+  # which can lead to hangs. In these environments it is recommend to use "Ignore" instead.
+  # This setting can be safely disabled by setting to "Ignore".
+  failurePolicy: "Fail"
+
   # Selector for restricting the webhook to only
   # specific namespaces. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
