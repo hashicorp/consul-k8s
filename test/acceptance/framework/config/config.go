@@ -55,6 +55,11 @@ type TestConfig struct {
 func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	helmValues := map[string]string{}
 
+	// If Kind is being used they use a pod to provision the underlying PV which will hang if we
+	// use "Fail" for the webhook failurePolicy.
+	if t.UseKind {
+		setIfNotEmpty(helmValues, "connectInject.failurePolicy", "Ignore")
+	}
 	// Set the enterprise image first if enterprise tests are enabled.
 	// It can be overwritten by the -consul-image flag later.
 	if t.EnableEnterprise {

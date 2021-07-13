@@ -12,7 +12,13 @@ metadata:
     release: {{ .Release.Name }}
 webhooks:
   - name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
-    failurePolicy: Ignore
+    # The webhook will fail scheduling all pods that are not part of consul if all replicas of the webhook are unhealthy.
+    objectSelector:
+      matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [ {{ template "consul.name" . }} ]
+    failurePolicy: {{ .Values.connectInject.failurePolicy }}
     sideEffects: None
     admissionReviewVersions:
     - "v1beta1"
