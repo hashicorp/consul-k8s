@@ -19,7 +19,7 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 spec:
-  replicas: 2
+  replicas: {{ .Values.connectInject.replicas }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
