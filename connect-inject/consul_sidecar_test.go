@@ -1,6 +1,7 @@
 package connectinject
 
 import (
+	"fmt"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
@@ -20,6 +21,7 @@ func TestConsulSidecar_MetricsFlags(t *testing.T) {
 			DefaultEnableMetricsMerging: true,
 		},
 	}
+	fmt.Println("======= TEST")
 	container, err := handler.consulSidecar(corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
