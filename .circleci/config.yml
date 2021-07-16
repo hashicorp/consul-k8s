@@ -712,9 +712,9 @@ workflows:
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
-      - acceptance-openshift:
-          requires:
-          - cleanup-azure-resources
+#      - acceptance-openshift: <-- Disabled until we can make them less flakey.
+#          requires:
+#          - cleanup-azure-resources
       - acceptance-gke-1-17:
           requires:
             - cleanup-gcp-resources
@@ -725,9 +725,6 @@ workflows:
           requires:
             - cleanup-azure-resources
       - acceptance-kind-1-21
-#      - acceptance-openshift: <-- Disabled until we can make them less flakey.
-#          requires:
-#          - cleanup-azure-resources
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
