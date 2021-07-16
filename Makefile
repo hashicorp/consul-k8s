@@ -2,27 +2,21 @@ SHELL = bash
 
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
-GOPATH=$(shell go env GOPATH)
-GOTAGS ?=
-GOTOOLS = \
-	github.com/magiconair/vendorfmt/cmd/vendorfmt \
-	github.com/mitchellh/gox \
-	golang.org/x/tools/cmd/cover \
-	golang.org/x/tools/cmd/stringer
-
 DEV_IMAGE?=consul-k8s-dev
-GO_BUILD_TAG?=consul-k8s-build-go
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
-GIT_IMPORT=github.com/hashicorp/consul-k8s/version
-GOLDFLAGS=-X $(GIT_IMPORT).GitCommit=$(GIT_COMMIT)$(GIT_DIRTY) -X $(GIT_IMPORT).GitDescribe=$(GIT_DESCRIBE)
+
+DEV_PUSH?=0
+ifeq ($(DEV_PUSH),1)
+DEV_PUSH_ARG=
+else
+DEV_PUSH_ARG=--no-push
+endif
 
 export GIT_COMMIT
 export GIT_DIRTY
 export GIT_DESCRIBE
-export GOLDFLAGS
-export GOTAGS
 
 CRD_OPTIONS ?= "crd:trivialVersions=true,allowDangerousTypes=true"
 
@@ -34,55 +28,6 @@ CI_DEV_DOCKER_IMAGE_NAME?=consul-k8s
 CI_DEV_DOCKER_WORKDIR?=.
 CONSUL_K8S_IMAGE_VERSION?=latest
 ################
-
-DIST_TAG?=1
-DIST_BUILD?=1
-DIST_SIGN?=1
-
-ifdef DIST_VERSION
-DIST_VERSION_ARG=-v "$(DIST_VERSION)"
-else
-DIST_VERSION_ARG=
-endif
-
-ifdef DIST_RELEASE_DATE
-DIST_DATE_ARG=-d "$(DIST_RELEASE_DATE)"
-else
-DIST_DATE_ARG=
-endif
-
-ifdef DIST_PRERELEASE
-DIST_REL_ARG=-r "$(DIST_PRERELEASE)"
-else
-DIST_REL_ARG=
-endif
-
-PUB_GIT?=1
-PUB_WEBSITE?=1
-
-ifeq ($(PUB_GIT),1)
-PUB_GIT_ARG=-g
-else
-PUB_GIT_ARG=
-endif
-
-ifeq ($(PUB_WEBSITE),1)
-PUB_WEBSITE_ARG=-w
-else
-PUB_WEBSITE_ARG=
-endif
-
-DEV_PUSH?=0
-ifeq ($(DEV_PUSH),1)
-DEV_PUSH_ARG=
-else
-DEV_PUSH_ARG=--no-push
-endif
-
-all: bin ctrl-generate
-
-bin:
-	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh
 
 dev:
 	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh -o $(GOOS) -a $(GOARCH)
@@ -105,47 +50,17 @@ cov:
 	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out
 
-tools:
-	go get -u -v $(GOTOOLS)
-
-# dist builds binaries for all platforms and packages them for distribution
-# make dist DIST_VERSION=<Desired Version> DIST_RELEASE_DATE=<release date>
-# date is in "month day, year" format.
-dist:
-	@$(SHELL) $(CURDIR)/build-support/scripts/release.sh -t '$(DIST_TAG)' -b '$(DIST_BUILD)' -S '$(DIST_SIGN)' $(DIST_VERSION_ARG) $(DIST_DATE_ARG) $(DIST_REL_ARG)
-
-publish:
-	@$(SHELL) $(CURDIR)/build-support/scripts/publish.sh $(PUB_GIT_ARG) $(PUB_WEBSITE_ARG)
-
-docker-images: go-build-image
-
-go-build-image:
-	@echo "Building Golang build container"
-	@docker build $(NOCACHE) $(QUIET) --build-arg 'GOTOOLS=$(GOTOOLS)' -t $(GO_BUILD_TAG) - < build-support/docker/Build-Go.dockerfile
-
 clean:
 	@rm -rf \
 		$(CURDIR)/bin \
 		$(CURDIR)/pkg
 
-# Run controller tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-ctrl-test: ctrl-generate ctrl-manifests
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/master/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./...
-
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-ctrl-deploy: ctrl-manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-
 # Generate manifests e.g. CRD, RBAC etc.
-ctrl-manifests: controller-gen
+ctrl-manifests: get-controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
-ctrl-generate: controller-gen
+ctrl-generate: get-controller-gen
 	$(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
 # Copy CRD YAML to consul-helm.
@@ -155,7 +70,7 @@ ctrl-crd-copy:
 
 # find or download controller-gen
 # download controller-gen if necessary
-controller-gen:
+get-controller-gen:
 ifeq (, $(shell which controller-gen))
 	@{ \
 	set -e ;\
@@ -170,7 +85,7 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
-kustomize:
+get-kustomize:
 ifeq (, $(shell which kustomize))
 	@{ \
 	set -e ;\
