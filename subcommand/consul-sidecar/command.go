@@ -21,8 +21,13 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const metricsServerShutdownTimeout = 5 * time.Second
-const envoyMetricsAddr = "http://127.0.0.1:19000/stats/prometheus"
+const (
+	metricsServerShutdownTimeout = 5 * time.Second
+	envoyMetricsAddr             = "http://127.0.0.1:19000/stats/prometheus"
+	// prometheusMergedServiceMetricSuccessKey is the key of the prometheus metric used to
+	// indicate if service metrics were scraped successfully.
+	prometheusMergedServiceMetricSuccessKey = "consul_merged_service_metrics_success"
+)
 
 type Command struct {
 	UI cli.Ui
@@ -243,35 +248,49 @@ func (c *Command) createMergedMetricsServer() *http.Server {
 	mergedMetricsServerAddr := fmt.Sprintf("127.0.0.1:%s", c.flagMergedMetricsPort)
 	server := &http.Server{Addr: mergedMetricsServerAddr, Handler: mux}
 
+	// http.Client satisfies the metricsGetter interface.
 	// The default http.Client timeout is indefinite, so adding a timeout makes
 	// sure that requests don't hang.
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
-	// http.Client satisfies the metricsGetter interface.
-	c.envoyMetricsGetter = client
-	c.serviceMetricsGetter = client
+
+	// During tests these may already be set to mocks.
+	if c.envoyMetricsGetter == nil {
+		c.envoyMetricsGetter = client
+	}
+	if c.serviceMetricsGetter == nil {
+		c.serviceMetricsGetter = client
+	}
 
 	return server
 }
 
 // mergedMetricsHandler has the logic to append both Envoy and service metrics
 // together, logging if it's unsuccessful at either.
+// If the Envoy scrape fails, we respond with a 500 code which follows the Prometheus
+// exporter guidelines. If the service scrape fails, we respond with a 200 so
+// that the Envoy metrics are still scraped.
+// We also include a metric line in each response indicating the success or
+// failure of the service metric scraping.
 func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) {
-
 	envoyMetrics, err := c.envoyMetricsGetter.Get(envoyMetricsAddr)
 	if err != nil {
-		// If there is an error scraping Envoy, we want the handler to return
-		// without writing anything to the response, and log the error.
-		c.logger.Error(fmt.Sprintf("Error scraping Envoy proxy metrics: %s", err.Error()))
+		c.logger.Error("Error scraping Envoy proxy metrics", "err", err)
+		http.Error(rw, fmt.Sprintf("Error scraping Envoy proxy metrics: %s", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Write Envoy metrics to the response.
 	defer envoyMetrics.Body.Close()
 	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Couldn't read Envoy proxy metrics: %s", err.Error()))
+		c.logger.Error("Could not read Envoy proxy metrics", "err", err)
+		http.Error(rw, fmt.Sprintf("Could not read Envoy proxy metrics: %s", err), http.StatusInternalServerError)
+		return
+	}
+	if non2xxCode(envoyMetrics.StatusCode) {
+		c.logger.Error("Received non-2xx status code scraping Envoy proxy metrics", "code", envoyMetrics.StatusCode, "response", string(envoyMetricsBody))
+		http.Error(rw, fmt.Sprintf("Received non-2xx status code scraping Envoy proxy metrics: %d: %s", envoyMetrics.StatusCode, string(envoyMetricsBody)), http.StatusInternalServerError)
 		return
 	}
 	rw.Write(envoyMetricsBody)
@@ -279,21 +298,27 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	serviceMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
 	serviceMetrics, err := c.serviceMetricsGetter.Get(serviceMetricsAddr)
 	if err != nil {
-		c.logger.Warn(fmt.Sprintf("Error scraping service metrics: %s", err.Error()))
+		c.logger.Warn("Error scraping service metrics", "err", err)
+		rw.Write(serviceMetricSuccess(false))
 		// Since we've already written the Envoy metrics to the response, we can
 		// return at this point if we were unable to get service metrics.
 		return
 	}
 
-	// Since serviceMetrics will be non-nil if there are no errors, write the
-	// service metrics to the response as well.
 	defer serviceMetrics.Body.Close()
 	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Couldn't read service metrics: %s", err.Error()))
+		c.logger.Error("Could not read service metrics", "err", err)
+		rw.Write(serviceMetricSuccess(false))
+		return
+	}
+	if non2xxCode(serviceMetrics.StatusCode) {
+		c.logger.Error("Received non-2xx status code scraping service metrics", "code", serviceMetrics.StatusCode, "response", string(serviceMetricsBody))
+		rw.Write(serviceMetricSuccess(false))
 		return
 	}
 	rw.Write(serviceMetricsBody)
+	rw.Write(serviceMetricSuccess(true))
 }
 
 // validateFlags validates the flags.
@@ -324,6 +349,21 @@ func (c *Command) validateFlags() error {
 		}
 	}
 	return nil
+}
+
+// non2xxCode returns true if code is not in the range of 200-299 inclusive.
+func non2xxCode(code int) bool {
+	return code < 200 || code >= 300
+}
+
+// serviceMetricSuccess returns a prometheus metric line indicating
+// the success of the metrics merging.
+func serviceMetricSuccess(success bool) []byte {
+	boolAsInt := 0
+	if success {
+		boolAsInt = 1
+	}
+	return []byte(fmt.Sprintf("%s %d\n", prometheusMergedServiceMetricSuccessKey, boolAsInt))
 }
 
 // parseConsulFlags creates Consul client command flags
