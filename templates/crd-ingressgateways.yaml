@@ -1,0 +1,176 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: ingressgateways.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: IngressGateway
+    listKind: IngressGatewayList
+    plural: ingressgateways
+    singular: ingressgateway
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: IngressGateway is the Schema for the ingressgateways API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: IngressGatewaySpec defines the desired state of IngressGateway
+            properties:
+              listeners:
+                description: Listeners declares what ports the ingress gateway should
+                  listen on, and what services to associated to those ports.
+                items:
+                  description: IngressListener manages the configuration for a listener
+                    on a specific port.
+                  properties:
+                    port:
+                      description: Port declares the port on which the ingress gateway
+                        should listen for traffic.
+                      type: integer
+                    protocol:
+                      description: 'Protocol declares what type of traffic this listener
+                        is expected to receive. Depending on the protocol, a listener
+                        might support multiplexing services over a single port, or
+                        additional discovery chain features. The current supported
+                        values are: (tcp | http | http2 | grpc).'
+                      type: string
+                    services:
+                      description: "Services declares the set of services to which
+                        the listener forwards traffic. \n For \"tcp\" protocol listeners,
+                        only a single service is allowed. For \"http\" listeners,
+                        multiple services can be declared."
+                      items:
+                        description: IngressService manages configuration for services
+                          that are exposed to ingress traffic.
+                        properties:
+                          hosts:
+                            description: "Hosts is a list of hostnames which should
+                              be associated to this service on the defined listener.
+                              Only allowed on layer 7 protocols, this will be used
+                              to route traffic to the service by matching the Host
+                              header of the HTTP request. \n If a host is provided
+                              for a service that also has a wildcard specifier defined,
+                              the host will override the wildcard-specifier-provided
+                              \"<service-name>.*\" domain for that listener. \n This
+                              cannot be specified when using the wildcard specifier,
+                              \"*\", or when using a \"tcp\" listener."
+                            items:
+                              type: string
+                            type: array
+                          name:
+                            description: "Name declares the service to which traffic
+                              should be forwarded. \n This can either be a specific
+                              service, or the wildcard specifier, \"*\". If the wildcard
+                              specifier is provided, the listener must be of \"http\"
+                              protocol and means that the listener will forward traffic
+                              to all services. \n A name can be specified on multiple
+                              listeners, and will be exposed on both of the listeners."
+                            type: string
+                          namespace:
+                            description: Namespace is the namespace where the service
+                              is located. Namespacing is a Consul Enterprise feature.
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
+              tls:
+                description: TLS holds the TLS configuration for this gateway.
+                properties:
+                  enabled:
+                    description: Indicates that TLS should be enabled for this gateway
+                      service.
+                    type: boolean
+                required:
+                - enabled
+                type: object
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

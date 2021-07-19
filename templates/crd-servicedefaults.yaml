@@ -1,0 +1,374 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: servicedefaults.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: ServiceDefaults
+    listKind: ServiceDefaultsList
+    plural: servicedefaults
+    singular: servicedefaults
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServiceDefaults is the Schema for the servicedefaults API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceDefaultsSpec defines the desired state of ServiceDefaults
+            properties:
+              expose:
+                description: Expose controls the default expose path configuration
+                  for Envoy.
+                properties:
+                  checks:
+                    description: Checks defines whether paths associated with Consul
+                      checks will be exposed. This flag triggers exposing all HTTP
+                      and GRPC check paths registered for the service.
+                    type: boolean
+                  paths:
+                    description: Paths is the list of paths exposed through the proxy.
+                    items:
+                      properties:
+                        listenerPort:
+                          description: ListenerPort defines the port of the proxy's
+                            listener for exposed paths.
+                          type: integer
+                        localPathPort:
+                          description: LocalPathPort is the port that the service
+                            is listening on for the given path.
+                          type: integer
+                        path:
+                          description: Path is the path to expose through the proxy,
+                            ie. "/metrics".
+                          type: string
+                        protocol:
+                          description: Protocol describes the upstream's service protocol.
+                            Valid values are "http" and "http2", defaults to "http".
+                          type: string
+                      type: object
+                    type: array
+                type: object
+              externalSNI:
+                description: ExternalSNI is an optional setting that allows for the
+                  TLS SNI value to be changed to a non-connect value when federating
+                  with an external system.
+                type: string
+              meshGateway:
+                description: MeshGateway controls the default mesh gateway configuration
+                  for this service.
+                properties:
+                  mode:
+                    description: Mode is the mode that should be used for the upstream
+                      connection. One of none, local, or remote.
+                    type: string
+                type: object
+              mode:
+                description: 'Mode can be one of "direct" or "transparent". "transparent"
+                  represents that inbound and outbound application traffic is being
+                  captured and redirected through the proxy. This mode does not enable
+                  the traffic redirection itself. Instead it signals Consul to configure
+                  Envoy as if traffic is already being redirected. "direct" represents
+                  that the proxy''s listeners must be dialed directly by the local
+                  application and other proxies. Note: This cannot be set using the
+                  CRD and should be set using annotations on the services that are
+                  part of the mesh.'
+                type: string
+              protocol:
+                description: Protocol sets the protocol of the service. This is used
+                  by Connect proxies for things like observability features and to
+                  unlock usage of the service-splitter and service-router config entries
+                  for a service.
+                type: string
+              transparentProxy:
+                description: 'TransparentProxy controls configuration specific to
+                  proxies in transparent mode. Note: This cannot be set using the
+                  CRD and should be set using annotations on the services that are
+                  part of the mesh.'
+                properties:
+                  dialedDirectly:
+                    description: DialedDirectly indicates whether transparent proxies
+                      can dial this proxy instance directly. The discovery chain is
+                      not considered when dialing a service instance directly. This
+                      setting is useful when addressing stateful services, such as
+                      a database cluster with a leader node.
+                    type: boolean
+                  outboundListenerPort:
+                    description: OutboundListenerPort is the port of the listener
+                      where outbound application traffic is being redirected to.
+                    type: integer
+                type: object
+              upstreamConfig:
+                description: UpstreamConfig controls default configuration settings
+                  that apply across all upstreams, and per-upstream configuration
+                  overrides. Note that per-upstream configuration applies across all
+                  federated datacenters to the pairing of source and upstream destination
+                  services.
+                properties:
+                  defaults:
+                    description: Defaults contains default configuration for all upstreams
+                      of a given service. The name field must be empty.
+                    properties:
+                      connectTimeoutMs:
+                        description: ConnectTimeoutMs is the number of milliseconds
+                          to timeout making a new connection to this upstream. Defaults
+                          to 5000 (5 seconds) if not set.
+                        type: integer
+                      envoyClusterJSON:
+                        description: 'EnvoyClusterJSON is a complete override ("escape
+                          hatch") for the upstream''s cluster. The Connect client
+                          TLS certificate and context will be injected overriding
+                          any TLS settings present. Note: This escape hatch is NOT
+                          compatible with the discovery chain and will be ignored
+                          if a discovery chain is active.'
+                        type: string
+                      envoyListenerJSON:
+                        description: 'EnvoyListenerJSON is a complete override ("escape
+                          hatch") for the upstream''s listener. Note: This escape
+                          hatch is NOT compatible with the discovery chain and will
+                          be ignored if a discovery chain is active.'
+                        type: string
+                      limits:
+                        description: Limits are the set of limits that are applied
+                          to the proxy for a specific upstream of a service instance.
+                        properties:
+                          maxConcurrentRequests:
+                            description: MaxConcurrentRequests is the maximum number
+                              of in-flight requests that will be allowed to the upstream
+                              cluster at a point in time. This is mostly applicable
+                              to HTTP/2 clusters since all HTTP/1.1 requests are limited
+                              by MaxConnections.
+                            type: integer
+                          maxConnections:
+                            description: MaxConnections is the maximum number of connections
+                              the local proxy can make to the upstream service.
+                            type: integer
+                          maxPendingRequests:
+                            description: MaxPendingRequests is the maximum number
+                              of requests that will be queued waiting for an available
+                              connection. This is mostly applicable to HTTP/1.1 clusters
+                              since all HTTP/2 requests are streamed over a single
+                              connection.
+                            type: integer
+                        type: object
+                      meshGateway:
+                        description: MeshGatewayConfig controls how Mesh Gateways
+                          are configured and used.
+                        properties:
+                          mode:
+                            description: Mode is the mode that should be used for
+                              the upstream connection. One of none, local, or remote.
+                            type: string
+                        type: object
+                      name:
+                        description: Name is only accepted within a service-defaults
+                          config entry.
+                        type: string
+                      namespace:
+                        description: Namespace is only accepted within a service-defaults
+                          config entry.
+                        type: string
+                      passiveHealthCheck:
+                        description: PassiveHealthCheck configuration determines how
+                          upstream proxy instances will be monitored for removal from
+                          the load balancing pool.
+                        properties:
+                          interval:
+                            description: Interval between health check analysis sweeps.
+                              Each sweep may remove hosts or return hosts to the pool.
+                            type: string
+                          maxFailures:
+                            description: MaxFailures is the count of consecutive failures
+                              that results in a host being removed from the pool.
+                            format: int32
+                            type: integer
+                        type: object
+                      protocol:
+                        description: Protocol describes the upstream's service protocol.
+                          Valid values are "tcp", "http" and "grpc". Anything else
+                          is treated as tcp. This enables protocol aware features
+                          like per-request metrics and connection pooling, tracing,
+                          routing etc.
+                        type: string
+                    type: object
+                  overrides:
+                    description: Overrides is a slice of per-service configuration.
+                      The name field is required.
+                    items:
+                      properties:
+                        connectTimeoutMs:
+                          description: ConnectTimeoutMs is the number of milliseconds
+                            to timeout making a new connection to this upstream. Defaults
+                            to 5000 (5 seconds) if not set.
+                          type: integer
+                        envoyClusterJSON:
+                          description: 'EnvoyClusterJSON is a complete override ("escape
+                            hatch") for the upstream''s cluster. The Connect client
+                            TLS certificate and context will be injected overriding
+                            any TLS settings present. Note: This escape hatch is NOT
+                            compatible with the discovery chain and will be ignored
+                            if a discovery chain is active.'
+                          type: string
+                        envoyListenerJSON:
+                          description: 'EnvoyListenerJSON is a complete override ("escape
+                            hatch") for the upstream''s listener. Note: This escape
+                            hatch is NOT compatible with the discovery chain and will
+                            be ignored if a discovery chain is active.'
+                          type: string
+                        limits:
+                          description: Limits are the set of limits that are applied
+                            to the proxy for a specific upstream of a service instance.
+                          properties:
+                            maxConcurrentRequests:
+                              description: MaxConcurrentRequests is the maximum number
+                                of in-flight requests that will be allowed to the
+                                upstream cluster at a point in time. This is mostly
+                                applicable to HTTP/2 clusters since all HTTP/1.1 requests
+                                are limited by MaxConnections.
+                              type: integer
+                            maxConnections:
+                              description: MaxConnections is the maximum number of
+                                connections the local proxy can make to the upstream
+                                service.
+                              type: integer
+                            maxPendingRequests:
+                              description: MaxPendingRequests is the maximum number
+                                of requests that will be queued waiting for an available
+                                connection. This is mostly applicable to HTTP/1.1
+                                clusters since all HTTP/2 requests are streamed over
+                                a single connection.
+                              type: integer
+                          type: object
+                        meshGateway:
+                          description: MeshGatewayConfig controls how Mesh Gateways
+                            are configured and used.
+                          properties:
+                            mode:
+                              description: Mode is the mode that should be used for
+                                the upstream connection. One of none, local, or remote.
+                              type: string
+                          type: object
+                        name:
+                          description: Name is only accepted within a service-defaults
+                            config entry.
+                          type: string
+                        namespace:
+                          description: Namespace is only accepted within a service-defaults
+                            config entry.
+                          type: string
+                        passiveHealthCheck:
+                          description: PassiveHealthCheck configuration determines
+                            how upstream proxy instances will be monitored for removal
+                            from the load balancing pool.
+                          properties:
+                            interval:
+                              description: Interval between health check analysis
+                                sweeps. Each sweep may remove hosts or return hosts
+                                to the pool.
+                              type: string
+                            maxFailures:
+                              description: MaxFailures is the count of consecutive
+                                failures that results in a host being removed from
+                                the pool.
+                              format: int32
+                              type: integer
+                          type: object
+                        protocol:
+                          description: Protocol describes the upstream's service protocol.
+                            Valid values are "tcp", "http" and "grpc". Anything else
+                            is treated as tcp. This enables protocol aware features
+                            like per-request metrics and connection pooling, tracing,
+                            routing etc.
+                          type: string
+                      type: object
+                    type: array
+                type: object
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

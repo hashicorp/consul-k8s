@@ -1,0 +1,78 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ template "consul.fullname" . }}-test"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  {{- if .Values.global.tls.enabled }}
+  volumes:
+    {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+    - name: consul-ca-cert
+      secret:
+        {{- if .Values.global.tls.caCert.secretName }}
+        secretName: {{ .Values.global.tls.caCert.secretName }}
+        {{- else }}
+        secretName: {{ template "consul.fullname" . }}-ca-cert
+        {{- end }}
+        items:
+        - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+          path: tls.crt
+    {{- end }}
+    - name: consul-auto-encrypt-ca-cert
+      emptyDir:
+        medium: "Memory"
+  {{- end }}
+  {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
+  initContainers:
+  {{- include "consul.getAutoEncryptClientCA" . | nindent 2 }}
+  {{- end }}
+  containers:
+    - name: consul-test
+      image: "{{ .Values.global.image }}"
+      env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        {{- if .Values.global.tls.enabled }}
+        - name: CONSUL_HTTP_ADDR
+          value: https://$(HOST_IP):8501
+        - name: CONSUL_CACERT
+          value: /consul/tls/ca/tls.crt
+        {{- else }}
+        - name: CONSUL_HTTP_ADDR
+          value: http://$(HOST_IP):8500
+        {{- end }}
+      {{- if .Values.global.tls.enabled }}
+      volumeMounts:
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      - name: consul-auto-encrypt-ca-cert
+        mountPath: /consul/tls/ca
+        readOnly: true
+      {{- else }}
+      - name: consul-ca-cert
+        mountPath: /consul/tls/ca
+        readOnly: true
+      {{- end }}
+      {{- end }}
+      command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+            consul members | tee members.txt
+            if [ $(grep -c consul-server members.txt) != $(grep consul-server members.txt | grep -c alive) ]
+            then
+              echo "Failed because not all consul servers are available"
+              exit 1
+            fi
+
+  restartPolicy: Never
+{{- end }}

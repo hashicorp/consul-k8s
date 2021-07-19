@@ -1,0 +1,41 @@
+{{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
+# Service for Consul DNS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "consul.fullname" . }}-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: dns
+  {{- if .Values.dns.annotations }}
+  annotations:
+    {{ tpl .Values.dns.annotations . | nindent 4 | trim }}
+  {{- end }}
+spec:
+{{- if .Values.dns.type }}
+  type: {{ .Values.dns.type }}
+{{- end }}
+{{- if .Values.dns.clusterIP }}
+  clusterIP: {{ .Values.dns.clusterIP }}
+{{- end }}
+  ports:
+    - name: dns-tcp
+      port: 53
+      protocol: "TCP"
+      targetPort: dns-tcp
+    - name: dns-udp
+      port: 53
+      protocol: "UDP"
+      targetPort: dns-udp
+  selector:
+    app: {{ template "consul.name" . }}
+    release: "{{ .Release.Name }}"
+    hasDNS: "true"
+  {{- if .Values.dns.additionalSpec }}
+  {{ tpl .Values.dns.additionalSpec . | nindent 2 | trim }}
+  {{- end }}
+{{- end }}
