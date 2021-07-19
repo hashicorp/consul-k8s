@@ -1,3 +1,4 @@
+# Originally from consul-k8s
 version: 2.1
 # reusable 'executor' object for jobs
 executors:
@@ -9,6 +10,8 @@ executors:
       CONSUL_VERSION: 1.10.0 # Consul's OSS version to use in tests
       CONSUL_ENT_VERSION: 1.10.0+ent # Consul's enterprise version to use in tests
 
+control-plane-path : &control-plane-path control-plane
+
 jobs:
   go-fmt-and-vet:
     executor: go
@@ -18,19 +21,23 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
 
-      - run: go mod download
+      - run:
+          name: go mod download
+          working_directory: *control-plane-path
+          command: go mod download
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+          key: consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
           paths:
             - "/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
           name: check go fmt
+          working_directory: *control-plane-path
           command: |
             files=$(go fmt ./...)
             if [ -n "$files" ]; then
@@ -38,14 +45,17 @@ jobs:
               echo "$files"
               exit 1
             fi
-      - run: go vet ./...
+      - run: cd control-plane && go vet ./...
 
   linters:
     executor: go
     steps:
       - checkout
       - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
-      - run: go run hack/lint-api-new-client/main.go
+      - run:
+          name: run lint
+          working_directory: *control-plane-path
+          command: go run hack/lint-api-new-client/main.go
 
   test:
     executor: go
@@ -59,16 +69,19 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
-      - run: |
-          # download and install the consul binary
-          wget https://releases.hashicorp.com/consul/"${CONSUL_VERSION}"/consul_"${CONSUL_VERSION}"_linux_amd64.zip && \
-               unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
-               rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
-          PACKAGE_NAMES=$(go list ./...)
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+      - run:
+          name: run go tests
+          working_directory: *control-plane-path
+          command: |
+            # download and install the consul binary
+            wget https://releases.hashicorp.com/consul/"${CONSUL_VERSION}"/consul_"${CONSUL_VERSION}"_linux_amd64.zip && \
+                 unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+                 rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
@@ -87,17 +100,20 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
-      - run: |
-          # download and install the consul binary
-          wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
-               unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
-               rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
-      - run: |
-          PACKAGE_NAMES=$(go list ./...)
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+      - run:
+          name: run enterprise go tests
+          working_directory: *control-plane-path
+          command: |
+            # download and install the consul binary
+            wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
+                 unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+                 rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
+            PACKAGE_NAMES=$(go list ./...)
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -123,16 +139,19 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
-      - run: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
+            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+      - run:
+          name: build local
+          working_directory: *control-plane-path
+          command: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
       # persist to downstream job
       - persist_to_workspace:
           root: .
           paths:
-            - pkg/bin
+            - control-plane/pkg/bin
       # save dev build to CircleCI
       - store_artifacts:
-          path: ./pkg/bin
+          path: ./control-plane/pkg/bin
 
   # upload dev docker image
   dev-upload-docker:
@@ -143,11 +162,17 @@ jobs:
       - attach_workspace:
           at: .
       - setup_remote_docker
-      - run: make ci.dev-docker
+      - run:
+          name: make ci.dev-docker
+          working_directory: *control-plane-path
+          command: make ci.dev-docker
 
 workflows:
   version: 2
-  test-and-build:
+#  helm-and-acceptance-tests:
+#    jobs:
+#      - go-fmt-and-vet-acceptance
+  control-plane-test-and-build:
     jobs:
       - go-fmt-and-vet
       - linters
