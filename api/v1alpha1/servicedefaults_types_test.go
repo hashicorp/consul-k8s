@@ -26,10 +26,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 			&capi.ServiceConfigEntry{
 				Name: "foo",
 				Kind: capi.ServiceDefaults,
-				TransparentProxy: &capi.TransparentProxyConfig{
-					OutboundListenerPort: 0,
-					DialedDirectly:       false,
-				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -263,13 +259,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				Spec: ServiceDefaultsSpec{},
 			},
 			&capi.ServiceConfigEntry{
-				Kind:      capi.ServiceDefaults,
-				Name:      "my-test-service",
-				Namespace: "namespace",
-				TransparentProxy: &capi.TransparentProxyConfig{
-					OutboundListenerPort: 0,
-					DialedDirectly:       false,
-				},
+				Kind:        capi.ServiceDefaults,
+				Name:        "my-test-service",
+				Namespace:   "namespace",
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -492,6 +484,65 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 				ModifyIndex: 2,
 			},
 			false,
+		},
+		// Consul's API returns the TransparentProxy object as empty
+		// even when it was written as a nil pointer so test that we
+		// treat the two as equal (https://github.com/hashicorp/consul/issues/10595).
+		"empty transparentProxy object from Consul API matches nil pointer on CRD": {
+			internal: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-test-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					// Passing a nil pointer here.
+					TransparentProxy: nil,
+				},
+			},
+			consul: &capi.ServiceConfigEntry{
+				Kind:        capi.ServiceDefaults,
+				Name:        "my-test-service",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+				// Consul will always return this even if it was written
+				// as a nil pointer.
+				TransparentProxy: &capi.TransparentProxyConfig{},
+			},
+			matches: true,
+		},
+		// Since we needed to add a special case to handle the nil pointer on
+		// the CRD (see above test case), also test that if the CRD and API
+		// have empty TransparentProxy structs that they're still equal to ensure
+		// we didn't break something when adding the special case.
+		"empty transparentProxy object from Consul API matches empty object on CRD": {
+			internal: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-test-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					// Using the empty struct here.
+					TransparentProxy: &TransparentProxy{},
+				},
+			},
+			consul: &capi.ServiceConfigEntry{
+				Kind:        capi.ServiceDefaults,
+				Name:        "my-test-service",
+				Namespace:   "namespace",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+				// Consul will always return this even if it was written
+				// as a nil pointer.
+				TransparentProxy: &capi.TransparentProxyConfig{},
+			},
+			matches: true,
 		},
 	}
 
