@@ -28,13 +28,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				Spec: ProxyDefaultsSpec{},
 			},
 			Theirs: &capi.ProxyConfigEntry{
-				Name:      common.Global,
-				Kind:      capi.ProxyDefaults,
-				Namespace: "default",
-				TransparentProxy: &capi.TransparentProxyConfig{
-					OutboundListenerPort: 0,
-					DialedDirectly:       false,
-				},
+				Name:        common.Global,
+				Kind:        capi.ProxyDefaults,
+				Namespace:   "default",
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -123,6 +119,63 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 			},
 			Matches: false,
 		},
+		// Consul's API returns the TransparentProxy object as empty
+		// even when it was written as a nil pointer so test that we
+		// treat the two as equal (https://github.com/hashicorp/consul/issues/10595).
+		"empty transparentProxy object from Consul API matches nil pointer on CRD": {
+			Ours: ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Global,
+				},
+				Spec: ProxyDefaultsSpec{
+					// Passing a nil pointer here.
+					TransparentProxy: nil,
+				},
+			},
+			Theirs: &capi.ProxyConfigEntry{
+				Name:        common.Global,
+				Kind:        capi.ProxyDefaults,
+				Namespace:   "default",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+				// Consul will always return this even if it was written
+				// as a nil pointer.
+				TransparentProxy: &capi.TransparentProxyConfig{},
+			},
+			Matches: true,
+		},
+		// Since we needed to add a special case to handle the nil pointer on
+		// the CRD (see above test case), also test that if the CRD and API
+		// have empty TransparentProxy structs that they're still equal to ensure
+		// we didn't break something when adding the special case.
+		"empty transparentProxy object from Consul API matches empty object on CRD": {
+			Ours: ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Global,
+				},
+				Spec: ProxyDefaultsSpec{
+					// Using the empty struct here.
+					TransparentProxy: &TransparentProxy{},
+				},
+			},
+			Theirs: &capi.ProxyConfigEntry{
+				Name:        common.Global,
+				Kind:        capi.ProxyDefaults,
+				Namespace:   "default",
+				CreateIndex: 1,
+				ModifyIndex: 2,
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+				TransparentProxy: &capi.TransparentProxyConfig{},
+			},
+			Matches: true,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -149,10 +202,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
-				},
-				TransparentProxy: &capi.TransparentProxyConfig{
-					OutboundListenerPort: 0,
-					DialedDirectly:       false,
 				},
 			},
 		},
