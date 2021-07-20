@@ -181,15 +181,13 @@ func meta(datacenter string) map[string]string {
 // CRD as not synced and would continually try and write it to Consul.
 func transparentProxyConfigComparer(a, b *capi.TransparentProxyConfig) bool {
 	empty := capi.TransparentProxyConfig{}
-	if a == nil && b == nil {
-		return true
-	}
+
 	// If one is a nil pointer and the other is the empty struct
 	// then treat them as equal.
-	if a == nil && *b == empty {
+	if a == nil && b != nil && *b == empty {
 		return true
 	}
-	if b == nil && *a == empty {
+	if b == nil && a != nil && *a == empty {
 		return true
 	}
 
