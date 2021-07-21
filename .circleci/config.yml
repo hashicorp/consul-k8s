@@ -408,7 +408,7 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
 
-  test-helm-gen:
+  validate-helm-gen:
     executor: go
     steps:
       - checkout
@@ -426,7 +426,7 @@ jobs:
           command: |
             go run ./... -validate
 
-  unit-helm:
+  unit-test-helm-templates:
     docker:
       - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
 
@@ -780,7 +780,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: verify Chart version matches tag version
+          name: verify chart version matches tag version
+          working_directory: *charts-consul-path
           command: |
             GO111MODULE=on go get github.com/mikefarah/yq/v2
             git_tag=$(echo "${CIRCLE_TAG#v}")
@@ -827,8 +828,8 @@ workflows:
       - unit-helm-gen:
           requires:
             - go-fmt-and-vet-helm-gen
-      - test-helm-gen
-      - unit-helm
+      - validate-helm-gen
+      - unit-test-helm-templates
       # Build control plane binaries
       - build-distro:
           OS: "freebsd linux windows"
