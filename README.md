@@ -1,36 +1,60 @@
-# Consul Helm Chart
+# Consul + Kubernetes (consul-k8s)
 
-## Announcement: Consul Helm Chart moving to `hashicorp/consul-k8s`
-
-We are planning on consolidating our Consul Helm and Consul K8s repos soon! *TLDR:* The HashiCorp Helm chart will be moving to [`hashicorp/consul-k8s`](https://github.com/hashicorp/consul-k8s). We target completing the migration before the end of August 2021.
-
-### Background
-
-For users, the separate repositories lead to difficulty on new releases and confusion surrounding versioning. Most of the time new releases that include changes to `consul-k8s` also change `consul-helm`. But separate repositories mean separate GitHub PR's and added confusion in opening new Github Issues. In addition, we maintain separate versions of the `consul-k8s` binary and the Consul Helm chart, which in most cases are more tightly coupled together with dependencies. This versioning strategy has also led to confusion as to which Helm charts are compatible with which versions of `consul-k8s`.
-
-### Proposal
-
-The single repository name will be consul-k8s. It will contain the Helm charts, control-plane code, and other components of Consul on Kubernetes. The original `consul-k8s` binary will be renamed to `consul-k8s-control-plane`, and an upcoming user-facing CLI binary will be called `consul-k8s`.
-
-Some additional details regarding the Consul Helm chart migration:
-
-1. All open and closed issues will be migrated from `consul-helm` to `consul-k8s`.
-2. PRs from consul-helm will not be migrated `consul-k8s`. Users will need to do that themselves, since it would be too complex to perform the migration with CI automation. The new repo will have a charts folder where the Helm chart will reside and PRs can be made against the contents in that folder in the same structure as before.
-3. We will be archiving the `consul-helm` repo, as no more changes will be made to the repository.
-4. A new Docker image that hosts the renamed consul-k8s binary will now exist in the following Docker Hub repo: `hashicorp/consul-k8s-control-plane`.
-5. Most importantly, there will be no change to any users that are installing Consul Kubernetes via the Helm chart, since the Helm chart will still be released to same location (i.e. https://helm.releases.hashicorp.com).
-
-After the integration, all of our Consul on Kubernetes components will be versioned together. For each new release of Consul Kubernetes, a new tag of the repository will be created. We will use that tag as the version for the control-plane docker image, the upcoming CLI binary, and the Consul Helm charts.
+> :warning: **Please note**: This repository has recently been merged with [consul-helm](https://www.consul.io/docs/platform/k8s/index.html). For more information on this change, please see [PR #1051](https://github.com/hashicorp/consul-helm/issues/1051).
 
 ---
 
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
- 
-----
 
 ## Overview
 
-This repository contains the official HashiCorp Helm chart for installing
+The `consul-k8s` binary includes first-class integrations between Consul and
+Kubernetes. The project encapsulates multiple use cases such as syncing
+services, injecting Connect sidecars, and more.
+The Kubernetes integrations with Consul are
+[documented directly on the Consul website](https://www.consul.io/docs/platform/k8s/index.html).
+
+This README will present a basic overview of use cases and installing the Helm charts, but for full documentation please reference the Consul website.
+
+This project is versioned separately from Consul. Supported Consul versions
+for each feature will be noted below. By versioning this project separately,
+we can iterate on Kubernetes integrations more quickly and release new versions
+without forcing Consul users to do a full Consul upgrade.
+
+> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
+you believe you have found a security issue in Consul K8s, _please responsibly disclose_
+by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
+
+## Features
+    
+  * [**Consul Service Mesh (Connect)**](https://www.consul.io/docs/k8s/connect):
+    Run Consul Service Mesh (aka Consul Connect) on Kubernetes. This feature
+    injects Envoy sidecars and registers your Pods with Consul.
+    _(Requires Consul 1.3+)_
+    
+  * [**Catalog Sync**](https://www.consul.io/docs/k8s/service-sync):
+    Sync Consul services into first-class Kubernetes services and vice versa.
+    This enables Kubernetes to easily access external services and for
+    non-Kubernetes nodes to easily discover and access Kubernetes services.
+    _(Requires Consul 1.1+)_
+
+## Installation
+
+`consul-k8s` is distributed in multiple forms:
+
+  * The recommended installation method is the official
+    [Consul Helm chart](https://github.com/hashicorp/consul-k8s/tree/merge-repos/charts/consul). This will
+    automatically configure the Consul and Kubernetes integration to run within
+    an existing Kubernetes cluster.
+
+  * A [Docker image `hashicorp/consul-k8s`](https://hub.docker.com/r/hashicorp/consul-k8s) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
+
+  * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
+    These can be used to run `consul-k8s` directly or build custom packages.
+
+## Helm
+
+Within the 'charts/consul' directory is the official HashiCorp Helm chart for installing
 and configuring Consul on Kubernetes. This chart supports multiple use
 cases of Consul on Kubernetes, depending on the values provided.
 
@@ -38,13 +62,13 @@ For full documentation on this Helm chart along with all the ways you can
 use Consul with Kubernetes, please see the
 [Consul and Kubernetes documentation](https://www.consul.io/docs/platform/k8s/index.html).
 
-## Prerequisites
+### Prerequisites
   * **Helm 3.0+** (Helm 2 is not supported)
   * **Kubernetes 1.17+** - This is the earliest version of Kubernetes tested.
     It is possible that this chart works with earlier versions but it is
     untested.
 
-## Usage
+### Usage
 
 Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
@@ -68,7 +92,7 @@ Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://www.consul.io/docs/platform/k8s/helm.html).
 
-## Tutorials
+# Tutorials
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/consul).
