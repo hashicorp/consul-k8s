@@ -1,0 +1,34 @@
+linters:
+  enable-all: true
+
+issues:
+  # Disable the default exclude list so that all excludes are explicitly
+  # defined in this file.
+  exclude-use-default: false
+
+  # Only report deltas off of main branch
+  new: true
+
+  exclude-rules:
+    # These pop up as a result of command tests and can be safely gnored. 
+    - linters: [errcheck]
+      text: 'Error return value of `(.*).Stop` is not checked'
+    - linters: [errcheck]
+      text: 'Error return value of `(.*).Write` is not checked'
+    - linters: [errcheck]
+      text: 'Error return value of `(.*).Remove` is not checked'
+
+    # Allow unused parameters to start with an underscore. Arguments with a name
+    # of '_' are already ignored.
+    # Ignoring longer names that start with underscore allow for better
+    # self-documentation than a single underscore by itself.  Underscore arguments
+    # should generally only be used when a function is implementing an interface.
+    - linters: [unparam]
+      text: '`_[^`]*` is unused'
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+run:
+  timeout: 5m
