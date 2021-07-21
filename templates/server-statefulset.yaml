@@ -137,6 +137,10 @@ spec:
                   {{- else }}
                   fieldPath: status.podIP
                   {{- end }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             - name: POD_IP
               valueFrom:
                 fieldRef:
@@ -175,6 +179,8 @@ spec:
             - "-ec"
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
+              {{ template "consul.extraconfig" }}
 
               exec /bin/consul agent \
                 -advertise="${ADVERTISE_IP}" \
@@ -236,6 +242,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
+                -config-file=/consul/extra-config/extra-from-values.json \
                 -server
           volumeMounts:
             - name: data-{{ .Release.Namespace }}
