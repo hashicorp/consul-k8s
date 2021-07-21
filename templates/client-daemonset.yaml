@@ -193,6 +193,8 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
+              {{ template "consul.extraconfig" }}
+
               exec /bin/consul agent \
                 -node="${NODE}" \
                 -advertise="${ADVERTISE_IP}" \
@@ -261,6 +263,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
+                -config-file=/consul/extra-config/extra-from-values.json \
                 -domain={{ .Values.global.domain }}
           volumeMounts:
             - name: data

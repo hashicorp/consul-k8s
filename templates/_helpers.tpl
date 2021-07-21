@@ -16,6 +16,20 @@ as well as the global.name setting.
 {{- end -}}
 
 {{/*
+Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
+substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file
+is passed to consul as a -config-file param on command line.
+*/}}
+{{- define "consul.extraconfig" -}}
+              mkdir -p /consul/extra-config
+              cp /consul/config/extra-from-values.json /consul/extra-config/extra-from-values.json
+              [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
+              [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
+              [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
+{{- end -}}
+
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "consul.chart" -}}

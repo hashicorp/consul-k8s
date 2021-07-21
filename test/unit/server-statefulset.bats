@@ -837,19 +837,19 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.[3].name' | tee /dev/stderr)
+      yq -r '.[4].name' | tee /dev/stderr)
   [ "${actual}" = "custom_proxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[3].value' | tee /dev/stderr)
+      yq -r '.[4].value' | tee /dev/stderr)
   [ "${actual}" = "fakeproxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[4].name' | tee /dev/stderr)
+      yq -r '.[5].name' | tee /dev/stderr)
   [ "${actual}" = "no_proxy" ]
 
   local actual=$(echo $object |
-      yq -r '.[4].value' | tee /dev/stderr)
+      yq -r '.[5].value' | tee /dev/stderr)
   [ "${actual}" = "custom_no_proxy" ]
 }
 
