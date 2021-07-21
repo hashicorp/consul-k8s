@@ -1,0 +1,27 @@
+linters:
+  # enables all defaults + the below, `golangci-lint linters` to see the list of active linters.
+  enable:
+    - gofmt
+    # TODO: re-enable things as we have master cleaned up vs the defaults
+    #- stylecheck
+    #- goconst
+    #- prealloc
+    #- unparam
+
+issues:
+  # Disable the default exclude list so that all excludes are explicitly
+  # defined in this file.
+  exclude-use-default: false
+
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - errcheck
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+run:
+  timeout: 5m

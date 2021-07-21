@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	ServiceDefaultsKubeKind string = "servicedefaults"
-	defaultUpstream                = "default"
-	overrideUpstream               = "override"
+	ServiceDefaultsKubeKind = "servicedefaults"
+	defaultUpstream         = "default"
+	overrideUpstream        = "override"
 )
 
 func init() {
