@@ -10,7 +10,7 @@ issues:
   new: true
 
   exclude-rules:
-    # These pop up as a result of command tests and can be safely gnored. 
+    # These pop up as a result of command tests and can be safely ignored. 
     - linters: [errcheck]
       text: 'Error return value of `(.*).Stop` is not checked'
     - linters: [errcheck]
