@@ -62,6 +62,11 @@ type initContainerCommandData struct {
 	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
+
+	// ConsulClientPort needs to be set to the ports the Consul client is using.
+	ConsulClientPortHTTP  string
+	ConsulClientPortHTTPS string
+	ConsulClientPortGRPC  string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -114,6 +119,9 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
 		EnvoyUID:                   envoyUserAndGroupID,
+		ConsulClientPortHTTP:       h.ConsulClientPortHTTP,
+		ConsulClientPortHTTPS:      h.ConsulClientPortHTTPS,
+		ConsulClientPortGRPC:       h.ConsulClientPortGRPC,
 	}
 
 	if data.AuthMethod != "" {
@@ -261,15 +269,15 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // the init container.
 const initContainerCommandTpl = `
 {{- if .ConsulCACert}}
-export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
-export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:{{ .ConsulClientPortHTTPS }}"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:{{ .ConsulClientPortGRPC }}"
 export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
 cat <<EOF >/consul/connect-inject/consul-ca.pem
 {{ .ConsulCACert }}
 EOF
 {{- else}}
-export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
-export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+export CONSUL_HTTP_ADDR="${HOST_IP}:{{ .ConsulClientPortHTTP }}"
+export CONSUL_GRPC_ADDR="${HOST_IP}:{{ .ConsulClientPortGRPC }}"
 {{- end}}
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}

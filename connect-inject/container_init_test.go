@@ -56,10 +56,35 @@ func TestHandlerContainerInit(t *testing.T) {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
-			Handler{},
+			Handler{
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
+			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+			"",
+		},
+
+		{
+			"Whole template, custom ports",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				ConsulClientPortHTTP: "9500",
+				ConsulClientPortGRPC: "9502",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:9500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:9502"
 consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 # Generate the envoy bootstrap code
@@ -83,7 +108,9 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				return pod
 			},
 			Handler{
-				AuthMethod: "an-auth-method",
+				AuthMethod:           "an-auth-method",
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -113,7 +140,10 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				pod.Annotations[annotationPrometheusScrapePath] = "/scrape-path"
 				return pod
 			},
-			Handler{},
+			Handler{
+				ConsulClientPortHTTP: "8500",
+				ConsulClientPortGRPC: "8502",
+			},
 			`# Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
@@ -357,6 +387,8 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -380,6 +412,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -404,6 +438,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -433,6 +469,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -461,6 +499,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -491,6 +531,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -523,6 +565,8 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
+				ConsulClientPortHTTP:       "8500",
+				ConsulClientPortGRPC:       "8502",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -610,7 +654,9 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 func TestHandlerContainerInit_WithTLS(t *testing.T) {
 	require := require.New(t)
 	h := Handler{
-		ConsulCACert: "consul-ca-cert",
+		ConsulCACert:          "consul-ca-cert",
+		ConsulClientPortHTTPS: "8501",
+		ConsulClientPortGRPC:  "8502",
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -640,6 +686,46 @@ EOF`)
 	require.NotContains(actual, `
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"`)
+}
+
+// If Consul CA cert is set and custom Consul client ports are used,
+// Consul addresses should use HTTPS
+// and CA cert should be set as env variable
+func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
+	require := require.New(t)
+	h := Handler{
+		ConsulCACert:          "consul-ca-cert",
+		ConsulClientPortHTTPS: "9501",
+		ConsulClientPortGRPC:  "9502",
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "foo",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+			},
+		},
+	}
+	container, err := h.containerInit(testNS, *pod)
+	require.NoError(err)
+	actual := strings.Join(container.Command, " ")
+	require.Contains(actual, `
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:9501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:9502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+consul-ca-cert
+EOF`)
+	require.NotContains(actual, `
+export CONSUL_HTTP_ADDR="${HOST_IP}:9500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:9502"`)
 }
 
 func TestHandlerContainerInit_Resources(t *testing.T) {
