@@ -58,7 +58,7 @@ use Consul with Kubernetes, please see the
     It is possible that this chart works with earlier versions but it is
     untested.
 
-#### Usage
+### Usage
 
 Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
