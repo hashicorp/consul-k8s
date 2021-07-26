@@ -172,7 +172,7 @@ func (c *Command) Run(args []string) int {
 			// it is not "lost" to the user at the end of the retries when the pod enters a CrashLoop.
 			if registrationRetryCount%10 == 0 {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
-					" Check the connect-inject deployment logs if your Pod is not starting.")
+					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
