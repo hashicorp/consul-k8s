@@ -2,6 +2,8 @@
 
 > :warning: **Please note**: This repository has recently been merged with [consul-helm](https://www.consul.io/docs/platform/k8s/index.html). For more information on this change, please see [PR #1051](https://github.com/hashicorp/consul-helm/issues/1051).
 
+⭐ **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** ⭐
+
 The `consul-k8s` binary includes first-class integrations between Consul and
 Kubernetes. The project encapsulates multiple use cases such as syncing
 services, injecting Connect sidecars, and more.
@@ -14,6 +16,10 @@ This project is versioned separately from Consul. Supported Consul versions
 for each feature will be noted below. By versioning this project separately,
 we can iterate on Kubernetes integrations more quickly and release new versions
 without forcing Consul users to do a full Consul upgrade.
+
+> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
+you believe you have found a security issue in Consul K8s, _please responsibly disclose_
+by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
 ## Features
     
@@ -86,7 +92,3 @@ file. These are also fully documented directly on the
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/consul).
-
-> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
-you believe you have found a security issue in Consul K8s, _please responsibly disclose_
-by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
