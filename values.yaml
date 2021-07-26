@@ -344,6 +344,34 @@ server:
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
 
+  # A Kubernetes secret containing a certificate & key for the server agents to use
+  # for TLS communication within the Consul cluster. Cert needs to be provided with
+  # additional DNS name SANs so that it will work within the Kubernetes cluster:
+  #
+  # ```bash
+  # consul tls cert create -server -days=730 -domain=consul -ca=consul-agent-ca.pem \
+  #     -key=consul-agent-ca-key.pem -dc={{datacenter}} \
+  #     -additional-dnsname="{{fullname}}-server" \
+  #     -additional-dnsname="*.{{fullname}}-server" \
+  #     -additional-dnsname="*.{{fullname}}-server.{{namespace}}" \
+  #     -additional-dnsname="*.{{fullname}}-server.{{namespace}}.svc" \
+  #     -additional-dnsname="*.server.{{datacenter}}.{{domain}}" \
+  #     -additional-dnsname="server.{{datacenter}}.{{domain}}"
+  # ```
+  #
+  # If you have generated the
+  # server-cert yourself with the consul CLI, you could use the following command
+  # to create the secret in Kubernetes:
+  #
+  # ```bash
+  # kubectl create secret generic consul-server-cert \
+  #     --from-file='tls.crt=./dc1-server-consul-0.pem'
+  #     --from-file='tls.key=./dc1-server-consul-0-key.pem'
+  # ```
+  serverCert:
+    # The name of the Kubernetes secret.
+    secretName: null
+
   # Exposes the servers' gossip and RPC ports as hostPorts. To enable a client
   # agent outside of the k8s cluster to join the datacenter, you would need to
   # enable `server.exposeGossipAndRPCPorts`, `client.exposeGossipPorts`, and
@@ -724,7 +752,7 @@ client:
   # required for Connect.
   grpc: true
 
-  # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node 
+  # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node
   # (see https://www.consul.io/docs/agent/options.html#_node_meta)
   nodeMeta:
     pod-name: ${HOSTNAME}

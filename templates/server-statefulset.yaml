@@ -1,6 +1,7 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if and .Values.global.federation.enabled (not .Values.global.tls.enabled) }}{{ fail "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" }}{{ end }}
 {{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
+{{- if and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert must also be provided" }}{{ end }}
 {{- if .Values.server.disableFsGroupSecurityContext }}{{ fail "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." }}{{ end }}
 {{- if .Values.server.bootstrapExpect }}{{ if lt (int .Values.server.bootstrapExpect) (int .Values.server.replicas) }}{{ fail "server.bootstrapExpect cannot be less than server.replicas" }}{{ end }}{{ end }}
 {{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
@@ -95,7 +96,11 @@ spec:
               path: tls.crt
         - name: consul-server-cert
           secret:
+            {{- if .Values.server.serverCert.secretName }}
+            secretName: {{ .Values.server.serverCert.secretName }}
+            {{- else }}
             secretName: {{ template "consul.fullname" . }}-server-cert
+            {{- end }}
         {{- end }}
         {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
         - name: consul-license

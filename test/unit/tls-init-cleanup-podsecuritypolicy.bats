@@ -9,6 +9,17 @@ load _helpers
       .
 }
 
+@test "tlsInitCleanup/PodSecurityPolicy: disabled with global.tls.enabled=true and server.serverCert.secretName!=null" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/tls-init-cleanup-podsecuritypolicy.yaml  \
+      --set 'global.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'server.serverCert.secretName=test' \
+      .
+}
+
 @test "tlsInitCleanup/PodSecurityPolicy: disabled by default with TLS enabled" {
   cd `chart_dir`
   assert_empty helm template \
