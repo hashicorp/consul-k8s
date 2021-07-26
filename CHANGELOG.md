@@ -1,5 +1,8 @@
 ## Unreleased
 
+BREAKING CHANGES:
+* Minimum Kubernetes versions supported is 1.17+ and now matches what is stated in the `README.md` file.  [[GH-1053](https://github.com/hashicorp/consul-helm/pull/1053)]
+
 IMPROVEMENTS:
 * Substitute `HOST_IP/POD_IP/HOSTNAME` variables in `server.extraConfig` and `client.extraConfig` so they are passed in to server/client config already evaluated at runtime. [[GH-1042](https://github.com/hashicorp/consul-helm/pull/1042)]
 * Set failurePolicy to Fail for connectInject mutating webhook so that pods fail to schedule when the webhook is offline. This can be controlled via `connectInject.failurePolicy`. [[GH-1024](https://github.com/hashicorp/consul-helm/pull/1024)]
