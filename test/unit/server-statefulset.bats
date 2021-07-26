@@ -161,6 +161,46 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# serverCert
+
+@test "server/StatefulSet: consul-server-cert uses default cert when serverCert.secretName not set" {
+    cd `chart_dir`
+    local object=$(helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.tls.enabled=true' \
+        --set 'server.serverCert.secretName=null' \
+        . | tee /dev/stderr )
+
+    local actual=$(echo "$object" |
+        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+    [ "${actual}" = "RELEASE-NAME-consul-server-cert" ]
+}
+
+@test "server/StatefulSet: consul-server-cert uses serverCert.secretName when serverCert (and caCert) are set" {
+    cd `chart_dir`
+    local object=$(helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.tls.enabled=true' \
+        --set 'global.tls.caCert.secretName=ca-cert' \
+        --set 'server.serverCert.secretName=server-cert' \
+        . | tee /dev/stderr )
+
+    local actual=$(echo "$object" |
+        yq -r '.spec.template.spec.volumes[2].secret.secretName' | tee /dev/stderr)
+    [ "${actual}" = "server-cert" ]
+}
+
+@test "server/StatefulSet: when server.serverCert.secretName!=null and global.tls.caCert.secretName=null, fail" {
+    cd `chart_dir`
+    run helm template \
+        -s templates/server-statefulset.yaml \
+        --set 'global.tls.enabled=true' \
+        --set 'server.serverCert.secretName=server-cert' \
+        .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If server.serverCert.secretName is provided, global.tls.caCert must also be provided" ]]
+}
+#--------------------------------------------------------------------
 # exposeGossipAndRPCPorts
 
 @test "server/StatefulSet: server gossip and RPC ports are not exposed by default" {
