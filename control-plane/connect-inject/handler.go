@@ -184,7 +184,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
-	h.Log.Info("received pod", "name", pod.Name, "ns", pod.Namespace)
+	h.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
