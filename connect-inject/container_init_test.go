@@ -543,6 +543,7 @@ consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 
 # Apply traffic redirection rules.
 /consul/connect-inject/consul connect redirect-traffic \
+  -token-file="/consul/connect-inject/acl-token" \
   -namespace="k8snamespace" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
