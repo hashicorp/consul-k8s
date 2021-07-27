@@ -206,6 +206,8 @@ namespace "{{ .SyncConsulDestNS }}" {
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
 	// It must also create/update service health checks via the endpoints controller.
+	// When ACLs are enabled, the endpoints controller needs "acl:write" permissions
+	// to delete ACL tokens created via "consul login".
 	injectRulesTpl := `
 {{- if .EnableNamespaces }}
 operator = "write"
@@ -216,6 +218,7 @@ node_prefix "" {
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
+  acl = "write"
   service_prefix "" {
     policy = "write"
   }

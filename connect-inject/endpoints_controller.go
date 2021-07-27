@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/deckarep/golang-set"
@@ -34,13 +35,13 @@ const (
 	MetaKeyKubeServiceName     = "k8s-service-name"
 	MetaKeyKubeNS              = "k8s-namespace"
 	MetaKeyManagedBy           = "managed-by"
+	TokenMetaPodNameKey        = "pod"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
 	envoySidecarContainer      = "envoy-sidecar"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
-	// TODO: change this to a constant shared with Consul to avoid accidentally changing this.
 	clusterIPTaggedAddressName = "virtual"
 
 	// exposedPathsLivenessPortsRangeStart is the start of the port range that we will use as
@@ -100,6 +101,11 @@ type EndpointsController struct {
 	// TProxyOverwriteProbes controls whether the endpoints controller should expose pod's HTTP probes
 	// via Envoy proxy.
 	TProxyOverwriteProbes bool
+	// AuthMethod is the name of the Kubernetes Auth Method that
+	// was used to login with Consul. The Endpoints controller
+	// will delete any tokens associated with this auth method
+	// whenever service instances are deregistered.
+	AuthMethod string
 
 	MetricsConfig MetricsConfig
 	Log           logr.Logger
@@ -710,6 +716,18 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 						r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 						return err
 					}
+
+					if r.AuthMethod != "" {
+						r.Log.Info("deleting ACL token for service instance", "id", svcID)
+						// We don't check that these keys exist in the map because we expect that they always do by the time we're
+						// looking at this service registration.
+						err = r.deleteACLTokenForService(client, serviceRegistration.Service,
+							serviceRegistration.Meta[MetaKeyPodName], serviceRegistration.Meta[MetaKeyKubeNS])
+						if err != nil {
+							r.Log.Error(err, "failed to delete ACL token for service instance", "id", svcID)
+							return err
+						}
+					}
 				}
 			} else {
 				r.Log.Info("deregistering service from consul", "svc", svcID)
@@ -717,10 +735,73 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 					r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 					return err
 				}
+
+				if r.AuthMethod != "" {
+					r.Log.Info("deleting ACL token for service instance", "id", svcID)
+					err = r.deleteACLTokenForService(client, serviceRegistration.Service, serviceRegistration.Meta[MetaKeyPodName], serviceRegistration.Meta[MetaKeyKubeNS])
+					if err != nil {
+						r.Log.Error(err, "failed to delete ACL token for service instance", "id", svcID)
+						return err
+					}
+				}
 			}
 		}
 	}
 	return nil
+}
+
+// deleteACLTokenForService finds the ACL token that belongs to the service and deletes it from Consul.
+// It will only check for ACL tokens that have been created with the auth method this controller
+// has been configured with.
+func (r *EndpointsController) deleteACLTokenForService(client *api.Client, serviceName, podName, k8sNS string) error {
+	tokens, _, err := client.ACL().TokenList(nil)
+	if err != nil {
+		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
+	}
+
+	podNamespacedName := fmt.Sprintf("%s/%s", k8sNS, podName)
+
+	for _, token := range tokens {
+		// Only delete tokens that:
+		// * have been created with the auth method configured for this endpoints controller
+		// * have a single service identity whose service name is the same as 'serviceName'
+		if token.AuthMethod == r.AuthMethod &&
+			len(token.ServiceIdentities) == 1 &&
+			token.ServiceIdentities[0].ServiceName == serviceName {
+			tokenMeta, err := getTokenMetaFromDescription(token.Description)
+			if err != nil {
+				return fmt.Errorf("failed to parse token metadata: %s", err)
+			}
+
+			if tokenMeta[TokenMetaPodNameKey] == podNamespacedName {
+				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
+				if err != nil {
+					return fmt.Errorf("failed to delete token from Consul: %s", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// getTokenMetaFromDescription parses JSON metadata from token's description.
+func getTokenMetaFromDescription(description string) (map[string]string, error) {
+	re := regexp.MustCompile(`.*({.+})`)
+
+	matches := re.FindStringSubmatch(description)
+	if len(matches) != 2 {
+		return nil, fmt.Errorf("failed to extract token metadata from description: %s", description)
+	}
+	tokenMetaJSON := matches[1]
+
+	var tokenMeta map[string]string
+	err := json.Unmarshal([]byte(tokenMetaJSON), &tokenMeta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token metadata '%s': %s", tokenMetaJSON, err)
+	}
+
+	return tokenMeta, nil
 }
 
 // serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list

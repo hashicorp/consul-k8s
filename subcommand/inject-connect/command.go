@@ -231,7 +231,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Proxy resources
+	// Proxy resources.
 	var sidecarProxyCPULimit, sidecarProxyCPURequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
 	var err error
 	if c.flagDefaultSidecarProxyCPURequest != "" {
@@ -276,7 +276,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Validate ports in metrics flags
+	// Validate ports in metrics flags.
 	err = common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
 	if err != nil {
 		c.UI.Error(err.Error())
@@ -295,7 +295,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// We must have an in-cluster K8S client
+	// We must have an in-cluster K8S client.
 	if c.clientset == nil {
 		config, err := rest.InClusterConfig()
 		if err != nil {
@@ -309,7 +309,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// create Consul API config object
+	// Create Consul API config object.
 	cfg := api.DefaultConfig()
 	c.http.MergeOntoConfig(cfg)
 	if cfg.TLSConfig.CAFile == "" && c.flagConsulCACert != "" {
@@ -326,7 +326,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// load CA file contents
+	// Load CA file contents.
 	var consulCACert []byte
 	if cfg.TLSConfig.CAFile != "" {
 		var err error
@@ -337,7 +337,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Set up Consul client
+	// Set up Consul client.
 	if c.consulClient == nil {
 		var err error
 		c.consulClient, err = consul.NewClient(cfg)
@@ -351,7 +351,7 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	// Convert allow/deny lists to sets
+	// Convert allow/deny lists to sets.
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
@@ -412,6 +412,7 @@ func (c *Command) Run(args []string) int {
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
 		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
 		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
+		AuthMethod:                 c.flagACLAuthMethod,
 		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
 		Scheme:                     mgr.GetScheme(),
 		ReleaseName:                c.flagReleaseName,
