@@ -1229,7 +1229,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,
 								Meta: map[string]string{
-									"pod": fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+									TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
 								},
 							}, &writeOpts)
 
@@ -1539,7 +1539,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,
 								Meta: map[string]string{
-									"pod": fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+									TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
 								},
 							}, &writeOpts)
 
