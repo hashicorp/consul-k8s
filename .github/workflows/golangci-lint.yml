@@ -26,9 +26,9 @@ jobs:
 
           # Optional: golangci-lint command line arguments.
           # args: --issues-exit-code=0
-          args: --config .golangci.yml
+          # args: --config .golangci.yml
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # TODO: if we fix all the issues.. remove
-          only-new-issues: true
+          # only-new-issues: true
 
