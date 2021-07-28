@@ -93,15 +93,6 @@ func (s *GenSource) expiry() time.Duration {
 	return 24 * time.Hour
 }
 
-func (s *GenSource) expiryWithin() time.Duration {
-	if s.ExpiryWithin > 0 {
-		return s.ExpiryWithin
-	}
-
-	// Roughly 10% accounting for float errors
-	return time.Duration(float64(s.expiry()) * 0.10)
-}
-
 func (s *GenSource) generateCA() error {
 	// generate the CA
 	signer, _, caCertPem, caCertTemplate, err := GenerateCA(s.Name + " CA")
