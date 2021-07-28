@@ -165,7 +165,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flags.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
 
