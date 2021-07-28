@@ -98,17 +98,17 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagConfigFile == "" {
-		c.UI.Error(fmt.Sprintf("-config-file must be set"))
+		c.UI.Error("-config-file must be set")
 		return 1
 	}
 
 	if c.flagDeploymentName == "" {
-		c.UI.Error(fmt.Sprintf("-deployment-name must be set"))
+		c.UI.Error("-deployment-name must be set")
 		return 1
 	}
 
 	if c.flagDeploymentNamespace == "" {
-		c.UI.Error(fmt.Sprintf("-deployment-namespace must be set"))
+		c.UI.Error("-deployment-namespace must be set")
 		return 1
 	}
 
