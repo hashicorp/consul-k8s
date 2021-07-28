@@ -58,7 +58,7 @@ func (s *GenSource) Certificate(ctx context.Context, last *Bundle) (Bundle, erro
 			return result, err
 		}
 
-		waitTime := time.Until(cert.NotAfter)
+		waitTime := time.Until(cert.NotAfter) - s.expiryWithin()
 		if waitTime < 0 {
 			waitTime = 1 * time.Millisecond
 		}
@@ -91,6 +91,15 @@ func (s *GenSource) expiry() time.Duration {
 	}
 
 	return 24 * time.Hour
+}
+
+func (s *GenSource) expiryWithin() time.Duration {
+	if s.ExpiryWithin > 0 {
+		return s.ExpiryWithin
+	}
+
+	// Roughly 10% accounting for float errors
+	return time.Duration(float64(s.expiry()) * 0.10)
 }
 
 func (s *GenSource) generateCA() error {
