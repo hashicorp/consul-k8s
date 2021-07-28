@@ -1236,6 +1236,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							require.NoError(t, err)
 
 							tokensForServices[svc.ID] = token.AccessorID
+
+							// Create another token for the same service but a pod that no longer exists.
+							// This is to test a scenario with orphaned tokens
+							// where we have a token for the pod but the service instance
+							// for that pod no longer exists in Consul.
+							// In that case, the token should still be deleted.
+							token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+								AuthMethod:  test.AuthMethod,
+								BearerToken: test.ServiceAccountJWTToken,
+								Meta: map[string]string{
+									TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], "does-not-exist"),
+								},
+							}, &writeOpts)
+							require.NoError(t, err)
+							tokensForServices["does-not-exist"+svc.Name] = token.AccessorID
 						}
 					}
 				}
