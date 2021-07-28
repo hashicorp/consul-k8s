@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/subcommand"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/mitchellh/cli"
 	v1 "k8s.io/api/batch/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"

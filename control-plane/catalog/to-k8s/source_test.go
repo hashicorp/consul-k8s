@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	toconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
+	toconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"

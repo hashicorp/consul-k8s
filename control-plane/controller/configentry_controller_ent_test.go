@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/api/common"
-	"github.com/hashicorp/consul-k8s/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/controller"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"

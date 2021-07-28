@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
