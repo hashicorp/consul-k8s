@@ -18,6 +18,9 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
+    - path: test_util\.go
+      linters:
+        - errcheck
 
 linters-settings:
   gofmt:
