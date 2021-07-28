@@ -5,12 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
 	"github.com/hashicorp/consul-k8s/consul"
@@ -102,7 +100,6 @@ type Command struct {
 
 	once sync.Once
 	help string
-	cert atomic.Value
 }
 
 var (
@@ -463,13 +460,6 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Info("shutting down")
 	return 0
-}
-
-func (c *Command) handleReady(rw http.ResponseWriter, req *http.Request) {
-	// Always ready at this point. The main readiness check is whether
-	// there is a TLS certificate. If we reached this point it means we
-	// served a TLS certificate.
-	rw.WriteHeader(204)
 }
 
 func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, corev1.ResourceRequirements, error) {

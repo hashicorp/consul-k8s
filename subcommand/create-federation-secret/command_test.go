@@ -650,6 +650,7 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 						},
 					},
 				})
+				require.NoError(t, err)
 			}
 			require.NoError(t, err)
 

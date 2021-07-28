@@ -1016,7 +1016,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 
 			// Check that the Consul health check was created for the k8s pod.
 			if tt.expectedAgentHealthChecks != nil {
-				for i, _ := range tt.expectedConsulSvcInstances {
+				for i := range tt.expectedConsulSvcInstances {
 					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
 					check, err := consulClient.Agent().ChecksWithFilter(filter)
 					require.NoError(t, err)
@@ -2134,7 +2134,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 				// Check that the Consul health check was created for the k8s pod.
 				if tt.expectedAgentHealthChecks != nil {
-					for i, _ := range tt.expectedConsulSvcInstances {
+					for i := range tt.expectedConsulSvcInstances {
 						filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
 						check, err := consulClient.Agent().ChecksWithFilter(filter)
 						require.NoError(t, err)
@@ -3010,6 +3010,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			consulClient, err := api.NewClient(&api.Config{
 				Address: consul.HTTPAddr,
 			})
+			require.NoError(t, err)
 
 			for _, svc := range servicesInConsul {
 				err := consulClient.Agent().ServiceRegister(svc)
@@ -4417,6 +4418,7 @@ func TestRegisterServicesAndHealthCheck_skipsWhenDuplicateServiceFound(t *testin
 			}
 
 			err = ep.registerServicesAndHealthCheck(context.Background(), *endpoints, endpointsAddress, api.HealthPassing, make(map[string]bool))
+			require.NoError(t, err)
 
 			// Check that the service is not registered with Consul.
 			_, _, err = consulClient.Agent().Service("test-pod-test-service", nil)

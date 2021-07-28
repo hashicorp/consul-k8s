@@ -77,7 +77,6 @@ type K8SSink struct {
 	// It's populated from Kubernetes data.
 	serviceMapConsul map[string]*apiv1.Service
 	triggerCh        chan struct{}
-	readyCh          chan struct{}
 }
 
 // SetServices implements Sink

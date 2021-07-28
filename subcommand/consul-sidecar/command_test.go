@@ -563,10 +563,8 @@ func stopCommand(t *testing.T, cmd *Command, exitChan chan int) {
 	if len(exitChan) == 0 {
 		cmd.interrupt()
 	}
-	select {
-	case c := <-exitChan:
-		require.Equal(t, 0, c, string(cmd.UI.(*cli.MockUi).ErrorWriter.Bytes()))
-	}
+	c := <-exitChan
+	require.Equal(t, 0, c, string(cmd.UI.(*cli.MockUi).ErrorWriter.Bytes()))
 }
 
 // createServicesTmpFile creates a temp directory

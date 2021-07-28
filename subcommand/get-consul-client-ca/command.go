@@ -27,14 +27,13 @@ type Command struct {
 
 	flags *flag.FlagSet
 
-	flagOutputFile      string
-	flagServerAddr      string
-	flagServerPort      string
-	flagCAFile          string
-	flagTLSServerName   string
-	flagPollingInterval time.Duration
-	flagLogLevel        string
-	flagLogJSON         bool
+	flagOutputFile    string
+	flagServerAddr    string
+	flagServerPort    string
+	flagCAFile        string
+	flagTLSServerName string
+	flagLogLevel      string
+	flagLogJSON       bool
 
 	once sync.Once
 	help string
@@ -101,7 +100,7 @@ func (c *Command) Run(args []string) int {
 	// Get the active CA root from Consul
 	// Wait until it gets a successful response
 	var activeRoot string
-	backoff.Retry(func() error {
+	_ = backoff.Retry(func() error {
 		caRoots, _, err := consulClient.Agent().ConnectCARoots(nil)
 		if err != nil {
 			logger.Error("Error retrieving CA roots from Consul", "err", err)

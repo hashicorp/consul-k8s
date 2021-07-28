@@ -43,10 +43,9 @@ type Command struct {
 	flagCreateSyncToken    bool
 	flagSyncConsulNodeName string
 
-	flagCreateInjectToken      bool
-	flagCreateInjectAuthMethod bool
-	flagInjectAuthMethodHost   string
-	flagBindingRuleSelector    string
+	flagCreateInjectToken    bool
+	flagInjectAuthMethodHost string
+	flagBindingRuleSelector  string
 
 	flagCreateControllerToken bool
 

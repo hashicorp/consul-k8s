@@ -95,7 +95,7 @@ func (c *Command) Run(args []string) int {
 	// Run until we get an address from the service.
 	var address string
 	var unretryableErr error
-	backoff.Retry(withErrLogger(logger, func() error {
+	err = backoff.Retry(withErrLogger(logger, func() error {
 		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(context.TODO(), c.flagServiceName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("getting service %s: %s", c.flagServiceName, err)
@@ -131,8 +131,8 @@ func (c *Command) Run(args []string) int {
 		}
 	}), backoff.NewConstantBackOff(c.retryDuration))
 
-	if unretryableErr != nil {
-		c.UI.Error(fmt.Sprintf("Unable to get service address: %s", unretryableErr.Error()))
+	if err != nil || unretryableErr != nil {
+		c.UI.Error(fmt.Sprintf("Unable to get service address: %s, err: %s", unretryableErr.Error(), err))
 		return 1
 	}
 

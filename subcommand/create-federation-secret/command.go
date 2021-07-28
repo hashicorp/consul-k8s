@@ -295,7 +295,7 @@ func (c *Command) replicationToken(logger hclog.Logger) ([]byte, error) {
 	// requires all servers to be running and a leader elected.
 	// This will run forever but it's running as a Helm hook so Helm will timeout
 	// after a configurable time period.
-	backoff.Retry(func() error {
+	_ = backoff.Retry(func() error {
 		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Warn("secret not yet created, retrying", "secret", secretName, "ns", c.flagK8sNamespace)
@@ -329,7 +329,7 @@ func (c *Command) meshGatewayAddrs(logger hclog.Logger) ([]string, error) {
 	var meshGWSvcs []*api.CatalogService
 
 	// Run in a retry in case the mesh gateways haven't yet been registered.
-	backoff.Retry(func() error {
+	_ = backoff.Retry(func() error {
 		var err error
 		meshGWSvcs, _, err = c.consulClient.Catalog().Service(c.flagMeshGatewayServiceName, "", nil)
 		if err != nil {
@@ -387,7 +387,7 @@ func (c *Command) consulDatacenter(logger hclog.Logger) string {
 
 	// Run in a retry because the Consul clients may not be running yet.
 	var dc string
-	backoff.Retry(withLog(func() error {
+	_ = backoff.Retry(withLog(func() error {
 		agentCfg, err := c.consulClient.Agent().Self()
 		if err != nil {
 			return err
