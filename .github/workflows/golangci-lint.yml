@@ -17,7 +17,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-          version: v1.41.1
+          version: v1.23.6
 
           # Optional: working directory, useful for monorepos
           # TODO: we may need to modify this when monorepo comes, it could be helpful for when we test
