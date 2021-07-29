@@ -1,5 +1,9 @@
 # Consul + Kubernetes (consul-k8s)
 
+> :warning: **Please note**: We take Consul's security and our users' trust very seriously. If
+you believe you have found a security issue in Consul K8s, _please responsibly disclose_
+by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
+
 The `consul-k8s` binary includes first-class integrations between Consul and
 Kubernetes. The project encapsulates multiple use cases such as syncing
 services, injecting Connect sidecars, and more.
