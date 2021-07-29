@@ -17,6 +17,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/helper/test"
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
@@ -1741,7 +1742,7 @@ func TestRun_HTTPS(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	srv, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true

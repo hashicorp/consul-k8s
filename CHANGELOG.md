@@ -7,6 +7,7 @@ BUG FIXES:
 * Connect: Use `AdmissionregistrationV1` instead of `AdmissionregistrationV1beta1` API as it was deprecated in k8s 1.16. [[GH-558](https://github.com/hashicorp/consul-k8s/pull/558)]
 * Connect: Fix bug where environment variables `<NAME>_CONNECT_SERVICE_HOST` and
   `<NAME>_CONNECT_SERVICE_PORT` weren't being set when the upstream annotation was used. [[GH-549](https://github.com/hashicorp/consul-k8s/issues/549)]
+* Connect: Fix a bug with leaving around ACL tokens after a service has been deregistered. [[GH-571](https://github.com/hashicorp/consul-k8s/issues/540)]
 * CRDs: Fix ProxyDefaults and ServiceDefaults resources not syncing with Consul < 1.10.0 [[GH-1023](https://github.com/hashicorp/consul-helm/issues/1023)]
 
 ## 0.26.0 (June 22, 2021)
