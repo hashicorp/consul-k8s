@@ -1,6 +1,6 @@
 # Consul Helm Chart
 
-## ⚠️	 ANNOUNCEMENT: Consul Helm Chart moving to `hashicorp/consul-k8s` ⚠️	
+## Announcement: Consul Helm Chart moving to `hashicorp/consul-k8s`
 
 We are planning on consolidating our Consul Helm and Consul K8s repos soon! *TLDR:* The HashiCorp Helm chart will be moving to [`hashicorp/consul-k8s`](https://github.com/hashicorp/consul-k8s). We target completing the migration before the end of August 2021.
 
