@@ -58,7 +58,7 @@ type Handler struct {
 	RequireAnnotation bool
 
 	// AuthMethod is the name of the Kubernetes Auth Method to
-	// use for identity with connectInjection if ACLs are enabled
+	// use for identity with connectInjection if ACLs are enabled.
 	AuthMethod string
 
 	// The PEM-encoded CA certificate string

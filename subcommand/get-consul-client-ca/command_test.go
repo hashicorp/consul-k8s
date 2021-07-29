@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -71,7 +71,7 @@ func TestRun(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -132,7 +132,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -218,7 +218,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outputFile.Name())
 
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -315,7 +315,7 @@ func TestRun_WithProvider(t *testing.T) {
 		providers: map[string]discover.Provider{"mock": provider},
 	}
 
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	// start the test server
 	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
