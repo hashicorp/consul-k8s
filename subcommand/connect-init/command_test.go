@@ -65,6 +65,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 		tls                        bool
 		serviceAccountName         string
 		serviceName                string
+		k8sServiceName             string
 		includeServiceAccountName  bool
 		serviceAccountNameMismatch bool
 		expFail                    bool
@@ -103,6 +104,21 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			tls:                false,
 			serviceAccountName: "not-a-match",
 			serviceName:        "",
+			expFail:            true,
+		},
+		{
+			name:               "ACLs enabled, k8s-service-name flag is set and matches the service in Consul",
+			tls:                false,
+			serviceAccountName: "counting",
+			serviceName:        "",
+			k8sServiceName:     "counting",
+		},
+		{
+			name:               "ACLs enabled, k8s-service-name flag is set and doesn't match the service in Consul",
+			tls:                false,
+			serviceAccountName: "counting",
+			serviceName:        "",
+			k8sServiceName:     "not-in-consul",
 			expFail:            true,
 		},
 	}
@@ -172,6 +188,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-acl-auth-method", test.AuthMethod,
 				"-service-account-name", tt.serviceAccountName,
 				"-service-name", tt.serviceName,
+				"-k8s-service-name", tt.k8sServiceName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
@@ -210,8 +227,10 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 func TestRun_ServicePollingOnly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		tls  bool
+		name           string
+		tls            bool
+		k8sServiceName string
+		expFail        bool
 	}{
 		{
 			name: "ACLs disabled, no tls",
@@ -220,6 +239,17 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 		{
 			name: "ACLs disabled, tls",
 			tls:  true,
+		},
+		{
+			name:           "ACLs disabled, k8s-service-name flag is set and matches the service in Consul",
+			tls:            false,
+			k8sServiceName: "counting",
+		},
+		{
+			name:           "ACLs disabled, k8s-service-name flag is set and doesn't match the service in Consul",
+			tls:            false,
+			k8sServiceName: "not-in-consul",
+			expFail:        true,
 		},
 	}
 	for _, tt := range cases {
@@ -275,6 +305,7 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			flags := []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
+				"-k8s-service-name", tt.k8sServiceName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
@@ -283,6 +314,10 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 
 			// Run the command.
 			code := cmd.Run(flags)
+			if tt.expFail {
+				require.Equal(t, 1, code)
+				return
+			}
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 			// Validate contents of proxyFile.

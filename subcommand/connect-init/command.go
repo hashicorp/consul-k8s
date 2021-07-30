@@ -37,7 +37,8 @@ type Command struct {
 	flagAuthMethodNamespace    string // Consul namespace the auth-method is defined in.
 	flagConsulServiceNamespace string // Consul destination namespace for the service.
 	flagServiceAccountName     string // Service account name.
-	flagServiceName            string // Service name.
+	flagServiceName            string // Consul Service name.
+	flagK8sServiceName         string // Kubernetes Service name.
 	flagLogLevel               string
 	flagLogJSON                bool
 
@@ -62,7 +63,10 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagAuthMethodNamespace, "auth-method-namespace", "", "Consul namespace the auth-method is defined in")
 	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
-	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name as specified via the pod annotation.")
+	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name in Consul as specified via the pod annotation.")
+	c.flagSet.StringVar(&c.flagK8sServiceName, "k8s-service-name", "",
+		"Kubernetes service name matching this pod. If provided, the connect-init command will wait for a "+
+			"service to be registered in Consul that also matches the value of this flag.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -160,6 +164,10 @@ func (c *Command) Run(args []string) int {
 	err = backoff.Retry(func() error {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q", connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
+		// If the k8s-service-name flag is set, narrow the search to Consul services that have the same K8s service name.
+		if c.flagK8sServiceName != "" {
+			filter = filter + fmt.Sprintf(" and Meta[%q] == %q", connectinject.MetaKeyKubeServiceName, c.flagK8sServiceName)
+		}
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
 		if err != nil {
 			c.logger.Error("Unable to get Agent services", "error", err)

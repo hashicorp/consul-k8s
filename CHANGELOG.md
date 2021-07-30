@@ -2,6 +2,8 @@
 
 IMPROVEMENTS:
 * Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
+* Connect: Add flag `-k8s-service-name` to `connect-init` command which will narrow the search in Consul to services
+  that have a meta key matching that K8s service name. [[GH-584](https://github.com/hashicorp/consul-k8s/pull/584)]
 
 BUG FIXES:
 * Connect: Use `AdmissionregistrationV1` instead of `AdmissionregistrationV1beta1` API as it was deprecated in k8s 1.16. [[GH-558](https://github.com/hashicorp/consul-k8s/pull/558)]
