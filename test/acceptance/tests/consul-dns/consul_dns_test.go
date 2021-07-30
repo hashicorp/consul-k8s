@@ -3,6 +3,7 @@ package consuldns
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
@@ -16,30 +17,19 @@ import (
 const podName = "dns-pod"
 
 func TestConsulDNS(t *testing.T) {
-	cases := []struct {
-		name       string
-		helmValues map[string]string
-	}{
-		{
-			"Default installation",
-			nil,
-		},
-		{
-			"Secure installation (with TLS and ACLs enabled)",
-			map[string]string{
-				"global.tls.enabled":           "true",
-				"global.acls.manageSystemACLs": "true",
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+	for _, secure := range []bool{false, true} {
+		name := fmt.Sprintf("secure: %t", secure)
+		t.Run(name, func(t *testing.T) {
 			env := suite.Environment()
 			ctx := env.DefaultContext(t)
 			releaseName := helpers.RandomName()
 
-			cluster := consul.NewHelmCluster(t, c.helmValues, ctx, suite.Config(), releaseName)
+			helmValues := map[string]string{
+				"dns.enabled":                  "true",
+				"global.tls.enabled":           strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+			}
+			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
 
 			k8sClient := ctx.KubernetesClient(t)
