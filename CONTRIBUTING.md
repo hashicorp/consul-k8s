@@ -46,6 +46,14 @@ To create a docker image with your local changes:
 $ make dev-docker
 ```
 
+### Running linters locally
+`golangci-lint` is used in CI to enforce coding and style standards and help catch bugs ahead of time.
+The configuration that CI runs is stored in `.golangci.yml` at the top level of the repository.
+Please ensure your code passes by running `golangci-lint run` at the top level of the repository and addressing
+any issues prior to submitting a PR.
+
+Version 1.41.1 of [`golangci-lint`](https://github.com/golangci/golangci-lint/releases/tag/v1.41.1) is currently required.
+
 ### Rebasing contributions against master
 
 PRs in this repo are merged using the [`rebase`](https://git-scm.com/docs/git-rebase) method. This keeps
