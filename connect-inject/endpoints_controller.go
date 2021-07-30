@@ -124,12 +124,17 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	err := r.Client.Get(ctx, req.NamespacedName, &serviceEndpoints)
 
+	// endpointPods holds a set of all pods this endpoints object is currently pointing to.
+	// We use this later when we reconcile ACL tokens to decide whether an ACL token in Consul
+	// is for a pod that no longer exists.
+	endpointPods := mapset.NewSet()
+
 	// If the endpoints object has been deleted (and we get an IsNotFound
 	// error), we need to deregister all instances in Consul for that service.
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		if err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil); err != nil {
+		if err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -158,6 +163,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		for address, healthStatus := range allAddresses {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+				endpointPods.Add(address.TargetRef.Name)
 				if err := r.registerServicesAndHealthCheck(ctx, serviceEndpoints, address, healthStatus, endpointAddressMap); err != nil {
 					r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 					errs = multierror.Append(errs, err)
@@ -169,7 +175,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
+	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap, endpointPods); err != nil {
 		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
 	}
@@ -673,7 +679,7 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
+func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool, endpointPods mapset.Set) error {
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	agents := corev1.PodList{}
 	listOptions := client.ListOptions{
@@ -727,7 +733,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 			if r.AuthMethod != "" {
 				r.Log.Info("reconciling ACL tokens for service", "svc", serviceRegistration.Service)
-				err = r.reconcileACLTokensForService(client, serviceRegistration.Service, k8sSvcNamespace)
+				err = r.reconcileACLTokensForService(client, serviceRegistration.Service, k8sSvcNamespace, endpointPods)
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
 					return err
@@ -741,7 +747,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 // reconcileACLTokensForService finds the ACL tokens that belongs to the service and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
 // has been configured with.
-func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, serviceName, k8sNS string) error {
+func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, serviceName, k8sNS string, endpointPods mapset.Set) error {
 	tokens, _, err := client.ACL().TokenList(nil)
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
@@ -760,9 +766,9 @@ func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, s
 			}
 
 			podName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
-			err = r.Client.Get(r.Context, types.NamespacedName{Name: podName, Namespace: k8sNS}, &corev1.Pod{})
+
 			// If we can't find token's pod, delete it.
-			if err != nil && k8serrors.IsNotFound(err) {
+			if !endpointPods.Contains(podName) {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
 				if err != nil {
@@ -896,13 +902,11 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 
 	// Ignores deny list.
 	if denySet.Contains(namespace) {
-		fmt.Printf("%+v\n", denySet.ToSlice()...)
 		return true
 	}
 
 	// Ignores if not in allow list or allow list is not *.
 	if !allowSet.Contains("*") && !allowSet.Contains(namespace) {
-		fmt.Printf("%+v\n", allowSet.ToSlice()...)
 		return true
 	}
 

@@ -2,7 +2,6 @@ package connectinject
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -4591,10 +4590,6 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 			if c.podContainers != nil {
 				pod.Spec.Containers = c.podContainers
 			}
-
-			marshalledPod, err := json.Marshal(pod)
-			fmt.Println(string(marshalledPod))
-			require.NoError(t, err)
 
 			// We set these annotations explicitly as these are set by the handler and we
 			// need these values to determine which port to use for the service registration.
