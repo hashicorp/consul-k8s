@@ -166,9 +166,7 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 	// We must wait for the initial sync to be complete and our maps to be
 	// populated. If we don't wait, we will reap all services tagged with k8s
 	// because we have no tracked services in our maps yet.
-	select {
-	case <-s.initialSync:
-	}
+	<-s.initialSync
 
 	opts := &api.QueryOptions{
 		AllowStale: true,

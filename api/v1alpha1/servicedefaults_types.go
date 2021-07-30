@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	ServiceDefaultsKubeKind string = "servicedefaults"
-	defaultUpstream                = "default"
-	overrideUpstream               = "override"
+	ServiceDefaultsKubeKind = "servicedefaults"
+	defaultUpstream         = "default"
+	overrideUpstream        = "override"
 )
 
 func init() {
@@ -355,7 +355,6 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 
 // DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.
 func (in *ServiceDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
-	return
 }
 
 // MatchesConsul returns true if entry has the same config as this struct.

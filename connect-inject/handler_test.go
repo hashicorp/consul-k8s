@@ -542,7 +542,7 @@ func TestHandlerHandle(t *testing.T) {
 
 			actual := resp.Patches
 			if len(actual) > 0 {
-				for i, _ := range actual {
+				for i := range actual {
 					actual[i].Value = nil
 				}
 			}

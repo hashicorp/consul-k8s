@@ -16,8 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -25,9 +23,6 @@ import (
 )
 
 var (
-	codecs       = serializer.NewCodecFactory(runtime.NewScheme())
-	deserializer = codecs.UniversalDeserializer()
-
 	// kubeSystemNamespaces is a set of namespaces that are considered
 	// "system" level namespaces and are always skipped (never injected).
 	kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.NamespacePublic)

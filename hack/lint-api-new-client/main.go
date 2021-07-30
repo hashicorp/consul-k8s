@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	broken           = make(map[string]bool, 0) // Stored in a map for deduplication
+	broken           = make(map[string]bool) // Stored in a map for deduplication
 	exitCode         = 0
 	fset             = token.NewFileSet()
 	consulApiPackage = "github.com/hashicorp/consul/api"
@@ -25,19 +25,19 @@ var (
 func main() {
 	dir, err := os.Getwd()
 	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("failed to get cwd: %v", err))
+		_, _ = os.Stderr.WriteString(fmt.Sprintf("failed to get cwd: %v", err))
 		os.Exit(1)
 	}
 	err = walkDir(dir)
 	if err != nil {
-		os.Stderr.WriteString(err.Error())
+		_, _ = os.Stderr.WriteString(err.Error())
 		os.Exit(1)
 	}
 	if len(broken) > 0 {
 		exitCode = 1
-		os.Stderr.WriteString("Found code using github.com/hashicorp/consul/api.NewClient()\ninstead of github.com/hashicorp/consul-k8s/consul.NewClient()\nin the following files:\n")
+		_, _ = os.Stderr.WriteString("Found code using github.com/hashicorp/consul/api.NewClient()\ninstead of github.com/hashicorp/consul-k8s/consul.NewClient()\nin the following files:\n")
 		for filePath := range broken {
-			os.Stderr.WriteString(fmt.Sprintf("-  %s\n", filePath))
+			_, _ = os.Stderr.WriteString(fmt.Sprintf("-  %s\n", filePath))
 		}
 	}
 	os.Exit(exitCode)

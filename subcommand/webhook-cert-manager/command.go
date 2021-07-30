@@ -98,17 +98,17 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagConfigFile == "" {
-		c.UI.Error(fmt.Sprintf("-config-file must be set"))
+		c.UI.Error("-config-file must be set")
 		return 1
 	}
 
 	if c.flagDeploymentName == "" {
-		c.UI.Error(fmt.Sprintf("-deployment-name must be set"))
+		c.UI.Error("-deployment-name must be set")
 		return 1
 	}
 
 	if c.flagDeploymentNamespace == "" {
-		c.UI.Error(fmt.Sprintf("-deployment-namespace must be set"))
+		c.UI.Error("-deployment-namespace must be set")
 		return 1
 	}
 
@@ -189,15 +189,13 @@ func (c *Command) Run(args []string) int {
 	// We define a signal handler for OS interrupts, and when an SIGINT or SIGTERM is received,
 	// we gracefully shut down, by first stopping our cert notifiers and then cancelling
 	// all the contexts that have been created by the process.
-	select {
-	case sig := <-c.sigCh:
-		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
-		cancelFunc()
-		for _, notifier := range notifiers {
-			notifier.Stop()
-		}
-		return 0
+	sig := <-c.sigCh
+	c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
+	cancelFunc()
+	for _, notifier := range notifiers {
+		notifier.Stop()
 	}
+	return 0
 }
 
 // certWatcher listens for a new MetaBundle on the ch channel for all webhooks and updates
@@ -369,7 +367,7 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 		err = multierror.Append(err, errors.New(`config.Name cannot be ""`))
 	} else {
 		if _, err2 := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
-			err = multierror.Append(err, errors.New(fmt.Sprintf("MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name)))
+			err = multierror.Append(err, fmt.Errorf("MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
 		}
 	}
 	if c.SecretName == "" {

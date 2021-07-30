@@ -2,7 +2,6 @@
 package common
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -62,11 +61,11 @@ func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
 func ValidateUnprivilegedPort(flagName, flagValue string) error {
 	port, err := strconv.Atoi(flagValue)
 	if err != nil {
-		return errors.New(fmt.Sprintf("%s value of %s is not a valid integer", flagName, flagValue))
+		return fmt.Errorf("%s value of %s is not a valid integer", flagName, flagValue)
 	}
 	// This checks if the port is in the unprivileged port range.
 	if port < 1024 || port > 65535 {
-		return errors.New(fmt.Sprintf("%s value of %d is not in the unprivileged port range 1024-65535", flagName, port))
+		return fmt.Errorf("%s value of %d is not in the unprivileged port range 1024-65535", flagName, port)
 	}
 	return nil
 }

@@ -554,9 +554,8 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
-	proxyFile, err := os.Stat(randFileName)
-	// If the file has not been written it wont exist and proxyFile will be nil.
-	require.Nil(t, proxyFile)
+	_, err = os.Stat(randFileName)
+	require.Error(t, err)
 }
 
 // TestRun_FailsWithBadServerResponses tests error handling with invalid server responses.

@@ -24,7 +24,6 @@ type Command struct {
 	UI cli.Ui
 
 	flagSet   *flag.FlagSet
-	k8s       *flags.K8SFlags
 	httpFlags *flags.HTTPFlags
 
 	flagWebhookTLSCertDir    string

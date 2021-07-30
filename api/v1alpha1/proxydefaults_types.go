@@ -206,7 +206,6 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 
 // DefaultNamespaceFields has no behaviour here as proxy-defaults have no namespace specific fields.
 func (in *ProxyDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
-	return
 }
 
 // convertConfig converts the config of type json.RawMessage which is stored
@@ -220,7 +219,7 @@ func (in *ProxyDefaults) convertConfig() map[string]interface{} {
 	// We explicitly ignore the error returned by Unmarshall
 	// because validate() ensures that if we get to here that it
 	// won't return an error.
-	json.Unmarshal(in.Spec.Config, &outConfig)
+	_ = json.Unmarshal(in.Spec.Config, &outConfig)
 	return outConfig
 }
 

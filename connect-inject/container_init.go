@@ -249,9 +249,7 @@ func pointerToBool(b bool) *bool {
 func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) []string {
 	var items []string
 	if raw, ok := pod.Annotations[annotation]; ok {
-		for _, item := range strings.Split(raw, ",") {
-			items = append(items, item)
-		}
+		items = append(items, strings.Split(raw, ",")...)
 	}
 
 	return items

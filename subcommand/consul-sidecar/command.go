@@ -136,12 +136,9 @@ func (c *Command) Run(args []string) int {
 	// on shutdown. Also passing a context in so that it can interrupt the cmd and exit cleanly.
 	signalCtx, cancelFunc := context.WithCancel(context.Background())
 	go func() {
-		select {
-		case sig := <-c.sigCh:
-			c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
-			cancelFunc()
-			return
-		}
+		sig := <-c.sigCh
+		c.logger.Info(fmt.Sprintf("%s received, shutting down", sig))
+		cancelFunc()
 	}()
 
 	// If metrics merging is enabled, run a merged metrics server in a goroutine
@@ -268,13 +265,21 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}
 
 	// Write Envoy metrics to the response.
-	defer envoyMetrics.Body.Close()
+	defer func() {
+		err = envoyMetrics.Body.Close()
+		if err != nil {
+			c.logger.Error(fmt.Sprintf("Error closing envoy metrics body: %s", err.Error()))
+		}
+	}()
 	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
 	if err != nil {
 		c.logger.Error(fmt.Sprintf("Couldn't read Envoy proxy metrics: %s", err.Error()))
 		return
 	}
-	rw.Write(envoyMetricsBody)
+	_, err = rw.Write(envoyMetricsBody)
+	if err != nil {
+		c.logger.Error(fmt.Sprintf("Error writing envoy metrics body: %s", err.Error()))
+	}
 
 	serviceMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
 	serviceMetrics, err := c.serviceMetricsGetter.Get(serviceMetricsAddr)
@@ -287,13 +292,21 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 
 	// Since serviceMetrics will be non-nil if there are no errors, write the
 	// service metrics to the response as well.
-	defer serviceMetrics.Body.Close()
+	defer func() {
+		err = serviceMetrics.Body.Close()
+		if err != nil {
+			c.logger.Error(fmt.Sprintf("Error closing service metrics body: %s", err.Error()))
+		}
+	}()
 	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
 	if err != nil {
 		c.logger.Error(fmt.Sprintf("Couldn't read service metrics: %s", err.Error()))
 		return
 	}
-	rw.Write(serviceMetricsBody)
+	_, err = rw.Write(serviceMetricsBody)
+	if err != nil {
+		c.logger.Error(fmt.Sprintf("Error writing service metrics body: %s", err.Error()))
+	}
 }
 
 // validateFlags validates the flags.
