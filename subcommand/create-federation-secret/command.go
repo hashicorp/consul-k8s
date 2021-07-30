@@ -295,7 +295,7 @@ func (c *Command) replicationToken(logger hclog.Logger) ([]byte, error) {
 	// requires all servers to be running and a leader elected.
 	// This will run forever but it's running as a Helm hook so Helm will timeout
 	// after a configurable time period.
-	_ = backoff.Retry(func() error {
+	err := backoff.Retry(func() error {
 		secret, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Warn("secret not yet created, retrying", "secret", secretName, "ns", c.flagK8sNamespace)
@@ -315,6 +315,10 @@ func (c *Command) replicationToken(logger hclog.Logger) ([]byte, error) {
 		}
 		return nil
 	}, backoff.NewConstantBackOff(retryInterval))
+	// Unable to find the secret before timing out.
+	if err != nil {
+		return nil, err
+	}
 
 	if unrecoverableErr != nil {
 		return nil, unrecoverableErr

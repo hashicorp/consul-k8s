@@ -268,7 +268,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	defer func() {
 		err = envoyMetrics.Body.Close()
 		if err != nil {
-			c.logger.Info(fmt.Sprintf("Error closing envoy metrics body: %s", err.Error()))
+			c.logger.Error(fmt.Sprintf("Error closing envoy metrics body: %s", err.Error()))
 		}
 	}()
 	envoyMetricsBody, err := ioutil.ReadAll(envoyMetrics.Body)
@@ -278,7 +278,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}
 	_, err = rw.Write(envoyMetricsBody)
 	if err != nil {
-		c.logger.Info(fmt.Sprintf("Error writing envoy metrics body: %s", err.Error()))
+		c.logger.Error(fmt.Sprintf("Error writing envoy metrics body: %s", err.Error()))
 	}
 
 	serviceMetricsAddr := fmt.Sprintf("http://127.0.0.1:%s%s", c.flagServiceMetricsPort, c.flagServiceMetricsPath)
@@ -295,7 +295,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	defer func() {
 		err = serviceMetrics.Body.Close()
 		if err != nil {
-			c.logger.Info(fmt.Sprintf("Error closing service metrics body: %s", err.Error()))
+			c.logger.Error(fmt.Sprintf("Error closing service metrics body: %s", err.Error()))
 		}
 	}()
 	serviceMetricsBody, err := ioutil.ReadAll(serviceMetrics.Body)
@@ -305,7 +305,7 @@ func (c *Command) mergedMetricsHandler(rw http.ResponseWriter, _ *http.Request) 
 	}
 	_, err = rw.Write(serviceMetricsBody)
 	if err != nil {
-		c.logger.Info(fmt.Sprintf("Error writing service metrics body: %s", err.Error()))
+		c.logger.Error(fmt.Sprintf("Error writing service metrics body: %s", err.Error()))
 	}
 }
 
