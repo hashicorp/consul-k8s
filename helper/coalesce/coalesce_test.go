@@ -18,7 +18,7 @@ func TestCoalesce_quiet(t *testing.T) {
 		100*time.Millisecond,
 		500*time.Millisecond,
 		testSummer(&total, deltaCh))
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	if total != 42 {
 		t.Fatalf("total != 42: %d", total)
 	}
@@ -44,7 +44,7 @@ func TestCoalesce_max(t *testing.T) {
 		200*time.Millisecond,
 		500*time.Millisecond,
 		testSummer(&total, deltaCh))
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	if total < 4 || total > 6 {
 		// 4 to 6 to account for CI weirdness
 		t.Fatalf("total should be 4 to 6: %d", total)
@@ -78,7 +78,7 @@ func TestCoalesce_cancel(t *testing.T) {
 		500*time.Millisecond,
 		1000*time.Millisecond,
 		testSummer(&total, deltaCh))
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	// The check on total here isn't super important since it should
 	// never fail but I kept it in to match the rest of the tests.
 	if total != 1 {

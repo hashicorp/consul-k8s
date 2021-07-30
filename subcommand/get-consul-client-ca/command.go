@@ -27,14 +27,13 @@ type Command struct {
 
 	flags *flag.FlagSet
 
-	flagOutputFile      string
-	flagServerAddr      string
-	flagServerPort      string
-	flagCAFile          string
-	flagTLSServerName   string
-	flagPollingInterval time.Duration
-	flagLogLevel        string
-	flagLogJSON         bool
+	flagOutputFile    string
+	flagServerAddr    string
+	flagServerPort    string
+	flagCAFile        string
+	flagTLSServerName string
+	flagLogLevel      string
+	flagLogJSON       bool
 
 	once sync.Once
 	help string
@@ -71,17 +70,17 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flags.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
 
 	if c.flagOutputFile == "" {
-		c.UI.Error(fmt.Sprintf("-output-file must be set"))
+		c.UI.Error("-output-file must be set")
 		return 1
 	}
 
 	if c.flagServerAddr == "" {
-		c.UI.Error(fmt.Sprintf("-server-addr must be set"))
+		c.UI.Error("-server-addr must be set")
 		return 1
 	}
 
@@ -101,7 +100,7 @@ func (c *Command) Run(args []string) int {
 	// Get the active CA root from Consul
 	// Wait until it gets a successful response
 	var activeRoot string
-	backoff.Retry(func() error {
+	_ = backoff.Retry(func() error {
 		caRoots, _, err := consulClient.Agent().ConnectCARoots(nil)
 		if err != nil {
 			logger.Error("Error retrieving CA roots from Consul", "err", err)

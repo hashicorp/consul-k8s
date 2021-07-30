@@ -159,5 +159,4 @@ func (in *Mesh) Validate(_ bool) error {
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.
 func (in *Mesh) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
-	return
 }

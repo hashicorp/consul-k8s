@@ -1,0 +1,24 @@
+name: golangci-lint
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - master
+      - main
+  pull_request:
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.41.1
+          # Optional: working directory, useful for monorepos
+          # TODO: we may need to modify this when monorepo comes, it could be helpful for when we test
+          # only control-plane components in a PR, or some other scenario.
+          # working-directory: somedir
+

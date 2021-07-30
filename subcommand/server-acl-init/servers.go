@@ -125,6 +125,9 @@ func (c *Command) setServerTokens(consulClient *api.Client, serverAddresses []st
 				CAFile:  c.flagConsulCACert,
 			},
 		})
+		if err != nil {
+			return err
+		}
 
 		// Create token for the server
 		err = c.untilSucceeds(fmt.Sprintf("creating server token for %s - PUT /v1/acl/token", host),

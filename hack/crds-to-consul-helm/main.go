@@ -55,9 +55,7 @@ func realMain(helmPathAbs string) error {
 		contents := string(contentBytes)
 
 		// Strip leading newline.
-		if strings.HasPrefix(contents, "\n") {
-			contents = strings.TrimPrefix(contents, "\n")
-		}
+		contents = strings.TrimPrefix(contents, "\n")
 
 		// Add {{- if .Values.controller.enabled }} {{- end }} wrapper.
 		contents = fmt.Sprintf("{{- if .Values.controller.enabled }}\n%s{{- end }}\n", contents)

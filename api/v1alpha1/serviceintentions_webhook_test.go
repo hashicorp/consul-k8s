@@ -426,6 +426,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
 			marshalledRequestObject, err := json.Marshal(c.newResource)
+			require.NoError(t, err)
 			marshalledOldRequestObject, err := json.Marshal(c.existingResources[0])
 			require.NoError(t, err)
 			s := runtime.NewScheme()

@@ -92,7 +92,7 @@ func helpFunc() cli.HelpFunc {
 	// aren't shown in any help output. We use this for prerelease functionality
 	// or advanced features.
 	hidden := map[string]struct{}{
-		"inject-connect": struct{}{},
+		"inject-connect": {},
 	}
 
 	var include []string
