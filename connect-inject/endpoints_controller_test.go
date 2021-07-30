@@ -11,7 +11,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -123,7 +123,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	nodeName := "test-node"
 
 	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-	caFile, certFile, keyFile := common.GenerateServerCerts(t)
+	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 	// Create test consul server with ACLs and TLS
 	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
@@ -1042,7 +1042,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 // For the register and deregister codepath, this also tests that they work when the Consul service name is different
 // from the K8s service name.
 // This test covers EndpointsController.deregisterServiceOnAllAgents when services should be selectively deregistered
-// since the map will not be nil. This test also runs each test with ACLs+TLS enabled and disabled, since it covers all the cases where a Consul client is created.
+// since the map will not be nil.
 func TestReconcileUpdateEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
@@ -1051,10 +1051,10 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 		consulSvcName              string
 		k8sObjects                 func() []runtime.Object
 		initialConsulSvcs          []*api.AgentServiceRegistration
-		expectedNumSvcInstances    int
 		expectedConsulSvcInstances []*api.CatalogService
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedAgentHealthChecks  []*api.AgentCheck
+		enableACLs                 bool
 	}{
 		// Legacy services are not managed by endpoints controller, but endpoints controller
 		// will still add/update the legacy service's health checks.
@@ -1105,7 +1105,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1177,7 +1176,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1257,7 +1255,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1337,7 +1334,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1419,7 +1415,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1501,7 +1496,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1560,7 +1554,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{MetaKeyKubeNS: "default"},
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyManagedBy:       managedByValue,
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -1568,14 +1567,18 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "service-updated-sidecar-proxy",
 					Port:    20000,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{MetaKeyKubeNS: "default"},
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyManagedBy:       managedByValue,
+					},
 					Proxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "service-updated",
 						DestinationServiceID:   "pod1-service-updated",
 					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1624,7 +1627,12 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Name:    "different-consul-svc-name",
 					Port:    80,
 					Address: "1.2.3.4",
-					Meta:    map[string]string{MetaKeyManagedBy: managedByValue, MetaKeyKubeNS: "default"},
+					Meta: map[string]string{
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+					},
 				},
 				{
 					Kind:    api.ServiceKindConnectProxy,
@@ -1636,9 +1644,14 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						DestinationServiceName: "different-consul-svc-name",
 						DestinationServiceID:   "pod1-different-consul-svc-name",
 					},
+					Meta: map[string]string{
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+					},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-different-consul-svc-name",
@@ -1653,7 +1666,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:          "Endpoints has additional address not in Consul.",
+			name:          "Endpoints has additional address not in Consul",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -1710,7 +1723,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 				},
 			},
-			expectedNumSvcInstances: 2,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1753,7 +1765,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:          "Consul has instances that are not in the Endpoints addresses.",
+			name:          "Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -1820,7 +1832,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-service-updated",
@@ -1835,7 +1846,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses.",
+			name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -1903,7 +1914,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
-			expectedNumSvcInstances: 1,
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
 					ServiceID:      "pod1-different-consul-svc-name",
@@ -1971,7 +1981,6 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
-			expectedNumSvcInstances:    0,
 			expectedConsulSvcInstances: []*api.CatalogService{},
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
@@ -2029,123 +2038,362 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-updated", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
-			expectedNumSvcInstances:    0,
 			expectedConsulSvcInstances: []*api.CatalogService{},
 			expectedProxySvcInstances:  []*api.CatalogService{},
 		},
+		{
+			name:          "ACLs enabled: Endpoints has an updated address because the target pod changes",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod2 := createPod("pod2", "4.4.4.4", true, true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "4.4.4.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod2",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod2, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyManagedBy:       managedByValue,
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeNS:          "default",
+						MetaKeyPodName:         "pod1",
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyManagedBy:       managedByValue,
+					},
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+				},
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod2-service-updated",
+					ServiceAddress: "4.4.4.4",
+					ServiceMeta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod2",
+					},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod2-service-updated-sidecar-proxy",
+					ServiceAddress: "4.4.4.4",
+					ServiceMeta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod2",
+					},
+				},
+			},
+			enableACLs: true,
+		},
+		{
+			name:          "ACLs enabled: Consul has instances that are not in the Endpoints addresses",
+			consulSvcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod1-service-updated",
+					},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+				{
+					ID:      "pod2-service-updated",
+					Name:    "service-updated",
+					Port:    80,
+					Address: "2.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod2",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod2-service-updated-sidecar-proxy",
+					Name:    "service-updated-sidecar-proxy",
+					Port:    20000,
+					Address: "2.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-updated",
+						DestinationServiceID:   "pod2-service-updated",
+					},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod2",
+					},
+				},
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated",
+					ServiceName:    "service-updated",
+					ServiceAddress: "1.2.3.4",
+					ServiceMeta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-updated-sidecar-proxy",
+					ServiceName:    "service-updated-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+					ServiceMeta: map[string]string{
+						MetaKeyKubeServiceName: "service-updated",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+			},
+			enableACLs: true,
+		},
 	}
-	// Each test is run with ACLs+TLS (secure) enabled and disabled.
-	for _, secure := range []bool{true, false} {
-		for _, tt := range cases {
-			t.Run(fmt.Sprintf("%s - secure: %v", tt.name, secure), func(t *testing.T) {
-				// The agent pod needs to have the address 127.0.0.1 so when the
-				// code gets the agent pods via the label component=client, and
-				// makes requests against the agent API, it will actually hit the
-				// test server we have on localhost.
-				fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-				fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// The agent pod needs to have the address 127.0.0.1 so when the
+			// code gets the agent pods via the label component=client, and
+			// makes requests against the agent API, it will actually hit the
+			// test server we have on localhost.
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
-				// Add the default namespace.
-				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-				// Create fake k8s client
-				k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
-				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client.
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-				masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
-				caFile, certFile, keyFile := common.GenerateServerCerts(t)
-				// Create test consul server, with ACLs+TLS if necessary
-				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-					if secure {
-						c.ACL.Enabled = true
-						c.ACL.DefaultPolicy = "deny"
-						c.ACL.Tokens.Master = masterToken
-						c.CAFile = caFile
-						c.CertFile = certFile
-						c.KeyFile = keyFile
-					}
-					c.NodeName = nodeName
-				})
-				require.NoError(t, err)
-				defer consul.Stop()
-				consul.WaitForServiceIntentions(t)
-				addr := strings.Split(consul.HTTPAddr, ":")
-				consulPort := addr[1]
-
-				cfg := &api.Config{
-					Scheme:  "http",
-					Address: consul.HTTPAddr,
+			// Create test consul server.
+			adminToken := "123e4567-e89b-12d3-a456-426614174000"
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				if tt.enableACLs {
+					c.ACL.Enabled = tt.enableACLs
+					c.ACL.Tokens.Master = adminToken
 				}
-				if secure {
-					consulPort = strings.Split(consul.HTTPSAddr, ":")[1]
-					cfg.Address = consul.HTTPSAddr
-					cfg.Scheme = "https"
-					cfg.TLSConfig = api.TLSConfig{
-						CAFile: caFile,
-					}
-					cfg.Token = masterToken
-				}
-				consulClient, err := api.NewClient(cfg)
-				require.NoError(t, err)
-
-				// Register service and proxy in consul
-				for _, svc := range tt.initialConsulSvcs {
-					err = consulClient.Agent().ServiceRegister(svc)
-					require.NoError(t, err)
-				}
-
-				// Create the endpoints controller
-				ep := &EndpointsController{
-					Client:                fakeClient,
-					Log:                   logrtest.TestLogger{T: t},
-					ConsulClient:          consulClient,
-					ConsulPort:            consulPort,
-					ConsulScheme:          cfg.Scheme,
-					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-					DenyK8sNamespacesSet:  mapset.NewSetWith(),
-					ReleaseName:           "consul",
-					ReleaseNamespace:      "default",
-					ConsulClientCfg:       cfg,
-				}
-				namespacedName := types.NamespacedName{
-					Namespace: "default",
-					Name:      "service-updated",
-				}
-
-				resp, err := ep.Reconcile(context.Background(), ctrl.Request{
-					NamespacedName: namespacedName,
-				})
-				require.NoError(t, err)
-				require.False(t, resp.Requeue)
-
-				// After reconciliation, Consul should have service-updated with the correct number of instances
-				serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
-				require.NoError(t, err)
-				require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
-				for i, instance := range serviceInstances {
-					require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
-					require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
-				}
-				proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
-				require.NoError(t, err)
-				require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
-				for i, instance := range proxyServiceInstances {
-					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
-					require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
-				}
-				// Check that the Consul health check was created for the k8s pod.
-				if tt.expectedAgentHealthChecks != nil {
-					for i := range tt.expectedConsulSvcInstances {
-						filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
-						check, err := consulClient.Agent().ChecksWithFilter(filter)
-						require.NoError(t, err)
-						require.EqualValues(t, len(check), 1)
-						// Ignoring Namespace because the response from ENT includes it and OSS does not.
-						var ignoredFields = []string{"Node", "Definition", "Namespace"}
-						require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
-					}
-				}
+				c.NodeName = nodeName
 			})
-		}
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			cfg := &api.Config{Scheme: "http", Address: consul.HTTPAddr}
+			if tt.enableACLs {
+				cfg.Token = adminToken
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+
+			// Holds token accessorID for each service ID.
+			tokensForServices := make(map[string]string)
+
+			// Register service and proxy in consul.
+			for _, svc := range tt.initialConsulSvcs {
+				err = consulClient.Agent().ServiceRegister(svc)
+				require.NoError(t, err)
+
+				// Create a token for this service if ACLs are enabled.
+				if tt.enableACLs {
+					if svc.Kind != api.ServiceKindConnectProxy {
+						test.SetupK8sAuthMethod(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS])
+						token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+							},
+						}, nil)
+						// Record each token we create.
+						require.NoError(t, err)
+						tokensForServices[svc.ID] = token.AccessorID
+
+						// Create another token for the same service but a pod that no longer exists.
+						// This is to test a scenario with orphaned tokens
+						// where we have a token for the pod but the service instance
+						// for that pod no longer exists in Consul.
+						// In that case, the token should still be deleted.
+						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								TokenMetaPodNameKey: fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], "does-not-exist"),
+							},
+						}, nil)
+						require.NoError(t, err)
+						tokensForServices["does-not-exist"+svc.Name] = token.AccessorID
+					}
+				}
+			}
+
+			// Create the endpoints controller.
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          cfg.Scheme,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				ConsulClientCfg:       cfg,
+			}
+			if tt.enableACLs {
+				ep.AuthMethod = test.AuthMethod
+			}
+			namespacedName := types.NamespacedName{Namespace: "default", Name: "service-updated"}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// After reconciliation, Consul should have service-updated with the correct number of instances.
+			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
+			require.NoError(t, err)
+			require.Len(t, serviceInstances, len(tt.expectedConsulSvcInstances))
+			for i, instance := range serviceInstances {
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
+			}
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
+			require.NoError(t, err)
+			require.Len(t, proxyServiceInstances, len(tt.expectedProxySvcInstances))
+			for i, instance := range proxyServiceInstances {
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
+			}
+			// Check that the Consul health check was created for the k8s pod.
+			if tt.expectedAgentHealthChecks != nil {
+				for i := range tt.expectedConsulSvcInstances {
+					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
+					check, err := consulClient.Agent().ChecksWithFilter(filter)
+					require.NoError(t, err)
+					require.EqualValues(t, len(check), 1)
+					// Ignoring Namespace because the response from ENT includes it and OSS does not.
+					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+				}
+			}
+
+			if tt.enableACLs {
+				// Put expected services into a map to make it easier to find service IDs.
+				expectedServices := make(map[string]struct{})
+				for _, svc := range tt.expectedConsulSvcInstances {
+					expectedServices[svc.ServiceID] = struct{}{}
+				}
+
+				// Look through the tokens we've created and check that only
+				// tokens for the deregistered services have been deleted.
+				for serviceID, tokenID := range tokensForServices {
+					// Read the token from Consul.
+					token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
+					if _, ok := expectedServices[serviceID]; ok {
+						// If service is expected to still exist in Consul, then the ACL token for it should not be deleted.
+						require.NoError(t, err, "token should exist for service instance: "+serviceID)
+						require.NotNil(t, token)
+					} else {
+						// If service should no longer exist, then ACL token for it should be deleted.
+						require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -2159,6 +2407,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		consulSvcName     string
 		legacyService     bool
 		initialConsulSvcs []*api.AgentServiceRegistration
+		enableACLs        bool
 	}{
 		{
 			name:          "Legacy service: does not delete",
@@ -2236,6 +2485,42 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "When ACLs are enabled, the token should be deleted",
+			consulSvcName: "service-deleted",
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-deleted",
+					Name:    "service-deleted",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-deleted-sidecar-proxy",
+					Name:    "service-deleted-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-deleted",
+						DestinationServiceID:   "pod1-service-deleted",
+					},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+			},
+			enableACLs: true,
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2248,19 +2533,25 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-			// Create fake k8s client
+			// Create fake k8s client.
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(fakeClientPod, &ns).Build()
 
-			// Create test consul server
+			// Create test consul server.
+			adminToken := "123e4567-e89b-12d3-a456-426614174000"
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				if tt.enableACLs {
+					c.ACL.Enabled = true
+					c.ACL.Tokens.Master = adminToken
+				}
 				c.NodeName = nodeName
 			})
 			require.NoError(t, err)
 			defer consul.Stop()
 
 			consul.WaitForServiceIntentions(t)
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
+			cfg := &api.Config{Address: consul.HTTPAddr}
+			if tt.enableACLs {
+				cfg.Token = adminToken
 			}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
@@ -2268,9 +2559,26 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			consulPort := addr[1]
 
 			// Register service and proxy in consul
+			var token *api.ACLToken
 			for _, svc := range tt.initialConsulSvcs {
 				err = consulClient.Agent().ServiceRegister(svc)
 				require.NoError(t, err)
+
+				// Create a token for it if ACLs are enabled.
+				if tt.enableACLs {
+					test.SetupK8sAuthMethod(t, consulClient, svc.Name, "default")
+					if svc.Kind != api.ServiceKindConnectProxy {
+						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
+							AuthMethod:  test.AuthMethod,
+							BearerToken: test.ServiceAccountJWTToken,
+							Meta: map[string]string{
+								"pod": fmt.Sprintf("%s/%s", svc.Meta[MetaKeyKubeNS], svc.Meta[MetaKeyPodName]),
+							},
+						}, nil)
+
+						require.NoError(t, err)
+					}
+				}
 			}
 
 			// Create the endpoints controller
@@ -2285,6 +2593,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				ReleaseName:           "consul",
 				ReleaseNamespace:      "default",
 				ConsulClientCfg:       cfg,
+			}
+			if tt.enableACLs {
+				ep.AuthMethod = test.AuthMethod
 			}
 
 			// Set up the Endpoint that will be reconciled, and reconcile
@@ -2312,6 +2623,10 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, proxyServiceInstances)
 
+			if tt.enableACLs {
+				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
+				require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+			}
 		})
 	}
 }
@@ -4428,6 +4743,31 @@ func TestRegisterServicesAndHealthCheck_skipsWhenDuplicateServiceFound(t *testin
 			_, _, err = consulClient.Agent().Service("test-pod-test-service-sidecar-proxy", nil)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "Unexpected response code: 404 (unknown service ID")
+		})
+	}
+}
+
+func TestGetTokenMetaFromDescription(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		description       string
+		expectedTokenMeta map[string]string
+	}{
+		"no description prefix": {
+			description:       `{"pod":"default/pod"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+		},
+		"consul's default description prefix": {
+			description:       `token created via login: {"pod":"default/pod"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tokenMeta, err := getTokenMetaFromDescription(c.description)
+			require.NoError(t, err)
+			require.Equal(t, c.expectedTokenMeta, tokenMeta)
 		})
 	}
 }

@@ -506,6 +506,7 @@ func TestInjectRules(t *testing.T) {
 node_prefix "" {
   policy = "write"
 }
+  acl = "write"
   service_prefix "" {
     policy = "write"
   }`,
@@ -518,6 +519,7 @@ node_prefix "" {
   policy = "write"
 }
 namespace_prefix "" {
+  acl = "write"
   service_prefix "" {
     policy = "write"
   }
