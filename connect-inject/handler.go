@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
