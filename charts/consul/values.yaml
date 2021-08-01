@@ -1075,6 +1075,15 @@ ui:
     # @type: string
     type: null
 
+    # Set the port value of the UI service.
+    port:
+
+      # HTTP port.
+      http: 80
+
+      # HTTPS port.
+      https: 443
+
     # Optionally set the nodePort value of the ui service if using a NodePort service.
     # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
