@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"

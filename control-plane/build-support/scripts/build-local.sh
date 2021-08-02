@@ -98,7 +98,7 @@ function main {
       esac
    done
 
-   build_consul_local "${sdir}" "${build_os}" "${build_arch}" || return 1
+   build_consul_local "${sdir}" "${build_os}" "${build_arch}" "consul-k8s-control-plane" || return 1
 
    return 0
 }

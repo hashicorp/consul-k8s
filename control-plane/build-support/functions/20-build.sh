@@ -169,7 +169,8 @@ function build_consul_local {
    #   $1 - Path to the top level Consul source
    #   $2 - Space separated string of OSes to build. If empty will use env vars for determination.
    #   $3 - Space separated string of architectures to build. If empty will use env vars for determination.
-   #   $4 - Subdirectory to put binaries in under pkg/bin (optional)
+   #   $4 - Output binary name
+   #   $5 - Subdirectory to put binaries in under pkg/bin (optional)
    #
    # Returns:
    #   0 - success
@@ -193,7 +194,8 @@ function build_consul_local {
    local sdir="$1"
    local build_os="$2"
    local build_arch="$3"
-   local extra_dir_name="$4"
+   local bin_name="$4"
+   local extra_dir_name="$5"
    local extra_dir=""
 
    if test -n "${extra_dir_name}"
@@ -243,7 +245,7 @@ function build_consul_local {
          -osarch="!darwin/arm !darwin/arm64" \
          -ldflags="${GOLDFLAGS}" \
          -parallel="${GOXPARALLEL:-"-1"}" \
-         -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/consul-k8s" \
+         -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/control-plane" \
          -tags="${GOTAGS}" \
          .
 
@@ -286,7 +288,7 @@ function build_consul_local {
             else
               OS_BIN_EXTENSION=""
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"/consul-k8s${OS_BIN_EXTENSION} "${outdir}/consul-k8s"
+            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}"/control-plane${OS_BIN_EXTENSION} "${outdir}/${bin_name}"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"
