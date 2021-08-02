@@ -860,28 +860,28 @@ workflows:
       - acceptance:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
       # TODO: delete these acceptance steps from here
       - cleanup-gcp-resources:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
       - cleanup-azure-resources:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
       - cleanup-eks-resources:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
       - acceptance-gke-1-17:
           requires:
@@ -895,7 +895,7 @@ workflows:
       - acceptance-kind-1-21:
           requires:
             - dev-upload-docker
-            - unit-helm
+            - unit-test-helm-templates
             - unit-acceptance-framework
   nightly-acceptance-tests:
     triggers:
