@@ -235,13 +235,13 @@ func (r *EndpointsController) registerServicesAndHealthCheck(ctx context.Context
 					return err
 				}
 				for _, service := range services {
-					if service.ServiceMeta[MetaKeyKubeNS] != serviceEndpoints.Namespace {
+					if existingNS, ok := service.ServiceMeta[MetaKeyKubeNS]; ok && existingNS != serviceEndpoints.Namespace {
 						// Log but don't return an error because we don't want to reconcile this endpoints object again.
 						r.Log.Info("Skipping service registration because a service with the same name "+
 							"but a different Kubernetes namespace is already registered with Consul",
 							"name", serviceRegistration.Name,
 							MetaKeyKubeNS, serviceEndpoints.Namespace,
-							"existing-k8s-namespace", service.ServiceMeta[MetaKeyKubeNS])
+							"existing-k8s-namespace", existingNS)
 						return nil
 					}
 				}
