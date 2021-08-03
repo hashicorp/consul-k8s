@@ -48,7 +48,7 @@ load _helpers
       .
 }
 
-@test "serverACLInitCleanup/Job: consul-k8s delete-completed-job is called with correct arguments" {
+@test "serverACLInitCleanup/Job: consul-k8s-control-plane delete-completed-job is called with correct arguments" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-cleanup-job.yaml  \

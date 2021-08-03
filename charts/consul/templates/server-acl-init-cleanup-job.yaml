@@ -47,7 +47,7 @@ spec:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
           command:
-            - consul-k8s
+            - consul-k8s-control-plane
           args:
             - delete-completed-job
             - -log-level={{ .Values.global.logLevel }}
