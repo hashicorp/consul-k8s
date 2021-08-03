@@ -132,13 +132,8 @@ load _helpers
       yq -r '.apiVersion' | tee /dev/stderr)
   [ "${actual}" = "policy/v1" ]
 }
+# NOTE: can't test that it uses policy/v1beta1 if policy/v1 is *not* supported
+# because the supported API versions depends on the Helm version and there's
+# no flag to *remove* an API version so some Helm versions will always have
+# policy/v1 support and will always use that API version.
 
-@test "server/DisruptionBudget: uses policy/v1beta1 if policy/v1 not supported" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-disruptionbudget.yaml \
-      --api-versions 'policy/v1beta1' \
-      . | tee /dev/stderr |
-      yq -r '.apiVersion' | tee /dev/stderr)
-  [ "${actual}" = "policy/v1beta1" ]
-}
