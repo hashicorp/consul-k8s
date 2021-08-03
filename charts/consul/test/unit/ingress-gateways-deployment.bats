@@ -1172,7 +1172,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -1235,12 +1235,12 @@ EOF
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s acl-init \
+  exp='consul-k8s-control-plane acl-init \
   -secret-name="RELEASE-NAME-consul-ingress-gateway-ingress-gateway-acl-token" \
   -k8s-namespace=default \
   -token-sink-file=/consul/service/acl-token
 
-consul-k8s service-address \
+consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -1302,7 +1302,7 @@ EOF
       --set 'connectInject.enabled=true' \
       --set 'ingressGateways.defaults.service.type=LoadBalancer' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s service-address")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1315,7 +1315,7 @@ EOF
       --set 'ingressGateways.gateways[0].name=ingress-gateway' \
       --set 'ingressGateways.gateways[0].service.type=LoadBalancer' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s service-address")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1329,7 +1329,7 @@ EOF
       --set 'ingressGateways.defaults.service.ports[0].port=80' \
       --set 'ingressGateways.defaults.service.ports[0].nodePort=1234' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s service-address")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1344,7 +1344,7 @@ EOF
       --set 'ingressGateways.gateways[0].service.ports[0].port=80' \
       --set 'ingressGateways.gateways[0].service.ports[0].nodePort=1234' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s service-address")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2] | contains("consul-k8s-control-plane service-address")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 

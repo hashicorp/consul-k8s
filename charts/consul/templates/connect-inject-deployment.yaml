@@ -82,7 +82,7 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              consul-k8s inject-connect \
+              consul-k8s-control-plane inject-connect \
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
@@ -243,7 +243,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s acl-init \
+            consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-connect-inject-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
         resources:
