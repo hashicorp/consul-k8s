@@ -1042,7 +1042,7 @@ load _helpers
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.command | any(contains("consul-k8s acl-init"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

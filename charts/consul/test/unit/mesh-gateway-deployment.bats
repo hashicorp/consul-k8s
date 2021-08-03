@@ -815,7 +815,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -867,12 +867,12 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s acl-init \
+  exp='consul-k8s-control-plane acl-init \
   -secret-name="RELEASE-NAME-consul-mesh-gateway-acl-token" \
   -k8s-namespace=default \
   -token-sink-file=/consul/service/acl-token
 
-consul-k8s service-address \
+consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -926,7 +926,7 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -1205,7 +1205,7 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -1324,7 +1324,7 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \
@@ -1376,7 +1376,7 @@ EOF
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers | map(select(.name == "service-init"))[0] | .command[2]' | tee /dev/stderr)
 
-  exp='consul-k8s service-address \
+  exp='consul-k8s-control-plane service-address \
   -log-level=info \
   -log-json=false \
   -k8s-namespace=default \

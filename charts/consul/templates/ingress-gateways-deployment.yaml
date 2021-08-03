@@ -155,7 +155,7 @@ spec:
             - "-ec"
             - |
                 {{- if $root.Values.global.acls.manageSystemACLs }}
-                consul-k8s acl-init \
+                consul-k8s-control-plane acl-init \
                   -secret-name="{{ template "consul.fullname" $root }}-{{ .name }}-ingress-gateway-acl-token" \
                   -k8s-namespace={{ $root.Release.Namespace }} \
                   -token-sink-file=/consul/service/acl-token
@@ -165,7 +165,7 @@ spec:
                 {{- if (eq $serviceType "NodePort") }}
                 WAN_ADDR="${HOST_IP}"
                 {{- else if (or (eq $serviceType "ClusterIP") (eq $serviceType "LoadBalancer")) }}
-                consul-k8s service-address \
+                consul-k8s-control-plane service-address \
                   -log-level={{ $root.Values.global.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }} \
                   -k8s-namespace={{ $root.Release.Namespace }} \
@@ -419,7 +419,7 @@ spec:
               value: http://$(HOST_IP):8500
             {{- end }}
           command:
-            - consul-k8s
+            - consul-k8s-control-plane
             - consul-sidecar
             - -log-level={{ $root.Values.global.logLevel }}
             - -log-json={{ $root.Values.global.logJSON }}

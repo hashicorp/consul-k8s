@@ -73,7 +73,7 @@ This template is for an init container.
     - "/bin/sh"
     - "-ec"
     - |
-      consul-k8s get-consul-client-ca \
+      consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}

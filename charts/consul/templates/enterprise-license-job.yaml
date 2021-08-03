@@ -115,7 +115,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s acl-init \
+            consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
         resources:

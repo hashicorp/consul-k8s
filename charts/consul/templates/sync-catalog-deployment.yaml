@@ -112,7 +112,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s sync-catalog \
+              consul-k8s-control-plane sync-catalog \
                 -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -k8s-default-sync={{ .Values.syncCatalog.default }} \
@@ -205,7 +205,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s acl-init \
+            consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-catalog-sync-acl-token" \
               -k8s-namespace={{ .Release.Namespace }}
         resources:
