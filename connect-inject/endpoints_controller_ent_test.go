@@ -304,10 +304,6 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			if setup.expectedAgentHealthChecks != nil {
 				for i := range setup.expectedConsulSvcInstances {
 					filter := fmt.Sprintf("CheckID == `%s`", setup.expectedAgentHealthChecks[i].CheckID)
-					newChecks, _ := consulClient.Agent().Checks()
-					for key, value := range newChecks {
-						fmt.Printf("%s:%v\n", key, value)
-					}
 					check, err := consulClient.Agent().ChecksWithFilter(filter)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, len(check))
@@ -1306,10 +1302,6 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				if tt.expectedAgentHealthChecks != nil {
 					for i := range tt.expectedConsulSvcInstances {
 						filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
-						newChecks, _ := consulClient.Agent().Checks()
-						for key, value := range newChecks {
-							fmt.Printf("%s:%v\n", key, value)
-						}
 						check, err := consulClient.Agent().ChecksWithFilter(filter)
 						require.NoError(t, err)
 						require.EqualValues(t, 1, len(check))

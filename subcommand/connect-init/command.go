@@ -104,7 +104,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if c.flagACLAuthMethod != "" && c.flagServiceAccountName == "" {
-		fmt.Println(c.flagServiceAccountName)
 		c.UI.Error("-service-account-name must be set when ACLs are enabled")
 		return 1
 	}
