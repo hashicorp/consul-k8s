@@ -41,7 +41,6 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
-	cfg                config.TestConfig
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -144,7 +143,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
-	helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+	_ = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 
 	// Force delete any pods that have h.releaseName in their name because sometimes
 	// graceful termination takes a long time and since this is an uninstall
@@ -162,7 +161,8 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	// Delete PVCs.
-	h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	err = h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+	require.NoError(t, err)
 
 	// Delete any serviceaccounts that have h.releaseName in their name.
 	sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
@@ -347,12 +347,11 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 	// Pod Security Policy
 	{
 		// Check if the pod security policy with this name already exists
-		psp, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
-		// If it doesn't exist, create it.
+		_, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			// This pod security policy can be used by any tests resources.
 			// This policy is fairly simple and only prevents from running privileged containers.
-			psp = &policyv1beta.PodSecurityPolicy{
+			psp := &policyv1beta.PodSecurityPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-psp",
 				},
@@ -384,11 +383,11 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 	// Cluster role for the PSP.
 	{
 		// Check if we have a cluster role that authorizes the use of the pod security policy.
-		pspClusterRole, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
+		_, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
 
 		// If it doesn't exist, create the clusterrole.
 		if errors.IsNotFound(err) {
-			pspClusterRole = &rbacv1.ClusterRole{
+			pspClusterRole := &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: pspName,
 				},
@@ -411,10 +410,10 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 	// A role binding to allow default service account in the installation namespace access to the PSP.
 	{
 		// Check if this cluster role binding already exists.
-		pspRoleBinding, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
+		_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
 
 		if errors.IsNotFound(err) {
-			pspRoleBinding = &rbacv1.RoleBinding{
+			pspRoleBinding := &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: pspName,
 				},
@@ -439,9 +438,9 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
 	})
 }
 
@@ -463,7 +462,7 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{})
+		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{})
 	})
 }
 
@@ -479,10 +478,10 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 	{
 		for clusterRoleName, roleBindingName := range map[string]string{anyuidClusterRole: anyuidRoleBinding, privilegedClusterRole: privilegedRoleBinding} {
 			// Check if this cluster role binding already exists.
-			roleBinding, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), roleBindingName, metav1.GetOptions{})
+			_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), roleBindingName, metav1.GetOptions{})
 
 			if errors.IsNotFound(err) {
-				roleBinding = &rbacv1.RoleBinding{
+				roleBinding := &rbacv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: roleBindingName,
 					},
@@ -508,8 +507,8 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
-		client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
+		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
 }
 

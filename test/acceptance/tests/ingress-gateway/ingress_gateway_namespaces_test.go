@@ -132,7 +132,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
-				_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
+				_, err = consulClient.Connect().IntentionUpsert(&api.Intention{
 					SourceName:      "ingress-gateway",
 					SourceNS:        testNamespace,
 					DestinationName: "static-server",
@@ -252,7 +252,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
-				_, _, err = consulClient.Connect().IntentionCreate(&api.Intention{
+				_, err = consulClient.Connect().IntentionUpsert(&api.Intention{
 					SourceName:      "ingress-gateway",
 					SourceNS:        "default",
 					DestinationName: "static-server",

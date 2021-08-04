@@ -85,8 +85,6 @@ type kubernetesContext struct {
 
 	client  kubernetes.Interface
 	options *k8s.KubectlOptions
-
-	logDirectory string
 }
 
 func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
