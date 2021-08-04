@@ -746,7 +746,8 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 // reconcileACLTokensForService finds the ACL tokens that belongs to the service and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with.
+// has been configured with and will only delete tokens for pods that aren't in endpointPods
+// (endpointPods is a set of pods that the endpoints object is pointing to).
 func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, serviceName, k8sNS string, endpointPods mapset.Set) error {
 	tokens, _, err := client.ACL().TokenList(nil)
 	if err != nil {
