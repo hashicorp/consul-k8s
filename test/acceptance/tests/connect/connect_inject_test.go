@@ -20,7 +20,7 @@ import (
 const staticClientName = "static-client"
 const staticServerName = "static-server"
 
-// Test that Connect works in a default and a secure installation
+// Test that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
 	cases := []struct {
 		secure      bool
@@ -50,6 +50,25 @@ func TestConnectInject(t *testing.T) {
 
 			consulCluster.Create(t)
 
+			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+
+			// Check that the ACL token is deleted.
+			if c.secure {
+				// We need to register the cleanup function before we create the deployments
+				// because golang will execute them in reverse order i.e. the last registered
+				// cleanup function will be executed first.
+				t.Cleanup(func() {
+					retry.Run(t, func(r *retry.R) {
+						tokens, _, err := consulClient.ACL().TokenList(nil)
+						require.NoError(r, err)
+						for _, token := range tokens {
+							require.NotContains(r, token.Description, staticServerName)
+							require.NotContains(r, token.Description, staticClientName)
+						}
+					})
+				})
+			}
+
 			logger.Log(t, "creating static-server and static-client deployments")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
@@ -76,10 +95,8 @@ func TestConnectInject(t *testing.T) {
 					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), "http://localhost:1234")
 				}
 
-				consulClient := consulCluster.SetupConsulClient(t, true)
-
 				logger.Log(t, "creating intention")
-				_, _, err := consulClient.Connect().IntentionCreate(&api.Intention{
+				_, err := consulClient.Connect().IntentionUpsert(&api.Intention{
 					SourceName:      staticClientName,
 					DestinationName: staticServerName,
 					Action:          api.IntentionActionAllow,
