@@ -57,7 +57,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 // Sets up a goroutine that will wait for interrupt signals
 // and call cleanup function when it catches it.
 func SetupInterruptHandler(cleanup func()) {
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
