@@ -108,6 +108,40 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
+			consulClient := consulCluster.SetupConsulClient(t, c.secure)
+
+			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
+			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
+
+			if !c.mirrorK8S {
+				serverQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
+				clientQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
+			}
+
+			// Check that the ACL token is deleted.
+			if c.secure {
+				// We need to register the cleanup function before we create the deployments
+				// because golang will execute them in reverse order i.e. the last registered
+				// cleanup function will be executed first.
+				t.Cleanup(func() {
+					if c.secure {
+						retry.Run(t, func(r *retry.R) {
+							tokens, _, err := consulClient.ACL().TokenList(serverQueryOpts)
+							require.NoError(r, err)
+							for _, token := range tokens {
+								require.NotContains(r, token.Description, staticServerName)
+							}
+
+							tokens, _, err = consulClient.ACL().TokenList(clientQueryOpts)
+							require.NoError(r, err)
+							for _, token := range tokens {
+								require.NotContains(r, token.Description, staticClientName)
+							}
+						})
+					}
+				})
+			}
+
 			logger.Log(t, "creating static-server and static-client deployments")
 			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
@@ -126,21 +160,12 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				require.Len(t, podList.Items[0].Spec.Containers, 2)
 			}
 
-			consulClient := consulCluster.SetupConsulClient(t, c.secure)
-
 			// Make sure that services are registered in the correct namespace.
 			// If mirroring is enabled, we expect services to be registered in the
 			// Consul namespace with the same name as their source
 			// Kubernetes namespace.
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
-			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
-			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
-
-			if !c.mirrorK8S {
-				serverQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
-				clientQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
-			}
 			services, _, err := consulClient.Catalog().Service(staticServerName, "", serverQueryOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
