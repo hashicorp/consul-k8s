@@ -1,0 +1,12 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: IngressGateway
+metadata:
+  name: ingressgateway-sample
+spec:
+  tls:
+    enabled: false
+  listeners:
+    - port: 8080
+      protocol: "tcp"
+      services:
+        - name: "foo"

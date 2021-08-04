@@ -3,9 +3,11 @@ version: 2.1
 executors:
   go:
     docker:
-      - image: circleci/golang:1.13
+      - image: docker.mirror.hashicorp.services/circleci/golang:1.16
     environment:
-      - TEST_RESULTS: /tmp/test-results # path to where test results are saved
+      TEST_RESULTS: /tmp/test-results # path to where test results are saved
+      CONSUL_VERSION: 1.10.0 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.10.0+ent # Consul's enterprise version to use in tests
 
 jobs:
   go-fmt-and-vet:
@@ -38,6 +40,13 @@ jobs:
             fi
       - run: go vet ./...
 
+  linters:
+    executor: go
+    steps:
+      - checkout
+      - run: go get -u github.com/hashicorp/lint-consul-retry && lint-consul-retry
+      - run: go run hack/lint-api-new-client/main.go
+
   test:
     executor: go
     environment:
@@ -54,15 +63,57 @@ jobs:
 
       # run go tests with gotestsum
       - run: |
+          # download and install the consul binary
+          wget https://releases.hashicorp.com/consul/"${CONSUL_VERSION}"/consul_"${CONSUL_VERSION}"_linux_amd64.zip && \
+               unzip consul_"${CONSUL_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+               rm consul_"${CONSUL_VERSION}"_linux_amd64.zip
           PACKAGE_NAMES=$(go list ./...)
-          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- $PACKAGE_NAMES
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
 
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
 
-  build-distros:
+  test_enterprise:
+    executor: go
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
+
+      # run go tests with gotestsum
+      - run: |
+          # download and install the consul binary
+          wget https://releases.hashicorp.com/consul/"${CONSUL_ENT_VERSION}"/consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip && \
+               unzip consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip -d /home/circleci/bin &&
+               rm consul_"${CONSUL_ENT_VERSION}"_linux_amd64.zip
+      - run: |
+          PACKAGE_NAMES=$(go list ./...)
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+  build-distro: # defines a parameterized job
+    description: A job that will build the os/arch distro set by XC_OS and XC_ARCH
+    parameters:
+      OS:
+        description: What OSes to build
+        default: ""
+        type: string
+      ARCH:
+        description: What architectures to build
+        default: ""
+        type: string
     executor: go
     environment:
       GOXPARALLEL: 2 # CircleCI containers are 2 CPU x 4GB RAM
@@ -73,22 +124,63 @@ jobs:
       - restore_cache:
           keys:
             - consul-k8s-modcache-v1-{{ checksum "go.mod" }}
-
-      - run: make tools
-      - run: ./build-support/scripts/build-local.sh
-
+      - run: XC_OS="<< parameters.OS >>" XC_ARCH="<< parameters.ARCH >>" ./build-support/scripts/build-local.sh
+      # persist to downstream job
+      - persist_to_workspace:
+          root: .
+          paths:
+            - pkg/bin
       # save dev build to CircleCI
       - store_artifacts:
           path: ./pkg/bin
+
+  # upload dev docker image
+  dev-upload-docker:
+    executor: go
+    steps:
+      - checkout
+      # get consul-k8s binary
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - run: make ci.dev-docker
 
 workflows:
   version: 2
   test-and-build:
     jobs:
       - go-fmt-and-vet
+      - linters
       - test:
           requires:
             - go-fmt-and-vet
-      - build-distros:
+            - linters
+      - test_enterprise:
+          requires:
+            - go-fmt-and-vet
+            - linters
+      - build-distro:
+          OS: "freebsd linux windows"
+          ARCH: "386"
+          name: build-distros-386
           requires:
             - test
+            - test_enterprise
+      - build-distro:
+          OS: "darwin freebsd linux solaris windows"
+          ARCH: "amd64"
+          name: build-distros-amd64
+          requires:
+            - test
+            - test_enterprise
+      - build-distro:
+          OS: "linux"
+          ARCH: "arm arm64"
+          name: build-distros-arm-arm64
+          requires:
+            - test
+            - test_enterprise
+      - dev-upload-docker:
+          context: consul-ci
+          requires:
+            - build-distros-amd64

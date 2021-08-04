@@ -15,7 +15,7 @@ func TestNotify(t *testing.T) {
 	source.ExpiryWithin = 2 * time.Second
 
 	// Create notifier
-	ch := make(chan Bundle)
+	ch := make(chan MetaBundle)
 	n := &Notify{Ch: ch, Source: source}
 	defer n.Stop()
 	go n.Start(context.Background())
@@ -25,7 +25,7 @@ func TestNotify(t *testing.T) {
 	case <-time.After(250 * time.Millisecond):
 		t.Fatal("should've received initial bundle")
 	case b := <-ch:
-		testBundleVerify(t, &b)
+		testBundleVerify(t, &b.Bundle)
 	}
 
 	// We should not receive an update for at least one second
@@ -36,5 +36,5 @@ func TestNotify(t *testing.T) {
 	}
 
 	b := <-ch
-	testBundleVerify(t, &b)
+	testBundleVerify(t, &b.Bundle)
 }

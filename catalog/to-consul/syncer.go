@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
@@ -37,14 +39,16 @@ type ConsulSyncer struct {
 	Client *api.Client
 	Log    hclog.Logger
 
-	// Namespace is the namespace to run this syncer for. This is used
-	// primarily to limit the reaping of the syncer: the syncer will only
-	// reap services/nodes that 1.) have no NS key set or 2.) have an NS
-	// key set that is equal to this.
-	//
-	// If this is blank, any NS key is allowed. This should only be blank
-	// if a single syncer is running for the entire cluster.
-	Namespace string
+	// EnableNamespaces indicates that a user is running Consul Enterprise
+	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
+	// with syncing into either a single Consul namespace or mirrored from
+	// k8s namespaces.
+	EnableNamespaces bool
+
+	// CrossNamespaceACLPolicy is the name of the ACL policy to attach to
+	// any created Consul namespaces to allow cross namespace service discovery.
+	// Only necessary if ACLs are enabled.
+	CrossNamespaceACLPolicy string
 
 	// SyncPeriod is the interval between full catalog syncs. These will
 	// re-register all services to prevent overwrites of data. This should
@@ -62,18 +66,36 @@ type ConsulSyncer struct {
 	// ConsulK8STag is the tag value for services registered.
 	ConsulK8STag string
 
-	lock     sync.Mutex
-	once     sync.Once
-	services map[string]struct{} // set of valid service names
-	nodes    map[string]*consulSyncState
-	deregs   map[string]*api.CatalogDeregistration
-	watchers map[string]context.CancelFunc
-}
+	// The Consul node name to register services with.
+	ConsulNodeName string
 
-// consulSyncState keeps track of the state of syncing nodes/services.
-type consulSyncState struct {
-	// Services keeps track of the valid services on this node (by service ID)
-	Services map[string]*api.CatalogRegistration
+	// ConsulNodeServicesClient is used to list services for a node. We use a
+	// separate client for this API call that handles older version of Consul.
+	ConsulNodeServicesClient ConsulNodeServicesClient
+
+	lock sync.Mutex
+	once sync.Once
+
+	// initialSync is used to ensure that we have received our initial list
+	// of services before we start reaping services. When it is closed,
+	// the initial sync is complete.
+	initialSync chan bool
+	// initialSyncOnce controls the close operation on the initialSync channel
+	// to ensure it isn't closed more than once.
+	initialSyncOnce sync.Once
+
+	// serviceNames is all namespaces mapped to a set of valid
+	// Consul service names
+	serviceNames map[string]mapset.Set
+
+	// namespaces is all namespaces mapped to a map of Consul service
+	// ids mapped to their CatalogRegistrations
+	namespaces map[string]map[string]*api.CatalogRegistration
+	deregs     map[string]*api.CatalogDeregistration
+
+	// watchers is all namespaces mapped to a map of Consul service
+	// names mapped to a cancel function for watcher routines
+	watchers map[string]map[string]context.CancelFunc
 }
 
 // Sync implements Syncer
@@ -82,25 +104,33 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.services = make(map[string]struct{})
-	s.nodes = make(map[string]*consulSyncState)
+	s.serviceNames = make(map[string]mapset.Set)
+	s.namespaces = make(map[string]map[string]*api.CatalogRegistration)
+
 	for _, r := range rs {
-		// Mark this as a valid service
-		s.services[r.Service.Service] = struct{}{}
+		// Determine the namespace the service is in to use for indexing
+		// against the s.serviceNames and s.namespaces maps.
+		// This will be "" for OSS.
+		ns := r.Service.Namespace
 
-		// Initialize the state if we don't have it
-		state, ok := s.nodes[r.Node]
-		if !ok {
-			state = &consulSyncState{
-				Services: make(map[string]*api.CatalogRegistration),
-			}
-
-			s.nodes[r.Node] = state
+		// Mark this as a valid service, initializing state if necessary
+		if _, ok := s.serviceNames[ns]; !ok {
+			s.serviceNames[ns] = mapset.NewSet()
 		}
+		s.serviceNames[ns].Add(r.Service.Service)
+		s.Log.Debug("[Sync] adding service to serviceNames set", "service", r.Service, "service name", r.Service.Service)
 
-		// Add our registration
-		state.Services[r.Service.ID] = r
+		// Add service to namespaces map, initializing if necessary
+		if _, ok := s.namespaces[ns]; !ok {
+			s.namespaces[ns] = make(map[string]*api.CatalogRegistration)
+		}
+		s.namespaces[ns][r.Service.ID] = r
+		s.Log.Debug("[Sync] adding service to namespaces map", "service", r.Service)
 	}
+
+	// Signal that the initial sync is complete and our maps have been populated.
+	// We can now safely reap untracked services.
+	s.initialSyncOnce.Do(func() { close(s.initialSync) })
 }
 
 // Run is the long-running runloop for reconciling the local set of
@@ -133,10 +163,19 @@ func (s *ConsulSyncer) Run(ctx context.Context) {
 // This task only marks them for deletion but doesn't perform the actual
 // deletion.
 func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
-	opts := api.QueryOptions{
+	// We must wait for the initial sync to be complete and our maps to be
+	// populated. If we don't wait, we will reap all services tagged with k8s
+	// because we have no tracked services in our maps yet.
+	<-s.initialSync
+
+	opts := &api.QueryOptions{
 		AllowStale: true,
 		WaitIndex:  1,
 		WaitTime:   1 * time.Minute,
+	}
+
+	if s.EnableNamespaces {
+		opts.Namespace = "*"
 	}
 
 	// minWait is the minimum time to wait between scheduling service deletes.
@@ -144,17 +183,19 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 	minWait := s.SyncPeriod / 4
 	minWaitCh := time.After(0)
 	for {
-		// Get all services with tags.
-		var serviceMap map[string][]string
+		var services []ConsulService
 		var meta *api.QueryMeta
 		err := backoff.Retry(func() error {
 			var err error
-			serviceMap, meta, err = s.Client.Catalog().Services(&opts)
+			services, meta, err = s.ConsulNodeServicesClient.NodeServices(s.ConsulK8STag, s.ConsulNodeName, *opts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+
 		if err != nil {
 			s.Log.Warn("error querying services, will retry", "err", err)
-			continue
+		} else {
+			s.Log.Debug("[watchReapableServices] services returned from catalog",
+				"services", services)
 		}
 
 		// Wait our minimum time before continuing or retrying
@@ -172,29 +213,30 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		// Update our blocking index
 		opts.WaitIndex = meta.LastIndex
 
-		// Lock so we can modify the
+		// Lock so we can modify the stored state
 		s.lock.Lock()
 
-		// Go through the service map and find services that should be reaped
-		for name, tags := range serviceMap {
-			for _, tag := range tags {
-				if tag == s.ConsulK8STag {
-					// We only care if we don't know about this service at all.
-					if _, ok := s.services[name]; ok {
-						continue
-					}
-
-					s.Log.Info("invalid service found, scheduling for delete",
-						"service-name", name)
-					if err := s.scheduleReapServiceLocked(name); err != nil {
-						s.Log.Info("error querying service for delete",
-							"service-name", name,
-							"err", err)
-					}
-
-					// We're done searching this service, let it go
-					break
+		// Go through the service array and find services that should be reaped
+		for _, service := range services {
+			// Check that the namespace exists in the valid service names map
+			// before checking whether it contains the service
+			if _, ok := s.serviceNames[service.Namespace]; ok {
+				// We only care if we don't know about this service at all.
+				if s.serviceNames[service.Namespace].Contains(service.Name) {
+					s.Log.Debug("[watchReapableServices] serviceNames contains service",
+						"namespace", service.Namespace,
+						"service-name", service.Name)
+					continue
 				}
+			}
+
+			s.Log.Info("invalid service found, scheduling for delete",
+				"service-name", service.Name, "service-consul-namespace", service.Namespace)
+			if err := s.scheduleReapServiceLocked(service.Name, service.Namespace); err != nil {
+				s.Log.Info("error querying service for delete",
+					"service-name", service.Name,
+					"service-consul-namespace", service.Namespace,
+					"err", err)
 			}
 		}
 
@@ -204,9 +246,9 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 
 // watchService watches all instances of a service by name for changes
 // and schedules re-registration or deletion if necessary.
-func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
-	s.Log.Info("starting service watcher", "service-name", name)
-	defer s.Log.Info("stopping service watcher", "service-name", name)
+func (s *ConsulSyncer) watchService(ctx context.Context, name, namespace string) {
+	s.Log.Info("starting service watcher", "service-name", name, "service-consul-namespace", namespace)
+	defer s.Log.Info("stopping service watcher", "service-name", name, "service-consul-namespace", namespace)
 
 	for {
 		select {
@@ -218,18 +260,26 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		case <-time.After(s.SyncPeriod):
 		}
 
+		// Set up query options
+		queryOpts := &api.QueryOptions{
+			AllowStale: true,
+		}
+		if s.EnableNamespaces {
+			// Sets the Consul namespace to query the catalog
+			queryOpts.Namespace = namespace
+		}
+
 		// Wait for service changes
 		var services []*api.CatalogService
 		err := backoff.Retry(func() error {
 			var err error
-			services, _, err = s.Client.Catalog().Service(name, s.ConsulK8STag, &api.QueryOptions{
-				AllowStale: true,
-			})
+			services, _, err = s.Client.Catalog().Service(name, s.ConsulK8STag, queryOpts)
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 		if err != nil {
 			s.Log.Warn("error querying service, will retry",
 				"service-name", name,
+				"service-namespace", namespace, // will be "" if namespaces aren't enabled
 				"err", err)
 			continue
 		}
@@ -238,28 +288,26 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 		s.lock.Lock()
 
 		for _, svc := range services {
-			// If we have a namespace set and the key exactly matches this
-			// namespace, then we skip it.
-			if s.Namespace != "" &&
-				len(svc.ServiceMeta) > 0 &&
-				svc.ServiceMeta[ConsulK8SNS] != "" &&
-				svc.ServiceMeta[ConsulK8SNS] != s.Namespace {
-				continue
-			}
-
-			// We delete unless we have a service and the node mapping
-			delete := true
-			if _, ok := s.services[svc.ServiceName]; ok {
-				nodeSvc := s.nodes[svc.Node]
-				delete = nodeSvc == nil || nodeSvc.Services[svc.ServiceID] == nil
-			}
-
-			if delete {
-				s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
-					Node:      svc.Node,
-					ServiceID: svc.ServiceID,
+			// Make sure the namespace exists before we run checks against it
+			if _, ok := s.serviceNames[namespace]; ok {
+				// If the service is valid and its info isn't nil, we don't deregister it
+				if s.serviceNames[namespace].Contains(svc.ServiceName) && s.namespaces[namespace][svc.ServiceID] != nil {
+					continue
 				}
 			}
+
+			s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
+				Node:      svc.Node,
+				ServiceID: svc.ServiceID,
+			}
+			if s.EnableNamespaces {
+				s.deregs[svc.ServiceID].Namespace = namespace
+			}
+			s.Log.Debug("[watchService] service being scheduled for deregistration",
+				"namespace", namespace,
+				"service name", svc.ServiceName,
+				"service id", svc.ServiceID,
+				"service dereg", s.deregs[svc.ServiceID])
 		}
 
 		s.lock.Unlock()
@@ -270,28 +318,33 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name string) {
 // name that have the k8s tag and schedules them for removal.
 //
 // Precondition: lock must be held
-func (s *ConsulSyncer) scheduleReapServiceLocked(name string) error {
-	services, _, err := s.Client.Catalog().Service(name, s.ConsulK8STag, &api.QueryOptions{
-		AllowStale: true,
-	})
+func (s *ConsulSyncer) scheduleReapServiceLocked(name, namespace string) error {
+	// Set up query options
+	opts := api.QueryOptions{AllowStale: true}
+	if s.EnableNamespaces {
+		opts.Namespace = namespace
+	}
+
+	// Only consider services that are tagged from k8s
+	services, _, err := s.Client.Catalog().Service(name, s.ConsulK8STag, &opts)
 	if err != nil {
 		return err
 	}
 
+	// Create deregistrations for all of these
 	for _, svc := range services {
-		// If we have a namespace set and the key exactly matches this
-		// namespace, then we skip it.
-		if s.Namespace != "" &&
-			len(svc.ServiceMeta) > 0 &&
-			svc.ServiceMeta[ConsulK8SNS] != "" &&
-			svc.ServiceMeta[ConsulK8SNS] != s.Namespace {
-			continue
-		}
-
 		s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
 			Node:      svc.Node,
 			ServiceID: svc.ServiceID,
 		}
+		if s.EnableNamespaces {
+			s.deregs[svc.ServiceID].Namespace = namespace
+		}
+		s.Log.Debug("[scheduleReapServiceLocked] service being scheduled for deregistration",
+			"namespace", namespace,
+			"service name", svc.ServiceName,
+			"service id", svc.ServiceID,
+			"service dereg", s.deregs[svc.ServiceID])
 	}
 
 	return nil
@@ -306,18 +359,35 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 
 	s.Log.Info("registering services")
 
-	// Start the service watchers
-	for k, cf := range s.watchers {
-		if _, ok := s.services[k]; !ok {
-			cf()
-			delete(s.watchers, k)
+	// Update the service watchers
+	for ns, watchers := range s.watchers {
+		// If the service the watcher is watching is no longer valid,
+		// cancel the watcher
+		for svc, cf := range watchers {
+			if s.serviceNames[ns] == nil || !s.serviceNames[ns].Contains(svc) {
+				cf()
+				delete(s.watchers[ns], svc)
+				s.Log.Debug("[syncFull] deleting service watcher", "namespace", ns, "service", svc)
+			}
 		}
 	}
-	for k := range s.services {
-		if _, ok := s.watchers[k]; !ok {
-			svcCtx, cancelF := context.WithCancel(ctx)
-			go s.watchService(svcCtx, k)
-			s.watchers[k] = cancelF
+
+	// Start watchers for all services if they're not already running
+	for ns, services := range s.serviceNames {
+		for svc := range services.Iter() {
+			if _, ok := s.watchers[ns][svc.(string)]; !ok {
+				svcCtx, cancelF := context.WithCancel(ctx)
+				go s.watchService(svcCtx, svc.(string), ns)
+				s.Log.Debug("[syncFull] starting watchService routine", "namespace", ns, "service", svc)
+
+				// Create watcher map if it doesn't exist for this namespace
+				if s.watchers[ns] == nil {
+					s.watchers[ns] = make(map[string]context.CancelFunc)
+				}
+
+				// Add the watcher to our tracking
+				s.watchers[ns][svc.(string)] = cancelF
+			}
 		}
 	}
 
@@ -325,12 +395,14 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 	for _, r := range s.deregs {
 		s.Log.Info("deregistering service",
 			"node-name", r.Node,
-			"service-id", r.ServiceID)
+			"service-id", r.ServiceID,
+			"service-consul-namespace", r.Namespace)
 		_, err := s.Client.Catalog().Deregister(r, nil)
 		if err != nil {
 			s.Log.Warn("error deregistering service",
 				"node-name", r.Node,
 				"service-id", r.ServiceID,
+				"service-consul-namespace", r.Namespace,
 				"err", err)
 		}
 	}
@@ -340,41 +412,62 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 
 	// Register all the services. This will overwrite any changes that
 	// may have been made to the registered services.
-	for _, state := range s.nodes {
-		for _, r := range state.Services {
+	for _, services := range s.namespaces {
+		for _, r := range services {
+			if s.EnableNamespaces {
+				_, err := namespaces.EnsureExists(s.Client, r.Service.Namespace, s.CrossNamespaceACLPolicy)
+				if err != nil {
+					s.Log.Warn("error checking and creating Consul namespace",
+						"node-name", r.Node,
+						"service-name", r.Service.Service,
+						"consul-namespace-name", r.Service.Namespace,
+						"err", err)
+					continue
+				}
+			}
+
+			// Register the service
 			_, err := s.Client.Catalog().Register(r, nil)
 			if err != nil {
 				s.Log.Warn("error registering service",
 					"node-name", r.Node,
 					"service-name", r.Service.Service,
+					"service", r.Service,
 					"err", err)
 				continue
 			}
 
 			s.Log.Debug("registered service instance",
 				"node-name", r.Node,
-				"service-name", r.Service.Service)
+				"service-name", r.Service.Service,
+				"consul-namespace-name", r.Service.Namespace,
+				"service", r.Service)
 		}
 	}
 }
 
 func (s *ConsulSyncer) init() {
-	if s.services == nil {
-		s.services = make(map[string]struct{})
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.serviceNames == nil {
+		s.serviceNames = make(map[string]mapset.Set)
 	}
-	if s.nodes == nil {
-		s.nodes = make(map[string]*consulSyncState)
+	if s.namespaces == nil {
+		s.namespaces = make(map[string]map[string]*api.CatalogRegistration)
 	}
 	if s.deregs == nil {
 		s.deregs = make(map[string]*api.CatalogDeregistration)
 	}
 	if s.watchers == nil {
-		s.watchers = make(map[string]context.CancelFunc)
+		s.watchers = make(map[string]map[string]context.CancelFunc)
 	}
 	if s.SyncPeriod == 0 {
 		s.SyncPeriod = ConsulSyncPeriod
 	}
 	if s.ServicePollPeriod == 0 {
 		s.ServicePollPeriod = ConsulServicePollPeriod
+	}
+	if s.initialSync == nil {
+		s.initialSync = make(chan bool)
 	}
 }

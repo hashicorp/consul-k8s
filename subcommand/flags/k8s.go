@@ -2,12 +2,10 @@ package flags
 
 import (
 	"flag"
-
-	"github.com/hashicorp/consul/command/flags"
 )
 
 type K8SFlags struct {
-	kubeconfig flags.StringValue
+	kubeconfig StringValue
 }
 
 func (f *K8SFlags) Flags() *flag.FlagSet {

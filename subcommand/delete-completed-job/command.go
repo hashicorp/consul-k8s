@@ -4,19 +4,18 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/consul/command/flags"
-	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	v1 "k8s.io/api/batch/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
-	"sync"
-	"time"
 )
 
 // Command is the command for deleting completed jobs.
@@ -24,9 +23,11 @@ type Command struct {
 	UI cli.Ui
 
 	flags         *flag.FlagSet
-	k8s           *k8sflags.K8SFlags
+	k8s           *flags.K8SFlags
 	flagNamespace string
 	flagTimeout   string
+	flagLogLevel  string
+	flagLogJSON   bool
 
 	once      sync.Once
 	help      string
@@ -39,11 +40,16 @@ type Command struct {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.k8s = &k8sflags.K8SFlags{}
+	c.k8s = &flags.K8SFlags{}
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the job is deployed")
 	c.flags.StringVar(&c.flagTimeout, "timeout", "30m",
 		"How long we'll wait for the job to complete before timing out, e.g. 1ms, 2s, 3m")
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 
@@ -95,15 +101,16 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:  hclog.Info,
-		Output: os.Stderr,
-	})
+	logger, err := common.Logger(c.flagLogLevel, c.flagLogJSON)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	// Wait for job to complete.
 	logger.Info(fmt.Sprintf("waiting for job %q to complete successfully", jobName))
 	for {
-		job, err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Get(jobName, metav1.GetOptions{})
+		job, err := c.k8sClient.BatchV1().Jobs(c.flagNamespace).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if k8serrors.IsNotFound(err) {
 			logger.Info(fmt.Sprintf("job %q does not exist, no need to delete", jobName))
 			return 0
@@ -142,7 +149,7 @@ func (c *Command) Run(args []string) int {
 	// ourselves.
 	logger.Info(fmt.Sprintf("job %q has succeeded, deleting", jobName))
 	propagationPolicy := metav1.DeletePropagationForeground
-	err = c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(jobName, &metav1.DeleteOptions{
+	err = c.k8sClient.BatchV1().Jobs(c.flagNamespace).Delete(context.TODO(), jobName, metav1.DeleteOptions{
 		// Needed so that the underlying pods are also deleted.
 		PropagationPolicy: &propagationPolicy,
 	})

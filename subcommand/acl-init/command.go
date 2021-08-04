@@ -2,6 +2,7 @@ package aclinit
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -12,8 +13,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/subcommand"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,14 +23,15 @@ type Command struct {
 	UI cli.Ui
 
 	flags             *flag.FlagSet
-	k8s               *k8sflags.K8SFlags
+	k8s               *flags.K8SFlags
 	flagSecretName    string
 	flagInitType      string
 	flagNamespace     string
 	flagACLDir        string
+	flagTokenSinkFile string
 	flagDefaultPolicy string
 
-	k8sClient *kubernetes.Clientset
+	k8sClient kubernetes.Interface
 
 	once sync.Once
 	help string
@@ -46,14 +47,17 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "",
 		"Name of secret to watch for an ACL token")
 	c.flags.StringVar(&c.flagInitType, "init-type", "",
-		"ACL init target, valid values are `client` and `sync`")
+		"ACL init type. The only supported value is 'client'. If set to 'client' will write Consul client ACL config to an acl-config.json file in -acl-dir")
 	c.flags.StringVar(&c.flagNamespace, "k8s-namespace", "",
 		"Name of Kubernetes namespace where the servers are deployed")
 	c.flags.StringVar(&c.flagACLDir, "acl-dir", "/consul/aclconfig",
-		"Directory name of shared volume where acl config will be output")
+		"Directory name of shared volume where client acl config file acl-config.json will be written if -init-type=client")
+	c.flags.StringVar(&c.flagTokenSinkFile, "token-sink-file", "",
+		"Optional filepath to write acl token")
 	c.flags.StringVar(&c.flagDefaultPolicy, "default-policy", "deny",
 		"Default policy for ACLs. Supported values are \"deny\" (default) and \"allow\"")
-	c.k8s = &k8sflags.K8SFlags{}
+
+	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
 }
@@ -64,32 +68,33 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flags.Args()) > 0 {
-		c.UI.Error(fmt.Sprintf("Should have no non-flag arguments."))
+		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
-
 	if c.flagDefaultPolicy != "allow" && c.flagDefaultPolicy != "deny" {
 		c.UI.Error(fmt.Sprintf("\"%s\" is not a support default policy", c.flagDefaultPolicy))
 		return 1
 	}
 
-	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
-		return 1
-	}
-
 	// Create the Kubernetes clientset
-	c.k8sClient, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
-		return 1
+	if c.k8sClient == nil {
+		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error retrieving Kubernetes auth: %s", err))
+			return 1
+		}
+		c.k8sClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
+			return 1
+		}
 	}
 
 	// Check if the client secret exists yet
 	// If not, wait until it does
 	var secret string
 	for {
+		var err error
 		secret, err = c.getSecret(c.flagSecretName)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error getting Kubernetes secret: %s", err))
@@ -112,10 +117,22 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		// Write the data out as a file
+		// Write the data out as a file.
+		// Must be 0644 because this is written by the consul-k8s user but needs
+		// to be readable by the consul user.
 		err = ioutil.WriteFile(filepath.Join(c.flagACLDir, "acl-config.json"), buf.Bytes(), 0644)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error writing config file: %s", err))
+			return 1
+		}
+	}
+
+	if c.flagTokenSinkFile != "" {
+		// Must be 0600 in case this command is re-run. In that case we need
+		// to have permissions to overwrite our file.
+		err := ioutil.WriteFile(c.flagTokenSinkFile, []byte(secret), 0600)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
 			return 1
 		}
 	}
@@ -124,7 +141,7 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) getSecret(secretName string) (string, error) {
-	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(secretName, metav1.GetOptions{})
+	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

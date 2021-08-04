@@ -2,123 +2,145 @@ package connectinject
 
 import (
 	"bytes"
-	"encoding/json"
+	"strconv"
 	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	InjectInitCopyContainerName = "copy-consul-bin"
+	InjectInitContainerName     = "consul-connect-inject-init"
+	rootUserAndGroupID          = 0
+	envoyUserAndGroupID         = 5995
+	copyContainerUserAndGroupID = 5996
+	netAdminCapability          = "NET_ADMIN"
+)
+
 type initContainerCommandData struct {
-	ServiceName string
-	ServicePort int32
-	// ServiceProtocol is the protocol for the service-defaults config
-	// that will be written if CentralConfig is true. If empty, Consul
-	// will default to "tcp".
-	ServiceProtocol string
-	AuthMethod      string
-	CentralConfig   bool
-	Upstreams       []initContainerCommandUpstreamData
-	Tags            string
-	Meta            map[string]string
+	ServiceName        string
+	ServiceAccountName string
+	AuthMethod         string
+	// ConsulNamespace is the Consul namespace to register the service
+	// and proxy in. An empty string indicates namespaces are not
+	// enabled in Consul (necessary for OSS).
+	ConsulNamespace           string
+	NamespaceMirroringEnabled bool
+
+	// The PEM-encoded CA certificate to use when
+	// communicating with Consul clients
+	ConsulCACert string
+	// EnableMetrics adds a listener to Envoy where Prometheus will scrape
+	// metrics from.
+	EnableMetrics bool
+	// PrometheusScrapePath configures the path on the listener on Envoy where
+	// Prometheus will scrape metrics from.
+	PrometheusScrapePath string
+	// PrometheusBackendPort configures where the listener on Envoy will point to.
+	PrometheusBackendPort string
+	// EnvoyUID is the Linux user id that will be used when tproxy is enabled.
+	EnvoyUID int
+
+	// EnableTransparentProxy configures this init container to run in transparent proxy mode,
+	// i.e. run consul connect redirect-traffic command and add the required privileges to the
+	// container to do that.
+	EnableTransparentProxy bool
+
+	// TProxyExcludeInboundPorts is a list of inbound ports to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeInboundPorts []string
+
+	// TProxyExcludeOutboundPorts is a list of outbound ports to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeOutboundPorts []string
+
+	// TProxyExcludeOutboundCIDRs is a list of outbound CIDRs to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeOutboundCIDRs []string
+
+	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
+	// the consul connect redirect-traffic command.
+	TProxyExcludeUIDs []string
 }
 
-type initContainerCommandUpstreamData struct {
-	Name       string
-	LocalPort  int32
-	Datacenter string
-	Query      string
+// initCopyContainer returns the init container spec for the copy container which places
+// the consul binary into the shared volume.
+func (h *Handler) initCopyContainer() corev1.Container {
+	// Copy the Consul binary from the image to the shared volume.
+	cmd := "cp /bin/consul /consul/connect-inject/consul"
+	container := corev1.Container{
+		Name:      InjectInitCopyContainerName,
+		Image:     h.ImageConsul,
+		Resources: h.InitContainerResources,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			},
+		},
+		Command: []string{"/bin/sh", "-ec", cmd},
+	}
+	// If running on OpenShift, don't set the security context and instead let OpenShift set a random user/group for us.
+	if !h.EnableOpenShift {
+		container.SecurityContext = &corev1.SecurityContext{
+			// Set RunAsUser because the default user for the consul container is root and we want to run non-root.
+			RunAsUser:              pointerToInt64(copyContainerUserAndGroupID),
+			RunAsGroup:             pointerToInt64(copyContainerUserAndGroupID),
+			RunAsNonRoot:           pointerToBool(true),
+			ReadOnlyRootFilesystem: pointerToBool(true),
+		}
+	}
+	return container
 }
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
-	protocol := h.DefaultProtocol
-	if annoProtocol, ok := pod.Annotations[annotationProtocol]; ok {
-		protocol = annoProtocol
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
+	// Check if tproxy is enabled on this pod.
+	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
+	if err != nil {
+		return corev1.Container{}, err
 	}
+
 	data := initContainerCommandData{
-		ServiceName:     pod.Annotations[annotationService],
-		ServiceProtocol: protocol,
-		AuthMethod:      h.AuthMethod,
-		CentralConfig:   h.CentralConfig,
-	}
-	if data.ServiceName == "" {
-		// Assertion, since we call defaultAnnotations above and do
-		// not mutate pods without a service specified.
-		panic("No service found. This should be impossible since we default it.")
-	}
-
-	// If a port is specified, then we determine the value of that port
-	// and register that port for the host service.
-	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
-		if port, _ := portValue(pod, raw); port > 0 {
-			data.ServicePort = port
-		}
+		AuthMethod:                 h.AuthMethod,
+		ConsulNamespace:            h.consulNamespace(namespace.Name),
+		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
+		ConsulCACert:               h.ConsulCACert,
+		EnableTransparentProxy:     tproxyEnabled,
+		TProxyExcludeInboundPorts:  splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeInboundPorts, pod),
+		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
+		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
+		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
+		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
-	var tags []string
-	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags = strings.Split(raw, ",")
-	}
-	// Get the tags from the deprecated tags annotation and combine.
-	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
-		tags = append(tags, strings.Split(raw, ",")...)
+	if data.AuthMethod != "" {
+		data.ServiceAccountName = pod.Spec.ServiceAccountName
+		data.ServiceName = pod.Annotations[annotationService]
 	}
 
-	if len(tags) > 0 {
-		// Create json array from the annotations since we're going to output
-		// this in an HCL config file and HCL arrays are json formatted.
-		jsonTags, err := json.Marshal(tags)
+	// This determines how to configure the consul connect envoy command: what
+	// metrics backend to use and what path to expose on the
+	// envoy_prometheus_bind_addr listener for scraping.
+	metricsServer, err := h.MetricsConfig.shouldRunMergedMetricsServer(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if metricsServer {
+		prometheusScrapePath := h.MetricsConfig.prometheusScrapePath(pod)
+		mergedMetricsPort, err := h.MetricsConfig.mergedMetricsPort(pod)
 		if err != nil {
-			h.Log.Error("Error json marshaling tags", "Error", err, "Tags", tags)
-		} else {
-			data.Tags = string(jsonTags)
+			return corev1.Container{}, err
 		}
-	}
-
-	// If there is metadata specified split into a map and create.
-	data.Meta = make(map[string]string)
-	for k, v := range pod.Annotations {
-		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
-			data.Meta[strings.TrimPrefix(k, annotationMeta)] = v
-		}
-	}
-
-	// If upstreams are specified, configure those
-	if raw, ok := pod.Annotations[annotationUpstreams]; ok && raw != "" {
-		for _, raw := range strings.Split(raw, ",") {
-			parts := strings.SplitN(raw, ":", 3)
-
-			var datacenter, service_name, prepared_query string
-			var port int32
-			if parts[0] == "prepared_query" {
-				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
-				prepared_query = strings.TrimSpace(parts[1])
-			} else {
-				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
-				service_name = strings.TrimSpace(parts[0])
-
-				// parse the optional datacenter
-				if len(parts) > 2 {
-					datacenter = strings.TrimSpace(parts[2])
-				}
-			}
-
-			if port > 0 {
-				data.Upstreams = append(data.Upstreams, initContainerCommandUpstreamData{
-					Name:       service_name,
-					LocalPort:  port,
-					Datacenter: datacenter,
-					Query:      prepared_query,
-				})
-			}
-		}
+		data.PrometheusScrapePath = prometheusScrapePath
+		data.PrometheusBackendPort = mergedMetricsPort
 	}
 
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
-		corev1.VolumeMount{
+		{
 			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
 		},
@@ -139,14 +161,14 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 	var buf bytes.Buffer
 	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(
 		initContainerCommandTpl)))
-	err := tpl.Execute(&buf, &data)
+	err = tpl.Execute(&buf, &data)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
-	return corev1.Container{
-		Name:  "consul-connect-inject-init",
-		Image: h.ImageConsul,
+	container := corev1.Container{
+		Name:  InjectInitContainerName,
+		Image: h.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
 				Name: "HOST_IP",
@@ -173,129 +195,141 @@ func (h *Handler) containerInit(pod *corev1.Pod) (corev1.Container, error) {
 				},
 			},
 		},
+		Resources:    h.InitContainerResources,
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
-	}, nil
+	}
+
+	if tproxyEnabled {
+		// Running consul connect redirect-traffic with iptables
+		// requires both being a root user and having NET_ADMIN capability.
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:  pointerToInt64(rootUserAndGroupID),
+			RunAsGroup: pointerToInt64(rootUserAndGroupID),
+			// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
+			RunAsNonRoot: pointerToBool(false),
+			Privileged:   pointerToBool(true),
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{netAdminCapability},
+			},
+		}
+	}
+
+	return container, nil
+}
+
+// transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
+// to read the pod's namespace label when it exists.
+func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+	// First check to see if the pod annotation exists to override the namespace or global settings.
+	if raw, ok := pod.Annotations[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Next see if the namespace has been defaulted.
+	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Else fall back to the global default.
+	return globalEnabled, nil
+}
+
+// pointerToInt64 takes an int64 and returns a pointer to it.
+func pointerToInt64(i int64) *int64 {
+	return &i
+}
+
+// pointerToBool takes a bool and returns a pointer to it.
+func pointerToBool(b bool) *bool {
+	return &b
+}
+
+// splitCommaSeparatedItemsFromAnnotation takes an annotation and a pod
+// and returns the comma-separated value of the annotation as a list of strings.
+func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) []string {
+	var items []string
+	if raw, ok := pod.Annotations[annotation]; ok {
+		items = append(items, strings.Split(raw, ",")...)
+	}
+
+	return items
 }
 
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
+{{- if .ConsulCACert}}
+export CONSUL_HTTP_ADDR="https://${HOST_IP}:8501"
+export CONSUL_GRPC_ADDR="https://${HOST_IP}:8502"
+export CONSUL_CACERT=/consul/connect-inject/consul-ca.pem
+cat <<EOF >/consul/connect-inject/consul-ca.pem
+{{ .ConsulCACert }}
+EOF
+{{- else}}
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
-
-# Register the service. The HCL is stored in the volume so that
-# the preStop hook can access it to deregister the service.
-cat <<EOF >/consul/connect-inject/service.hcl
-services {
-  id   = "${POD_NAME}-{{ .ServiceName }}-sidecar-proxy"
-  name = "{{ .ServiceName }}-sidecar-proxy"
-  kind = "connect-proxy"
-  address = "${POD_IP}"
-  port = 20000
-  {{- if .Tags}}
-  tags = {{.Tags}}
-  {{- end}}
-  {{- if .Meta}}
-  meta = {
-    {{- range $key, $value := .Meta }}
-    {{$key}} = "{{$value}}"
-    {{- end }}
-  }
-  {{- end}}
-
-  proxy {
-    destination_service_name = "{{ .ServiceName }}"
-    destination_service_id = "{{ .ServiceName }}"
-    {{- if (gt .ServicePort 0) }}
-    local_service_address = "127.0.0.1"
-    local_service_port = {{ .ServicePort }}
-    {{- end }}
-    {{- range .Upstreams }}
-    upstreams {
-      {{- if .Name }}
-      destination_type = "service" 
-      destination_name = "{{ .Name }}"
-      {{- end}}
-      {{- if .Query }}
-      destination_type = "prepared_query" 
-      destination_name = "{{ .Query}}"
-      {{- end}}
-      local_bind_port = {{ .LocalPort }}
-      {{- if .Datacenter }}
-      datacenter = "{{ .Datacenter }}"
-      {{- end}}
-    }
-    {{- end }}
-  }
-
-  checks {
-    name = "Proxy Public Listener"
-    tcp = "${POD_IP}:20000"
-    interval = "10s"
-    deregister_critical_service_after = "10m"
-  }
-
-  checks {
-    name = "Destination Alias"
-    alias_service = "{{ .ServiceName }}"
-  }
-}
-
-services {
-  id   = "${POD_NAME}-{{ .ServiceName }}"
-  name = "{{ .ServiceName }}"
-  address = "${POD_IP}"
-  port = {{ .ServicePort }}
-  {{- if .Tags}}
-  tags = {{.Tags}}
-  {{- end}}
-  {{- if .Meta}}
-  meta = {
-    {{- range $key, $value := .Meta }}
-    {{$key}} = "{{$value}}"
-    {{- end }}
-  }
-  {{- end}}
-}
-EOF
-
-{{- if .CentralConfig }}
-# Create the central config's service registration
-cat <<EOF >/consul/connect-inject/central-config.hcl
-kind = "service-defaults"
-name = "{{ .ServiceName }}"
-protocol = "{{ .ServiceProtocol }}"
-EOF
-{{- end }}
-{{- if .AuthMethod }}
-/bin/consul login -method="{{ .AuthMethod }}" \
-  -bearer-token-file="/var/run/secrets/kubernetes.io/serviceaccount/token" \
-  -token-sink-file="/consul/connect-inject/acl-token" \
-  -meta="pod=${POD_NAMESPACE}/${POD_NAME}"
-{{- end }}
-{{- if .CentralConfig }}
-/bin/consul config write -cas -modify-index 0 \
+{{- end}}
+consul-k8s connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   {{- if .AuthMethod }}
-  -token-file="/consul/connect-inject/acl-token" \
+  -acl-auth-method="{{ .AuthMethod }}" \
+  -service-account-name="{{ .ServiceAccountName }}" \
+  -service-name="{{ .ServiceName }}" \
+  {{- if .ConsulNamespace }}
+  {{- if .NamespaceMirroringEnabled }}
+  {{- /* If namespace mirroring is enabled, the auth method is
+         defined in the default namespace */}}
+  -auth-method-namespace="default" \
+  {{- else }}
+  -auth-method-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  /consul/connect-inject/central-config.hcl || true
-{{- end }}
-
-/bin/consul services register \
-  {{- if .AuthMethod }}
-  -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
-  /consul/connect-inject/service.hcl
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -consul-service-namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
 
 # Generate the envoy bootstrap code
-/bin/consul connect envoy \
-  -proxy-id="${POD_NAME}-{{ .ServiceName }}-sidecar-proxy" \
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  {{- if .PrometheusScrapePath }}
+  -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
+  {{- end }}
+  {{- if .PrometheusBackendPort }}
+  -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
+  {{- end }}
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
-# Copy the Consul binary
-cp /bin/consul /consul/connect-inject/consul
+{{- if .EnableTransparentProxy }}
+{{- /* The newline below is intentional to allow extra space
+       in the rendered template between this and the previous commands. */}}
+
+# Apply traffic redirection rules.
+/consul/connect-inject/consul connect redirect-traffic \
+  {{- if .AuthMethod }}
+  -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulNamespace }}
+  -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- range .TProxyExcludeInboundPorts }}
+  -exclude-inbound-port="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeOutboundPorts }}
+  -exclude-outbound-port="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeOutboundCIDRs }}
+  -exclude-outbound-cidr="{{ . }}" \
+  {{- end }}
+  {{- range .TProxyExcludeUIDs }}
+  -exclude-uid="{{ . }}" \
+  {{- end }}
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid={{ .EnvoyUID }}
+{{- end }}
 `

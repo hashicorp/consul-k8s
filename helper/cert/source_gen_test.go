@@ -58,7 +58,7 @@ func TestGenSource_expiry(t *testing.T) {
 	// Generate again
 	start := time.Now()
 	next, err := source.Certificate(context.Background(), &bundle)
-	dur := time.Now().Sub(start)
+	dur := time.Since(start)
 	require.NoError(t, err)
 	require.False(t, bundle.Equal(&next))
 	require.True(t, dur > time.Second)
@@ -70,14 +70,6 @@ func testGenSource() *GenSource {
 		Name:  "Test",
 		Hosts: []string{"127.0.0.1", "localhost"},
 	}
-}
-
-// testBundle returns a valid bundle.
-func testBundle(t *testing.T) *Bundle {
-	source := testGenSource()
-	bundle, err := source.Certificate(context.Background(), nil)
-	require.NoError(t, err)
-	return &bundle
 }
 
 // testBundleDir writes the bundle contents to a directory and returns the
@@ -112,7 +104,7 @@ func testBundleVerify(t *testing.T, bundle *Bundle) {
 	cmd := exec.Command(
 		"openssl", "verify", "-verbose", "-CAfile", "ca.pem", "leaf.pem")
 	cmd.Dir = td
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	t.Log(string(output))
 	require.NoError(err)
 }

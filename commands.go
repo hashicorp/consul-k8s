@@ -4,11 +4,19 @@ import (
 	"os"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/subcommand/acl-init"
+	cmdConnectInit "github.com/hashicorp/consul-k8s/subcommand/connect-init"
+	cmdConsulSidecar "github.com/hashicorp/consul-k8s/subcommand/consul-sidecar"
+	cmdController "github.com/hashicorp/consul-k8s/subcommand/controller"
+	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/subcommand/delete-completed-job"
+	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/subcommand/inject-connect"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/subcommand/server-acl-init"
+	cmdServiceAddress "github.com/hashicorp/consul-k8s/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/subcommand/sync-catalog"
+	cmdTLSInit "github.com/hashicorp/consul-k8s/subcommand/tls-init"
 	cmdVersion "github.com/hashicorp/consul-k8s/subcommand/version"
+	webhookCertManager "github.com/hashicorp/consul-k8s/subcommand/webhook-cert-manager"
 	"github.com/hashicorp/consul-k8s/version"
 	"github.com/mitchellh/cli"
 )
@@ -24,8 +32,16 @@ func init() {
 			return &cmdACLInit.Command{UI: ui}, nil
 		},
 
+		"connect-init": func() (cli.Command, error) {
+			return &cmdConnectInit.Command{UI: ui}, nil
+		},
+
 		"inject-connect": func() (cli.Command, error) {
 			return &cmdInjectConnect.Command{UI: ui}, nil
+		},
+
+		"consul-sidecar": func() (cli.Command, error) {
+			return &cmdConsulSidecar.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {
@@ -40,8 +56,32 @@ func init() {
 			return &cmdDeleteCompletedJob.Command{UI: ui}, nil
 		},
 
+		"service-address": func() (cli.Command, error) {
+			return &cmdServiceAddress.Command{UI: ui}, nil
+		},
+
+		"get-consul-client-ca": func() (cli.Command, error) {
+			return &cmdGetConsulClientCA.Command{UI: ui}, nil
+		},
+
 		"version": func() (cli.Command, error) {
 			return &cmdVersion.Command{UI: ui, Version: version.GetHumanVersion()}, nil
+		},
+
+		"create-federation-secret": func() (cli.Command, error) {
+			return &cmdCreateFederationSecret.Command{UI: ui}, nil
+		},
+
+		"controller": func() (cli.Command, error) {
+			return &cmdController.Command{UI: ui}, nil
+		},
+
+		"webhook-cert-manager": func() (cli.Command, error) {
+			return &webhookCertManager.Command{UI: ui}, nil
+		},
+
+		"tls-init": func() (cli.Command, error) {
+			return &cmdTLSInit.Command{UI: ui}, nil
 		},
 	}
 }
@@ -52,7 +92,7 @@ func helpFunc() cli.HelpFunc {
 	// aren't shown in any help output. We use this for prerelease functionality
 	// or advanced features.
 	hidden := map[string]struct{}{
-		"inject-connect": struct{}{},
+		"inject-connect": {},
 	}
 
 	var include []string
