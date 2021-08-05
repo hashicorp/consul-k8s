@@ -17,7 +17,7 @@ func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 	}
 
 	command := []string{
-		"consul-k8s",
+		"consul-k8s-control-plane",
 		"consul-sidecar",
 		"-enable-service-registration=false",
 		"-enable-metrics-merging=true",

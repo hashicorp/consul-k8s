@@ -353,7 +353,7 @@ func (c *Command) validateFlags() error {
 
 const synopsis = "Initialize CA and Server Certificates during Consul install."
 const help = `
-Usage: consul-k8s tls-init [options]
+Usage: consul-k8s-control-plane tls-init [options]
 
   Bootstraps the installation with a CA certificate, CA private key and TLS Certificates
   for the Consul server. It manages the rotation of the Server certificates on subsequent

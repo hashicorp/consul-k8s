@@ -417,7 +417,7 @@ func (c *Command) sendSignal(sig os.Signal) {
 
 const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"
 const help = `
-Usage: consul-k8s webhook-cert-manager [options]
+Usage: consul-k8s-control-plane webhook-cert-manager [options]
 
   Starts the Consul Kubernetes webhook-cert-manager that manages the lifecycle for webhook TLS certificates.
 

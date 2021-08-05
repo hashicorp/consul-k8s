@@ -170,7 +170,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Delete Kubernetes Job when complete."
 const help = `
-Usage: consul-k8s delete-completed-job [name] [options]
+Usage: consul-k8s-control-plane delete-completed-job [name] [options]
 
   Waits for job to complete, then deletes it. If the job reaches its
   backoff limit then the command will exit.

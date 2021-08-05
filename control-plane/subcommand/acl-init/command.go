@@ -145,7 +145,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Initialize ACLs on non-server components."
 const help = `
-Usage: consul-k8s acl-init [options]
+Usage: consul-k8s-control-plane acl-init [options]
 
   Bootstraps non-server components with ACLs by waiting for a
   secret to be populated with an ACL token to be used.
