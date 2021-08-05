@@ -2,7 +2,7 @@ SHELL = bash
 
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
-DEV_IMAGE?=consul-k8s-dev
+DEV_IMAGE?=consul-k8s-control-plane-dev
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
@@ -24,7 +24,7 @@ CRD_OPTIONS ?= "crd:trivialVersions=true,allowDangerousTypes=true"
 # CI Variables #
 ################
 CI_DEV_DOCKER_NAMESPACE?=hashicorpdev
-CI_DEV_DOCKER_IMAGE_NAME?=consul-k8s
+CI_DEV_DOCKER_IMAGE_NAME?=consul-k8s-control-plane
 CI_DEV_DOCKER_WORKDIR?=.
 CONSUL_K8S_IMAGE_VERSION?=latest
 ################
@@ -104,7 +104,7 @@ endif
 # should only run in CI and not locally.
 ci.dev-docker:
 	@echo "Pulling consul-k8s container image - $(CONSUL_K8S_IMAGE_VERSION)"
-	@docker pull hashicorp/$(CI_DEV_DOCKER_IMAGE_NAME):$(CONSUL_K8S_IMAGE_VERSION) >/dev/null
+	@docker pull hashicorp/consul-k8s:$(CONSUL_K8S_IMAGE_VERSION) >/dev/null #todo change this back after pulling it the first time since the dockerfile is FROM this image
 	@echo "Building consul-k8s Development container - $(CI_DEV_DOCKER_IMAGE_NAME)"
 	@docker build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)' \
 	--build-arg CONSUL_K8S_IMAGE_VERSION=$(CONSUL_K8S_IMAGE_VERSION) \
@@ -122,6 +122,10 @@ endif
 ifeq ($(CIRCLE_BRANCH), crd-controller-base)
 	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):crd-controller-base-latest
 	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):crd-controller-base-latest
+endif
+ifeq ($(CIRCLE_BRANCH), merge-repos)
+	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):merge-repos
+	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):merge-repos
 endif
 
 .PHONY: all bin clean dev dist docker-images go-build-image test tools ci.dev-docker

@@ -68,7 +68,7 @@ commands:
         type: string
       consul-k8s-image:
         type: string
-        default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s:1b9aec4"
+        default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:merge-repos"
     steps:
       - when:
           condition: << parameters.failfast >>
