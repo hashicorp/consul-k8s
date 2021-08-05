@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/subcommand/webhook-cert-manager/mocks"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager/mocks"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"

@@ -1,4 +1,4 @@
-module github.com/hashicorp/consul-k8s
+module github.com/hashicorp/consul-k8s/control-plane
 
 require (
 	github.com/armon/go-metrics v0.3.9 // indirect

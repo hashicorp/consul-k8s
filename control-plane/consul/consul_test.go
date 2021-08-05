@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/version"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )

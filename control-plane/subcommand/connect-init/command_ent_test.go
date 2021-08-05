@@ -9,9 +9,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/helper/test"
-	"github.com/hashicorp/consul-k8s/namespaces"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
