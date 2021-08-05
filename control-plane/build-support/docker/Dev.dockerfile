@@ -6,6 +6,6 @@ RUN rm /bin/consul-k8s
 RUN apk update && apk add iptables
 
 COPY pkg/bin/linux_amd64/consul-k8s-control-plane /bin
-RUN ln -s pkg/bin/linux_amd64/consul-k8s-control-plane /bin/consul-k8s
+RUN ln -s /bin/consul-k8s-control-plane /bin/consul-k8s
 
 USER consul-k8s
