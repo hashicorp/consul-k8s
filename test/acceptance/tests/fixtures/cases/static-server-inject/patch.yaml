@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+    spec:
+      containers:
+        - name: static-server
+          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          args:
+            - -text="hello world"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+      serviceAccountName: static-server

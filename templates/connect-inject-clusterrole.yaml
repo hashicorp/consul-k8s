@@ -1,0 +1,45 @@
+{{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
+# The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-connect-injector-webhook
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+rules:
+- apiGroups: [""]
+  resources: ["pods", "endpoints", "services", "namespaces"]
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-connect-injector-webhook
+  verbs:
+  - use
+{{- end }}
+{{- if .Values.global.acls.manageSystemACLs }}
+- apiGroups: [""]
+  resources:
+  - secrets
+  resourceNames:
+  - {{ template "consul.fullname" . }}-connect-inject-acl-token
+  verbs:
+  - get
+{{- end }}
+{{- end }}

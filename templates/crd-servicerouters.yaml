@@ -1,0 +1,257 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: servicerouters.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: ServiceRouter
+    listKind: ServiceRouterList
+    plural: servicerouters
+    singular: servicerouter
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServiceRouter is the Schema for the servicerouters API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceRouterSpec defines the desired state of ServiceRouter
+            properties:
+              routes:
+                description: Routes are the list of routes to consider when processing
+                  L7 requests. The first route to match in the list is terminal and
+                  stops further evaluation. Traffic that fails to match any of the
+                  provided routes will be routed to the default service.
+                items:
+                  properties:
+                    destination:
+                      description: Destination controls how to proxy the matching
+                        request(s) to a service.
+                      properties:
+                        namespace:
+                          description: Namespace is the Consul namespace to resolve
+                            the service from instead of the current namespace. If
+                            empty the current namespace is assumed.
+                          type: string
+                        numRetries:
+                          description: NumRetries is the number of times to retry
+                            the request when a retryable result occurs
+                          format: int32
+                          type: integer
+                        prefixRewrite:
+                          description: PrefixRewrite defines how to rewrite the HTTP
+                            request path before proxying it to its final destination.
+                            This requires that either match.http.pathPrefix or match.http.pathExact
+                            be configured on this route.
+                          type: string
+                        requestTimeout:
+                          description: RequestTimeout is the total amount of time
+                            permitted for the entire downstream request (and retries)
+                            to be processed.
+                          type: string
+                        retryOnConnectFailure:
+                          description: RetryOnConnectFailure allows for connection
+                            failure errors to trigger a retry.
+                          type: boolean
+                        retryOnStatusCodes:
+                          description: RetryOnStatusCodes is a flat list of http response
+                            status codes that are eligible for retry.
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        service:
+                          description: Service is the service to resolve instead of
+                            the default service. If empty then the default service
+                            name is used.
+                          type: string
+                        serviceSubset:
+                          description: ServiceSubset is a named subset of the given
+                            service to resolve instead of the one defined as that
+                            service's DefaultSubset. If empty, the default subset
+                            is used.
+                          type: string
+                      type: object
+                    match:
+                      description: Match is a set of criteria that can match incoming
+                        L7 requests. If empty or omitted it acts as a catch-all.
+                      properties:
+                        http:
+                          description: HTTP is a set of http-specific match criteria.
+                          properties:
+                            header:
+                              description: Header is a set of criteria that can match
+                                on HTTP request headers. If more than one is configured
+                                all must match for the overall match to apply.
+                              items:
+                                properties:
+                                  exact:
+                                    description: Exact will match if the header with
+                                      the given name is this value.
+                                    type: string
+                                  invert:
+                                    description: Invert inverts the logic of the match.
+                                    type: boolean
+                                  name:
+                                    description: Name is the name of the header to
+                                      match.
+                                    type: string
+                                  prefix:
+                                    description: Prefix will match if the header with
+                                      the given name has this prefix.
+                                    type: string
+                                  present:
+                                    description: Present will match if the header
+                                      with the given name is present with any value.
+                                    type: boolean
+                                  regex:
+                                    description: Regex will match if the header with
+                                      the given name matches this pattern.
+                                    type: string
+                                  suffix:
+                                    description: Suffix will match if the header with
+                                      the given name has this suffix.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              type: array
+                            methods:
+                              description: Methods is a list of HTTP methods for which
+                                this match applies. If unspecified all http methods
+                                are matched.
+                              items:
+                                type: string
+                              type: array
+                            pathExact:
+                              description: PathExact is an exact path to match on
+                                the HTTP request path.
+                              type: string
+                            pathPrefix:
+                              description: PathPrefix is a path prefix to match on
+                                the HTTP request path.
+                              type: string
+                            pathRegex:
+                              description: PathRegex is a regular expression to match
+                                on the HTTP request path.
+                              type: string
+                            queryParam:
+                              description: QueryParam is a set of criteria that can
+                                match on HTTP query parameters. If more than one is
+                                configured all must match for the overall match to
+                                apply.
+                              items:
+                                properties:
+                                  exact:
+                                    description: Exact will match if the query parameter
+                                      with the given name is this value.
+                                    type: string
+                                  name:
+                                    description: Name is the name of the query parameter
+                                      to match on.
+                                    type: string
+                                  present:
+                                    description: Present will match if the query parameter
+                                      with the given name is present with any value.
+                                    type: boolean
+                                  regex:
+                                    description: Regex will match if the query parameter
+                                      with the given name matches this pattern.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              type: array
+                          type: object
+                      type: object
+                  type: object
+                type: array
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

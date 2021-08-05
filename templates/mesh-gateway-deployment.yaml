@@ -1,0 +1,384 @@
+{{- if .Values.meshGateway.enabled }}
+{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
+{{- if not .Values.client.grpc }}{{ fail "client.grpc must be true" }}{{ end -}}
+{{- if and .Values.global.acls.manageSystemACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
+{{- if .Values.meshGateway.imageEnvoy }}{{ fail "meshGateway.imageEnvoy must be specified in global.imageEnvoy" }}{{ end -}}
+{{- if .Values.meshGateway.globalMode }}{{ fail "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end -}}
+{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
+{{- /* The below test checks if clients are disabled (and if so, fails). We use the conditional from other client files and prepend 'not' */ -}}
+{{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-mesh-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: mesh-gateway
+spec:
+  replicas: {{ .Values.meshGateway.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: mesh-gateway
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: mesh-gateway
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/metrics"
+        "prometheus.io/port": "20200"
+        {{- end }}
+        {{- if .Values.meshGateway.annotations }}
+        {{- tpl .Values.meshGateway.annotations . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.meshGateway.affinity }}
+      affinity:
+        {{ tpl .Values.meshGateway.affinity . | nindent 8 | trim }}
+      {{- end }}
+      {{- if .Values.meshGateway.tolerations }}
+      tolerations:
+        {{ tpl .Values.meshGateway.tolerations . | nindent 8 | trim }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" . }}-mesh-gateway
+      volumes:
+        - name: consul-bin
+          emptyDir: {}
+        - name: consul-service
+          emptyDir:
+            medium: "Memory"
+        {{- if .Values.global.tls.enabled }}
+        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+        {{- end }}
+        {{- if .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
+        {{- end }}
+      {{- if .Values.meshGateway.hostNetwork }}
+      hostNetwork: {{ .Values.meshGateway.hostNetwork }}
+      {{- end }}
+      {{- if .Values.meshGateway.dnsPolicy }}
+      dnsPolicy: {{ .Values.meshGateway.dnsPolicy }}
+      {{- end }}
+      initContainers:
+        # We use the Envoy image as our base image so we use an init container to
+        # copy the Consul binary to a shared directory that can be used when
+        # starting Envoy.
+        - name: copy-consul-bin
+          image: {{ .Values.global.image | quote }}
+          command:
+          - cp
+          - /bin/consul
+          - /consul-bin/consul
+          volumeMounts:
+          - name: consul-bin
+            mountPath: /consul-bin
+          {{- if .Values.meshGateway.initCopyConsulContainer }}
+          {{- if .Values.meshGateway.initCopyConsulContainer.resources }}
+          resources: {{ toYaml .Values.meshGateway.initCopyConsulContainer.resources | nindent 12 }}
+          {{- end }}
+          {{- end }}
+        {{- if (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
+        {{- include "consul.getAutoEncryptClientCA" . | nindent 8 }}
+        {{- end }}
+        # service-init registers the mesh gateway service.
+        - name: service-init
+          image: {{ .Values.global.imageK8S }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+                {{- if .Values.global.acls.manageSystemACLs }}
+                consul-k8s acl-init \
+                  -secret-name="{{ template "consul.fullname" . }}-mesh-gateway-acl-token" \
+                  -k8s-namespace={{ .Release.Namespace }} \
+                  -token-sink-file=/consul/service/acl-token
+                {{ end }}
+
+                {{- $source := .Values.meshGateway.wanAddress.source }}
+                {{- $serviceType := .Values.meshGateway.service.type }}
+                {{- if and (eq $source "Service") (not .Values.meshGateway.service.enabled) }}{{ fail "if meshGateway.wanAddress.source=Service then meshGateway.service.enabled must be set to true" }}{{ end }}
+                {{- if or (eq $source "NodeIP") (and (eq $source "Service") (eq $serviceType "NodePort")) }}
+                WAN_ADDR="${HOST_IP}"
+                {{- else if eq $source "NodeName" }}
+                WAN_ADDR="${NODE_NAME}"
+                {{- else if and (eq $source "Service") (or (eq $serviceType "ClusterIP") (eq $serviceType "LoadBalancer")) }}
+                consul-k8s service-address \
+                  -log-level={{ .Values.global.logLevel }} \
+                  -log-json={{ .Values.global.logJSON }} \
+                  -k8s-namespace={{ .Release.Namespace }} \
+                  -name={{ template "consul.fullname" . }}-mesh-gateway \
+                  -output-file=/tmp/address.txt
+                WAN_ADDR="$(cat /tmp/address.txt)"
+                {{- else if eq $source "Static" }}
+                {{- if eq .Values.meshGateway.wanAddress.static "" }}{{ fail "if meshGateway.wanAddress.source=Static then meshGateway.wanAddress.static cannot be empty" }}{{ end }}
+                WAN_ADDR="{{ .Values.meshGateway.wanAddress.static }}"
+                {{- else }}
+                {{- fail "currently set meshGateway values for wanAddress.source and service.type are not supported" }}
+                {{- end }}
+
+                {{- if eq $source "Service" }}
+                {{- if eq $serviceType "NodePort" }}
+                {{- if not .Values.meshGateway.service.nodePort }}{{ fail "if meshGateway.wanAddress.source=Service and meshGateway.service.type=NodePort, meshGateway.service.nodePort must be set" }}{{ end }}
+                WAN_PORT="{{ .Values.meshGateway.service.nodePort }}"
+                {{- else }}
+                WAN_PORT="{{ .Values.meshGateway.service.port }}"
+                {{- end }}
+                {{- else }}
+                WAN_PORT="{{ .Values.meshGateway.wanAddress.port }}"
+                {{- end }}
+
+                cat > /consul/service/service.hcl << EOF
+                service {
+                  kind = "mesh-gateway"
+                  name = "{{ .Values.meshGateway.consulServiceName }}"
+                  {{- if .Values.global.federation.enabled }}
+                  meta {
+                    consul-wan-federation = "1"
+                  }
+                  {{- end }}
+                  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
+                  proxy { config { envoy_prometheus_bind_addr = "${POD_IP}:20200" } }
+                  {{- end }}
+                  port = {{ .Values.meshGateway.containerPort }}
+                  address = "${POD_IP}"
+                  tagged_addresses {
+                    lan {
+                      address = "${POD_IP}"
+                      port = {{ .Values.meshGateway.containerPort }}
+                    }
+                    wan {
+                      address = "${WAN_ADDR}"
+                      port = ${WAN_PORT}
+                    }
+                  }
+                  checks = [
+                    {
+                      name = "Mesh Gateway Listening"
+                      interval = "10s"
+                      tcp = "${POD_IP}:{{ .Values.meshGateway.containerPort }}"
+                      deregister_critical_service_after = "6h"
+                    }
+                  ]
+                }
+                EOF
+
+                /consul-bin/consul services register \
+                  {{- if .Values.global.acls.manageSystemACLs }}
+                  -token-file=/consul/service/acl-token \
+                  {{- end }}
+                  /consul/service/service.hcl
+          volumeMounts:
+            - name: consul-service
+              mountPath: /consul/service
+            - name: consul-bin
+              mountPath: /consul-bin
+            {{- if .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
+            - name: consul-ca-cert
+            {{- end }}
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      containers:
+        - name: mesh-gateway
+          image: {{ .Values.global.imageEnvoy | quote }}
+          {{- if .Values.meshGateway.resources }}
+          resources:
+            {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
+            {{ tpl .Values.meshGateway.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.meshGateway.resources | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: consul-bin
+            mountPath: /consul-bin
+          {{- if .Values.global.tls.enabled }}
+          {{- if .Values.global.tls.enableAutoEncrypt }}
+          - name: consul-auto-encrypt-ca-cert
+          {{- else }}
+          - name: consul-ca-cert
+          {{- end }}
+            mountPath: /consul/tls/ca
+            readOnly: true
+          {{- end }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- if eq .Values.meshGateway.wanAddress.source "NodeName" }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "consul.fullname" . }}-mesh-gateway-acl-token"
+                  key: "token"
+            {{- end}}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_GRPC_ADDR
+              value: https://$(HOST_IP):8502
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            - name: CONSUL_GRPC_ADDR
+              value: $(HOST_IP):8502
+            {{- end }}
+          command:
+            - /consul-bin/consul
+            - connect
+            - envoy
+            - -mesh-gateway
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.meshGateway.containerPort }}
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.meshGateway.containerPort }}
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.meshGateway.containerPort }}
+              {{- if .Values.meshGateway.hostPort }}
+              hostPort:  {{ .Values.meshGateway.hostPort }}
+              {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-ec", "/consul-bin/consul services deregister -id=\"{{ .Values.meshGateway.consulServiceName }}\""]
+
+        # consul-sidecar ensures the mesh gateway is always registered with
+        # the local Consul agent, even if it loses the initial registration.
+        - name: consul-sidecar
+          image: {{ .Values.global.imageK8S }}
+          volumeMounts:
+            - name: consul-service
+              mountPath: /consul/service
+              readOnly: true
+            - name: consul-bin
+              mountPath: /consul-bin
+            {{- if .Values.global.tls.enabled }}
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
+            - name: consul-ca-cert
+            {{- end }}
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          {{- if .Values.global.consulSidecarContainer }}
+          {{- if .Values.global.consulSidecarContainer.resources }}
+          resources: {{ toYaml .Values.global.consulSidecarContainer.resources | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+          command:
+            - consul-k8s
+            - consul-sidecar
+            - -log-level={{ .Values.global.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
+            - -service-config=/consul/service/service.hcl
+            - -consul-binary=/consul-bin/consul
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - -token-file=/consul/service/acl-token
+            {{- end }}
+      {{- if .Values.meshGateway.priorityClassName }}
+      priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.meshGateway.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.meshGateway.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+{{- end }}

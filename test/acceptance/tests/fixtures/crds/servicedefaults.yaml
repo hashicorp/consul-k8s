@@ -1,0 +1,26 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: defaults
+spec:
+  protocol: "http"
+  upstreamConfig:
+    defaults:
+      limits:
+        maxConnections: 3
+      passiveHealthCheck:
+        interval: 3s
+        maxFailures: 5
+    overrides:
+    - name: "foo"
+      limits:
+        maxConnections: 3
+      passiveHealthCheck:
+        interval: 1s
+        maxFailures: 10
+    - name: "bar"
+      limits:
+        maxConnections: 5
+      passiveHealthCheck:
+        interval: 10s
+        maxFailures: 2

@@ -1,0 +1,21 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ProxyDefaults
+metadata:
+  name: global
+spec:
+  config:
+    protocol: "tcp"
+    number: 3
+    bool: true
+    array:
+      - item1
+      - item2
+    map:
+      key: value
+  meshGateway:
+    mode: local
+  expose:
+    paths:
+      - path: /health
+        listenerPort: 22000
+        localPathPort: 8080

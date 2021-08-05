@@ -1,0 +1,31 @@
+apiVersion: v2
+name: consul
+version: 0.32.1
+appVersion: 1.10.0
+kubeVersion: ">=1.17.0-0"
+description: Official HashiCorp Consul Chart
+home: https://www.consul.io
+icon: https://raw.githubusercontent.com/hashicorp/consul-helm/master/assets/icon.png
+sources:
+  - https://github.com/hashicorp/consul
+  - https://github.com/hashicorp/consul-helm
+  - https://github.com/hashicorp/consul-k8s
+annotations:
+  artifacthub.io/prerelease: false
+  artifacthub.io/images: |
+    - name: consul
+      image: hashicorp/consul:1.10.0
+    - name: consul-k8s
+      image: hashicorp/consul-k8s:0.26.0
+    - name: envoy
+      image: envoyproxy/envoy-alpine:v1.18.3
+  artifacthub.io/license: MPL-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://www.consul.io/docs/k8s
+    - name: hashicorp/consul-helm
+      url: https://github.com/hashicorp/consul-helm
+    - name: hashicorp/consul
+      url: https://github.com/hashicorp/consul
+    - name: hashicorp/consul-k8s
+      url: https://github.com/hashicorp/consul-k8s

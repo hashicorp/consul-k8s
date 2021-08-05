@@ -1,0 +1,7 @@
+resources:
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - psp-rolebinding.yaml
+  - anyuid-scc-rolebinding.yaml
+  - privileged-scc-rolebinding.yaml
