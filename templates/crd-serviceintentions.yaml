@@ -1,0 +1,232 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: serviceintentions.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: ServiceIntentions
+    listKind: ServiceIntentionsList
+    plural: serviceintentions
+    singular: serviceintentions
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServiceIntentions is the Schema for the serviceintentions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceIntentionsSpec defines the desired state of ServiceIntentions
+            properties:
+              destination:
+                description: Destination is the intention destination that will have
+                  the authorization granted to.
+                properties:
+                  name:
+                    description: Name is the destination of all intentions defined
+                      in this config entry. This may be set to the wildcard character
+                      (*) to match all services that don't otherwise have intentions
+                      defined.
+                    type: string
+                  namespace:
+                    description: Namespace specifies the namespace the config entry
+                      will apply to. This may be set to the wildcard character (*)
+                      to match all services in all namespaces that don't otherwise
+                      have intentions defined.
+                    type: string
+                type: object
+              sources:
+                description: Sources is the list of all intention sources and the
+                  authorization granted to those sources. The order of this list does
+                  not matter, but out of convenience Consul will always store this
+                  reverse sorted by intention precedence, as that is the order that
+                  they will be evaluated at enforcement time.
+                items:
+                  properties:
+                    action:
+                      description: Action is required for an L4 intention, and should
+                        be set to one of "allow" or "deny" for the action that should
+                        be taken if this intention matches a request.
+                      type: string
+                    description:
+                      description: Description for the intention. This is not used
+                        by Consul, but is presented in API responses to assist tooling.
+                      type: string
+                    name:
+                      description: Name is the source of the intention. This is the
+                        name of a Consul service. The service doesn't need to be registered.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace for the Name parameter.
+                      type: string
+                    permissions:
+                      description: Permissions is the list of all additional L7 attributes
+                        that extend the intention match criteria. Permission precedence
+                        is applied top to bottom. For any given request the first
+                        permission to match in the list is terminal and stops further
+                        evaluation. As with L4 intentions, traffic that fails to match
+                        any of the provided permissions in this intention will be
+                        subject to the default intention behavior is defined by the
+                        default ACL policy. This should be omitted for an L4 intention
+                        as it is mutually exclusive with the Action field.
+                      items:
+                        properties:
+                          action:
+                            description: Action is one of "allow" or "deny" for the
+                              action that should be taken if this permission matches
+                              a request.
+                            type: string
+                          http:
+                            description: HTTP is a set of HTTP-specific authorization
+                              criteria.
+                            properties:
+                              header:
+                                description: Header is a set of criteria that can
+                                  match on HTTP request headers. If more than one
+                                  is configured all must match for the overall match
+                                  to apply.
+                                items:
+                                  properties:
+                                    exact:
+                                      description: Exact matches if the header with
+                                        the given name is this value.
+                                      type: string
+                                    invert:
+                                      description: Invert inverts the logic of the
+                                        match.
+                                      type: boolean
+                                    name:
+                                      description: Name is the name of the header
+                                        to match.
+                                      type: string
+                                    prefix:
+                                      description: Prefix matches if the header with
+                                        the given name has this prefix.
+                                      type: string
+                                    present:
+                                      description: Present matches if the header with
+                                        the given name is present with any value.
+                                      type: boolean
+                                    regex:
+                                      description: Regex matches if the header with
+                                        the given name matches this pattern.
+                                      type: string
+                                    suffix:
+                                      description: Suffix matches if the header with
+                                        the given name has this suffix.
+                                      type: string
+                                  type: object
+                                type: array
+                              methods:
+                                description: Methods is a list of HTTP methods for
+                                  which this match applies. If unspecified all HTTP
+                                  methods are matched. If provided the names must
+                                  be a valid method.
+                                items:
+                                  type: string
+                                type: array
+                              pathExact:
+                                description: PathExact is the exact path to match
+                                  on the HTTP request path.
+                                type: string
+                              pathPrefix:
+                                description: PathPrefix is the path prefix to match
+                                  on the HTTP request path.
+                                type: string
+                              pathRegex:
+                                description: PathRegex is the regular expression to
+                                  match on the HTTP request path.
+                                type: string
+                            type: object
+                        type: object
+                      type: array
+                  type: object
+                type: array
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

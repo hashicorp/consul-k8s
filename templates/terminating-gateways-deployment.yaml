@@ -1,0 +1,386 @@
+{{- if .Values.terminatingGateways.enabled }}
+{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
+{{- if not .Values.client.grpc }}{{ fail "client.grpc must be true" }}{{ end -}}
+{{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled" }}{{ end -}}
+{{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
+
+{{- $root := . }}
+{{- $defaults := .Values.terminatingGateways.defaults }}
+{{- $names := dict }}
+
+{{- range .Values.terminatingGateways.gateways }}
+
+{{- if empty .name }}
+# Check that name is not empty
+{{ fail "Terminating gateway names cannot be empty"}}
+{{ end -}}
+{{- if hasKey $names .name }}
+# Check that the name doesn't already exist
+{{ fail "Terminating gateway names must be unique"}}
+{{ end -}}
+{{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
+{{- $_ := set $names .name .name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" $root }}
+    chart: {{ template "consul.chart" $root }}
+    heritage: {{ $root.Release.Service }}
+    release: {{ $root.Release.Name }}
+    component: terminating-gateway
+    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+spec:
+  replicas: {{ default $defaults.replicas .replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" $root }}
+      chart: {{ template "consul.chart" $root }}
+      heritage: {{ $root.Release.Service }}
+      release: {{ $root.Release.Name }}
+      component: terminating-gateway
+      terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" $root }}
+        chart: {{ template "consul.chart" $root }}
+        heritage: {{ $root.Release.Service }}
+        release: {{ $root.Release.Name }}
+        component: terminating-gateway
+        terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/metrics"
+        "prometheus.io/port": "20200"
+        {{- end }}
+        {{- if $defaults.annotations }}
+        # We allow both default annotations and gateway-specific annotations
+        {{- tpl $defaults.annotations $root | nindent 8 }}
+        {{- end }}
+        {{- if .annotations }}
+        {{- tpl .annotations $root | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if (or $defaults.affinity .affinity) }}
+      affinity:
+        {{ tpl (default $defaults.affinity .affinity) $root | nindent 8 | trim }}
+      {{- end }}
+      {{- if (or $defaults.tolerations .tolerations) }}
+      tolerations:
+        {{ tpl (default $defaults.tolerations .tolerations) $root | nindent 8 | trim }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
+      volumes:
+        - name: consul-bin
+          emptyDir: {}
+        - name: consul-service
+          emptyDir:
+            medium: "Memory"
+        {{- range (default $defaults.extraVolumes .extraVolumes) }}
+        - name: userconfig-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
+            {{- end }}
+        {{- end }}
+        {{- if $root.Values.global.tls.enabled }}
+        {{- if not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) }}
+        - name: consul-ca-cert
+          secret:
+            {{- if $root.Values.global.tls.caCert.secretName }}
+            secretName: {{ $root.Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" $root }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" $root.Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+        {{- end }}
+        {{- if $root.Values.global.tls.enableAutoEncrypt }}
+        - name: consul-auto-encrypt-ca-cert
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
+        {{- end }}
+      initContainers:
+        # We use the Envoy image as our base image so we use an init container to
+        # copy the Consul binary to a shared directory that can be used when
+        # starting Envoy.
+        - name: copy-consul-bin
+          image: {{ $root.Values.global.image | quote }}
+          command:
+          - cp
+          - /bin/consul
+          - /consul-bin/consul
+          volumeMounts:
+          - name: consul-bin
+            mountPath: /consul-bin
+          {{- $initContainer := .initCopyConsulContainer }}
+          {{- if (or $initContainer $defaults.initCopyConsulContainer) }}
+          {{- if (default $defaults.initCopyConsulContainer.resources $initContainer.resources) }}
+          resources: {{ toYaml (default $defaults.initCopyConsulContainer.resources $initContainer.resources) | nindent 12 }}
+          {{- end }}
+          {{- end }}
+        {{- if (and $root.Values.global.tls.enabled $root.Values.global.tls.enableAutoEncrypt) }}
+        {{- include "consul.getAutoEncryptClientCA" $root | nindent 8 }}
+        {{- end }}
+        # service-init registers the terminating gateway service.
+        - name: service-init
+          image: {{ $root.Values.global.imageK8S }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- if $root.Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+                {{- if $root.Values.global.acls.manageSystemACLs }}
+                consul-k8s acl-init \
+                  -secret-name="{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token" \
+                  -k8s-namespace={{ $root.Release.Namespace }} \
+                  -token-sink-file=/consul/service/acl-token
+                {{- end }}
+
+                cat > /consul/service/service.hcl << EOF
+                service {
+                  kind = "terminating-gateway"
+                  name = "{{ .name }}"
+                  id = "${POD_NAME}"
+                  {{- if $root.Values.global.enableConsulNamespaces }}
+                  namespace = "{{ (default $defaults.consulNamespace .consulNamespace) }}"
+                  {{- end }}
+                  address = "${POD_IP}"
+                  port = 8443
+                  {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
+                  proxy { config { envoy_prometheus_bind_addr = "${POD_IP}:20200" } }
+                  {{- end }}
+                  checks = [
+                    {
+                      name = "Terminating Gateway Listening"
+                      interval = "10s"
+                      tcp = "${POD_IP}:8443"
+                      deregister_critical_service_after = "6h"
+                    }
+                  ]
+                }
+                EOF
+
+                /consul-bin/consul services register \
+                  {{- if $root.Values.global.acls.manageSystemACLs }}
+                  -token-file=/consul/service/acl-token \
+                  {{- end }}
+                  /consul/service/service.hcl
+          volumeMounts:
+            - name: consul-service
+              mountPath: /consul/service
+            - name: consul-bin
+              mountPath: /consul-bin
+            {{- if $root.Values.global.tls.enabled }}
+            {{- if $root.Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
+            - name: consul-ca-cert
+            {{- end }}
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      containers:
+        - name: terminating-gateway
+          image: {{ $root.Values.global.imageEnvoy | quote }}
+          {{- if (default $defaults.resources .resources) }}
+          resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          - name: consul-bin
+            mountPath: /consul-bin
+          {{- if $root.Values.global.tls.enabled }}
+          {{- if $root.Values.global.tls.enableAutoEncrypt }}
+          - name: consul-auto-encrypt-ca-cert
+          {{- else }}
+          - name: consul-ca-cert
+          {{- end }}
+            mountPath: /consul/tls/ca
+            readOnly: true
+          {{- end }}
+          {{- range (default $defaults.extraVolumes .extraVolumes) }}
+          - name: userconfig-{{ .name }}
+            readOnly: true
+            mountPath: /consul/userconfig/{{ .name }}
+          {{- end }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- if $root.Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "consul.fullname" $root }}-{{ .name }}-terminating-gateway-acl-token"
+                  key: "token"
+            {{- end}}
+            {{- if $root.Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_GRPC_ADDR
+              value: https://$(HOST_IP):8502
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            - name: CONSUL_GRPC_ADDR
+              value: $(HOST_IP):8502
+            {{- end }}
+          command:
+            - /consul-bin/consul
+            - connect
+            - envoy
+            - -gateway=terminating
+            - -proxy-id=$(POD_NAME)
+            {{- if $root.Values.global.enableConsulNamespaces }}
+            - -namespace={{ default $defaults.consulNamespace .consulNamespace }}
+            {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8443
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          ports:
+            - name: gateway
+              containerPort: 8443
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-ec"
+                  - |
+                      /consul-bin/consul services deregister \
+                      {{- if $root.Values.global.enableConsulNamespaces }}
+                      -namespace={{ default $defaults.consulNamespace .consulNamespace }} \
+                      {{- end }}
+                      -id="${POD_NAME}"
+
+        # consul-sidecar ensures the terminating gateway is always registered with
+        # the local Consul agent, even if it loses the initial registration.
+        - name: consul-sidecar
+          image: {{ $root.Values.global.imageK8S }}
+          volumeMounts:
+            - name: consul-service
+              mountPath: /consul/service
+              readOnly: true
+            - name: consul-bin
+              mountPath: /consul-bin
+            {{- if $root.Values.global.tls.enabled }}
+            {{- if $root.Values.global.tls.enableAutoEncrypt }}
+            - name: consul-auto-encrypt-ca-cert
+            {{- else }}
+            - name: consul-ca-cert
+            {{- end }}
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+          {{- if  $root.Values.global.consulSidecarContainer }}
+          {{- if $root.Values.global.consulSidecarContainer.resources }}
+          resources: {{ toYaml $root.Values.global.consulSidecarContainer.resources | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- if $root.Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://$(HOST_IP):8501
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              value: http://$(HOST_IP):8500
+            {{- end }}
+          command:
+            - consul-k8s
+            - consul-sidecar
+            - -log-level={{ $root.Values.global.logLevel }}
+            - -log-json={{ $root.Values.global.logJSON }}
+            - -service-config=/consul/service/service.hcl
+            - -consul-binary=/consul-bin/consul
+            {{- if $root.Values.global.acls.manageSystemACLs }}
+            - -token-file=/consul/service/acl-token
+            {{- end }}
+      {{- if (default $defaults.priorityClassName .priorityClassName) }}
+      priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
+      {{- end }}
+      {{- if (default $defaults.nodeSelector .nodeSelector) }}
+      nodeSelector:
+        {{ tpl (default $defaults.nodeSelector .nodeSelector) $root | indent 8 | trim }}
+      {{- end }}
+---
+{{- end }}
+{{- end }}

@@ -1,0 +1,130 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey (not .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-license
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "100"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-license
+      labels:
+        app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+        app.kubernetes.io/instance: {{.Release.Name | quote }}
+        helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: license
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-enterprise-license
+      {{- if .Values.global.tls.enabled }}
+      volumes:
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+      {{- end }}
+      containers:
+        - name: apply-enterprise-license
+          image: "{{ default .Values.global.image .Values.server.image }}"
+          env:
+            - name: ENTERPRISE_LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.server.enterpriseLicense.secretName }}
+                  key: {{ .Values.server.enterpriseLicense.secretKey }}
+            - name: CONSUL_HTTP_ADDR
+              {{- if .Values.global.tls.enabled }}
+              value: https://{{ template "consul.fullname" . }}-server:8501
+              {{- else }}
+              value: http://{{ template "consul.fullname" . }}-server:8500
+              {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name:  CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end}}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "consul.fullname" . }}-enterprise-license-acl-token"
+                  key: "token"
+            {{- end}}
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+                # Create a script that we can execute with the timeout command.
+                mkdir -p /tmp/scripts/
+                cat > /tmp/scripts/apply-license.sh << 'EOF'
+                #!/bin/sh
+                while true; do
+                  echo "Applying license..."
+                  if consul license put "${ENTERPRISE_LICENSE}" 2>&1; then
+                    echo "License applied successfully"
+                    break
+                  fi
+                  echo "Retrying in 2s..."
+                  sleep 2
+                done
+                EOF
+                chmod +x /tmp/scripts/apply-license.sh
+
+                # Time out after 20 minutes. Use || to support new timeout versions that don't accept -t
+                timeout -t 1200 /tmp/scripts/apply-license.sh 2> /dev/null || timeout 1200 /tmp/scripts/apply-license.sh 2> /dev/null
+          {{- if .Values.global.tls.enabled }}
+          volumeMounts:
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+          {{- end }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      {{- if .Values.global.acls.manageSystemACLs }}
+      initContainers:
+      - name: ent-license-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }}
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
+      {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: TerminatingGateway
+metadata:
+  name: terminating-gateway
+spec:
+  services:
+    - name: name
+      caFile: "caFile"
+      certFile: "certFile"
+      keyFile: "keyFile"
+      sni: "sni"

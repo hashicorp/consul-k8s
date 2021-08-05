@@ -1,0 +1,426 @@
+{{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
+# DaemonSet to run the Consul clients on every node.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "consul.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  {{- if .Values.client.updateStrategy }}
+  updateStrategy:
+    {{ tpl .Values.client.updateStrategy . | nindent 4 | trim }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: client
+      hasDNS: "true"
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: client
+        hasDNS: "true"
+        {{- if .Values.client.extraLabels }}
+          {{- toYaml .Values.client.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
+        {{- if .Values.client.annotations }}
+          {{- tpl .Values.client.annotations . | nindent 8 }}
+        {{- end }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        "prometheus.io/scrape": "true"
+        "prometheus.io/path": "/v1/agent/metrics"
+        "prometheus.io/port": "8500"
+        {{- end }}
+    spec:
+    {{- if .Values.client.affinity }}
+      affinity:
+        {{ tpl .Values.client.affinity . | nindent 8 | trim }}
+    {{- end }}
+    {{- if .Values.client.tolerations }}
+      tolerations:
+        {{ tpl .Values.client.tolerations . | nindent 8 | trim }}
+    {{- end }}
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" . }}-client
+
+      {{- if not .Values.global.openshift.enabled }}
+      securityContext:
+        {{- toYaml .Values.client.securityContext | nindent 8 -}}
+      {{- end }}
+
+      {{- if .Values.client.priorityClassName }}
+      priorityClassName: {{ .Values.client.priorityClassName | quote }}
+      {{- end }}
+
+      {{- if .Values.client.dnsPolicy }}
+      dnsPolicy: {{ .Values.client.dnsPolicy }}
+      {{- end }}
+
+      {{- if .Values.client.hostNetwork }}
+      hostNetwork: {{ .Values.client.hostNetwork }}
+      {{- end }}
+
+      volumes:
+        - name: data
+        {{- if .Values.client.dataDirectoryHostPath }}
+          hostPath:
+            path: {{ .Values.client.dataDirectoryHostPath }}
+            type: DirectoryOrCreate
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+        - name: config
+          configMap:
+            name: {{ template "consul.fullname" . }}-client-config
+        {{- if .Values.global.tls.enabled }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+        {{ if not .Values.global.tls.enableAutoEncrypt }}
+        - name: consul-ca-key
+          secret:
+            {{- if .Values.global.tls.caKey.secretName }}
+            secretName: {{ .Values.global.tls.caKey.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-key
+            {{- end }}
+            items:
+            - key: {{ default "tls.key" .Values.global.tls.caKey.secretKey }}
+              path: tls.key
+        - name: consul-client-cert
+          emptyDir:
+            # We're using tmpfs here so that
+            # client certs are not written to disk
+            medium: "Memory"
+        {{- end }}
+        {{- end }}
+        {{- range .Values.client.extraVolumes }}
+        - name: userconfig-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+        {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: aclconfig
+          emptyDir: {}
+        {{- else }}
+        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        - name: consul-license
+          secret:
+            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+        {{- end }}
+        {{- end }}
+      containers:
+        - name: consul
+          image: "{{ default .Values.global.image .Values.client.image }}"
+          env:
+            - name: ADVERTISE_IP
+              valueFrom:
+                fieldRef:
+                  {{- if .Values.client.exposeGossipPorts }}
+                  {{- /* Clients will be exposed on their node's hostPort for external-to-k8s communication,
+                  so they need to advertise their host ip instead of their pod ip. */}}
+                  fieldPath: status.hostIP
+                  {{- else }}
+                  fieldPath: status.podIP
+                  {{- end }}
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+            - name: GOSSIP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.gossipEncryption.secretName }}
+                  key: {{ .Values.global.gossipEncryption.secretKey }}
+            {{- end }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            - name: CONSUL_LICENSE_PATH
+              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://localhost:8501
+            {{- if .Values.global.tls.enableAutoEncrypt }}
+            - name: CONSUL_HTTP_SSL_VERIFY
+              value: "false"
+            {{- else }}
+            - name: CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end }}
+            {{- end }}
+            {{- include "consul.extraEnvironmentVars" .Values.client | nindent 12 }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
+              {{ template "consul.extraconfig" }}
+
+              exec /bin/consul agent \
+                -node="${NODE}" \
+                -advertise="${ADVERTISE_IP}" \
+                -bind=0.0.0.0 \
+                -client=0.0.0.0 \
+                {{- range $k, $v := .Values.client.nodeMeta }}
+                -node-meta={{ $k }}:{{ $v }} \
+                {{- end }}
+                -hcl='leave_on_terminate = true' \
+                {{- if .Values.global.tls.enabled }}
+                -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
+                {{- if .Values.global.tls.enableAutoEncrypt }}
+                -hcl='auto_encrypt = {tls = true}' \
+                -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\",\"$POD_IP\"]}" \
+                {{- else }}
+                -hcl='cert_file = "/consul/tls/client/tls.crt"' \
+                -hcl='key_file = "/consul/tls/client/tls.key"' \
+                {{- end }}
+                {{- if .Values.global.tls.verify }}
+                -hcl='verify_outgoing = true' \
+                {{- if not .Values.global.tls.enableAutoEncrypt }}
+                -hcl='verify_incoming_rpc = true' \
+                -hcl='verify_server_hostname = true' \
+                {{- end }}
+                {{- end }}
+                -hcl='ports { https = 8501 }' \
+                {{- if .Values.global.tls.httpsOnly }}
+                -hcl='ports { http = -1 }' \
+                {{- end }}
+                {{- end }}
+                {{- if .Values.client.grpc }}
+                -hcl='ports { grpc = 8502 }' \
+                {{- end }}
+                {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+                -hcl='telemetry { prometheus_retention_time = "{{ .Values.global.metrics.agentMetricsRetentionTime }}" }' \
+                {{- end }}
+                -config-dir=/consul/config \
+                {{- if .Values.global.acls.manageSystemACLs }}
+                -config-dir=/consul/aclconfig \
+                {{- end }}
+                {{- /* Always include the extraVolumes at the end so that users can
+                      override other Consul settings. The last -config-dir takes
+                      precedence. */}}
+                {{- range .Values.client.extraVolumes }}
+                {{- if .load }}
+                -config-dir=/consul/userconfig/{{ .name }} \
+                {{- end }}
+                {{- end }}
+                -datacenter={{ .Values.global.datacenter }} \
+                -data-dir=/consul/data \
+                {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                -encrypt="${GOSSIP_KEY}" \
+                {{- end }}
+                {{- if .Values.client.join }}
+                {{- range $value := .Values.client.join }}
+                -retry-join={{ quote $value }} \
+                {{- end }}
+                {{- else }}
+                {{- if .Values.server.enabled }}
+                {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
+                {{- range $index := until (.Values.server.replicas | int) }}
+                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
+                {{- end }}
+                {{- end }}
+                {{- end }}
+                {{- range $value := .Values.global.recursors }}
+                -recursor={{ quote $value }} \
+                {{- end }}
+                -config-file=/consul/extra-config/extra-from-values.json \
+                -domain={{ .Values.global.domain }}
+          volumeMounts:
+            - name: data
+              mountPath: /consul/data
+            - name: config
+              mountPath: /consul/config
+            {{- if .Values.global.tls.enabled }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- if not .Values.global.tls.enableAutoEncrypt }}
+            - name: consul-client-cert
+              mountPath: /consul/tls/client
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- range .Values.client.extraVolumes }}
+            - name: userconfig-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: aclconfig
+              mountPath: /consul/aclconfig
+            {{- else }}
+            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- end }}
+          ports:
+            {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
+            - containerPort: 8500
+              hostPort: 8500
+              name: http
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - containerPort: 8501
+              hostPort: 8501
+              name: https
+            {{- end }}
+            - containerPort: 8502
+              hostPort: 8502
+              name: grpc
+            - containerPort: 8301
+              {{- if .Values.client.exposeGossipPorts }}
+              hostPort: 8301
+              {{- end }}
+              protocol: "TCP"
+              name: serflan-tcp
+            - containerPort: 8301
+              {{- if .Values.client.exposeGossipPorts }}
+              hostPort: 8301
+              {{- end }}
+              protocol: "UDP"
+              name: serflan-udp
+            - containerPort: 8600
+              name: dns-tcp
+              protocol: "TCP"
+            - containerPort: 8600
+              name: dns-udp
+              protocol: "UDP"
+          readinessProbe:
+            # NOTE(mitchellh): when our HTTP status endpoints support the
+            # proper status codes, we should switch to that. This is temporary.
+            exec:
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - |
+                  {{- if .Values.global.tls.enabled }}
+                  curl \
+                    -k \
+                    https://127.0.0.1:8501/v1/status/leader \
+                  {{- else }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
+                  {{- end }}
+                  2>/dev/null | grep -E '".+"'
+          {{- if .Values.client.resources }}
+          resources:
+            {{- if eq (typeOf .Values.client.resources) "string" }}
+            {{ tpl .Values.client.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.client.resources | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
+      initContainers:
+      {{- if .Values.global.acls.manageSystemACLs }}
+      - name: client-acl-init
+        image: {{ .Values.global.imageK8S }}
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s acl-init \
+              -secret-name="{{ template "consul.fullname" . }}-client-acl-token" \
+              -k8s-namespace={{ .Release.Namespace }} \
+              -init-type="client"
+        volumeMounts:
+          - name: aclconfig
+            mountPath: /consul/aclconfig
+        resources:
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+          limits:
+            memory: "25Mi"
+            cpu: "50m"
+      {{- end }}
+      {{- if and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt) }}
+      - name: client-tls-init
+        image: "{{ default .Values.global.image .Values.client.image }}"
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            cd /consul/tls/client
+            consul tls cert create -client \
+              -additional-ipaddress=${HOST_IP} \
+              -additional-ipaddress=${POD_IP} \
+              -dc={{ .Values.global.datacenter }} \
+              -domain={{ .Values.global.domain }} \
+              -ca=/consul/tls/ca/cert/tls.crt \
+              -key=/consul/tls/ca/key/tls.key
+            mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0.pem tls.crt
+            mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0-key.pem tls.key
+        volumeMounts:
+          - name: consul-client-cert
+            mountPath: /consul/tls/client
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca/cert
+            readOnly: true
+          - name: consul-ca-key
+            mountPath: /consul/tls/ca/key
+            readOnly: true
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
+      {{- end }}
+      {{- end }}
+      {{- if .Values.client.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.client.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+{{- end }}
