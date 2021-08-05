@@ -6,9 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"

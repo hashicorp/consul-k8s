@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )

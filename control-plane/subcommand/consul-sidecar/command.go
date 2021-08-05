@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )

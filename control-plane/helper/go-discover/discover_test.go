@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"

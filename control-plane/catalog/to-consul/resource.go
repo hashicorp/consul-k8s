@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/helper/controller"
-	"github.com/hashicorp/consul-k8s/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	apiv1 "k8s.io/api/core/v1"
