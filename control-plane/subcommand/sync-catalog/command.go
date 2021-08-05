@@ -414,7 +414,7 @@ func (c *Command) validateFlags() error {
 
 const synopsis = "Sync Kubernetes services and Consul services."
 const help = `
-Usage: consul-k8s sync-catalog [options]
+Usage: consul-k8s-control-plane sync-catalog [options]
 
   Sync K8S pods, services, and more with the Consul service catalog.
   This enables K8S services to discover and communicate with external

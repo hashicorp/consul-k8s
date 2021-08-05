@@ -439,7 +439,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Create a Kubernetes secret containing data needed for federation"
 const help = `
-Usage: consul-k8s create-federation-secret [options]
+Usage: consul-k8s-control-plane create-federation-secret [options]
 
   Creates a Kubernetes secret that contains all the data required for a secondary
   datacenter to federate with the primary. This command should only be run in the

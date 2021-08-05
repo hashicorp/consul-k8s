@@ -230,7 +230,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Inject connect init command."
 const help = `
-Usage: consul-k8s connect-init [options]
+Usage: consul-k8s-control-plane connect-init [options]
 
   Bootstraps connect-injected pod components.
   Not intended for stand-alone use.

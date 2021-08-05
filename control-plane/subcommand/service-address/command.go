@@ -206,7 +206,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Output Kubernetes Service address to file"
 const help = `
-Usage: consul-k8s service-address [options]
+Usage: consul-k8s-control-plane service-address [options]
 
   Waits until the Kubernetes service specified by -name in namespace
   -k8s-namespace is created, then writes its address to -output-file.

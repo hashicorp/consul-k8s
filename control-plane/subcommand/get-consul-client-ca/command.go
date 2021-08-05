@@ -213,7 +213,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Retrieve Consul client CA if using auto-encrypt feature."
 const help = `
-Usage: consul-k8s get-consul-client-ca [options]
+Usage: consul-k8s-control-plane get-consul-client-ca [options]
 
   Retrieve Consul client CA certificate by continuously polling
   Consul servers and save it at the provided file location.

@@ -841,7 +841,7 @@ func (c *Command) validateFlags() error {
 const consulDefaultNamespace = "default"
 const synopsis = "Initialize ACLs on Consul servers and other components."
 const help = `
-Usage: consul-k8s server-acl-init [options]
+Usage: consul-k8s-control-plane server-acl-init [options]
 
   Bootstraps servers with ACLs and creates policies and ACL tokens for other
   components as Kubernetes Secrets.
