@@ -1,4 +1,4 @@
-package main
+package control_plane
 
 import (
 	"os"
