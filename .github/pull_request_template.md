@@ -8,5 +8,6 @@ How I expect reviewers to test this PR:
 
 
 Checklist:
-- [ ] Tests added
+- [ ] Bats tests added
 - [ ] CHANGELOG entry added (*HashiCorp engineers only, community PRs should not add a changelog entry*)
+

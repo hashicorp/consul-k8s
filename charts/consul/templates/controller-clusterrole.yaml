@@ -1,0 +1,75 @@
+{{- if .Values.controller.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-controller
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: controller
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults
+  - serviceresolvers
+  - proxydefaults
+  - meshes
+  - servicerouters
+  - servicesplitters
+  - serviceintentions
+  - ingressgateways
+  - terminatinggateways
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - servicedefaults/status
+  - serviceresolvers/status
+  - proxydefaults/status
+  - meshes/status
+  - servicerouters/status
+  - servicesplitters/status
+  - serviceintentions/status
+  - ingressgateways/status
+  - terminatinggateways/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+{{- if .Values.global.acls.manageSystemACLs }}
+- apiGroups: [""]
+  resources:
+  - secrets
+  resourceNames:
+  - {{ template "consul.fullname" . }}-controller-acl-token
+  verbs:
+  - get
+{{- end }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames:
+    - {{ template "consul.fullname" . }}-controller
+  verbs:
+    - use
+{{- end }}
+{{- end }}

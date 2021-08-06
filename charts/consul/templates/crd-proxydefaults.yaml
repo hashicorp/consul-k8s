@@ -1,0 +1,184 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: proxydefaults.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: ProxyDefaults
+    listKind: ProxyDefaultsList
+    plural: proxydefaults
+    singular: proxydefaults
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ProxyDefaults is the Schema for the proxydefaults API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ProxyDefaultsSpec defines the desired state of ProxyDefaults
+            properties:
+              config:
+                description: Config is an arbitrary map of configuration values used
+                  by Connect proxies. Any values that your proxy allows can be configured
+                  globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              expose:
+                description: Expose controls the default expose path configuration
+                  for Envoy.
+                properties:
+                  checks:
+                    description: Checks defines whether paths associated with Consul
+                      checks will be exposed. This flag triggers exposing all HTTP
+                      and GRPC check paths registered for the service.
+                    type: boolean
+                  paths:
+                    description: Paths is the list of paths exposed through the proxy.
+                    items:
+                      properties:
+                        listenerPort:
+                          description: ListenerPort defines the port of the proxy's
+                            listener for exposed paths.
+                          type: integer
+                        localPathPort:
+                          description: LocalPathPort is the port that the service
+                            is listening on for the given path.
+                          type: integer
+                        path:
+                          description: Path is the path to expose through the proxy,
+                            ie. "/metrics".
+                          type: string
+                        protocol:
+                          description: Protocol describes the upstream's service protocol.
+                            Valid values are "http" and "http2", defaults to "http".
+                          type: string
+                      type: object
+                    type: array
+                type: object
+              meshGateway:
+                description: MeshGateway controls the default mesh gateway configuration
+                  for this service.
+                properties:
+                  mode:
+                    description: Mode is the mode that should be used for the upstream
+                      connection. One of none, local, or remote.
+                    type: string
+                type: object
+              mode:
+                description: 'Mode can be one of "direct" or "transparent". "transparent"
+                  represents that inbound and outbound application traffic is being
+                  captured and redirected through the proxy. This mode does not enable
+                  the traffic redirection itself. Instead it signals Consul to configure
+                  Envoy as if traffic is already being redirected. "direct" represents
+                  that the proxy''s listeners must be dialed directly by the local
+                  application and other proxies. Note: This cannot be set using the
+                  CRD and should be set using annotations on the services that are
+                  part of the mesh.'
+                type: string
+              transparentProxy:
+                description: 'TransparentProxy controls configuration specific to
+                  proxies in transparent mode. Note: This cannot be set using the
+                  CRD and should be set using annotations on the services that are
+                  part of the mesh.'
+                properties:
+                  dialedDirectly:
+                    description: DialedDirectly indicates whether transparent proxies
+                      can dial this proxy instance directly. The discovery chain is
+                      not considered when dialing a service instance directly. This
+                      setting is useful when addressing stateful services, such as
+                      a database cluster with a leader node.
+                    type: boolean
+                  outboundListenerPort:
+                    description: OutboundListenerPort is the port of the listener
+                      where outbound application traffic is being redirected to.
+                    type: integer
+                type: object
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}
