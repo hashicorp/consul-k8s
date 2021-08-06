@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: You're experiencing an issue with the consul-k8s binary that is different than the documented behavior.
+about: You're experiencing an issue with the Consul Helm chart that is different than the documented behavior.
 labels: bug
 
 ---
@@ -25,22 +25,44 @@ labels: bug
 
 ### Reproduction Steps
 
-<!--- In order to effectively and quickly resolve the issue, please provide exact steps that allow us the reproduce the problem. If no steps are provided, then it will likely take longer to get the issue resolved.  --->
+<!--- 
+
+In order to effectively and quickly resolve the issue, please provide exact steps that allow us the reproduce the problem. If no steps are provided, then it will likely take longer to get the issue resolved. An example that you can follow is provided below. 
+
+Steps to reproduce this issue, eg:
+
+1. When running helm install with the following `values.yml`:
+```
+global:
+  domain: consul
+  datacenter: dc1
+server:
+  replicas: 1
+  bootstrapExpect: 1
+connectInject:
+  enabled: true
+controller:
+  enabled: true
+```
+1. View error
+
+  --->
 
 ### Logs
 
 <!---
 
-Provide log files from consul-k8s or other components. 
+Provide log files from Consul Kubernetes components by providing output from `kubectl logs` from the pod and container that is surfacing the issue. 
 
 <details>
-  <summary>consul-k8s logs</summary>
+  <summary>Logs</summary>
 
 ```
-output from 'kubectl logs' in consul-k8s and/or other relevant components
+output from 'kubectl logs' in relevant components
 ```
 
 </details>
+
 --->
 
 ### Expected behavior
@@ -56,9 +78,14 @@ If not already included, please provide the following:
 - `consul-helm` version:
 - `values.yaml` used to deploy the helm chart:
 
-Any other information you can provide about the environment/deployment.
+Additionally, please provide details regarding the Kubernetes Infrastructure, as shown below:
+- Kubernetes version: v1.22.x
+- Cloud Provider (If self-hosted, the Kubernetes provider utilized): EKS, AKS, GKE, OpenShift (and version), Rancher (and version), TKGI (and version)
+- Networking CNI plugin in use: Calico, Cilium, NSX-T 
 
+Any other information you can provide about the environment/deployment.
 --->
+
 
 ### Additional Context
 
