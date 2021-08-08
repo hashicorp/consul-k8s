@@ -10,6 +10,7 @@ Please search the existing issues for relevant questions, and use the reaction f
 
 Please provide as many details as you can, including but not limited to
 - Helm command you're running
+- consul-k8s-control-plane command you're running
 - Any values you've configured
 - Your current understanding, and what you're trying to figure out
 
