@@ -1,4 +1,4 @@
-module github.com/hashicorp/consul-helm/test/acceptance
+module github.com/hashicorp/consul-k8s/charts/consul/test/acceptance
 
 go 1.14
 
