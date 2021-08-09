@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/config"
 )
 
 type TestFlags struct {

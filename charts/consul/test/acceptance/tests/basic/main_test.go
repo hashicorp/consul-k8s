@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	testsuite "github.com/hashicorp/consul-helm/test/acceptance/framework/suite"
+	testsuite "github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/suite"
 )
 
 var suite testsuite.Suite

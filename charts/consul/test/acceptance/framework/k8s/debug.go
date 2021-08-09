@@ -10,8 +10,8 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

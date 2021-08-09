@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/environment"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/flags"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/flags"
 )
 
 type suite struct {

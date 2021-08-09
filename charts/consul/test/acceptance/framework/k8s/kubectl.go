@@ -8,7 +8,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/shell"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
