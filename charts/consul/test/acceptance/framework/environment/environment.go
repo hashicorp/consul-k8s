@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/config"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
