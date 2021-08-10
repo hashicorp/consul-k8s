@@ -19,6 +19,7 @@ charts-consul-path: &charts-consul-path charts/consul
 helm-gen-path: &helm-gen-path charts/consul/hack/helm-reference-gen
 gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
+openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
 
 commands:
@@ -764,7 +765,7 @@ jobs:
       - checkout
       - run:
           name: terraform init & apply
-          working_directory: test/terraform/openshift
+          working_directory: *openshift-terraform-path
           command: |
             terraform init
 
@@ -796,7 +797,7 @@ jobs:
           path: /tmp/test-results
       - run:
           name: terraform destroy
-          working_directory: test/terraform/openshift
+          working_directory: *openshift-terraform-path
           command: |
             terraform destroy -auto-approve
           when: always
