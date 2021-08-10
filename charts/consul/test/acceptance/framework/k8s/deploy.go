@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"

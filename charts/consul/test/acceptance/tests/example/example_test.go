@@ -5,9 +5,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/k8s"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

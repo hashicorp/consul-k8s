@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/consul"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-helm/test/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )
