@@ -68,7 +68,7 @@ commands:
         type: string
       consul-k8s-image:
         type: string
-        default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest"
+        default: "ghcr.io/lkysow/consul-ubi:1.10.0-ent"
     steps:
       - when:
           condition: << parameters.failfast >>
@@ -94,6 +94,7 @@ commands:
                   for pkg in $pkgs
                   do
                     if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+                          -consul-image=ghcr.io/lkysow/consul-ubi:1.10.0-ent \
                           << parameters.additional-flags >> \
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
@@ -125,6 +126,7 @@ commands:
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $pkgs"
                   gotestsum --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- $pkgs -p 1 -timeout 2h -failfast \
+                       -consul-image=ghcr.io/lkysow/consul-ubi:1.10.0-ent \
                       << parameters.additional-flags >> \
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
