@@ -98,6 +98,7 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
+                          -run 'TestMeshGateway' \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
@@ -746,10 +747,6 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
-
   acceptance-kind-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -816,66 +813,7 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-      # Fmt, vet, lint control plane and helm code
-      - go-fmt-and-vet-control-plane
-      - lint-control-plane
-      - go-fmt-and-vet-acceptance
-      - go-fmt-and-vet-helm-gen
-      # Unit test control plane
-      - test-control-plane:
-          requires:
-            - go-fmt-and-vet-control-plane
-            - lint-control-plane
-      - test-enterprise-control-plane:
-          requires:
-            - go-fmt-and-vet-control-plane
-            - lint-control-plane
-      # Unit tests for go modules in helm and bats tests for templates
-      - unit-acceptance-framework:
-          requires:
-            - go-fmt-and-vet-acceptance
-      - unit-helm-gen:
-          requires:
-            - go-fmt-and-vet-helm-gen
-      - validate-helm-gen
-      - unit-test-helm-templates
-      # Build control plane binaries
-      - build-distro:
-          OS: "freebsd linux windows"
-          ARCH: "386"
-          name: build-distros-386
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
-      - build-distro:
-          OS: "darwin freebsd linux solaris windows"
-          ARCH: "amd64"
-          name: build-distros-amd64
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
-      - build-distro:
-          OS: "linux"
-          ARCH: "arm arm64"
-          name: build-distros-arm-arm64
-          requires:
-            - test-control-plane
-            - test-enterprise-control-plane
-      - dev-upload-docker:
-          context: consul-ci
-          requires:
-            - build-distros-amd64
-      # Run acceptance tests using the docker image built for the control plane
-      - acceptance:
-          requires:
-            - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
-      - acceptance-tproxy:
-          requires:
-            - dev-upload-docker
-            - unit-test-helm-templates
-            - unit-acceptance-framework
+      - acceptance-eks-1-18
   nightly-acceptance-tests:
     triggers:
       - schedule:
@@ -885,22 +823,7 @@ workflows:
               only:
                 - master
     jobs:
-      - cleanup-gcp-resources
-      - cleanup-azure-resources
-      - cleanup-eks-resources
-      #      - acceptance-openshift: <-- Disabled until we can make them less flakey.
-      #          requires:
-      #          - cleanup-azure-resources
-      - acceptance-gke-1-17:
-          requires:
-            - cleanup-gcp-resources
-      - acceptance-eks-1-18:
-          requires:
-            - cleanup-eks-resources
-      - acceptance-aks-1-19:
-          requires:
-            - cleanup-azure-resources
-      - acceptance-kind-1-21
+      - acceptance-eks-1-18
   update-helm-charts-index:
     jobs:
       - update-helm-charts-index:
