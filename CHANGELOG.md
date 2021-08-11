@@ -2,7 +2,7 @@
 
 IMPROVEMENTS:
 * Add flags `-log-level`, `-log-json` to all subcommands to control log level and json formatting. [[GH-523](https://github.com/hashicorp/consul-k8s/pull/523)]
-* Execute consul clients and servers using the docker entrypoint to keep consistent. [[GH-590](https://github.com/hashicorp/consul-k8s/pull/590)]
+* Execute Consul clients and servers using the Docker entrypoint for consistency. [[GH-590](https://github.com/hashicorp/consul-k8s/pull/590)]
 
 BUG FIXES:
 * Connect: Use `AdmissionregistrationV1` instead of `AdmissionregistrationV1beta1` API as it was deprecated in k8s 1.16. [[GH-558](https://github.com/hashicorp/consul-k8s/pull/558)]
