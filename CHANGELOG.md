@@ -19,6 +19,8 @@ IMPROVEMENTS:
   * Allow setting global.logLevel and global.logJSON and propogate this to all consul-k8s commands. [[GH-980](https://github.com/hashicorp/consul-helm/pull/980)]
   * Allow setting `connectInject.replicas` to control number of replicas of webhook injector. [[GH-1029](https://github.com/hashicorp/consul-helm/pull/1029)]
   * Add the ability to manually specify a k8s secret containing server-cert via the value `server.serverCert.secretName`. [[GH-1024](https://github.com/hashicorp/consul-helm/pull/1046)]
+  * Allow setting `ui.pathType` for providers that do not support the default pathType "Prefix". [[GH-1012](https://github.com/hashicorp/consul-helm/pull/1012)]
+  * Allow setting `client.nodeMeta` to specify arbitrary key-value pairs to associate with the node. [[GH-728](https://github.com/hashicorp/consul-helm/pull/728)]
 
 BUG FIXES:
 * Control Plane
@@ -28,6 +30,7 @@ BUG FIXES:
   * Connect: Fix a bug with leaving around ACL tokens after a service has been deregistered. [[GH-571](https://github.com/hashicorp/consul-k8s/issues/540)]
   * CRDs: Fix ProxyDefaults and ServiceDefaults resources not syncing with Consul < 1.10.0 [[GH-1023](https://github.com/hashicorp/consul-helm/issues/1023)]
   * Connect: Skip service registration for duplicate services only on Kubernetes. [[GH-581](https://github.com/hashicorp/consul-k8s/pull/581)]
+  * Connect: redirect-traffic command passes ACL token when ACLs are enabled. [[GH-576](https://github.com/hashicorp/consul-k8s/pull/576)]
 
 ## 0.26.0 (June 22, 2021)
 
