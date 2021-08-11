@@ -154,6 +154,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: CONSUL_DISABLE_PERM_MGMT
+              value: "true"
             {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
             - name: GOSSIP_KEY
               valueFrom:
@@ -187,7 +189,7 @@ spec:
 
               {{ template "consul.extraconfig" }}
 
-              exec /bin/consul agent \
+              exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -advertise="${ADVERTISE_IP}" \
                 -bind=0.0.0.0 \
                 -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
