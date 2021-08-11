@@ -69,7 +69,7 @@ commands:
         type: string
       consul-k8s-image:
         type: string
-        default: "ghcr.io/lkysow/consul-ubi:1.10.0-ent"
+        default: "ghcr.io/lkysow/consul-k8s-dev:aug11-ubi-master"
     steps:
       - when:
           condition: << parameters.failfast >>
@@ -789,7 +789,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy -failfast
 
       - store_test_results:
           path: /tmp/test-results
