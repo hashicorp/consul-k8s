@@ -714,6 +714,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 		for svcID, serviceRegistration := range svcs {
 			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
 			// every service instance.
+			var serviceDeregistered bool
 			if endpointsAddressesMap != nil {
 				if _, ok := endpointsAddressesMap[serviceRegistration.Address]; !ok {
 					// If the service address is not in the Endpoints addresses, deregister it.
@@ -722,6 +723,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 						r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 						return err
 					}
+					serviceDeregistered = true
 				}
 			} else {
 				r.Log.Info("deregistering service from consul", "svc", svcID)
@@ -729,11 +731,12 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 					r.Log.Error(err, "failed to deregister service instance", "id", svcID)
 					return err
 				}
+				serviceDeregistered = true
 			}
 
-			if r.AuthMethod != "" {
+			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", serviceRegistration.Service)
-				err = r.reconcileACLTokensForService(client, serviceRegistration.Service, k8sSvcNamespace, endpointPods)
+				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
 					return err
@@ -744,11 +747,15 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	return nil
 }
 
-// reconcileACLTokensForService finds the ACL tokens that belongs to the service and deletes it from Consul.
+// deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for pods that aren't in endpointPods
-// (endpointPods is a set of pods that the endpoints object is pointing to).
-func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, serviceName, k8sNS string, endpointPods mapset.Set) error {
+// has been configured with and will only delete tokens for the provided podName.
+func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Client, serviceName, k8sNS, podName string) error {
+	// Skip if podName is empty.
+	if podName == "" {
+		return nil
+	}
+
 	tokens, _, err := client.ACL().TokenList(nil)
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
@@ -766,10 +773,10 @@ func (r *EndpointsController) reconcileACLTokensForService(client *api.Client, s
 				return fmt.Errorf("failed to parse token metadata: %s", err)
 			}
 
-			podName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
+			tokenPodName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
 
 			// If we can't find token's pod, delete it.
-			if !endpointPods.Contains(podName) {
+			if tokenPodName == podName {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
 				if err != nil {
