@@ -901,16 +901,16 @@ workflows:
           requires:
             - cleanup-azure-resources
       - acceptance-kind-1-21
-  update-helm-charts-index:
-    jobs:
-      - helm-chart-pipeline-approval:
-          type: approval
-      - update-helm-charts-index:
-          requires:
-            - helm-chart-pipeline-approval
-          context: helm-charts-trigger-consul
-          filters:
-            tags:
-              only: /^v.*/
-            branches:
-              ignore: /.*/
+#  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
+#    jobs:
+#      - helm-chart-pipeline-approval:
+#          type: approval
+#      - update-helm-charts-index:
+#          requires:
+#            - helm-chart-pipeline-approval
+#          context: helm-charts-trigger-consul
+#          filters:
+#            tags:
+#              only: /^v.*/
+#            branches:
+#              ignore: /.*/
