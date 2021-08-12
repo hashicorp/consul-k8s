@@ -1,3 +1,9 @@
+## Unreleased
+
+IMPROVEMENTS:
+* Helm Chart
+  * Use `policy/v1` for Consul server `PodDisruptionBudget` if supported. [[GH-606](https://github.com/hashicorp/consul-k8s/pull/606)]
+
 ## 0.33.0 (August 12, 2021)
 
 BREAKING CHANGES:
