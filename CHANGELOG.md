@@ -1,3 +1,9 @@
+## Unreleased
+
+IMPROVEMENTS:
+* Helm Chart
+  * Add ability to specify port for ui service. [[GH-604](https://github.com/hashicorp/consul-k8s/pull/604)]
+
 ## 0.33.0 (August 12, 2021)
 
 BREAKING CHANGES:
