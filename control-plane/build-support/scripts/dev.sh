@@ -86,6 +86,9 @@ function main {
 
    set_dev_mode "${sdir}" || return 1
 
+   # Currently we're in control-plane, but for git functions we should be in top-level.
+   cd ".."
+
    if is_set "${do_git}"
    then
       status_stage "==> Commiting Dev Mode Changes"
