@@ -2302,11 +2302,13 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						require.NoError(t, err)
 						tokensForServices[svc.ID] = token.AccessorID
 
-						// Create another token for the same service but a pod that no longer exists.
-						// This is to test a scenario with orphaned tokens
-						// where we have a token for the pod but the service instance
-						// for that pod no longer exists in Consul.
-						// In that case, the token should still be deleted.
+						// Create another token for the same service but a pod that either no longer exists
+						// or the endpoints controller doesn't know about it yet.
+						// This is to test a scenario with either orphaned tokens
+						// or tokens for services that haven't yet been registered with Consul.
+						// In that case, we have a token for the pod but the service instance
+						// for that pod either no longer exists or is not yet registered in Consul.
+						// This token should not be deleted.
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -2372,23 +2374,30 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 
 			if tt.enableACLs {
 				// Put expected services into a map to make it easier to find service IDs.
-				expectedServices := make(map[string]struct{})
+				expectedServices := mapset.NewSet()
 				for _, svc := range tt.expectedConsulSvcInstances {
-					expectedServices[svc.ServiceID] = struct{}{}
+					expectedServices.Add(svc.ServiceID)
 				}
+
+				initialServices := mapset.NewSet()
+				for _, svc := range tt.initialConsulSvcs {
+					initialServices.Add(svc.ID)
+				}
+
+				// We only care about a case when services are deregistered, where
+				// the set of initial services is bigger than the set of expected services.
+				deregisteredServices := initialServices.Difference(expectedServices)
 
 				// Look through the tokens we've created and check that only
 				// tokens for the deregistered services have been deleted.
 				for serviceID, tokenID := range tokensForServices {
 					// Read the token from Consul.
 					token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
-					if _, ok := expectedServices[serviceID]; ok {
-						// If service is expected to still exist in Consul, then the ACL token for it should not be deleted.
+					if deregisteredServices.Contains(serviceID) {
+						require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
+					} else {
 						require.NoError(t, err, "token should exist for service instance: "+serviceID)
 						require.NotNil(t, token)
-					} else {
-						// If service should no longer exist, then ACL token for it should be deleted.
-						require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 					}
 				}
 			}
