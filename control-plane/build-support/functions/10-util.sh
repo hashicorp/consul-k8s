@@ -796,10 +796,10 @@ function set_dev_mode {
    local vers="$(parse_version "${sdir}" false false)"
 
    status_stage "==> Setting VersionPreRelease back to 'dev'"
-   update_version "${sdir}/control-plane/version/version.go" "${vers}" dev || return 1
+   update_version "${sdir}/version/version.go" "${vers}" dev || return 1
 
    status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
-   add_unreleased_to_changelog "${sdir}" || return 1
+   add_unreleased_to_changelog "${sdir}/.." || return 1
 
    return 0
 }
