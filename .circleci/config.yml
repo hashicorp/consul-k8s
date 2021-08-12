@@ -903,7 +903,11 @@ workflows:
       - acceptance-kind-1-21
   update-helm-charts-index:
     jobs:
+      - helm-chart-pipeline-approval:
+          type: approval
       - update-helm-charts-index:
+          requires:
+            - helm-chart-pipeline-approval
           context: helm-charts-trigger-consul
           filters:
             tags:
