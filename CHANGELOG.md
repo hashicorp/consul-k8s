@@ -1,5 +1,3 @@
-## UNRELEASED
-
 ## 0.33.0 (August 12, 2021)
 
 BREAKING CHANGES:
