@@ -799,7 +799,7 @@ function set_dev_mode {
    update_version "${sdir}/version/version.go" "${vers}" dev || return 1
 
    status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
-   add_unreleased_to_changelog "${sdir}" || return 1
+   add_unreleased_to_changelog "${sdir}/.." || return 1
 
    return 0
 }
@@ -857,7 +857,7 @@ function commit_dev_mode {
    pushd "$1" > /dev/null
 
    status "Staging CHANGELOG.md and version_*.go files"
-   git add CHANGELOG.md && git add version/version*.go
+   git add CHANGELOG.md && git add control-plane/version/version*.go
    ret=$?
 
    if test ${ret} -eq 0
