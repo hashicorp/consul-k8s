@@ -23,7 +23,7 @@ spec:
   ports:
     {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
     - name: http
-      port: 80
+      port: {{ .Values.ui.service.port.http }}
       targetPort: 8500
       {{- if .Values.ui.service.type }}{{ if (and (eq .Values.ui.service.type "NodePort") .Values.ui.service.nodePort.http) }}
       nodePort: {{ .Values.ui.service.nodePort.http }}
@@ -31,7 +31,7 @@ spec:
     {{- end }}
     {{- if .Values.global.tls.enabled }}
     - name: https
-      port: 443
+      port: {{ .Values.ui.service.port.https }}
       targetPort: 8501
       {{- if .Values.ui.service.type }}{{ if (and (eq .Values.ui.service.type "NodePort") .Values.ui.service.nodePort.https) }}
       nodePort: {{ .Values.ui.service.nodePort.https }}
