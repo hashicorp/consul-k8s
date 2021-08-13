@@ -806,7 +806,7 @@ jobs:
                 -X POST \
                 -H 'Content-Type: application/json' \
                 -H 'Accept: application/json' \
-                -d "{\"branch\": \"master\",\"parameters\":{\"SOURCE_REPO\": \"${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}\",\"SOURCE_TAG\": \"${CIRCLE_TAG}\"}}" \
+                -d "{\"branch\": \"master\",\"parameters\":{\"SOURCE_REPO\": \"${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}\",\"SOURCE_TAG\": \"0.33.0\",\"TEMPLATE_DIR\": \"charts/consul\",\"SOURCE_BRANCH_OVERRIDE\": \"master\"}}" \
                 "${CIRCLE_ENDPOINT}/${CIRCLE_PROJECT}/pipeline"
       - slack/status:
           fail_only: true
@@ -901,14 +901,14 @@ workflows:
           requires:
             - cleanup-azure-resources
       - acceptance-kind-1-21
-#  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
-#    jobs:
-#      - helm-chart-pipeline-approval:
-#          type: approval
-#      - update-helm-charts-index:
-#          requires:
-#            - helm-chart-pipeline-approval
-#          context: helm-charts-trigger-consul
+  update-helm-charts-index: # <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
+    jobs:
+      - helm-chart-pipeline-approval:
+          type: approval
+      - update-helm-charts-index:
+          requires:
+            - helm-chart-pipeline-approval
+          context: helm-charts-trigger-consul
 #          filters:
 #            tags:
 #              only: /^v.*/
