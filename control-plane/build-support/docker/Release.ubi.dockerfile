@@ -35,7 +35,7 @@ COPY LICENSE.md /licenses/mozilla.txt
 
 # Set up certificates, base tools, and software.
 RUN set -eux && \
-    microdnf install -y ca-certificates curl gnupg libcap openssl wget unzip shadow-utils iptables && \
+    microdnf install -y ca-certificates curl gnupg libcap openssl wget unzip tar shadow-utils iptables && \
     BUILD_GPGKEY=C874011F0AB405110D02105534365D9472D7468F; \
     found=''; \
     for server in \
