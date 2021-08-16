@@ -20,8 +20,8 @@ LABEL name=$NAME \
       vendor="HashiCorp" \
       version=$VERSION \
       release=$VERSION \
-      summary="The consul-k8s binary includes first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s includes first-class integrations between Consul and Kubernetes."
+      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes."
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
 ENV NAME=$NAME
