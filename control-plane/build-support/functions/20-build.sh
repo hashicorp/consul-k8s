@@ -245,7 +245,7 @@ function build_consul_local {
          -osarch="!darwin/arm !darwin/arm64" \
          -ldflags="${GOLDFLAGS}" \
          -parallel="${GOXPARALLEL:-"-1"}" \
-         -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/control-plane" \
+         -output "pkg.bin.new/${extra_dir}{{.OS}}_{{.Arch}}/${bin_name}" \
          -tags="${GOTAGS}" \
          .
 
