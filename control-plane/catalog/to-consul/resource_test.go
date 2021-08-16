@@ -1527,6 +1527,7 @@ func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node
 			Addresses: []apiv1.NodeAddress{
 				{Type: apiv1.NodeExternalIP, Address: "1.2.3.4"},
 				{Type: apiv1.NodeInternalIP, Address: "4.5.6.7"},
+				{Type: apiv1.NodeInternalIP, Address: "7.8.9.10"},
 			},
 		},
 	}
@@ -1542,6 +1543,7 @@ func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node
 			Addresses: []apiv1.NodeAddress{
 				{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
 				{Type: apiv1.NodeInternalIP, Address: "3.4.5.6"},
+				{Type: apiv1.NodeInternalIP, Address: "6.7.8.9"},
 			},
 		},
 	}
