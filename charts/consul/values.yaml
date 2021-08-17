@@ -271,7 +271,7 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
-  # For connect-injected pods, the consul sidecar is responsible for metrics merging. For ingress/mesh/terminating 
+  # For connect-injected pods, the consul sidecar is responsible for metrics merging. For ingress/mesh/terminating
   # gateways, it additionally ensures the Consul services are always registered with their local Consul client.
   # @recurse: false
   # @type: map
@@ -470,6 +470,14 @@ server:
     runAsGroup: 1000
     runAsUser: 100
     fsGroup: 1000
+
+  # The container securityContext for the server pods.  In addition to the [Pod
+  # secuirtyContext](#v-server-securitycontext) this can set the capabilities
+  # of processes running in the container and ensure the root file systems in
+  # the container is read-only.
+  # @type: map
+  # @recurse: false
+  containerSecurityContext: null
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
@@ -803,6 +811,26 @@ client:
     runAsGroup: 1000
     runAsUser: 100
     fsGroup: 1000
+
+  # The container securityContext for each container in the client pods.  In
+  # addition to the [Pod secuirtyContext](#v-client-securitycontext) this can
+  # set the capabilities of processes running in the container and ensure the
+  # root file systems in the container is read-only.
+  # @type: map
+  # @recurse: true
+  containerSecurityContext:
+    # The consul client agent container
+    # @type: map
+    # @recurse: false
+    client: null
+    # The acl-init initContainer
+    # @type: map
+    # @recurse: false
+    aclInit: null
+    # The tls-init initContainer
+    # @type: map
+    # @recurse: false
+    tlsInit: null
 
   # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
