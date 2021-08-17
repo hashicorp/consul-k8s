@@ -8,6 +8,10 @@ This script allows the user to comment on every open pull request in a given rep
   ```bash
   brew install python
   ```
+- [GitHub CLI](https://cli.github.com/)
+  ```bash
+  brew install gh
+  ```
 
 ## Usage
 
