@@ -347,7 +347,7 @@ spec:
             {{- toYaml .Values.server.resources | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if .Values.server.containerSecurityContext }}
+          {{- if and .Values.server.containerSecurityContext (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- toYaml .Values.server.containerSecurityContext | nindent 12 }}
           {{- end }}

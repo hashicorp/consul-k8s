@@ -353,7 +353,7 @@ spec:
             {{- toYaml .Values.client.resources | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if .Values.client.containerSecurityContext.client }}
+          {{- if and .Values.client.containerSecurityContext.client (not .Values.global.openshift.enabled) }}
           securityContext:
             {{- toYaml .Values.client.containerSecurityContext.client | nindent 12 }}
           {{- end }}
@@ -380,7 +380,7 @@ spec:
           limits:
             memory: "25Mi"
             cpu: "50m"
-        {{- if .Values.client.containerSecurityContext.aclInit }}
+        {{- if and .Values.client.containerSecurityContext.aclInit (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- toYaml .Values.client.containerSecurityContext.aclInit | nindent 10 }}
         {{- end }}
@@ -427,7 +427,7 @@ spec:
           limits:
             memory: "50Mi"
             cpu: "50m"
-        {{- if .Values.client.containerSecurityContext.tlsInit }}
+        {{- if and .Values.client.containerSecurityContext.tlsInit (not .Values.global.openshift.enabled) }}
         securityContext:
           {{- toYaml .Values.client.containerSecurityContext.tlsInit | nindent 10 }}
         {{- end }}
