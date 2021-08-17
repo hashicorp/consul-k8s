@@ -1,7 +1,13 @@
 """Comment Script
 
 This script fetches all PRs on a given GitHub repository and adds a comment
-using the text in ./comment.md
+
+Expects 2 arguments, a repository as OWNER/REPOSITORY and the path to a text
+file which will be the content of the comments.
+
+```python
+python3 comment.py OWNER/REPOSITORY ./comment.md
+```
 """
 
 from json import loads
@@ -42,3 +48,4 @@ if __name__ == "__main__":
     )
     if response in ("y", "Y"):
         comment(prs, repo, comment_file)
+        print("Done")
