@@ -4,3 +4,6 @@
 terraform.tfstate*
 terraform.tfvars
 values.dev.yaml
+bin/
+pkg/
+.idea/
