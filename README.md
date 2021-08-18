@@ -30,13 +30,11 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
   * [**Consul Service Mesh (Connect)**](https://www.consul.io/docs/k8s/connect):
     Run Consul Service Mesh (aka Consul Connect) on Kubernetes. This feature
     injects Envoy sidecars and registers your Pods with Consul.
-    _(Requires Consul 1.3+)_
     
   * [**Catalog Sync**](https://www.consul.io/docs/k8s/service-sync):
     Sync Consul services into first-class Kubernetes services and vice versa.
     This enables Kubernetes to easily access external services and for
     non-Kubernetes nodes to easily discover and access Kubernetes services.
-    _(Requires Consul 1.1+)_
 
 ## Installation
 
@@ -81,7 +79,7 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
 
         $ helm search repo hashicorp/consul
         NAME                CHART VERSION   APP VERSION DESCRIPTION
-        hashicorp/consul    0.20.1          1.7.2       Official HashiCorp Consul Chart
+        hashicorp/consul    0.33.0          1.10.0      Official HashiCorp Consul Chart
 
 3. Now you're ready to install Consul! To install Consul with the default configuration using Helm 3 run:
 
