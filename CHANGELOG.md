@@ -3,6 +3,8 @@
 IMPROVEMENTS:
 * Helm Chart
   * Add ability to specify port for ui service. [[GH-604](https://github.com/hashicorp/consul-k8s/pull/604)]
+* Control Plane
+  * Catalog Sync: Fix issue registering NodePort services with wrong IPs when a node has multiple IP addresses. [[GH-619](https://github.com/hashicorp/consul-k8s/pull/619)]
 
 ## 0.33.0 (August 12, 2021)
 
