@@ -276,14 +276,28 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("ELB: Destroyed [id=%s]\n", *elbDescrip.LoadBalancerName)
 		}
 
-		// Delete VPC.
+		// Delete VPC. Sometimes there's a race condition where AWS thinks
+		// the VPC still has dependencies but they've already been deleted so
+		// we may need to retry a couple times.
 		fmt.Printf("VPC: Destroying... [id=%s]\n", *vpcID)
-		_, err = ec2Client.DeleteVpc(&ec2.DeleteVpcInput{
-			VpcId: vpcID,
-		})
-		if err != nil {
-			return err
+		// Retry up to 10 times.
+		retryCount := 0
+		for ; retryCount < 10; retryCount++ {
+			_, err = ec2Client.DeleteVpc(&ec2.DeleteVpcInput{
+				VpcId: vpcID,
+			})
+			if err == nil {
+				break
+			}
+			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
+			time.Sleep(1 * time.Second)
 		}
+		if retryCount == 10 {
+			return errors.New("reached max retry count deleting VPC")
+		}
+
+		// Now that the destroy request went through we still need to wait for
+		// the deletion to complete.
 		if err := destroyBackoff(ctx, "VPC", *vpcID, func() error {
 			currVPCs, err := ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{
 				VpcIds: []*string{vpcID},
