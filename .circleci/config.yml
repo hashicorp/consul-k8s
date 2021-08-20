@@ -880,7 +880,6 @@ workflows:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
-      - acceptance-gke-1-17
   nightly-acceptance-tests:
     triggers:
       - schedule:
