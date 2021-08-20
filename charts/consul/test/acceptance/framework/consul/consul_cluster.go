@@ -356,7 +356,7 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 					Name: "test-psp",
 				},
 				Spec: policyv1beta.PodSecurityPolicySpec{
-					Privileged:          false,
+					Privileged:          true,
 					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
 					SELinux: policyv1beta.SELinuxStrategyOptions{
 						Rule: policyv1beta.SELinuxStrategyRunAsAny,
