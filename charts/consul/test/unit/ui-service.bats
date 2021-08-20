@@ -219,3 +219,67 @@ load _helpers
   actual=$(echo $ports | jq -r 'select(.name == "https") | .nodePort' | tee /dev/stderr)
   [ "${actual}" == "4444" ]
 }
+
+#--------------------------------------------------------------------
+# port
+
+@test "ui/Service: HTTP port defaults to 80" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
+  [ "${actual}" == "80" ]
+}
+
+@test "ui/Service: HTTP port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=false' \
+      --set 'ui.service.port.http=4443' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+}
+
+@test "ui/Service: HTTPS port defaults to 443" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
+  [ "${actual}" == "443" ]
+}
+
+@test "ui/Service: HTTPS port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'ui.service.port.https=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}
+
+@test "ui/Service: both HTTP and HTTPS ports can be set" {
+  cd `chart_dir`
+  local ports=$(helm template \
+      -s templates/ui-service.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.httpsOnly=false' \
+      --set 'ui.service.port.http=4443' \
+      --set 'ui.service.port.https=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $ports | jq -r 'select(.name == "http") | .port' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+
+  actual=$(echo $ports | jq -r 'select(.name == "https") | .port' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}

@@ -86,18 +86,20 @@ function main {
 
    set_dev_mode "${sdir}" || return 1
 
+
    if is_set "${do_git}"
    then
       status_stage "==> Commiting Dev Mode Changes"
-      commit_dev_mode "${sdir}" || return 1
+      # Currently ${sdir} is consul-k8s/control-plane, but for git functions we should be in top-level, so we pass in "${sdir}/..".
+      commit_dev_mode "${sdir}/.." || return 1
 
       if is_set "${do_push}"
       then
          status_stage "==> Confirming Git Changes"
-         confirm_git_push_changes "${sdir}" || return 1
+         confirm_git_push_changes "${sdir}/.." || return 1
 
          status_stage "==> Pushing to Git"
-         git_push_ref "${sdir}" || return 1
+         git_push_ref "${sdir}/.." || return 1
       fi
    fi
 
