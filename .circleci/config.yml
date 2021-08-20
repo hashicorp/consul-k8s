@@ -611,6 +611,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
+          failfast: true
           additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
 
       - store_test_results:
@@ -880,6 +881,7 @@ workflows:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
+      - acceptance-gke-1-17
   nightly-acceptance-tests:
     triggers:
       - schedule:
