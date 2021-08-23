@@ -5,7 +5,7 @@ appVersion: 1.10.0
 kubeVersion: ">=1.17.0-0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
-icon: https://raw.githubusercontent.com/hashicorp/consul-k8s/master/assets/icon.png
+icon: https://raw.githubusercontent.com/hashicorp/consul-k8s/main/assets/icon.png
 sources:
   - https://github.com/hashicorp/consul
   - https://github.com/hashicorp/consul-k8s
