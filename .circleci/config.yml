@@ -827,6 +827,10 @@ workflows:
             - go-fmt-and-vet-control-plane
             - lint-control-plane
       - test-enterprise-control-plane:
+          filters:
+            branches:
+              # Forked pull requests have CIRCLE_BRANCH set to pull/XXX.
+              ignore: /pull\/[0-9]+/
           requires:
             - go-fmt-and-vet-control-plane
             - lint-control-plane

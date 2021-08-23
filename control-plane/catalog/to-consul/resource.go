@@ -553,6 +553,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						r.Service.Address = address.Address
 
 						t.consulMap[key] = append(t.consulMap[key], &r)
+						// Only consider the first address that matches. In some cases
+						// there will be multiple addresses like when using AWS CNI.
+						// In those cases, Kubernetes will ensure eth0 is always the first
+						// address in the list.
+						// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
+						break
 					}
 				}
 
@@ -568,6 +574,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service.Address = address.Address
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
+							// Only consider the first address that matches. In some cases
+							// there will be multiple addresses like when using AWS CNI.
+							// In those cases, Kubernetes will ensure eth0 is always the first
+							// address in the list.
+							// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
+							break
 						}
 					}
 				}
