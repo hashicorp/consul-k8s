@@ -105,6 +105,21 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# template namespace
+#
+# This test ensures that we set "namespace: " in every file. The exceptions are files with CRDs and clusterroles and
+# clusterrolebindings.
+#
+# If this test fails, you're likely missing setting the namespace.
+
+@test "helper/namespace: used everywhere" {
+  cd `chart_dir`
+  # Grep for files that don't have 'namespace: ' in them
+  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}
+
+#--------------------------------------------------------------------
 # consul.getAutoEncryptClientCA
 # Similarly to consul.fullname tests, these tests use test-runner.yaml to test the
 # consul.getAutoEncryptClientCA helper since we need an existing template that calls
