@@ -133,7 +133,7 @@ rebase the branch on master, fixing any conflicts along the way before the code 
     +	Status `json:"status,omitempty"`
     }
     ```
-1. Go to the Consul `api` package for the config entry, e.g. https://github.com/hashicorp/consul/blob/master/api/config_entry_gateways.go
+1. Go to the Consul `api` package for the config entry, e.g. https://github.com/hashicorp/consul/blob/main/api/config_entry_gateways.go
 1. Copy the top-level fields over into the `Spec` struct except for
    `Kind`, `Name`, `Namespace`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
    example, the top-level fields remaining are `TLS` and `Listeners`:
