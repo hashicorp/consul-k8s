@@ -45,7 +45,6 @@ func TestReady(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func ptrToString(s string) *string {
