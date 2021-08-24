@@ -471,13 +471,17 @@ server:
     runAsUser: 100
     fsGroup: 1000
 
-  # The container securityContext for the server pods.  In addition to the [Pod
-  # secuirtyContext](#v-server-securitycontext) this can set the capabilities
-  # of processes running in the container and ensure the root file systems in
-  # the container is read-only.
+  # The container securityContext for each container in the server pods.  In
+  # addition to the [Pod secuirtyContext](#v-server-securitycontext) this can
+  # set the capabilities of processes running in the container and ensure the
+  # root file systems in the container is read-only.
   # @type: map
-  # @recurse: false
-  containerSecurityContext: null
+  # @recurse: true
+  containerSecurityContext:
+    # The consul server agent container
+    # @type: map
+    # @recurse: false
+    server: null
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
