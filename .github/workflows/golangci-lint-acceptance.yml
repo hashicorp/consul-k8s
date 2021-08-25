@@ -8,7 +8,7 @@ on:
   pull_request:
 jobs:
   golangci:
-    name: lint
+    name: lint-acceptance
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -20,4 +20,4 @@ jobs:
           # TODO: we may need to modify this when monorepo comes, it could be helpful for when we test
           # only control-plane components in a PR, or some other scenario.
           # working-directory: somedir
-          working-directory: charts/consul/tests/acceptance
+          working-directory: charts/consul/test/acceptance
