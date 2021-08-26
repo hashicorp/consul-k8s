@@ -802,6 +802,35 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# server.containerSecurityContext
+
+@test "server/StatefulSet: Can set container level securityContexts" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.containerSecurityContext.server.privileged=false' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext.privileged')
+  [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# global.openshift.enabled & client.containerSecurityContext
+
+@test "client/DaemonSet: container level securityContexts are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      --set 'server.containerSecurityContext.server.privileged=false' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+#--------------------------------------------------------------------
 # gossip encryption
 
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet by default" {

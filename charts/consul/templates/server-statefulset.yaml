@@ -347,6 +347,10 @@ spec:
             {{- toYaml .Values.server.resources | nindent 12 }}
             {{- end }}
           {{- end }}
+          {{- if not .Values.global.openshift.enabled }}
+          securityContext:
+            {{- toYaml .Values.server.containerSecurityContext.server | nindent 12 }}
+          {{- end }}
       {{- if .Values.server.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}
