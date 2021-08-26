@@ -1249,6 +1249,57 @@ rollingUpdate:
 }
 
 #--------------------------------------------------------------------
+# client.containerSecurityContext.*
+
+@test "client/DaemonSet: Can set container level securityContexts" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=false' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'client.containerSecurityContext.client.privileged=false' \
+      --set 'client.containerSecurityContext.aclInit.allowPrivilegeEscalation=false' \
+      --set 'client.containerSecurityContext.tlsInit.readOnlyRootFileSystem=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext.privileged')
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-acl-init")) | .[0].securityContext.allowPrivilegeEscalation')
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-tls-init")) | .[0].securityContext.readOnlyRootFileSystem')
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# global.openshift.enabled & client.containerSecurityContext
+
+@test "client/DaemonSet: container level securityContexts are not set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=false' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'client.containerSecurityContext.client.privileged=false' \
+      --set 'client.containerSecurityContext.aclInit.allowPrivilegeEscalation=false' \
+      --set 'client.containerSecurityContext.tlsInit.readOnlyRootFileSystem=true' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-acl-init")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "client-tls-init")) | .[0].securityContext')
+  [ "${actual}" = "null" ]
+}
+
+#--------------------------------------------------------------------
 # license-autoload
 
 @test "client/DaemonSet: adds volume for license secret when enterprise license secret name and key are provided" {
