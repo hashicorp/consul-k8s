@@ -74,8 +74,7 @@ output from 'kubectl logs' in relevant components
 <!---
 
 If not already included, please provide the following:
-- `consul-k8s-control-plane` version:
-- `consul-helm` version:
+- `consul-k8s` version:
 - `values.yaml` used to deploy the helm chart:
 
 Additionally, please provide details regarding the Kubernetes Infrastructure, as shown below:
