@@ -20,6 +20,7 @@ helm-gen-path: &helm-gen-path charts/consul/hack/helm-reference-gen
 gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
+openshift-terraform-path: &openshift-terraform-path charts/consul/test/terraform/openshift
 
 commands:
   install-prereqs:
@@ -750,6 +751,59 @@ jobs:
           fail_only: true
           failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
+  acceptance-openshift:
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    parallelism: 1
+    docker:
+      # This image is built from test/docker/Test.dockerfile
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
+
+    steps:
+      - checkout
+      - run:
+          name: terraform init & apply
+          working_directory: *openshift-terraform-path
+          command: |
+            terraform init
+            az login --service-principal -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null
+            terraform apply \
+              -var cluster_count=2 \
+              -var tags="{\"build_url\": \"$CIRCLE_BUILD_URL\"}" \
+              -auto-approve
+
+            primary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[0])
+            secondary_kubeconfig=$(terraform output -json | jq -r .kubeconfigs.value[1])
+
+            echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
+            echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-helm-acceptance-modcache-v1-{{ checksum "charts/consul/test/acceptance/go.mod" }}
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run-acceptance-tests:
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-openshift -enable-transparent-proxy
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+      - run:
+          name: terraform destroy
+          working_directory: *openshift-terraform-path
+          command: |
+            terraform destroy -auto-approve
+          when: always
+
+      - slack/status:
+          fail_only: true
+          failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+
   acceptance-kind-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
@@ -892,9 +946,9 @@ workflows:
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
-      #      - acceptance-openshift: <-- Disabled until we can make them less flakey.
-      #          requires:
-      #          - cleanup-azure-resources
+      - acceptance-openshift:
+          requires:
+          - cleanup-azure-resources
       - acceptance-gke-1-17:
           requires:
             - cleanup-gcp-resources
