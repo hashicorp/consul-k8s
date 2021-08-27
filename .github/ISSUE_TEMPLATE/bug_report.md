@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: You're experiencing an issue with the Consul Helm chart that is different than the documented behavior.
+about: You're experiencing an issue with the Consul Helm chart or consul-k8s-control-plane binary that is different than the documented behavior.
 labels: bug
 
 ---
@@ -75,7 +75,6 @@ output from 'kubectl logs' in relevant components
 
 If not already included, please provide the following:
 - `consul-k8s` version:
-- `consul-helm` version:
 - `values.yaml` used to deploy the helm chart:
 
 Additionally, please provide details regarding the Kubernetes Infrastructure, as shown below:
