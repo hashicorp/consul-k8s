@@ -28,9 +28,8 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-partition-init
-      {{- if (or .Values.global.tls.enabled (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
+      {{- if .Values.global.tls.enabled }}
       volumes:
-        {{- if .Values.global.tls.enabled }}
         - name: consul-ca-cert
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
@@ -41,15 +40,6 @@ spec:
             items:
               - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
                 path: tls.crt
-        {{- end }}
-        {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
-        - name: bootstrap-token
-          secret:
-            secretName: {{ .Values.global.acls.bootstrapToken.secretName }}
-            items:
-              - key: {{ .Values.global.acls.bootstrapToken.secretKey }}
-                path: bootstrap-token
-        {{- end }}
       {{- end }}
       containers:
         - name: post-install-job
@@ -59,18 +49,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if (or .Values.global.tls.enabled (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
+          {{- if .Values.global.tls.enabled }}
           volumeMounts:
-            {{- if .Values.global.tls.enabled }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
-            {{- end }}
-            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
-            - name: bootstrap-token
-              mountPath: /consul/acl/tokens
-              readOnly: true
-            {{- end }}
            {{- end }}
           command:
             - "/bin/sh"
@@ -97,10 +80,6 @@ spec:
                 {{- if .Values.externalServers.tlsServerName }}
                 -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
                 {{- end }}
-                {{- end }}
-
-                {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
-                -bootstrap-token-file=/consul/acl/tokens/bootstrap-token \
                 {{- end }}
                 -partition-name={{ .Values.global.adminPartitions.name }}
           resources:
