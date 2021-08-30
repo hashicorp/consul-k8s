@@ -1332,3 +1332,26 @@ rollingUpdate:
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+#--------------------------------------------------------------------
+# partitions
+
+@test "client/DaemonSet: -partitions can be set by global.adminPartition.enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"default\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: -partitions can be overridden by global.adminPartition.name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=test' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"test\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

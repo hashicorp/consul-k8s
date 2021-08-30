@@ -29,6 +29,10 @@ global:
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
+  adminPartitions:
+    enabled: false
+    name: "default"
+
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
   # version tag, otherwise you may inadvertently upgrade your Consul version.
