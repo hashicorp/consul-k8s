@@ -19,23 +19,24 @@ import (
 // Also note that the remainder of this function is tested in the command_test.go.
 func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
+	ctx := context.Background()
 
 	cmd := &Command{
 		flagK8sNamespace:   ns,
 		flagResourcePrefix: resourcePrefix,
 		clientset:          k8s,
 		log:                hclog.New(nil),
-		cmdTimeout:         context.TODO(),
+		cmdTimeout:         ctx,
 	}
 
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
 	secretName := resourcePrefix + "-connect-injector-authmethod-svc-account"
 
 	// Create a service account referencing secretName
-	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(ctx, serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
-			context.Background(),
+			ctx,
 			&v1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: serviceAccountName,
@@ -58,7 +59,7 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeOpaque,
 	}
-	_, err := k8s.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err := k8s.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	_, err = cmd.createAuthMethodTmpl("test")
