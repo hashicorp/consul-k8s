@@ -1556,8 +1556,8 @@ connectInject:
   # This setting can be safely disabled by setting to "Ignore".
   failurePolicy: "Fail"
 
-  # Selector for restricting the webhook to only
-  # specific namespaces. This should be set to a multiline string.
+  # Selector for restricting the webhook to only specific namespaces. 
+  # Use with `connectInject.default` to enable/disable connectInject by default via the selector. This should be set to a multiline string.
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
   #
