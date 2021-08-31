@@ -91,8 +91,8 @@ type Command struct {
 
 	clientset kubernetes.Interface
 
-	// cmdTimeout is cancelled when the command timeout is reached.
-	cmdTimeout    context.Context
+	// ctx is cancelled when the command timeout is reached.
+	ctx           context.Context
 	retryDuration time.Duration
 
 	// log
@@ -276,7 +276,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	var cancel context.CancelFunc
-	c.cmdTimeout, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
+	c.ctx, cancel = context.WithTimeout(context.Background(), c.flagTimeout)
 	// The context will only ever be intentionally ended by the timeout.
 	defer cancel()
 
@@ -687,7 +687,7 @@ func (c *Command) Run(args []string) int {
 // reading the Kubernetes Secret with name secretName.
 // If there is no bootstrap token yet, then it returns an empty string (not an error).
 func (c *Command) getBootstrapToken(secretName string) (string, error) {
-	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return "", nil
@@ -729,7 +729,7 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 		select {
 		case <-time.After(c.retryDuration):
 			continue
-		case <-c.cmdTimeout.Done():
+		case <-c.ctx.Done():
 			return errors.New("reached command timeout")
 		}
 	}

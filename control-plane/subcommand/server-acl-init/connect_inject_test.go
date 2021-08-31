@@ -26,7 +26,7 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 		flagResourcePrefix: resourcePrefix,
 		clientset:          k8s,
 		log:                hclog.New(nil),
-		cmdTimeout:         ctx,
+		ctx:                ctx,
 	}
 
 	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
