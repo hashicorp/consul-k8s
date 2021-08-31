@@ -193,6 +193,14 @@ spec:
                 -consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
+          startupProbe:
+            httpGet:
+              path: /readyz/ready
+              port: 9445
+              scheme: HTTP
+            failureThreshold: 15
+            periodSeconds: 2
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /readyz/ready
@@ -200,7 +208,6 @@ spec:
               scheme: HTTP
             failureThreshold: 2
             initialDelaySeconds: 1
-            periodSeconds: 2
             successThreshold: 1
             timeoutSeconds: 5
           readinessProbe:
@@ -210,7 +217,6 @@ spec:
               scheme: HTTP
             failureThreshold: 2
             initialDelaySeconds: 2
-            periodSeconds: 2
             successThreshold: 1
             timeoutSeconds: 5
           volumeMounts:
