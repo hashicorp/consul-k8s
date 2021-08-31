@@ -4,7 +4,7 @@ IMPROVEMENTS:
 * Helm Chart
   * Add ability to specify port for ui service. [[GH-604](https://github.com/hashicorp/consul-k8s/pull/604)]
   * Use `policy/v1` for Consul server `PodDisruptionBudget` if supported. [[GH-606](https://github.com/hashicorp/consul-k8s/pull/606)]
-  * Added readiness and liveness checks to the connect inject deployment. [[GH-626](https://github.com/hashicorp/consul-k8s/pull/626)]
+  * Added readiness, liveness and startup probes to the connect inject deployment. [[GH-626](https://github.com/hashicorp/consul-k8s/pull/626)][[GH-701](https://github.com/hashicorp/consul-k8s/pull/701)]
   * Add support for setting container security contexts on client and server Pods. [[GH-620](https://github.com/hashicorp/consul-k8s/pull/620)]
 * Control Plane
   * Added health endpoint to the connect inject webhook that will be healthy when webhook certs are present and not empty. [[GH-626](https://github.com/hashicorp/consul-k8s/pull/626)]
