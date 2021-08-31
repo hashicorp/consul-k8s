@@ -40,6 +40,17 @@ global:
     # The name of the Admin Partition. Must be "default" in the server cluster ie the Kubernetes cluster that
     # the Consul server pods are deployed onto.
     name: "default"
+    # Partition service properties.
+    service:
+      # Annotations to apply to the partition service.
+      #
+      # ```yaml
+      # annotations: |
+      #   "annotation-key": "annotation-value"
+      # ```
+      #
+      # @type: string
+      annotations: null
 
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
