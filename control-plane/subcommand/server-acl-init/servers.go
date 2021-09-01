@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -73,7 +72,7 @@ func (c *Command) bootstrapServers(serverAddresses []string, bootTokenSecretName
 					common.ACLTokenSecretKey: bootstrapToken,
 				},
 			}
-			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, secret, metav1.CreateOptions{})
 			return err
 		})
 	if err != nil {

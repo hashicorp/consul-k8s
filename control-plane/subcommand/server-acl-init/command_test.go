@@ -1448,8 +1448,8 @@ func TestConsulDatacenterList(t *testing.T) {
 			require.NoError(t, err)
 
 			command := Command{
-				log:        hclog.New(hclog.DefaultOptions),
-				cmdTimeout: context.Background(),
+				log: hclog.New(hclog.DefaultOptions),
+				ctx: context.Background(),
 			}
 			actDC, actPrimaryDC, err := command.consulDatacenterList(consulClient)
 			if c.expErr != "" {
