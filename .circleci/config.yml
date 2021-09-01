@@ -946,9 +946,10 @@ workflows:
       - cleanup-gcp-resources
       - cleanup-azure-resources
       - cleanup-eks-resources
-      - acceptance-openshift:
-          requires:
-          - cleanup-azure-resources
+# Disable until we can use UBI images.
+#      - acceptance-openshift:
+#          requires:
+#          - cleanup-azure-resources
       - acceptance-gke-1-17:
           requires:
             - cleanup-gcp-resources
