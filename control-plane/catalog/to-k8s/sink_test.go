@@ -398,6 +398,7 @@ func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
 	sink := &K8SSink{
 		Client: client,
 		Log:    hclog.Default(),
+		Ctx:    context.Background(),
 	}
 
 	closer := controller.TestControllerRun(sink)
