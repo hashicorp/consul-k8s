@@ -38,7 +38,7 @@ type Sink interface {
 
 // K8SSink is a Sink implementation that registers services with Kubernetes.
 //
-// K8SSink also implements controller. Resource and is meant to run as a K8S
+// K8SSink also implements controller.Resource and is meant to run as a K8S
 // controller that watches services. This is the primary way that the
 // sink should be run.
 type K8SSink struct {
@@ -51,7 +51,7 @@ type K8SSink struct {
 	// done if there are no changes.
 	SyncPeriod time.Duration
 
-	// Ctx is used to cancel the Sink
+	// Ctx is used to cancel the Sink.
 	Ctx context.Context
 
 	// lock gates concurrent access to all the maps.
