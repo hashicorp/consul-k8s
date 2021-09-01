@@ -42,6 +42,24 @@ global:
     name: "default"
     # Partition service properties.
     service:
+      type: LoadBalancer
+      # Optionally set the nodePort value of the partition service if using a NodePort service.
+      # If not set and using a NodePort service, Kubernetes will automatically assign
+      # a port.
+      nodePort:
+
+        # RPC node port
+        # @type: integer
+        rpc: null
+
+        # Serf node port
+        # @type: integer
+        serf: null
+
+        # HTTPS node port
+        # @type: integer
+        https: null
+
       # Annotations to apply to the partition service.
       #
       # ```yaml

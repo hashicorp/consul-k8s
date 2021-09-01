@@ -46,85 +46,17 @@ load _helpers
       .
 }
 
-# This can be seen as testing just what we put into the YAML raw, but
-# this is such an important part of making everything work we verify it here.
-@test "partition/Service: tolerates unready endpoints" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.metadata.annotations["service.alpha.kubernetes.io/tolerate-unready-endpoints"]' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.publishNotReadyAddresses' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.tls.enabled
-
-@test "partition/Service: no HTTPS listener when TLS is disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.tls.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
-  [ "${actual}" == "" ]
-}
-
-@test "partition/Service: HTTPS listener set when TLS is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.ports[] | select(.name == "https") | .port' | tee /dev/stderr)
-  [ "${actual}" == "8501" ]
-}
-
-@test "partition/Service: HTTP listener still active when httpsOnly is disabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.httpsOnly=false' \
-      . | tee /dev/stderr |
-      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
-  [ "${actual}" == "8500" ]
-}
-
-@test "partition/Service: no HTTP listener when httpsOnly is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-service.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.httpsOnly=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.ports[] | select(.name == "http") | .port' | tee /dev/stderr)
-  [ "${actual}" == "" ]
-}
-
 #--------------------------------------------------------------------
 # annotations
 
-@test "partition/Service: one annotation by default" {
+@test "partition/Service: no annotations by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-service.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "0" ]
 }
 
 @test "partition/Service: can set annotations" {
@@ -136,4 +68,66 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
+}
+
+#--------------------------------------------------------------------
+# nodePort
+
+@test "partition/Service: RPC node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-service.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.service.type=NodePort' \
+      --set 'global.adminPartitions.service.nodePort.rpc=4443' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "server") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+}
+
+@test "partition/Service: Serf node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-service.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.service.type=NodePort' \
+      --set 'global.adminPartitions.service.nodePort.serf=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "serflan") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}
+
+@test "partition/Service: HTTPS node port can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-service.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.service.type=NodePort' \
+      --set 'global.adminPartitions.service.nodePort.https=4444' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[] | select(.name == "https") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+}
+
+@test "partition/Service: RPC, Serf and HTTPS node ports can be set" {
+  cd `chart_dir`
+  local ports=$(helm template \
+      -s templates/partition-service.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.service.type=NodePort' \
+      --set 'global.adminPartitions.service.nodePort.rpc=4443' \
+      --set 'global.adminPartitions.service.nodePort.https=4444' \
+      --set 'global.adminPartitions.service.nodePort.serf=4445' \
+      . | tee /dev/stderr |
+      yq -r '.spec.ports[]' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $ports | jq -r 'select(.name == "server") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4443" ]
+
+  actual=$(echo $ports | jq -r 'select(.name == "https") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4444" ]
+
+  actual=$(echo $ports | jq -r 'select(.name == "serflan") | .nodePort' | tee /dev/stderr)
+  [ "${actual}" == "4445" ]
 }
