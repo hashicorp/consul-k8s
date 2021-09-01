@@ -1,7 +1,6 @@
 package serveraclinit
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -57,7 +56,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 	// Check if the secret already exists, if so, we assume the ACL has already been
 	// created and return.
 	secretName := c.withPrefix(name + "-acl-token")
-	_, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	_, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err == nil {
 		c.log.Info(fmt.Sprintf("Secret %q already exists", secretName))
 		return nil
@@ -93,7 +92,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 					common.ACLTokenSecretKey: []byte(token),
 				},
 			}
-			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+			_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, secret, metav1.CreateOptions{})
 			return err
 		})
 }
