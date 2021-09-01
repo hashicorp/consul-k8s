@@ -232,27 +232,6 @@ func (r *EndpointsController) registerServicesAndHealthCheck(ctx context.Context
 				return err
 			}
 
-			// When Consul namespaces are not enabled, we check that the service with the same name but in a different namespace
-			// is already registered with Consul, and if it is, we skip the registration to avoid service name collisions.
-			if !r.EnableConsulNamespaces {
-				services, _, err := client.Catalog().Service(serviceRegistration.Name, "", nil)
-				if err != nil {
-					r.Log.Error(err, "failed to get service from the Consul catalog", "name", serviceRegistration.Name)
-					return err
-				}
-				for _, service := range services {
-					if existingNS, ok := service.ServiceMeta[MetaKeyKubeNS]; ok && existingNS != serviceEndpoints.Namespace {
-						// Log but don't return an error because we don't want to reconcile this endpoints object again.
-						r.Log.Info("Skipping service registration because a service with the same name "+
-							"but a different Kubernetes namespace is already registered with Consul",
-							"name", serviceRegistration.Name,
-							MetaKeyKubeNS, serviceEndpoints.Namespace,
-							"existing-k8s-namespace", existingNS)
-						return nil
-					}
-				}
-			}
-
 			// Register the service instance with the local agent.
 			// Note: the order of how we register services is important,
 			// and the connect-proxy service should come after the "main" service
