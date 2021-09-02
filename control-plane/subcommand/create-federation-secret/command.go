@@ -67,6 +67,7 @@ type Command struct {
 
 	once sync.Once
 	help string
+	ctx  context.Context
 }
 
 func (c *Command) init() {
@@ -115,6 +116,10 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
+	}
+
+	if c.ctx == nil {
+		c.ctx = context.Background()
 	}
 
 	// The initial secret struct. We will be filling in its data map
@@ -239,7 +244,7 @@ func (c *Command) Run(args []string) int {
 
 	// Now create the Kubernetes secret.
 	logger.Info("Creating/updating Kubernetes secret", "name", federationSecret.ObjectMeta.Name, "ns", c.flagK8sNamespace)
-	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(context.TODO(), federationSecret, metav1.CreateOptions{})
+	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, federationSecret, metav1.CreateOptions{})
 	if k8serrors.IsAlreadyExists(err) {
 		logger.Info("Secret already exists, updating instead")
 		_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Update(context.TODO(), federationSecret, metav1.UpdateOptions{})
