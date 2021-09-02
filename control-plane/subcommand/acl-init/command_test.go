@@ -46,7 +46,6 @@ func TestRun_TokenSinkFile(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		k8sClient: k8s,
-		ctx:       context.Background(),
 	}
 	code := cmd.Run([]string{
 		"-k8s-namespace", k8sNS,
@@ -132,7 +131,6 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		k8sClient: k8s,
-		ctx:       context.Background(),
 	}
 
 	require.NoError(err)
