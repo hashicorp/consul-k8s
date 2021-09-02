@@ -34,6 +34,8 @@ type Command struct {
 
 	once sync.Once
 	help string
+
+	ctx context.Context
 }
 
 func (c *Command) init() {
@@ -124,11 +126,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+
 	return 0
 }
 
 func (c *Command) getSecret(secretName string) (string, error) {
-	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
