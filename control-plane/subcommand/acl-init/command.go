@@ -66,6 +66,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+
 	// Create the Kubernetes clientset
 	if c.k8sClient == nil {
 		config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
@@ -124,10 +128,6 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Error writing token to file %q: %s", c.flagTokenSinkFile, err))
 			return 1
 		}
-	}
-
-	if c.ctx == nil {
-		c.ctx = context.Background()
 	}
 
 	return 0
