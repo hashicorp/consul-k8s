@@ -293,6 +293,7 @@ func (c *Command) Run(args []string) int {
 			Client:    c.clientset,
 			Namespace: c.flagK8SWriteNamespace,
 			Log:       c.logger.Named("to-k8s/sink"),
+			Ctx:       ctx,
 		}
 
 		source := &catalogtok8s.Source{
