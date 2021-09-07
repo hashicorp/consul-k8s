@@ -39,6 +39,8 @@ type Command struct {
 	k8sClient     kubernetes.Interface
 	once          sync.Once
 	help          string
+
+	ctx context.Context
 }
 
 func (c *Command) init() {
@@ -92,11 +94,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+
 	// Run until we get an address from the service.
 	var address string
 	var unretryableErr error
 	err = backoff.Retry(withErrLogger(logger, func() error {
-		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(context.TODO(), c.flagServiceName, metav1.GetOptions{})
+		svc, err := c.k8sClient.CoreV1().Services(c.flagNamespace).Get(c.ctx, c.flagServiceName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("getting service %s: %s", c.flagServiceName, err)
 		}

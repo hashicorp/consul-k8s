@@ -1597,6 +1597,7 @@ func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceR
 		Log:                   hclog.Default(),
 		Client:                client,
 		Syncer:                syncer,
+		Ctx:                   context.Background(),
 		AllowK8sNamespacesSet: mapset.NewSet("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
 		ConsulNodeName:        ConsulSyncNodeName,

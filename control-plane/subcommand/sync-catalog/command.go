@@ -262,6 +262,7 @@ func (c *Command) Run(args []string) int {
 				Log:                        c.logger.Named("to-consul/source"),
 				Client:                     c.clientset,
 				Syncer:                     syncer,
+				Ctx:                        ctx,
 				AllowK8sNamespacesSet:      allowSet,
 				DenyK8sNamespacesSet:       denySet,
 				ExplicitEnable:             !c.flagK8SDefault,
