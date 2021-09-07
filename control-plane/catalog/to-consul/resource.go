@@ -53,6 +53,9 @@ type ServiceResource struct {
 	Client kubernetes.Interface
 	Syncer Syncer
 
+	// Ctx is used to cancel processes kicked off by ServiceResource.
+	Ctx context.Context
+
 	// AllowK8sNamespacesSet is a set of k8s namespaces to explicitly allow for
 	// syncing. It supports the special character `*` which indicates that
 	// all k8s namespaces are eligible unless explicitly denied. This filter
@@ -143,11 +146,11 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(context.TODO(), options)
+				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(t.Ctx, options)
 			},
 		},
 		&apiv1.Service{},
@@ -191,7 +194,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	if t.shouldTrackEndpoints(key) {
 		endpoints, err := t.Client.CoreV1().
 			Endpoints(service.Namespace).
-			Get(context.TODO(), service.Name, metav1.GetOptions{})
+			Get(t.Ctx, service.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Log.Warn("error loading initial endpoints",
 				"key", key,
@@ -242,7 +245,7 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
 	(&controller.Controller{
 		Log:      t.Log.Named("controller/endpoints"),
-		Resource: &serviceEndpointsResource{Service: t},
+		Resource: &serviceEndpointsResource{Service: t, Ctx: t.Ctx},
 	}).Run(ch)
 }
 
@@ -526,7 +529,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				}
 
 				// Look up the node's ip address by getting node info
-				node, err := t.Client.CoreV1().Nodes().Get(context.TODO(), *subsetAddr.NodeName, metav1.GetOptions{})
+				node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *subsetAddr.NodeName, metav1.GetOptions{})
 				if err != nil {
 					t.Log.Warn("error getting node info", "error", err)
 					continue
@@ -683,6 +686,7 @@ func (t *ServiceResource) sync() {
 // to keep track of changing endpoints for registered services.
 type serviceEndpointsResource struct {
 	Service *ServiceResource
+	Ctx     context.Context
 }
 
 func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
@@ -695,13 +699,13 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					List(context.TODO(), options)
+					List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
-					Watch(context.TODO(), options)
+					Watch(t.Ctx, options)
 			},
 		},
 		&apiv1.Endpoints{},
