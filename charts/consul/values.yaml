@@ -2246,6 +2246,7 @@ terminatingGateways:
     - name: terminating-gateway
 
 # Configuration settings for the webhook-cert-manager
+# webhook-cert-manager ensures that cert bundles are up to date for mutating webhooks
 webhookCertManager:
 
   # Toleration Settings
