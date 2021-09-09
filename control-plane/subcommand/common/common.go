@@ -119,6 +119,7 @@ func WriteFileWithPerms(outputFile, payload string, mode os.FileMode) error {
 }
 
 // GetResolvedServerAddresses resolves the Consul server address if it has been provided a provider else it returns the server addresses that were input to it.
+// It attempts to use go-discover iff there is a single server address, the value of which begins with "provider=", else it returns the server addresses as is.
 func GetResolvedServerAddresses(serverAddresses []string, providers map[string]discover.Provider, logger hclog.Logger) ([]string, error) {
 	if len(serverAddresses) != 1 || !strings.Contains(serverAddresses[0], "provider=") {
 		return serverAddresses, nil

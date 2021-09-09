@@ -31,8 +31,8 @@ global:
 
   # [Enterprise Only] Enabling `adminPartitions` allows creation of Admin Partitions in Kubernetes clusters.
   # It additionally indicates that you are running Consul Enterprise v1.11+ with a valid Consul Enterprise
-  # license and would like to make use of configuration beyond registering everything into
-  # the `default` Consul partition.
+  # license. Admin partitions enables deploying services across partitions, while sharing  
+  # a set of Consul servers. 
   adminPartitions:
     # If true, the Helm chart will enable Admin Partitions for the cluster. The clients in the server cluster
     # must be installed in the default partition.

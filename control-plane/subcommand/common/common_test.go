@@ -178,7 +178,14 @@ func TestGetResolvedServerAddresses(t *testing.T) {
 		providerMap             func() map[string]discover.Provider
 		expectedServerAddresses []string
 	}{
-		"without providers": {
+		"without providers and single address": {
+			inputServerAddresses: []string{"foo.bar"},
+			providerMap: func() map[string]discover.Provider {
+				return nil
+			},
+			expectedServerAddresses: []string{"foo.bar"},
+		},
+		"without providers and multiple addresses": {
 			inputServerAddresses: []string{"foo.bar", "hello.car"},
 			providerMap: func() map[string]discover.Provider {
 				return nil
