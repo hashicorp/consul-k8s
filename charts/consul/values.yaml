@@ -79,7 +79,10 @@ global:
   # secretKey are not set, gossip encryption will not be enabled. The secret must
   # be in the same namespace that Consul is installed into.
   #
-  # The secret can be created by running:
+  # The secret can be generated automatically by setting autogenerate to true. This will create an encryption key
+  # for you at the given secretName and secretKey.
+  #
+  # If you prefer to create your own key, you may do so by running with autogenerate set to false:
   #
   # ```shell
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
@@ -92,6 +95,7 @@ global:
   #   gossipEncryption:
   #     secretName: consul-gossip-encryption-key
   #     secretKey: key
+  #     autogenerate: true
   # ```
   gossipEncryption:
     # secretName is the name of the Kubernetes secret that holds the gossip
@@ -101,7 +105,7 @@ global:
     # encryption key.
     secretKey: ""
     # autogenerate a gossip encryption key at the given secretName and secretKey.
-    autogenerate: false
+    autogenerate: true
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
