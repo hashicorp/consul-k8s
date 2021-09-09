@@ -100,6 +100,8 @@ global:
     # secretKey is the key within the Kubernetes secret that holds the gossip
     # encryption key.
     secretKey: ""
+    # autogenerate a gossip encryption key at the given secretName and secretKey.
+    autogenerate: false
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
