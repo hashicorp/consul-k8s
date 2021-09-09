@@ -60,4 +60,9 @@ spec:
       - name: config
         configMap:
           name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
+      {{- if .Values.webhookCertManager.tolerations }}
+      tolerations:
+        {{ tpl .Values.webhookCertManager.tolerations . | indent 8 | trim }}
+      {{- end}}
+
 {{- end }}

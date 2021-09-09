@@ -39,3 +39,26 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "webhookCertManager/Deployment: no tolerations by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "webhookCertManager/Deployment: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/webhook-cert-manager-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'webhookCertManager.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}

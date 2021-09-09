@@ -2245,6 +2245,16 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
+# Configuration settings for the webhook-cert-manager
+# `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
+webhookCertManager:
+
+  # Toleration Settings
+  # This should be a multi-line string matching the Toleration array
+  # in a PodSpec.
+  # @type: string
+  tolerations: null
+
 # Configures a demo Prometheus installation.
 prometheus:
   # When true, the Helm chart will install a demo Prometheus server instance
