@@ -11,6 +11,7 @@ import (
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
+	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdServiceAddress "github.com/hashicorp/consul-k8s/control-plane/subcommand/service-address"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
@@ -46,6 +47,10 @@ func init() {
 
 		"server-acl-init": func() (cli.Command, error) {
 			return &cmdServerACLInit.Command{UI: ui}, nil
+		},
+
+		"partition-init": func() (cli.Command, error) {
+			return &cmdPartitionInit.Command{UI: ui}, nil
 		},
 
 		"sync-catalog": func() (cli.Command, error) {
