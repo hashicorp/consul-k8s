@@ -193,6 +193,7 @@ func TestProcessUpstreams(t *testing.T) {
 		configEntry             func() api.ConfigEntry
 		consulUnavailable       bool
 		consulNamespacesEnabled bool
+		consulPartitionsEnabled bool
 	}{
 		{
 			name: "upstream with datacenter without ProxyDefaults",
@@ -203,6 +204,7 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 			expErr:                  "upstream \"upstream1:1234:dc1\" is invalid: there is no ProxyDefaults config to set mesh gateway mode",
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults whose mesh gateway mode is not local or remote",
@@ -219,6 +221,7 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in local mode",
@@ -242,6 +245,7 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway in remote mode",
@@ -265,6 +269,7 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "when consul is unavailable, we don't return an error",
@@ -290,6 +295,7 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 			consulUnavailable:       true,
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "single upstream",
@@ -306,6 +312,7 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "single upstream with namespace",
@@ -323,6 +330,45 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "single upstream with namespace and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream.foo.bar:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream",
+					LocalBindPort:        1234,
+					DestinationNamespace: "foo",
+					DestinationPartition: "bar",
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "single upstream with partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream.default.bar:1234"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream",
+					LocalBindPort:        1234,
+					DestinationNamespace: "default",
+					DestinationPartition: "bar",
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: true,
 		},
 		{
 			name: "multiple upstreams",
@@ -344,6 +390,43 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "multiple upstreams with consul namespaces, partitions and datacenters",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2.bar:2234, upstream3.foo.baz:3234:dc2"
+				return pod1
+			},
+			configEntry: func() api.ConfigEntry {
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "pd")
+				pd := ce.(*api.ProxyConfigEntry)
+				pd.MeshGateway.Mode = "remote"
+				return pd
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType: api.UpstreamDestTypeService,
+					DestinationName: "upstream1",
+					LocalBindPort:   1234,
+				},
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream2",
+					DestinationNamespace: "bar",
+					LocalBindPort:        2234,
+				}, {
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream3",
+					DestinationNamespace: "foo",
+					DestinationPartition: "baz",
+					LocalBindPort:        3234,
+					Datacenter:           "dc2",
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
 		},
 		{
 			name: "multiple upstreams with consul namespaces and datacenters",
@@ -394,6 +477,7 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 		{
 			name: "prepared query and non-query upstreams",
@@ -420,6 +504,7 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
 		},
 	}
 	for _, tt := range cases {
@@ -455,6 +540,7 @@ func TestProcessUpstreams(t *testing.T) {
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSetWith(),
 				EnableConsulNamespaces: tt.consulNamespacesEnabled,
+				EnableConsulPartitions: tt.consulPartitionsEnabled,
 			}
 
 			upstreams, err := ep.processUpstreams(*tt.pod())

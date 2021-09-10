@@ -50,6 +50,8 @@ type Command struct {
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
 
+	flagEnablePartitions bool // Use Admin Partitions on all components
+
 	// Flags to support Consul namespaces
 	flagEnableNamespaces           bool   // Use namespacing on all components
 	flagConsulDestinationNamespace string // Consul namespace to register everything if not mirroring
@@ -141,6 +143,8 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
+		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -402,6 +406,7 @@ func (c *Command) Run(args []string) int {
 		DenyK8sNamespacesSet:       denyK8sNamespaces,
 		MetricsConfig:              metricsConfig,
 		ConsulClientCfg:            cfg,
+		EnableConsulPartitions:     c.flagEnablePartitions,
 		EnableConsulNamespaces:     c.flagEnableNamespaces,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
