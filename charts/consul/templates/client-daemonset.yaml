@@ -369,7 +369,8 @@ spec:
             consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-client-acl-token" \
               -k8s-namespace={{ .Release.Namespace }} \
-              -init-type="client"
+              -init-type="client" \
+              -default-policy="{{ .Values.global.acls.defaultPolicy | default "deny" }}"
         volumeMounts:
           - name: aclconfig
             mountPath: /consul/aclconfig

@@ -18,7 +18,7 @@ data:
     {
       "acl": {
         "enabled": true,
-        "default_policy": "deny",
+        "default_policy": "{{ .Values.global.acls.defaultPolicy | default "deny" }}",
         "down_policy": "extend-cache",
         {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
         "enable_token_replication": true,
