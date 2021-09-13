@@ -27,7 +27,7 @@ labels: enhancement
 
 #### Use Case(s)
 
-<!--- Use cases where this feature is applicable for Consul on Kubernetes (i.e. type of application, type of Consul use case i.e. Service Mesh, Service Disovery) --->
+<!--- Use cases where this feature is applicable for Consul on Kubernetes (i.e. type of application, type of Consul use case i.e. Service Mesh, Service Disovery). --->
 
 #### Contributions
 

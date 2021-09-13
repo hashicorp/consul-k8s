@@ -1,0 +1,18 @@
+# Disable non-essential components
+alertmanager:
+  enabled: false
+pushgateway:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+nodeExporter:
+  enabled: false
+server:
+  podAnnotations:
+    "consul.hashicorp.com/connect-inject": "false"
+  persistentVolume:
+    enabled: false
+  readinessProbeInitialDelay: 0
+  # Speed up scraping a bit from the default
+  global:
+    scrape_interval: 15s

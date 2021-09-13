@@ -9,8 +9,9 @@ Please search the existing issues for relevant questions, and use the reaction f
 #### Question
 
 Please provide as many details as you can, including but not limited to
-- consul-k8s command you're running
-- Any values you've configured
+- Helm command you're running
+- consul-k8s-control-plane command you're running
+- Any helm values you've configured
 - Your current understanding, and what you're trying to figure out
 
 More details will help us answer questions more accurately and with less delay :)

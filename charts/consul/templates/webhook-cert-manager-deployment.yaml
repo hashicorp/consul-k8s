@@ -1,0 +1,68 @@
+{{- if or .Values.connectInject.enabled .Values.controller.enabled}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-webhook-cert-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: webhook-cert-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      heritage: {{ .Release.Service }}
+      release: {{ .Release.Name }}
+      component: webhook-cert-manager
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        heritage: {{ .Release.Service }}
+        release: {{ .Release.Name }}
+        component: webhook-cert-manager
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+      - command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s-control-plane webhook-cert-manager \
+            -log-level={{ .Values.global.logLevel }} \
+            -log-json={{ .Values.global.logJSON }} \
+            -config-file=/bootstrap/config/webhook-config.json \
+            -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
+            -deployment-namespace={{ .Release.Namespace }}
+        image: {{ .Values.global.imageK8S }}
+        name: webhook-cert-manager
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        volumeMounts:
+        - name: config
+          mountPath: /bootstrap/config
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" . }}-webhook-cert-manager
+      volumes:
+      - name: config
+        configMap:
+          name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
+      {{- if .Values.webhookCertManager.tolerations }}
+      tolerations:
+        {{ tpl .Values.webhookCertManager.tolerations . | indent 8 | trim }}
+      {{- end}}
+
+{{- end }}

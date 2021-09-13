@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Consul-Helm GitHub Issues
-    url: https://github.com/hashicorp/consul-helm/issues
-    about: Are you submitting an issue or feature enhancement for the Consul helm chart? Please create an issue in the consul-helm repository.
   - name: Consul on Kubernetes Learn Tutorials
     url: https://learn.hashicorp.com/collections/consul/kubernetes
     about: Please check out our Learn Tutorials. These hands on tutorials deal with many of the tasks common to using Consul on Kubernetes.

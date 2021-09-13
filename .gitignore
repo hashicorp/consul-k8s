@@ -1,3 +1,6 @@
 .DS_Store
-/bin
-/pkg
+.terraform/
+.terraform.tfstate*
+terraform.tfstate*
+terraform.tfvars
+values.dev.yaml
