@@ -290,7 +290,7 @@ func realMain(ctx context.Context) error {
 				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 		if retryCount == 10 {
 			return errors.New("reached max retry count deleting VPC")
