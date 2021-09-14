@@ -64,6 +64,9 @@ spec:
             -log-json={{ .Values.global.logJSON }} \
             -webhook-tls-cert-dir=/tmp/controller-webhook/certs \
             -datacenter={{ .Values.global.datacenter }} \
+            {{- if .Values.global.adminPartitions.enabled }}
+            -partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
             -enable-leader-election \
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \

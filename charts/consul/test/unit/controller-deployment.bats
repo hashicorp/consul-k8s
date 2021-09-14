@@ -191,6 +191,32 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# partitions
+
+@test "controller/Deployment: partitions options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: partition name set with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition=default"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # namespaces
 
 @test "controller/Deployment: namespace options disabled by default" {
