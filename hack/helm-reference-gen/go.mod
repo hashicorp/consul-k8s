@@ -1,4 +1,4 @@
-module github.com/hashicorp/consul-helm/hack/helm-reference-gen
+module github.com/hashicorp/consul-k8s/hack/helm-reference-gen
 
 go 1.15
 

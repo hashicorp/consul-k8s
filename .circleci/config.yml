@@ -16,7 +16,7 @@ control-plane-path : &control-plane-path control-plane
 acceptance-test-path: &acceptance-test-path charts/consul/test/acceptance
 acceptance-framework-path: &acceptance-framework-path charts/consul/test/acceptance/framework
 charts-consul-path: &charts-consul-path charts/consul
-helm-gen-path: &helm-gen-path charts/consul/hack/helm-reference-gen
+helm-gen-path: &helm-gen-path hack/helm-reference-gen
 gke-terraform-path: &gke-terraform-path charts/consul/test/terraform/gke
 eks-terraform-path: &eks-terraform-path charts/consul/test/terraform/eks
 aks-terraform-path: &aks-terraform-path charts/consul/test/terraform/aks
@@ -547,7 +547,6 @@ jobs:
       - checkout
       - run:
           name: cleanup eks resources
-          working_directory: *charts-consul-path
           command: |
             # Assume the role and set environment variables.
             aws sts assume-role --role-arn "$AWS_ROLE_ARN" --role-session-name "consul-helm-$CIRCLE_BUILD_NUM" --duration-seconds 10800 > assume-role.json
@@ -555,8 +554,7 @@ jobs:
             export AWS_SECRET_ACCESS_KEY="$(jq -r .Credentials.SecretAccessKey assume-role.json)"
             export AWS_SESSION_TOKEN="$(jq -r .Credentials.SessionToken assume-role.json)"
 
-            cd hack/aws-acceptance-test-cleanup
-            go run ./... -auto-approve
+            make ci.aws-acceptance-test-cleanup
       - slack/status:
           fail_only: true
           failure_message: "EKS cleanup failed"
