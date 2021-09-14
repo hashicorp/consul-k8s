@@ -9,8 +9,8 @@ executors:
       - image: docker.mirror.hashicorp.services/circleci/golang:1.16
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      CONSUL_VERSION: 1.10.0 # Consul's OSS version to use in tests
-      CONSUL_ENT_VERSION: 1.10.0+ent # Consul's enterprise version to use in tests
+      CONSUL_VERSION: 1.10.2 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.10.2+ent # Consul's enterprise version to use in tests
 
 control-plane-path : &control-plane-path control-plane
 acceptance-test-path: &acceptance-test-path charts/consul/test/acceptance
