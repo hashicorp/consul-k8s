@@ -8,10 +8,23 @@ IMPROVEMENTS:
   * Add support for setting container security contexts on client and server Pods. [[GH-620](https://github.com/hashicorp/consul-k8s/pull/620)]
   * Update Envoy image to 1.18.4 [[GH-699](https://github.com/hashicorp/consul-k8s/pull/699)]
   * Add configuration for webhook-cert-manager tolerations [[GH-712](https://github.com/hashicorp/consul-k8s/pull/712)]
+  * Update default Consul version to 1.10.2 [[GH-718](https://github.com/hashicorp/consul-k8s/pull/718)]
 * Control Plane
   * Add health endpoint to the connect inject webhook that will be healthy when webhook certs are present and not empty. [[GH-626](https://github.com/hashicorp/consul-k8s/pull/626)]
   * Catalog Sync: Fix issue registering NodePort services with wrong IPs when a node has multiple IP addresses. [[GH-619](https://github.com/hashicorp/consul-k8s/pull/619)]
   * Allow registering the same service in multiple namespaces. [[GH-697](https://github.com/hashicorp/consul-k8s/pull/697)]
+
+BUG FIXES:
+* Helm Chart
+  * Disable [streaming](https://www.consul.io/docs/agent/options#use_streaming_backend) on Consul clients because it is currently not supported when
+    doing mesh gateway federation. If you wish to enable it, override the setting using `client.extraConfig`:
+
+    ```yaml
+    client:
+      extraConfig: |
+        {"use_streaming_backend": true}
+    ```
+    [[GH-718](https://github.com/hashicorp/consul-k8s/pull/718)]
 
 ## 0.33.0 (August 12, 2021)
 

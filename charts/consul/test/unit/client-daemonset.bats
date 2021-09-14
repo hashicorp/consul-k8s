@@ -543,7 +543,7 @@ load _helpers
 #--------------------------------------------------------------------
 # config-configmap
 
-@test "client/DaemonSet: adds config-checksum annotation when extraConfig is blank" {
+@test "client/DaemonSet: config-checksum annotation when extraConfig is blank" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
@@ -552,7 +552,7 @@ load _helpers
   [ "${actual}" = 779a0e24c2ed561c727730698a75b1c552f562c100f0c3315ff2cb925f5e296b ]
 }
 
-@test "client/DaemonSet: adds config-checksum annotation when extraConfig is provided" {
+@test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
@@ -562,14 +562,14 @@ load _helpers
   [ "${actual}" = ba1ceb79d2d18e136d3cc40a9dfddcf2a252aa19ca1703bee3219ca28f1ee187 ]
 }
 
-@test "client/DaemonSet: adds config-checksum annotation when client config is updated" {
+@test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 8496f6bcdec460eac8a5c890e7899f5757111e13e54808af533aaf205ef18bd0 ]
+  [ "${actual}" = b45de202f61d7d3b6118c1f47c351d357c2a83af09675f269d3617ae4a65a01c ]
 }
 
 #--------------------------------------------------------------------
