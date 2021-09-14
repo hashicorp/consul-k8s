@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/bgentry/speakeasy v0.1.0
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fatih/color v1.9.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/go-hclog v0.16.2
