@@ -1,5 +1,5 @@
-// Script to move generated CRD yaml into consul-helm and modify it to match
-// the expected consul-helm format.
+// Script to copy generated CRD yaml into chart directory and modify it to match
+// the expected chart format (e.g. formatted YAML).
 package main
 
 import (
@@ -11,33 +11,20 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run ./... <path-to-consul-helm>")
+	if len(os.Args) != 1 {
+		fmt.Println("Usage: go run ./...")
 		os.Exit(1)
 	}
 
-	helmRepoPath := os.Args[1]
-	if !filepath.IsAbs(helmRepoPath) {
-		var err error
-		// NOTE: Must add ../.. to a relative path because this program is in
-		// hack/crds-to-consul-helm.
-		helmRepoPath, err = filepath.Abs(filepath.Join("../..", helmRepoPath))
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-			os.Exit(1)
-		}
-	}
-	fmt.Printf("Using consul-helm repo path: %s\n", helmRepoPath)
-
-	if err := realMain(helmRepoPath); err != nil {
+	if err := realMain("../../charts/consul"); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-func realMain(helmPathAbs string) error {
-	return filepath.Walk("../../config/crd/bases", func(path string, info os.FileInfo, err error) error {
+func realMain(helmPath string) error {
+	return filepath.Walk("../../control-plane/config/crd/bases", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -77,7 +64,7 @@ func realMain(helmPathAbs string) error {
 		// Construct the destination filename.
 		filenameSplit := strings.Split(info.Name(), "_")
 		crdName := filenameSplit[1]
-		destinationPath := filepath.Join(helmPathAbs, "templates", fmt.Sprintf("crd-%s", crdName))
+		destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))
 
 		// Write it.
 		printf("writing to %s", destinationPath)
