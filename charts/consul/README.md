@@ -44,7 +44,7 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
 
         $ helm search repo hashicorp/consul
         NAME                CHART VERSION   APP VERSION DESCRIPTION
-        hashicorp/consul    0.33.0          1.10.0      Official HashiCorp Consul Chart
+        hashicorp/consul    x.xx.x          x.xx.x      Official HashiCorp Consul Chart
 
 3. Now you're ready to install Consul! To install Consul with the default configuration using Helm 3 run:
 

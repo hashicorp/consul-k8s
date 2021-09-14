@@ -998,9 +998,20 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceName, instance.ServiceName)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
-				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceProxy, instance.ServiceProxy)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
+
+				// When comparing the ServiceProxy field we ignore the DestinationNamespace
+				// field within that struct because on Consul OSS it's set to "" but on Consul Enterprise
+				// it's set to "default" and we want to re-use this test for both OSS and Ent.
+				// This does mean that we don't test that field but that's okay because
+				// it's not getting set specifically in this test.
+				// To do the comparison that ignores that field we use go-cmp instead
+				// of the regular require.Equal call since it supports ignoring certain
+				// fields.
+				diff := cmp.Diff(tt.expectedProxySvcInstances[i].ServiceProxy, instance.ServiceProxy,
+					cmpopts.IgnoreFields(api.Upstream{}, "DestinationNamespace"))
+				require.Empty(t, diff, "expected objects to be equal")
 			}
 
 			_, checkInfos, err := consulClient.Agent().AgentHealthServiceByName(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName))
