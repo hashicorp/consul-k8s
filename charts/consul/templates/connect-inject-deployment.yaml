@@ -131,6 +131,9 @@ spec:
                 {{- range $value := .Values.connectInject.k8sDenyNamespaces }}
                 -deny-k8s-namespace="{{ $value }}" \
                 {{- end }}
+                {{- if .Values.global.adminPartitions.enabled }}
+                -enable-partitions=true \
+                {{- end }}
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \
                 {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
