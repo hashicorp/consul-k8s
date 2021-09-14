@@ -1402,7 +1402,20 @@ rollingUpdate:
       -s templates/client-daemonset.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
+      --set 'server.enabled=false' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"test\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: partition name has to be default in server cluster" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=test' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.adminPartitions.name has to be \"default\" in the server cluster" ]]
 }
