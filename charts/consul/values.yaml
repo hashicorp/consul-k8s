@@ -148,7 +148,8 @@ global:
     # encryption key.
     secretKey: ""
     # autogenerate a gossip encryption key at the given secretName and secretKey.
-    autogenerate: true
+    autogenerate: false
+    # If user supplies autogen true and name or key are empty make our own names
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
