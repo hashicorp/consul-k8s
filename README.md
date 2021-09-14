@@ -8,7 +8,7 @@
 
 ## Overview
 
-The `consul-k8s` binary includes first-class integrations between Consul and
+The `consul-k8s-control-plane` binary includes first-class integrations between Consul and
 Kubernetes. The project encapsulates multiple use cases such as syncing
 services, injecting Connect sidecars, and more.
 The Kubernetes integrations with Consul are
@@ -41,7 +41,7 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 `consul-k8s` is distributed in multiple forms:
 
   * The recommended installation method is the official
-    [Consul Helm chart](https://github.com/hashicorp/consul-k8s/tree/merge-repos/charts/consul). This will
+    [Consul Helm chart](https://github.com/hashicorp/consul-k8s/tree/main/charts/consul). This will
     automatically configure the Consul and Kubernetes integration to run within
     an existing Kubernetes cluster.
 
