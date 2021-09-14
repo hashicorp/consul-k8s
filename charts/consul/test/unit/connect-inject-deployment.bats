@@ -687,6 +687,32 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# partitions
+
+@test "connectInject/Deployment: partitions options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("enable-partitions"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: partitions set with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("enable-partitions"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # namespaces
 
 @test "connectInject/Deployment: fails if namespaces are disabled and mirroringK8S is true" {
