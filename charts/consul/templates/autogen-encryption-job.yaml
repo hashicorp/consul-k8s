@@ -1,4 +1,4 @@
-{{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey .Values.global.gossipEncryption.autogenerate) }}
+{{- if .Values.global.gossipEncryption.autogenerate }}
 # autogenerate encryption key for gossip protocol and save in Kubernetes secrets
 apiVersion: batch/v1
 kind: Job
@@ -23,18 +23,14 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: autogen-encryption
-# NOTE: unsure if I should delete this annotation
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-autogen-encryption
-      {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
-# NOTE: are there any volumes I will need? 
-      {{- end }}
       containers:
         - name: autogen-encryption
-          image: "{{ .Values.global.imageK8S }}"
+          image: "{{ .Values.global.image }}"
           env:
             - name: NAMESPACE
               valueFrom:
@@ -44,15 +40,29 @@ spec:
           command:
             - "/bin/sh"
             - "-ec"
-# NOTE: this should generate the key using Consul and then use curl to add it to K8s
             - |
-              key=$(consul keygen) # TODO: get consul into this container
-              echo $key > key.txt
-# TODO: yeet this into k8s with curl
-          {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
-# NOTE: are there any volumeMounts I will need? 
-          {{- end }}
-# NOTE: no idea what resources I will need from the node. This is just copied from ./tls-init-job.yaml
+              $(consul keygen) > key.txt
+              {{- if .Values.global.gossipEncryption.secretName }}
+              secretName={{ .Values.global.gossipEncryption.secretName }}
+              {{- else }}
+              secretName={{ template "consul.fullname" . }}-gossip-encryption-key
+              {{- end }}
+              {{- if .Values.global.gossipEncryption.secretKey }}
+              secretKey={{ .Values.global.gossipEncryption.secretKey }}
+              {{- else }}
+              secretKey=key
+              {{- end }}
+              # Check if secret already exists
+              curl -s -X GET --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/${secretName}/data/${secretKey}
+              # If secret does not exist, create it
+              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
+                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json" \
+                # TODO put the key in a secret
+                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"${secretName}\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": {  }}" > /dev/null
           resources:
             requests:
               memory: "50Mi"
