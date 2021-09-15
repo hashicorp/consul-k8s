@@ -89,6 +89,8 @@ type Upstream struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is only accepted within a service-defaults config entry.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is only accepted within a service-defaults config entry.
+	Partition string `json:"partition,omitempty"`
 	// EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
 	// listener.
 	// Note: This escape hatch is NOT compatible with the discovery chain and
@@ -322,6 +324,7 @@ func (in *Upstream) toConsul() *capi.UpstreamConfig {
 	return &capi.UpstreamConfig{
 		Name:               in.Name,
 		Namespace:          in.Namespace,
+		Partition:          in.Partition,
 		EnvoyListenerJSON:  in.EnvoyListenerJSON,
 		EnvoyClusterJSON:   in.EnvoyClusterJSON,
 		Protocol:           in.Protocol,

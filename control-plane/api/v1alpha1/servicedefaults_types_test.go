@@ -68,6 +68,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						Defaults: &Upstream{
 							Name:              "upstream-default",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -91,6 +92,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							{
 								Name:              "upstream-override-1",
 								Namespace:         "ns",
+								Partition:         "part",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -113,6 +115,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							{
 								Name:              "upstream-default",
 								Namespace:         "ns",
+								Partition:         "part",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -169,6 +172,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
 						Namespace:         "ns",
+						Partition:         "part",
 						EnvoyListenerJSON: `{"key": "value"}`,
 						EnvoyClusterJSON:  `{"key": "value"}`,
 						Protocol:          "http2",
@@ -190,6 +194,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						{
 							Name:              "upstream-override-1",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -210,6 +215,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						{
 							Name:              "upstream-default",
 							Namespace:         "ns",
+							Partition:         "part",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
