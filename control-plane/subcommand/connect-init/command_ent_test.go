@@ -26,84 +26,97 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 		consulServiceNamespace string
 		acls                   bool
 		authMethodNamespace    string
+		adminPartition         string
 	}{
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=default, authMethodNS=default",
+			name:                   "ACLs enabled, no tls, serviceNS=default, authMethodNS=default, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=default, authMethodNS=default",
+			name:                   "ACLs enabled, tls, serviceNS=default, authMethodNS=default, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=default-ns, authMethodNS=default",
+			name:                   "ACLs enabled, no tls, serviceNS=default-ns, authMethodNS=default, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=default-ns, authMethodNS=default",
+			name:                   "ACLs enabled, tls, serviceNS=default-ns, authMethodNS=default, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, no tls, serviceNS=other, authMethodNS=other",
+			name:                   "ACLs enabled, no tls, serviceNS=other, authMethodNS=other, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs enabled, tls, serviceNS=other, authMethodNS=other",
+			name:                   "ACLs enabled, tls, serviceNS=other, authMethodNS=other, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
 			acls:                   true,
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=default, authMethodNS=default",
+			name:                   "ACLs disabled, no tls, serviceNS=default, authMethodNS=default, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=default, authMethodNS=default",
+			name:                   "ACLs disabled, tls, serviceNS=default, authMethodNS=default, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "default",
 			authMethodNamespace:    "default",
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=default-ns, authMethodNS=default",
+			name:                   "ACLs disabled, no tls, serviceNS=default-ns, authMethodNS=default, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=default-ns, authMethodNS=default",
+			name:                   "ACLs disabled, tls, serviceNS=default-ns, authMethodNS=default, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "default-ns",
 			authMethodNamespace:    "default",
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, no tls, serviceNS=other, authMethodNS=other",
+			name:                   "ACLs disabled, no tls, serviceNS=other, authMethodNS=other, partition=default",
 			tls:                    false,
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
+			adminPartition:         "default",
 		},
 		{
-			name:                   "ACLs disabled, tls, serviceNS=other, authMethodNS=other",
+			name:                   "ACLs disabled, tls, serviceNS=other, authMethodNS=other, partition=default",
 			tls:                    true,
 			consulServiceNamespace: "other",
 			authMethodNamespace:    "other",
+			adminPartition:         "default",
 		},
 	}
 	for _, c := range cases {
@@ -139,6 +152,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				Scheme:    "http",
 				Address:   server.HTTPAddr,
 				Namespace: c.consulServiceNamespace,
+				Partition: c.adminPartition,
 			}
 			if c.acls {
 				cfg.Token = masterToken
@@ -174,6 +188,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				tokenSinkFile:                      tokenFile,
 				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 5,
+				flagPartition:                      c.adminPartition,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.

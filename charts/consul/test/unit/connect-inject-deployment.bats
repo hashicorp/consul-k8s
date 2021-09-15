@@ -712,6 +712,18 @@ EOF
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: partition name set with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition-name=default"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # namespaces
 
