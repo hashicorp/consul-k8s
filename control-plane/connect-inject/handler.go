@@ -61,6 +61,11 @@ type Handler struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
+	// ConsulPartition is the name of the Admin Partition that the controller
+	// is deployed in. It is an enterprise feature requiring Consul Enterprise 1.11+.
+	// Its value is an empty string if partitions aren't enabled.
+	ConsulPartition string
+
 	// EnableNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
 	// with injection into either a single Consul namespace or mirrored from

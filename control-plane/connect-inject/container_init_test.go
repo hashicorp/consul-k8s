@@ -310,7 +310,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 	}
 }
 
-func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
+func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 	minimal := func() *corev1.Pod {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -349,7 +349,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 		Cmd     string // Strings.Contains test
 	}{
 		{
-			"whole template, default namespace",
+			"whole template, default namespace, no partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				return pod
@@ -357,6 +357,7 @@ func TestHandlerContainerInit_namespacesEnabled(t *testing.T) {
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				ConsulPartition:            "",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -370,9 +371,33 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -namespace="default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 		},
-
 		{
-			"whole template, non-default namespace",
+			"whole template, default namespace, default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+				ConsulPartition:            "default",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -partition="default" \
+  -consul-service-namespace="default" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -partition="default" \
+  -namespace="default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+		},
+		{
+			"whole template, non-default namespace, no partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				return pod
@@ -380,6 +405,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -393,9 +419,33 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 		},
-
 		{
-			"Whole template, auth method, non-default namespace, mirroring disabled",
+			"whole template, non-default namespace, non-default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[annotationService] = "web"
+				return pod
+			},
+			Handler{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "non-default-part",
+			},
+			`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -partition="non-default-part" \
+  -consul-service-namespace="non-default" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -partition="non-default-part" \
+  -namespace="non-default" \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
+		},
+		{
+			"Whole template, auth method, non-default namespace, mirroring disabled, default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = ""
 				return pod
@@ -404,6 +454,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "default",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -413,17 +464,19 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -service-account-name="web" \
   -service-name="" \
   -auth-method-namespace="non-default" \
+  -partition="default" \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
+  -partition="default" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 		},
 		{
-			"Whole template, auth method, non-default namespace, mirroring enabled",
+			"Whole template, auth method, non-default namespace, mirroring enabled, non-default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = ""
 				return pod
@@ -433,6 +486,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
+				ConsulPartition:            "non-default",
 			},
 			`/bin/sh -ec 
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
@@ -442,17 +496,19 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -service-account-name="web" \
   -service-name="" \
   -auth-method-namespace="default" \
+  -partition="non-default" \
   -consul-service-namespace="k8snamespace" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
+  -partition="non-default" \
   -namespace="k8snamespace" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml`,
 		},
 		{
-			"whole template, default namespace, tproxy enabled",
+			"whole template, default namespace, tproxy enabled, no partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				return pod
@@ -460,6 +516,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			Handler{
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
+				ConsulPartition:            "",
 				EnableTransparentProxy:     true,
 			},
 			`/bin/sh -ec 
@@ -480,15 +537,15 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 		},
-
 		{
-			"whole template, non-default namespace, tproxy enabled",
+			"whole template, non-default namespace, tproxy enabled, default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				return pod
 			},
 			Handler{
 				EnableNamespaces:           true,
+				ConsulPartition:            "default",
 				ConsulDestinationNamespace: "non-default",
 				EnableTransparentProxy:     true,
 			},
@@ -496,23 +553,26 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
 export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -partition="default" \
   -consul-service-namespace="non-default" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -partition="default" \
   -namespace="non-default" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Apply traffic redirection rules.
 /consul/connect-inject/consul connect redirect-traffic \
+  -partition="default" \
   -namespace="non-default" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
 		},
 
 		{
-			"Whole template, auth method, non-default namespace, mirroring enabled, tproxy enabled",
+			"Whole template, auth method, non-default namespace, mirroring enabled, tproxy enabled, non-default partition",
 			func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[annotationService] = "web"
 				return pod
@@ -520,6 +580,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			Handler{
 				AuthMethod:                 "auth-method",
 				EnableNamespaces:           true,
+				ConsulPartition:            "non-default",
 				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
 				EnableK8SNSMirroring:       true,
 				EnableTransparentProxy:     true,
@@ -532,18 +593,21 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -service-account-name="web" \
   -service-name="web" \
   -auth-method-namespace="default" \
+  -partition="non-default" \
   -consul-service-namespace="k8snamespace" \
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -token-file="/consul/connect-inject/acl-token" \
+  -partition="non-default" \
   -namespace="k8snamespace" \
   -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
 
 # Apply traffic redirection rules.
 /consul/connect-inject/consul connect redirect-traffic \
   -token-file="/consul/connect-inject/acl-token" \
+  -partition="non-default" \
   -namespace="k8snamespace" \
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
   -proxy-uid=5995`,
