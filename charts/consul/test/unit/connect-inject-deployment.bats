@@ -694,6 +694,7 @@ EOF
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("enable-partitions"))' | tee /dev/stderr)
 
@@ -706,6 +707,7 @@ EOF
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("enable-partitions"))' | tee /dev/stderr)
 
@@ -722,6 +724,17 @@ EOF
       yq '.spec.template.spec.containers[0].command | any(contains("partition-name=default"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: fails if namespaces are disabled and .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=false' \
+      --set 'connectInject.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" ]]
 }
 
 #--------------------------------------------------------------------

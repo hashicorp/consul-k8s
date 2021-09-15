@@ -51,18 +51,21 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 						{
 							Name:        "svc1",
 							Namespace:   "test",
+							Partition:   "test",
 							Action:      "allow",
 							Description: "allow access from svc1",
 						},
 						{
 							Name:        "*",
 							Namespace:   "not-test",
+							Partition:   "not-test",
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
 						{
 							Name:      "svc-2",
 							Namespace: "bar",
+							Partition: "bar",
 							Permissions: IntentionPermissions{
 								{
 									Action: "allow",
@@ -101,6 +104,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:        "svc1",
 						Namespace:   "test",
+						Partition:   "test",
 						Action:      "allow",
 						Precedence:  0,
 						Description: "allow access from svc1",
@@ -108,6 +112,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:        "*",
 						Namespace:   "not-test",
+						Partition:   "not-test",
 						Action:      "deny",
 						Precedence:  1,
 						Description: "disallow access from namespace not-test",
@@ -115,6 +120,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:      "svc-2",
 						Namespace: "bar",
+						Partition: "bar",
 						Permissions: []*capi.IntentionPermission{
 							{
 								Action: "allow",
@@ -249,18 +255,21 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 						{
 							Name:        "svc1",
 							Namespace:   "test",
+							Partition:   "test",
 							Action:      "allow",
 							Description: "allow access from svc1",
 						},
 						{
 							Name:        "*",
 							Namespace:   "not-test",
+							Partition:   "not-test",
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
 						{
 							Name:      "svc-2",
 							Namespace: "bar",
+							Partition: "bar",
 							Permissions: IntentionPermissions{
 								{
 									Action: "allow",
@@ -299,18 +308,21 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 					{
 						Name:        "svc1",
 						Namespace:   "test",
+						Partition:   "test",
 						Action:      "allow",
 						Description: "allow access from svc1",
 					},
 					{
 						Name:        "*",
 						Namespace:   "not-test",
+						Partition:   "not-test",
 						Action:      "deny",
 						Description: "disallow access from namespace not-test",
 					},
 					{
 						Name:      "svc-2",
 						Namespace: "bar",
+						Partition: "bar",
 						Permissions: []*capi.IntentionPermission{
 							{
 								Action: "allow",
@@ -601,16 +613,19 @@ func TestServiceIntentions_Validate(t *testing.T) {
 						{
 							Name:      "web",
 							Namespace: "web",
+							Partition: "web",
 							Action:    "allow",
 						},
 						{
 							Name:      "db",
 							Namespace: "db",
+							Partition: "db",
 							Action:    "deny",
 						},
 						{
 							Name:      "bar",
 							Namespace: "bar",
+							Partition: "bar",
 							Permissions: IntentionPermissions{
 								{
 									Action: "allow",
