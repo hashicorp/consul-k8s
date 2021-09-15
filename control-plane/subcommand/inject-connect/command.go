@@ -50,7 +50,8 @@ type Command struct {
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
 
-	flagEnablePartitions bool // Use Admin Partitions on all components
+	flagEnablePartitions bool   // Use Admin Partitions on all components
+	flagPartitionName    string // Name of Admin Partition if enabled.
 
 	// Flags to support Consul namespaces
 	flagEnableNamespaces           bool   // Use namespacing on all components
@@ -145,6 +146,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
 	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions.")
+	c.flagSet.StringVar(&c.flagPartitionName, "partition-name", "",
+		"[Enterprise Only] Name of the Admin Partition.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",
@@ -230,6 +233,14 @@ func (c *Command) Run(args []string) int {
 	if c.flagDefaultProtocol != "" {
 		c.UI.Error("-default-protocol is no longer supported")
 		return 1
+	}
+
+	if c.flagEnablePartitions && c.flagPartitionName == "" {
+		c.UI.Error("-partition-name must set if -enable-partitions is set to 'true'")
+	}
+
+	if c.flagPartitionName != "" && !c.flagEnablePartitions {
+		c.UI.Error("-enable-partitions must be set to 'true' if -partition-name is set")
 	}
 
 	// Proxy resources.
@@ -337,6 +348,8 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+
+	cfg.Partition = c.flagPartitionName
 
 	// Set up Consul client.
 	if c.consulClient == nil {
@@ -451,6 +464,7 @@ func (c *Command) Run(args []string) int {
 			MetricsConfig:              metricsConfig,
 			InitContainerResources:     initResources,
 			ConsulSidecarResources:     consulSidecarResources,
+			ConsulPartition:            c.flagPartitionName,
 			AllowK8sNamespacesSet:      allowK8sNamespaces,
 			DenyK8sNamespacesSet:       denyK8sNamespaces,
 			EnableNamespaces:           c.flagEnableNamespaces,

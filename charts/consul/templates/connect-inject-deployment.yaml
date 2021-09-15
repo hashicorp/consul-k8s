@@ -133,6 +133,7 @@ spec:
                 {{- end }}
                 {{- if .Values.global.adminPartitions.enabled }}
                 -enable-partitions=true \
+                -partition-name={{ .Values.global.adminPartitions.name }} \
                 {{- end }}
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \

@@ -32,6 +32,7 @@ type Command struct {
 	UI cli.Ui
 
 	flagACLAuthMethod          string // Auth Method to use for ACLs, if enabled.
+	flagPartition              string // Admin Partition name. Consul Enterprise 1.11+ feature.
 	flagPodName                string // Pod name.
 	flagPodNamespace           string // Pod namespace.
 	flagAuthMethodNamespace    string // Consul namespace the auth-method is defined in.
@@ -57,6 +58,7 @@ type Command struct {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "", "Name of the auth method to login to.")
+	c.flagSet.StringVar(&c.flagPartition, "partition", "", "Name of the Admin Partition of deployment.")
 	c.flagSet.StringVar(&c.flagPodName, "pod-name", "", "Name of the pod.")
 	c.flagSet.StringVar(&c.flagPodNamespace, "pod-namespace", "", "Name of the pod namespace.")
 	c.flagSet.StringVar(&c.flagAuthMethodNamespace, "auth-method-namespace", "", "Consul namespace the auth-method is defined in")
@@ -118,6 +120,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 	cfg := api.DefaultConfig()
+	cfg.Partition = c.flagPartition
 	cfg.Namespace = c.flagConsulServiceNamespace
 	c.http.MergeOntoConfig(cfg)
 	consulClient, err := consul.NewClient(cfg)
