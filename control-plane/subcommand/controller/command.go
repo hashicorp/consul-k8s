@@ -135,7 +135,6 @@ func (c *Command) Run(args []string) int {
 
 	cfg := api.DefaultConfig()
 	c.httpFlags.MergeOntoConfig(cfg)
-	cfg.Partition = c.flagPartition
 	consulClient, err := consul.NewClient(cfg)
 	if err != nil {
 		setupLog.Error(err, "connecting to Consul agent")

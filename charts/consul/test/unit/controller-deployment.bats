@@ -198,6 +198,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/controller-deployment.yaml  \
       --set 'controller.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("partition"))' | tee /dev/stderr)
 
@@ -210,12 +211,23 @@ load _helpers
       -s templates/controller-deployment.yaml  \
       --set 'controller.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("partition=default"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
 
+@test "controller/Deployment: fails if namespaces are disabled and .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=false' \
+      --set 'controller.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" ]]
+}
 #--------------------------------------------------------------------
 # namespaces
 

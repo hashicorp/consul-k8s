@@ -23,6 +23,7 @@ type HTTPFlags struct {
 	certFile      StringValue
 	keyFile       StringValue
 	tlsServerName StringValue
+	partition     StringValue
 }
 
 func (f *HTTPFlags) Flags() *flag.FlagSet {
@@ -56,6 +57,8 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 	fs.Var(&f.tlsServerName, "tls-server-name",
 		"The server name to use as the SNI host when connecting via TLS. This "+
 			"can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
+	fs.Var(&f.partition, "partition",
+		"[Enterprise Only] Name of the Consul Admin Partition the controller is operating in. The config entries are created in this partition.")
 	return fs
 }
 
@@ -110,6 +113,7 @@ func (f *HTTPFlags) MergeOntoConfig(c *api.Config) {
 	f.certFile.Merge(&c.TLSConfig.CertFile)
 	f.keyFile.Merge(&c.TLSConfig.KeyFile)
 	f.tlsServerName.Merge(&c.TLSConfig.Address)
+	f.partition.Merge(&c.Partition)
 }
 
 func Merge(dst, src *flag.FlagSet) {
