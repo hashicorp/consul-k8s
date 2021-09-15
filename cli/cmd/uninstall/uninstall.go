@@ -110,13 +110,14 @@ func (c *Command) init() {
 	}
 
 	c.help = c.set.Help()
+
+	// c.Init() calls the embedded BaseCommand's initialization function.
+	c.Init()
 }
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-	// Note that `c.init` and `c.Init` are NOT the same thing. One initializes the command struct,
-	// the other the UI. It looks similar because BaseCommand is embedded in Command.
-	c.Init()
+
 	defer func() {
 		if err := c.Close(); err != nil {
 			c.UI.Output(err.Error())

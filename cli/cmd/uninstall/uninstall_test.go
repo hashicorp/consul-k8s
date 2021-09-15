@@ -13,29 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// Helper function which sets up a Command struct for you.
-func getInitializedCommand(t *testing.T) *Command {
-	t.Helper()
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "cli",
-		Level:  hclog.Info,
-		Output: os.Stdout,
-	})
-	ctx, _ := context.WithCancel(context.Background())
-
-	baseCommand := &common.BaseCommand{
-		Ctx: ctx,
-		Log: log,
-	}
-
-	c := &Command{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	c.Init()
-	return c
-}
-
 func TestDeletePVCs(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
@@ -77,7 +54,7 @@ func TestDeleteSecrets(t *testing.T) {
 			},
 		},
 	}
-	secret2 := &v1.PersistentVolumeClaim{
+	secret2 := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "consul-test-secret2",
 			Labels: map[string]string{
@@ -124,4 +101,26 @@ func TestDeleteServiceAccounts(t *testing.T) {
 	sas, err := c.kubernetes.CoreV1().ServiceAccounts("default").List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
 	require.Len(t, sas.Items, 0)
+}
+
+// getInitializedCommand sets up a command struct for tests.
+func getInitializedCommand(t *testing.T) *Command {
+	t.Helper()
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "cli",
+		Level:  hclog.Info,
+		Output: os.Stdout,
+	})
+	ctx, _ := context.WithCancel(context.Background())
+
+	baseCommand := &common.BaseCommand{
+		Ctx: ctx,
+		Log: log,
+	}
+
+	c := &Command{
+		BaseCommand: baseCommand,
+	}
+	c.init()
+	return c
 }
