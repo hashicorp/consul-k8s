@@ -27,10 +27,11 @@ const (
 	FlagReleaseName       = "name"
 	DefaultAnyReleaseName = ""
 
-	FlagWipeAllData    = "wipe-all-data"
-	DefaultWipeAllData = false
-	//this is the auto-approve for wipe all data
-	// todo auto-approve to NOT wipe all data
+	FlagWipeData    = "wipe-data"
+	DefaultWipeData = false
+
+	FlagSkipWipeData    = "skip-wipe-data"
+	DefaultSkipWipeData = false
 )
 
 type Command struct {
@@ -40,10 +41,11 @@ type Command struct {
 
 	set *flag.Sets
 
-	flagNamespace   string
-	flagReleaseName string
-	flagAutoApprove bool
-	flagWipeAllData bool
+	flagNamespace    string
+	flagReleaseName  string
+	flagAutoApprove  bool
+	flagWipeData     bool
+	flagSkipWipeData bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -60,19 +62,29 @@ func (c *Command) init() {
 			Name:    FlagAutoApprove,
 			Target:  &c.flagAutoApprove,
 			Default: DefaultAutoApprove,
-			Usage:   "Skip confirmation prompt.",
+			Usage:   "Skip approval prompt for uninstalling Consul.",
 		})
+		// This is like the auto-approve to wipe all data without prompting for non-interactive environments that want
+		// to remove everything.
 		f.BoolVar(&flag.BoolVar{
-			Name:    FlagWipeAllData,
-			Target:  &c.flagWipeAllData,
-			Default: DefaultWipeAllData,
-			Usage:   "Will NOT prompt for approval before delete all PVCs, Secrets, and Service Accounts associated with Consul Helm installation. Only use this when persisted data from previous installations is no longer necessary.",
+			Name:    FlagWipeData,
+			Target:  &c.flagWipeData,
+			Default: DefaultWipeData,
+			Usage:   "Delete all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete. Only use this when persisted data from previous installations is no longer necessary.",
+		})
+		// This is like the auto-approve to NOT wipe all data without prompting for non-interactive environments that
+		// only want to remove the Consul Helm installation but keep the data.
+		f.BoolVar(&flag.BoolVar{
+			Name:    FlagSkipWipeData,
+			Target:  &c.flagSkipWipeData,
+			Default: DefaultSkipWipeData,
+			Usage:   "Skip deleting all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete.",
 		})
 		f.StringVar(&flag.StringVar{
 			Name:    FlagNamespace,
 			Target:  &c.flagNamespace,
 			Default: DefaultAllNamespaces,
-			Usage:   fmt.Sprintf("Namespace for the Consul installation. Defaults to \"%q\".", DefaultAllNamespaces),
+			Usage:   "Namespace for the Consul installation.",
 		})
 		f.StringVar(&flag.StringVar{
 			Name:    FlagReleaseName,
@@ -214,6 +226,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagSkipWipeData {
+		c.UI.Output("Skipping deleting PVCs, secrets, and service accounts.", terminal.WithSuccessStyle())
+		return 0
+	}
+
 	// At this point, even if no Helm release was found and uninstalled, there could
 	// still be PVCs, Secrets, and Service Accounts left behind from a previous installation.
 	// If there isn't a foundReleaseName and foundReleaseNamespace, we'll use the values of the
@@ -228,8 +245,9 @@ func (c *Command) Run(args []string) int {
 		foundReleaseNamespace = c.flagNamespace
 	}
 
-	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts.
-	if !c.flagWipeAllData {
+	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts. If flagWipeData is true,
+	// then it will proceed to delete those without a prompt.
+	if !c.flagWipeData {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/n)",
 			Style:  terminal.WarningStyle,

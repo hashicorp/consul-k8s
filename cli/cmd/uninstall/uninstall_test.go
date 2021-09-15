@@ -36,12 +36,6 @@ func getInitializedCommand(t *testing.T) *Command {
 	return c
 }
 
-// TestDebugger is used to play with install.go for ad-hoc testing.
-//func TestDebugger(t *testing.T) {
-//	c := getInitializedCommand(t)
-//	c.Run([]string{"-auto-approve", "-f=../../config.yaml"})
-//}
-
 func TestDeletePVCs(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
@@ -61,55 +55,73 @@ func TestDeletePVCs(t *testing.T) {
 			},
 		},
 	}
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc, metav1.CreateOptions{})
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc2, metav1.CreateOptions{})
-	err := c.deletePVCs("consul", "default")
+	_, err := c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deletePVCs("consul", "default")
 	require.NoError(t, err)
 	pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims("default").List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
 	require.Len(t, pvcs.Items, 0)
-
-	// Clear out the client and make sure the check now passes.
-	//c.kubernetes = fake.NewSimpleClientset()
-	//err = c.checkForPreviousPVCs()
-	//require.NoError(t, err)
-
-	// Add a new irrelevant PVC and make sure the check continues to pass.
-	//pvc = &v1.PersistentVolumeClaim{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: "irrelevant-pvc",
-	//	},
-	//}
-	//c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc, metav1.CreateOptions{})
-	//err = c.checkForPreviousPVCs()
-	//require.NoError(t, err)
 }
 
-//func TestCheckForPreviousSecrets(t *testing.T) {
-//	c := getInitializedCommand(t)
-//	c.kubernetes = fake.NewSimpleClientset()
-//	secret := &v1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: "test-consul-bootstrap-acl-token",
-//		},
-//	}
-//	c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
-//	err := c.checkForPreviousSecrets()
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "found consul-acl-bootstrap-token secret from previous installations: \"test-consul-bootstrap-acl-token\" in namespace \"default\". To delete, run kubectl delete secret test-consul-bootstrap-acl-token --namespace default")
-//
-//	// Clear out the client and make sure the check now passes.
-//	c.kubernetes = fake.NewSimpleClientset()
-//	err = c.checkForPreviousSecrets()
-//	require.NoError(t, err)
-//
-//	// Add a new irrelevant secret and make sure the check continues to pass.
-//	secret = &v1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: "irrelevant-secret",
-//		},
-//	}
-//	c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
-//	err = c.checkForPreviousSecrets()
-//	require.NoError(t, err)
-//}
+func TestDeleteSecrets(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-secret1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	secret2 := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-secret2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteSecrets("consul", "default")
+	require.NoError(t, err)
+	secrets, err := c.kubernetes.CoreV1().Secrets("default").List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, secrets.Items, 0)
+}
+
+func TestDeleteServiceAccounts(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	sa := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-sa1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	sa2 := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-sa2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.CoreV1().ServiceAccounts("default").Create(context.TODO(), sa, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.CoreV1().ServiceAccounts("default").Create(context.TODO(), sa2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteServiceAccounts("consul", "default")
+	require.NoError(t, err)
+	sas, err := c.kubernetes.CoreV1().ServiceAccounts("default").List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, sas.Items, 0)
+}
