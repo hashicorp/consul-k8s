@@ -22,6 +22,10 @@ type initContainerCommandData struct {
 	ServiceName        string
 	ServiceAccountName string
 	AuthMethod         string
+	// ConsulPartition is the Consul admin partition to register the service
+	// and proxy in. An empty string indicates partitions are not
+	// enabled in Consul (necessary for OSS).
+	ConsulPartition string
 	// ConsulNamespace is the Consul namespace to register the service
 	// and proxy in. An empty string indicates namespaces are not
 	// enabled in Consul (necessary for OSS).
@@ -105,6 +109,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,
+		ConsulPartition:            h.ConsulPartition,
 		ConsulNamespace:            h.consulNamespace(namespace.Name),
 		NamespaceMirroringEnabled:  h.EnableK8SNSMirroring,
 		ConsulCACert:               h.ConsulCACert,
@@ -284,6 +289,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- end }}
   {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
+  {{- end }}
   {{- if .ConsulNamespace }}
   -consul-service-namespace="{{ .ConsulNamespace }}" \
   {{- end }}
@@ -300,6 +308,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
   {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
+  {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
@@ -313,6 +324,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 /consul/connect-inject/consul connect redirect-traffic \
   {{- if .AuthMethod }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
+  {{- if .ConsulPartition }}
+  -partition="{{ .ConsulPartition }}" \
   {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
