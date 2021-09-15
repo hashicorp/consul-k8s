@@ -117,39 +117,27 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures which Kubernetes secret to retrieve Consul's
-  # gossip encryption key from (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)). If secretName or
-  # secretKey are not set, gossip encryption will not be enabled. The secret must
-  # be in the same namespace that Consul is installed into.
-  #
-  # The secret can be generated automatically by setting autogenerate to true. This will create an encryption key
-  # for you at the given secretName and secretKey.
-  #
-  # If you prefer to create your own key, you may do so by running with autogenerate set to false:
+  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
+  # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
+  # To automatically generate and set a gossip encryption key, set autoGenerate to true. The values for secretName
+  # and secretKey may be left empty. If values are supplied for these keys, they will be respected.
+  # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
+  # the gossip key referencing these values.
   #
   # ```shell
-  # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
+  # $ kubectl create secret generic <secretName> --from-literal=<key>=$(consul keygen)
   # ```
   #
-  # To reference, use:
-  #
-  # ```yaml
-  # global:
-  #   gossipEncryption:
-  #     secretName: consul-gossip-encryption-key
-  #     secretKey: key
-  #     autogenerate: true
-  # ```
   gossipEncryption:
+    # automatically generate a gossip encryption key and load it as a Kubernetes secret
+    autoGenerate: false
     # secretName is the name of the Kubernetes secret that holds the gossip
     # encryption key. The secret must be in the same namespace that Consul is installed into.
     secretName: ""
     # secretKey is the key within the Kubernetes secret that holds the gossip
     # encryption key.
     secretKey: ""
-    # autogenerate a gossip encryption key at the given secretName and secretKey.
-    autogenerate: false
-    # If user supplies autogen true and name or key are empty make our own names
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
