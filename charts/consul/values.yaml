@@ -125,10 +125,9 @@ global:
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
   # the gossip key referencing these values.
   #
-  # ```shell
-  # $ kubectl create secret generic <secretName> --from-literal=<key>=$(consul keygen)
   # ```
-  #
+  # $ kubectl create secret generic <secretName> --from-literal=<secretKey>=$(consul keygen)
+  # ```
   gossipEncryption:
     # automatically generate a gossip encryption key and load it as a Kubernetes secret
     autoGenerate: false
