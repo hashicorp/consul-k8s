@@ -97,8 +97,12 @@ func TestValidateFlags(t *testing.T) {
 			[]string{"-preset=foo"},
 		},
 		{
+			"Should error on invalid timeout.",
+			[]string{"-timeout=invalid-timeout"},
+		},
+		{
 			"Should error on an invalid namespace. If this failed, TestValidLabel() probably did too.",
-			[]string{"-namespace=\" preset\""},
+			[]string{"-namespace=\" nsWithSpace\""},
 		},
 		{
 			"Should have errored on a non-existant file.",
