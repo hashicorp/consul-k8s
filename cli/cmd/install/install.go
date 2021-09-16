@@ -43,6 +43,12 @@ const (
 	flagNameNamespace = "namespace"
 	defaultNamespace  = "consul"
 
+	flagNameTimeout = "timeout"
+	defaultTimeout  = "10m"
+
+	flagNameWait = "wait"
+	defaultWait  = true
+
 	helmRepository = "https://helm.releases.hashicorp.com"
 )
 
@@ -61,6 +67,9 @@ type Command struct {
 	flagSetStringValues []string
 	flagSetValues       []string
 	flagFileValues      []string
+	flagTimeout         string
+	timeoutDuration     time.Duration
+	flagWait            bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -101,13 +110,13 @@ func (c *Command) init() {
 			Name:    flagNameNamespace,
 			Target:  &c.flagNamespace,
 			Default: defaultNamespace,
-			Usage:   fmt.Sprintf("Namespace for the Consul installation. Defaults to \"%q\".", defaultNamespace),
+			Usage:   "Namespace for the Consul installation.",
 		})
 		f.StringVar(&flag.StringVar{
 			Name:    flagNamePreset,
 			Target:  &c.flagPreset,
 			Default: defaultPreset,
-			Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to \"%q\"", strings.Join(presetList, ", "), defaultPreset),
+			Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
 		})
 		f.StringSliceVar(&flag.StringSliceVar{
 			Name:   flagNameSetValues,
@@ -124,6 +133,18 @@ func (c *Command) init() {
 			Name:   flagNameSetStringValues,
 			Target: &c.flagSetStringValues,
 			Usage:  "Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
+		})
+		f.StringVar(&flag.StringVar{
+			Name:    flagNameTimeout,
+			Target:  &c.flagTimeout,
+			Default: defaultTimeout,
+			Usage:   "Timeout to wait for installation to be ready.",
+		})
+		f.BoolVar(&flag.BoolVar{
+			Name:    flagNameWait,
+			Target:  &c.flagWait,
+			Default: defaultWait,
+			Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
 		})
 
 		f = c.set.NewSet("Global Options")
@@ -294,8 +315,8 @@ func (c *Command) Run(args []string) int {
 	install.Namespace = c.flagNamespace
 	install.CreateNamespace = true
 	install.ChartPathOptions.RepoURL = helmRepository
-	install.Wait = true
-	install.Timeout = time.Minute * 10
+	install.Wait = c.flagWait
+	install.Timeout = c.timeoutDuration
 
 	// Locate the chart, install it in some cache locally.
 	chartPath, err := install.ChartPathOptions.LocateChart("consul", settings)
@@ -470,6 +491,11 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New(fmt.Sprintf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
 			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric.", c.flagNamespace))
 	}
+	duration, err := time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
+	}
+	c.timeoutDuration = duration
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
