@@ -74,26 +74,20 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures which Kubernetes secret to retrieve Consul's
-  # gossip encryption key from (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)). If secretName or
-  # secretKey are not set, gossip encryption will not be enabled. The secret must
-  # be in the same namespace that Consul is installed into.
-  #
-  # The secret can be created by running:
+  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
+  # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
+  # To automatically generate and set a gossip encryption key, set autoGenerate to true. The values for secretName
+  # and secretKey may be left empty. If values are supplied for these keys, they will be respected.
+  # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
+  # the gossip key referencing these values.
   #
   # ```shell
-  # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
-  # ```
-  #
-  # To reference, use:
-  #
-  # ```yaml
-  # global:
-  #   gossipEncryption:
-  #     secretName: consul-gossip-encryption-key
-  #     secretKey: key
+  # $ kubectl create secret generic <secretName> --from-literal=<secretKey>=$(consul keygen)
   # ```
   gossipEncryption:
+    # automatically generate a gossip encryption key and load it as a Kubernetes secret
+    autoGenerate: false
     # secretName is the name of the Kubernetes secret that holds the gossip
     # encryption key. The secret must be in the same namespace that Consul is installed into.
     secretName: ""
