@@ -1,5 +1,5 @@
-{{- if .Values.global.gossipEncryption.autogenerate }}
-# autogenerate encryption key for gossip protocol and save in Kubernetes secrets
+{{- if .Values.global.gossipEncryption.autoGenerate }}
+# automatically generate encryption key for gossip protocol and save in Kubernetes secrets
 apiVersion: batch/v1
 kind: Job
 metadata:
