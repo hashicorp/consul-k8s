@@ -156,6 +156,9 @@ spec:
                   fieldPath: metadata.namespace
             - name: CONSUL_DISABLE_PERM_MGMT
               value: "true"
+# TODO: properly reference the gossip encryption key here
+# if autoencrypt is true OR secretName and secretKey are non null, load the gossip key
+            {{- if .Values.global.gossipEncryption.autoGenerate }}
             {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
             - name: GOSSIP_KEY
               valueFrom:
