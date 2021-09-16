@@ -98,6 +98,7 @@ const (
 	WarningStyle     = "warning"
 	WarningBoldStyle = "warning-bold"
 	InfoStyle        = "info"
+	LibraryStyle     = "library"
 	SuccessStyle     = "success"
 	SuccessBoldStyle = "success-bold"
 )
@@ -150,6 +151,13 @@ func WithSuccessStyle() Option {
 	}
 }
 
+// WithLibraryStyle styles the output as a success message.
+func WithLibraryStyle() Option {
+	return func(c *config) {
+		c.Style = LibraryStyle
+	}
+}
+
 func WithStyle(style string) Option {
 	return func(c *config) {
 		c.Style = style
@@ -166,6 +174,7 @@ var (
 	colorInfo        = color.New()
 	colorError       = color.New(color.FgRed)
 	colorErrorBold   = color.New(color.FgRed, color.Bold)
+	colorLibrary     = color.New(color.FgCyan)
 	colorSuccess     = color.New(color.FgGreen)
 	colorSuccessBold = color.New(color.FgGreen, color.Bold)
 	colorWarning     = color.New(color.FgYellow)

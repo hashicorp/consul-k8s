@@ -186,7 +186,7 @@ func (c *Command) Run(args []string) int {
 	// Setup logger to stream Helm library logs
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
-		c.UI.Output(logMsg, terminal.WithInfoStyle())
+		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
 	// Set up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
