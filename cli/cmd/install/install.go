@@ -86,82 +86,80 @@ func (c *Command) init() {
 	}
 
 	c.set = flag.NewSets()
-	{
-		f := c.set.NewSet("Command Options")
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameAutoApprove,
-			Target:  &c.flagAutoApprove,
-			Default: defaultAutoApprove,
-			Usage:   "Skip confirmation prompt.",
-		})
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameDryRun,
-			Target:  &c.flagDryRun,
-			Default: defaultDryRun,
-			Usage:   "Run pre-install checks and display summary of installation.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:    flagNameConfigFile,
-			Aliases: []string{"f"},
-			Target:  &c.flagValueFiles,
-			Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNameNamespace,
-			Target:  &c.flagNamespace,
-			Default: defaultNamespace,
-			Usage:   "Namespace for the Consul installation.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNamePreset,
-			Target:  &c.flagPreset,
-			Default: defaultPreset,
-			Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameSetValues,
-			Target: &c.flagSetValues,
-			Usage:  "Set a value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameFileValues,
-			Target: &c.flagFileValues,
-			Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
-				"specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameSetStringValues,
-			Target: &c.flagSetStringValues,
-			Usage:  "Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNameTimeout,
-			Target:  &c.flagTimeout,
-			Default: defaultTimeout,
-			Usage:   "Timeout to wait for installation to be ready.",
-		})
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameWait,
-			Target:  &c.flagWait,
-			Default: defaultWait,
-			Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
-		})
+	f := c.set.NewSet("Command Options")
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameAutoApprove,
+		Target:  &c.flagAutoApprove,
+		Default: defaultAutoApprove,
+		Usage:   "Skip confirmation prompt.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameDryRun,
+		Target:  &c.flagDryRun,
+		Default: defaultDryRun,
+		Usage:   "Run pre-install checks and display summary of installation.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:    flagNameConfigFile,
+		Aliases: []string{"f"},
+		Target:  &c.flagValueFiles,
+		Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameNamespace,
+		Target:  &c.flagNamespace,
+		Default: defaultNamespace,
+		Usage:   "Namespace for the Consul installation.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNamePreset,
+		Target:  &c.flagPreset,
+		Default: defaultPreset,
+		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameSetValues,
+		Target: &c.flagSetValues,
+		Usage:  "Set a value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameFileValues,
+		Target: &c.flagFileValues,
+		Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
+			"specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameSetStringValues,
+		Target: &c.flagSetStringValues,
+		Usage:  "Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameTimeout,
+		Target:  &c.flagTimeout,
+		Default: defaultTimeout,
+		Usage:   "Timeout to wait for installation to be ready.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameWait,
+		Target:  &c.flagWait,
+		Default: defaultWait,
+		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
+	})
 
-		f = c.set.NewSet("Global Options")
-		f.StringVar(&flag.StringVar{
-			Name:    "kubeconfig",
-			Aliases: []string{"c"},
-			Target:  &c.flagKubeConfig,
-			Default: "",
-			Usage:   "Path to kubeconfig file.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    "context",
-			Target:  &c.flagKubeContext,
-			Default: "",
-			Usage:   "Kubernetes context to use.",
-		})
-	}
+	f = c.set.NewSet("Global Options")
+	f.StringVar(&flag.StringVar{
+		Name:    "kubeconfig",
+		Aliases: []string{"c"},
+		Target:  &c.flagKubeConfig,
+		Default: "",
+		Usage:   "Path to kubeconfig file.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "context",
+		Target:  &c.flagKubeContext,
+		Default: "",
+		Usage:   "Kubernetes context to use.",
+	})
 
 	c.help = c.set.Help()
 

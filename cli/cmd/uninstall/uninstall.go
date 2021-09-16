@@ -18,20 +18,20 @@ import (
 )
 
 const (
-	FlagAutoApprove    = "auto-approve"
-	DefaultAutoApprove = false
+	flagAutoApprove    = "auto-approve"
+	defaultAutoApprove = false
 
-	FlagNamespace        = "namespace"
-	DefaultAllNamespaces = ""
+	flagNamespace        = "namespace"
+	defaultAllNamespaces = ""
 
-	FlagReleaseName       = "name"
-	DefaultAnyReleaseName = ""
+	flagReleaseName       = "name"
+	defaultAnyReleaseName = ""
 
-	FlagWipeData    = "wipe-data"
-	DefaultWipeData = false
+	flagWipeData    = "wipe-data"
+	defaultWipeData = false
 
-	FlagSkipWipeData    = "skip-wipe-data"
-	DefaultSkipWipeData = false
+	flagSkipWipeData    = "skip-wipe-data"
+	defaultSkipWipeData = false
 )
 
 type Command struct {
@@ -56,58 +56,56 @@ type Command struct {
 
 func (c *Command) init() {
 	c.set = flag.NewSets()
-	{
-		f := c.set.NewSet("Command Options")
-		f.BoolVar(&flag.BoolVar{
-			Name:    FlagAutoApprove,
-			Target:  &c.flagAutoApprove,
-			Default: DefaultAutoApprove,
-			Usage:   "Skip approval prompt for uninstalling Consul.",
-		})
-		// This is like the auto-approve to wipe all data without prompting for non-interactive environments that want
-		// to remove everything.
-		f.BoolVar(&flag.BoolVar{
-			Name:    FlagWipeData,
-			Target:  &c.flagWipeData,
-			Default: DefaultWipeData,
-			Usage:   "Delete all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete. Only use this when persisted data from previous installations is no longer necessary.",
-		})
-		// This is like the auto-approve to NOT wipe all data without prompting for non-interactive environments that
-		// only want to remove the Consul Helm installation but keep the data.
-		f.BoolVar(&flag.BoolVar{
-			Name:    FlagSkipWipeData,
-			Target:  &c.flagSkipWipeData,
-			Default: DefaultSkipWipeData,
-			Usage:   "Skip deleting all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    FlagNamespace,
-			Target:  &c.flagNamespace,
-			Default: DefaultAllNamespaces,
-			Usage:   "Namespace for the Consul installation.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    FlagReleaseName,
-			Target:  &c.flagReleaseName,
-			Default: DefaultAnyReleaseName,
-			Usage:   "Name of the installation. This will be prefixed to resources installed on the cluster.",
-		})
+	f := c.set.NewSet("Command Options")
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagAutoApprove,
+		Target:  &c.flagAutoApprove,
+		Default: defaultAutoApprove,
+		Usage:   "Skip approval prompt for uninstalling Consul.",
+	})
+	// This is like the auto-approve to wipe all data without prompting for non-interactive environments that want
+	// to remove everything.
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagWipeData,
+		Target:  &c.flagWipeData,
+		Default: defaultWipeData,
+		Usage:   "Delete all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete. Only use this when persisted data from previous installations is no longer necessary.",
+	})
+	// This is like the auto-approve to NOT wipe all data without prompting for non-interactive environments that
+	// only want to remove the Consul Helm installation but keep the data.
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagSkipWipeData,
+		Target:  &c.flagSkipWipeData,
+		Default: defaultSkipWipeData,
+		Usage:   "Skip deleting all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNamespace,
+		Target:  &c.flagNamespace,
+		Default: defaultAllNamespaces,
+		Usage:   "Namespace for the Consul installation.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagReleaseName,
+		Target:  &c.flagReleaseName,
+		Default: defaultAnyReleaseName,
+		Usage:   "Name of the installation. This can be used to uninstall and/or delete the resources of a specific Helm release.",
+	})
 
-		f = c.set.NewSet("Global Options")
-		f.StringVar(&flag.StringVar{
-			Name:    "kubeconfig",
-			Aliases: []string{"c"},
-			Target:  &c.flagKubeConfig,
-			Default: "",
-			Usage:   "Path to kubeconfig file.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    "context",
-			Target:  &c.flagKubeContext,
-			Default: "",
-			Usage:   "Kubernetes context to use.",
-		})
-	}
+	f = c.set.NewSet("Global Options")
+	f.StringVar(&flag.StringVar{
+		Name:    "kubeconfig",
+		Aliases: []string{"c"},
+		Target:  &c.flagKubeConfig,
+		Default: "",
+		Usage:   "Path to kubeconfig file.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "context",
+		Target:  &c.flagKubeContext,
+		Default: "",
+		Usage:   "Kubernetes context to use.",
+	})
 
 	c.help = c.set.Help()
 
@@ -165,7 +163,7 @@ func (c *Command) Run(args []string) int {
 	// Setup logger to stream Helm library logs
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
-		c.UI.Output(logMsg, terminal.WithInfoStyle())
+		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
 	c.UI.Output("Existing Installation", terminal.WithHeaderStyle())
@@ -194,7 +192,7 @@ func (c *Command) Run(args []string) int {
 		// Prompt for approval to uninstall Helm release.
 		if !c.flagAutoApprove {
 			confirmation, err := c.UI.Input(&terminal.Input{
-				Prompt: "Proceed with uninstall? (y/n)",
+				Prompt: "Proceed with uninstall? (y/N)",
 				Style:  terminal.InfoStyle,
 				Secret: false,
 			})
@@ -250,7 +248,7 @@ func (c *Command) Run(args []string) int {
 	// then it will proceed to delete those without a prompt.
 	if !c.flagWipeData {
 		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/n)",
+			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/N)",
 			Style:  terminal.WarningStyle,
 			Secret: false,
 		})
@@ -288,8 +286,7 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: kubectl consul uninstall [options]" + "\n\n" + "Uninstall Consul and clean up all data." + "\n" +
-		"Any data store in Consul will not be recoverable." + "\n" + c.help
+	s := "Usage: kubectl consul uninstall [options]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
 	return s
 }
 
@@ -297,17 +294,9 @@ func (c *Command) Synopsis() string {
 	return "Uninstall Consul deployment."
 }
 
-const help = `
-Usage: kubectl consul uninstall [options]
-
-  Uninstall Consul and clean up all data.
-  This is a destructive action. Any data store in Consul will
-  not be recoverable.
-`
-
 func (c *Command) initActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger action.DebugLog) (*action.Configuration, error) {
 	var err error
-	if namespace == DefaultAllNamespaces {
+	if namespace == defaultAllNamespaces {
 		err = actionConfig.Init(settings.RESTClientGetter(), "",
 			os.Getenv("HELM_DRIVER"), logger)
 	} else {
@@ -322,7 +311,7 @@ func (c *Command) initActionConfig(actionConfig *action.Configuration, namespace
 
 func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (bool, string, string, error) {
 	lister := action.NewList(actionConfig)
-	if c.flagNamespace == DefaultAllNamespaces {
+	if c.flagNamespace == defaultAllNamespaces {
 		lister.AllNamespaces = true
 	}
 	res, err := lister.Run()
@@ -335,7 +324,7 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 	foundReleaseNamespace := ""
 	for _, rel := range res {
 		if rel.Chart.Metadata.Name == "consul" {
-			if c.flagNamespace != DefaultAllNamespaces {
+			if c.flagNamespace != defaultAllNamespaces {
 				if c.flagNamespace == rel.Name {
 					found = true
 					foundReleaseName = rel.Name

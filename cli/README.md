@@ -4,7 +4,7 @@ This repository contains a CLI tool for installing and operating [Consul](https:
 
 ## Installation & Setup
 Currently the tool is not available on any releases page. Instead clone the repository and run `go build -o bin/consul-k8s`
-and proceed to run the binary.
+from this directory and proceed to run the binary.
 
 ## Commands
 * [consul-k8s install](#consul-k8s-install)
@@ -94,17 +94,16 @@ consul-k8s uninstall
 
 ```
 Usage: kubectl consul uninstall [options]
+Uninstall Consul with options to delete data and resources associated with Consul installation.
 
-Uninstall Consul and clean up all data.
-Any data store in Consul will not be recoverable.
 Command Options:
 
   -auto-approve
       Skip approval prompt for uninstalling Consul. The default is false.
 
   -name=<string>
-      Name of the installation. This will be prefixed to resources installed
-      on the cluster.
+      Name of the installation. This can be used to uninstall and/or delete
+      the resources of a specific Helm release.
 
   -namespace=<string>
       Namespace for the Consul installation.
@@ -127,6 +126,4 @@ Global Options:
 
   -kubeconfig=<string>
       Path to kubeconfig file. This is aliased as "-c".
-
-
 ```
