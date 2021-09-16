@@ -31,41 +31,53 @@ rightmost flag value has the highest precedence, i.e `-set foo=bar -set foo=baz`
 
 ```
 Usage: consul-k8s install [flags]
+Install Consul onto a Kubernetes cluster.
 
- Install Consul onto a Kubernetes cluster.
-
-Flags:
-
+Command Options:
 
   -auto-approve
- 	Skip confirmation prompt.
+      Skip confirmation prompt. The default is false.
+
+  -config-file=<string>
+      Path to a file to customize the installation, such as Consul Helm chart
+      values file. Can be specified multiple times. This is aliased as "-f".
 
   -dry-run
-    Run pre-install checks and display summary of installation.
-
-  -config-file,-f=<string>
- 	Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.
+      Run pre-install checks and display summary of installation. The default
+      is false.
 
   -namespace=<string>
- 	Namespace for the Consul installation. Defaults to “consul”.
+      Namespace for the Consul installation. The default is consul.
 
   -preset=<string>
- 	Use an installation preset, one of demo, secure. Defaults to the default configuration of the Consul Helm chart.
+      Use an installation preset, one of demo, secure. Defaults to none
 
   -set=<string>
- 	Set a value to customize. Can be specified multiple times. Supports Consul Helm chart values.
+      Set a value to customize. Can be specified multiple times. Supports
+      Consul Helm chart values.
 
   -set-file=<string>
-      Set a value to customize via a file. The contents of the file will be set as the value. Can be specified multiple times. Supports Consul Helm chart values.
+      Set a value to customize via a file. The contents of the file will be
+      set as the value. Can be specified multiple times. Supports Consul Helm
+      chart values.
 
   -set-string=<string>
-      Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.
+      Set a string value to customize. Can be specified multiple times.
+      Supports Consul Helm chart values.
 
+  -timeout=<string>
+      Timeout to wait for installation to be ready. The default is 10m.
 
-Global Flags:
--context=<string> 
-	Kubernetes context to use
+  -wait
+      Determines whether to wait for resources in installation to be ready
+      before exiting command. The default is true.
 
--kubeconfig, -c=<string>
-	Path to kubeconfig file
+Global Options:
+
+  -context=<string>
+      Kubernetes context to use.
+
+  -kubeconfig=<string>
+      Path to kubeconfig file. This is aliased as "-c".
+
 ```
