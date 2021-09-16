@@ -88,9 +88,11 @@ func (ui *basicUI) Output(msg string, raw ...interface{}) {
 	case WarningBoldStyle:
 		msg = colorWarningBold.Sprintf(" * %s", msg)
 	case SuccessStyle:
-		msg = colorSuccess.Sprintf(" + %s", msg)
+		msg = colorSuccess.Sprintf(" ✓ %s", msg)
 	case SuccessBoldStyle:
-		msg = colorSuccessBold.Sprintf(" + %s", msg)
+		msg = colorSuccessBold.Sprintf(" ✓ %s", msg)
+	case LibraryStyle:
+		msg = colorLibrary.Sprintf(" --> %s", msg)
 	case InfoStyle:
 		lines := strings.Split(msg, "\n")
 		for i, line := range lines {
