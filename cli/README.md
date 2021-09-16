@@ -109,12 +109,10 @@ Command Options:
       Namespace for the Consul installation.
 
   -wipe-data
-      This behaviour of this flag depends on the value of -auto-approve.
-      When -wipe-data=true, the CLI will delete PVCs and Secrets if
-      -auto-approve=true. When -wipe-data=false, the CLI will prompt to
-      wipe PVCs and Secrets if -auto-approve=false, and skip wiping them
-      if -auto-approve=true. Only set this to true when persisted data from
-      previous installations is no longer necessary. The default is false.
+      When used in combination with -auto-approve, all persisted data (PVCs
+      and Secrets) from previous installations will be deleted. Only set this
+      to true when data from previous installations is no longer necessary.
+      The default is false.
 
 Global Options:
 

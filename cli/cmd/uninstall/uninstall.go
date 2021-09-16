@@ -38,11 +38,10 @@ type Command struct {
 
 	set *flag.Sets
 
-	flagNamespace    string
-	flagReleaseName  string
-	flagAutoApprove  bool
-	flagWipeData     bool
-	flagSkipWipeData bool
+	flagNamespace   string
+	flagReleaseName string
+	flagAutoApprove bool
+	flagWipeData    bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -64,7 +63,7 @@ func (c *Command) init() {
 		Name:    flagWipeData,
 		Target:  &c.flagWipeData,
 		Default: defaultWipeData,
-		Usage:   "This behaviour of this flag depends on the value of -auto-approve. When -wipe-data=true, the CLI will delete PVCs and Secrets if -auto-approve=true.  When -wipe-data=false, the CLI will prompt to wipe PVCs and Secrets if -auto-approve=false, and skip wiping them if -auto-approve=true. Only set this to true when persisted data from previous installations is no longer necessary.",
+		Usage:   "When used in combination with -auto-approve, all persisted data (PVCs and Secrets) from previous installations will be deleted. Only set this to true when data from previous installations is no longer necessary.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamespace,
@@ -121,7 +120,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Should have no non-flag arguments.", terminal.WithErrorStyle())
 		return 1
 	}
-	//TODO flag validation for -auto-approve=false -wipe-data=true
+	if c.flagWipeData && !c.flagAutoApprove {
+		c.UI.Output("Can't set -wipe-data alone. Omit this flag to interactively uninstall, or use it with -auto-approve to wipe all data during the uninstall.")
+		return 1
+	}
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
@@ -179,7 +181,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Namespace: %s", foundReleaseNamespace, terminal.WithInfoStyle())
 
 		// Prompt for approval to uninstall Helm release.
-		if c.flagAutoApprove == false {
+		if !c.flagAutoApprove {
 			confirmation, err := c.UI.Input(&terminal.Input{
 				Prompt: "Proceed with uninstall? (y/N)",
 				Style:  terminal.InfoStyle,
@@ -215,7 +217,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// If -auto-approve=true and -wipe-data=false, we should only uninstall the release, and skip deleting resources.
-	if c.flagWipeData == false && c.flagAutoApprove {
+	if c.flagAutoApprove && !c.flagWipeData {
 		c.UI.Output("Skipping deleting PVCs, secrets, and service accounts.", terminal.WithSuccessStyle())
 		return 0
 	}
@@ -234,9 +236,8 @@ func (c *Command) Run(args []string) int {
 		foundReleaseNamespace = c.flagNamespace
 	}
 
-	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts. If flagWipeData is true,
-	// then it will proceed to delete those without a prompt.
-	if c.flagAutoApprove == false {
+	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts.
+	if !c.flagAutoApprove {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/N)",
 			Style:  terminal.WarningStyle,
