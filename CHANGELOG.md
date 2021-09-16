@@ -1,4 +1,8 @@
 ## UNRELEASED
+FEATURES:
+* CLI
+  * The `consul-k8s` CLI enables users to deploy and operate Consul on Kubernetes.
+    * Support `consul-k8s install` command. [[GH-713](https://github.com/hashicorp/consul-k8s/pull/713)]
 
 IMPROVEMENTS:
 * Helm Chart
