@@ -29,9 +29,6 @@ const (
 
 	flagWipeData    = "wipe-data"
 	defaultWipeData = false
-
-	flagSkipWipeData    = "skip-wipe-data"
-	defaultSkipWipeData = false
 )
 
 type Command struct {
@@ -63,21 +60,11 @@ func (c *Command) init() {
 		Default: defaultAutoApprove,
 		Usage:   "Skip approval prompt for uninstalling Consul.",
 	})
-	// This is like the auto-approve to wipe all data without prompting for non-interactive environments that want
-	// to remove everything.
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagWipeData,
 		Target:  &c.flagWipeData,
 		Default: defaultWipeData,
-		Usage:   "Delete all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete. Only use this when persisted data from previous installations is no longer necessary.",
-	})
-	// This is like the auto-approve to NOT wipe all data without prompting for non-interactive environments that
-	// only want to remove the Consul Helm installation but keep the data.
-	f.BoolVar(&flag.BoolVar{
-		Name:    flagSkipWipeData,
-		Target:  &c.flagSkipWipeData,
-		Default: defaultSkipWipeData,
-		Usage:   "Skip deleting all PVCs, Secrets, and Service Accounts associated with Consul Helm installation without prompting for approval to delete.",
+		Usage:   "This behaviour of this flag depends on the value of -auto-approve. When -wipe-data=true, the CLI will delete PVCs and Secrets if -auto-approve=true.  When -wipe-data=false, the CLI will prompt to wipe PVCs and Secrets if -auto-approve=false, and skip wiping them if -auto-approve=true. Only set this to true when persisted data from previous installations is no longer necessary.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamespace,
@@ -118,7 +105,7 @@ func (c *Command) Run(args []string) int {
 
 	defer func() {
 		if err := c.Close(); err != nil {
-			c.UI.Output(err.Error())
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			os.Exit(1)
 		}
 	}()
@@ -127,12 +114,14 @@ func (c *Command) Run(args []string) int {
 	c.Log.ResetNamed("uninstall")
 
 	if err := c.set.Parse(args); err != nil {
-		c.UI.Output(err.Error())
-		os.Exit(1)
-	} else if len(c.set.Args()) > 0 {
-		c.UI.Output("Should have no non-flag arguments.")
-		os.Exit(1)
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
 	}
+	if len(c.set.Args()) > 0 {
+		c.UI.Output("Should have no non-flag arguments.", terminal.WithErrorStyle())
+		return 1
+	}
+	//TODO flag validation for -auto-approve=false -wipe-data=true
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
@@ -151,7 +140,7 @@ func (c *Command) Run(args []string) int {
 		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 		if err != nil {
 			c.UI.Output("retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
-			os.Exit(1)
+			return 1
 		}
 		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
 		if err != nil {
@@ -190,7 +179,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Namespace: %s", foundReleaseNamespace, terminal.WithInfoStyle())
 
 		// Prompt for approval to uninstall Helm release.
-		if !c.flagAutoApprove {
+		if c.flagAutoApprove == false {
 			confirmation, err := c.UI.Input(&terminal.Input{
 				Prompt: "Proceed with uninstall? (y/N)",
 				Style:  terminal.InfoStyle,
@@ -225,7 +214,8 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagSkipWipeData {
+	// If -auto-approve=true and -wipe-data=false, we should only uninstall the release, and skip deleting resources.
+	if c.flagWipeData == false && c.flagAutoApprove {
 		c.UI.Output("Skipping deleting PVCs, secrets, and service accounts.", terminal.WithSuccessStyle())
 		return 0
 	}
@@ -246,7 +236,7 @@ func (c *Command) Run(args []string) int {
 
 	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts. If flagWipeData is true,
 	// then it will proceed to delete those without a prompt.
-	if !c.flagWipeData {
+	if c.flagAutoApprove == false {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/N)",
 			Style:  terminal.WarningStyle,

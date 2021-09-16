@@ -108,16 +108,13 @@ Command Options:
   -namespace=<string>
       Namespace for the Consul installation.
 
-  -skip-wipe-data
-      Skip deleting all PVCs, Secrets, and Service Accounts associated with
-      Consul Helm installation without prompting for approval to delete. The
-      default is false.
-
   -wipe-data
-      Delete all PVCs, Secrets, and Service Accounts associated with Consul
-      Helm installation without prompting for approval to delete. Only use
-      this when persisted data from previous installations is no longer
-      necessary. The default is false.
+      This behaviour of this flag depends on the value of -auto-approve.
+      When -wipe-data=true, the CLI will delete PVCs and Secrets if
+      -auto-approve=true. When -wipe-data=false, the CLI will prompt to
+      wipe PVCs and Secrets if -auto-approve=false, and skip wiping them
+      if -auto-approve=true. Only set this to true when persisted data from
+      previous installations is no longer necessary. The default is false.
 
 Global Options:
 
