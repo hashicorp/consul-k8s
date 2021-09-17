@@ -32,6 +32,7 @@ data:
     {
       "ui_config": {
         "enabled": true,
+        "content_path": "{{ .Values.ui.contentPath }}",
         "metrics_provider": "{{ .Values.ui.metrics.provider }}",
         "metrics_proxy": {
           "base_url": "{{ .Values.ui.metrics.baseURL }}"
