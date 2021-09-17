@@ -352,25 +352,6 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: true,
 		},
 		{
-			name: "single upstream with partition",
-			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod1.Annotations[annotationUpstreams] = "upstream.default.bar:1234"
-				return pod1
-			},
-			expected: []api.Upstream{
-				{
-					DestinationType:      api.UpstreamDestTypeService,
-					DestinationName:      "upstream",
-					LocalBindPort:        1234,
-					DestinationNamespace: "default",
-					DestinationPartition: "bar",
-				},
-			},
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: true,
-		},
-		{
 			name: "multiple upstreams",
 			pod: func() *corev1.Pod {
 				pod1 := createPod("pod1", "1.2.3.4", true, true)
@@ -1096,7 +1077,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				// of the regular require.Equal call since it supports ignoring certain
 				// fields.
 				diff := cmp.Diff(tt.expectedProxySvcInstances[i].ServiceProxy, instance.ServiceProxy,
-					cmpopts.IgnoreFields(api.Upstream{}, "DestinationNamespace"))
+					cmpopts.IgnoreFields(api.Upstream{}, "DestinationNamespace", "DestinationPartition"))
 				require.Empty(t, diff, "expected objects to be equal")
 			}
 
@@ -1118,7 +1099,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					require.NoError(t, err)
 					require.EqualValues(t, len(check), 1)
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
 			}
@@ -2464,7 +2445,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					require.NoError(t, err)
 					require.EqualValues(t, len(check), 1)
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
 			}

@@ -54,7 +54,7 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
-				"-partition-name", "default"},
+				"-partition", "default"},
 			expErr: "-enable-partitions must be set to 'true' if -partition-name is set",
 		},
 		{
