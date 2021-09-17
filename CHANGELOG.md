@@ -3,6 +3,103 @@ FEATURES:
 * CLI
   * The `consul-k8s` CLI enables users to deploy and operate Consul on Kubernetes.
     * Support `consul-k8s install` command. [[GH-713](https://github.com/hashicorp/consul-k8s/pull/713)]
+* Helm Chart
+  * Add support for Admin Partitions. **(Consul Enterprise only)**
+  **ALPHA** [[GH-729](https://github.com/hashicorp/consul-k8s/pull/729)]
+    * This feature allows Consul to be deployed across multiple Kubernetes clusters while sharing a single set of Consul
+servers. The services on each cluster can be independently managed. This feature is an alpha feature. It requires:
+      * a flat pod and node network in order for inter-partition networking to work.
+      * TLS to be enabled.
+      * Consul Namespaces enabled.
+
+      Transparent Proxy is unsupported for cross partition communication.
+
+To enable Admin Partitions on the server cluster use the following config.
+
+```yaml
+global:
+  enableConsulNamespaces: true
+  tls:
+    enabled: true
+  image: hashicorp/consul-enterprise:1.11.0-ent-alpha
+  adminPartitions:
+    enabled: true
+server:
+  exposeGossipAndRPCPorts: true
+  enterpriseLicense:
+    secretName: license
+    secretKey: key
+connectInject:
+  enabled: true
+  transparentProxy:
+    defaultEnabled: false
+  consulNamespaces:
+    mirroringK8S: true
+controller:
+  enabled: true
+```
+
+Identify the LoadBalancer External IP of the `partition-service`
+
+```bash
+kubectl get svc consul-consul-partition-service -o json | jq -r '.status.loadBalancer.ingress[0].ip'
+```
+
+Migrate the TLS CA credentials from the server cluster to the workload clusters
+
+```bash
+kubectl get secret consul-consul-ca-key --context "server-context" -o yaml | kubectl apply --context "workload-context" -f -
+kubectl get secret consul-consul-ca-cert --context "server-context" -o yaml | kubectl apply --context "workload-context" -f -
+```
+
+Configure the workload cluster using the following config.
+
+```yaml
+global:
+  enabled: false
+  enableConsulNamespaces: true
+  image: hashicorp/consul-enterprise:1.11.0-ent-alpha
+  adminPartitions:
+    enabled: true
+    name: "alpha" # Name of Admin Partition
+  tls:
+    enabled: true
+    caCert:
+      secretName: consul-consul-ca-cert
+      secretKey: tls.crt
+    caKey:
+      secretName: consul-consul-ca-key
+      secretKey: tls.key
+server:
+  enterpriseLicense:
+    secretName: license
+    secretKey: key
+externalServers:
+  enabled: true
+  hosts: [ "loadbalancer IP" ] # external IP of partition service LB
+  tlsServerName: server.dc1.consul
+client:
+  enabled: true
+  exposeGossipPorts: true
+  join: [ "loadbalancer IP" ] # external IP of partition service LB
+connectInject:
+  enabled: true
+  consulNamespaces:
+    mirroringK8S: true
+controller:
+  enabled: true
+```
+
+This should lead to the workload cluster having only Consul agents that connect with the Consul server. Services in this
+cluster behave like independent services. They can be configured to communicate with services in other partitions by
+configuring the upstream configuration on the individual services.
+
+* Control Plane
+  * Add support for Admin Partitions. **(Consul Enterprise only)** **
+    ALPHA** [[GH-729](https://github.com/hashicorp/consul-k8s/pull/729)]
+    * Add Partition-Init job that runs in Kubernetes clusters that do not have servers running to provision Admin
+      Partitions.
+    * Update endpoints-controller, config-entry controller and config entries to add partition config to them.
 
 IMPROVEMENTS:
 * Helm Chart
