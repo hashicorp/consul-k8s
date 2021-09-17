@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIX:
+* Helm
+  * Fix consul-k8s image version in values file. [[GH-732](https://github.com/hashicorp/consul-k8s/pull/732)]
+
 ## 0.34.0 (September 17, 2021)
 FEATURES:
 * CLI
