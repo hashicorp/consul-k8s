@@ -188,7 +188,6 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				tokenSinkFile:                      tokenFile,
 				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 5,
-				flagPartition:                      c.adminPartition,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.

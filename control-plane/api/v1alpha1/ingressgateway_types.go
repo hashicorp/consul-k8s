@@ -210,7 +210,7 @@ func (in *IngressGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.IngressGatewayConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.IngressGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *IngressGateway) Validate(namespacesEnabled bool) error {

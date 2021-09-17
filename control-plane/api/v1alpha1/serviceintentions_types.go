@@ -235,7 +235,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	return cmp.Equal(
 		in.ToConsul(""),
 		configEntry,
-		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
 		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),

@@ -58,7 +58,7 @@ func (f *HTTPFlags) Flags() *flag.FlagSet {
 		"The server name to use as the SNI host when connecting via TLS. This "+
 			"can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
 	fs.Var(&f.partition, "partition",
-		"[Enterprise Only] Name of the Consul Admin Partition the controller is operating in. The config entries are created in this partition.")
+		"[Enterprise Only] Name of the Consul Admin Partition to query. Default to \"default\" if Admin Partitions are enabled.")
 	return fs
 }
 
@@ -94,6 +94,10 @@ func (f *HTTPFlags) ReadTokenFile() (string, error) {
 	}
 
 	return strings.TrimSpace(string(data)), nil
+}
+
+func (f *HTTPFlags) Partition() string {
+	return f.partition.String()
 }
 
 func (f *HTTPFlags) APIClient() (*api.Client, error) {
