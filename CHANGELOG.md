@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.34.0 (September 17, 2021)
 FEATURES:
 * CLI
   * The `consul-k8s` CLI enables users to deploy and operate Consul on Kubernetes.
