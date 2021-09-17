@@ -240,7 +240,7 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceRouter) Validate(namespacesEnabled bool) error {

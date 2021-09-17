@@ -32,7 +32,6 @@ type Command struct {
 	flagEnableLeaderElection bool
 	flagEnableWebhooks       bool
 	flagDatacenter           string
-	flagPartition            string
 	flagLogLevel             string
 	flagLogJSON              bool
 
@@ -65,8 +64,6 @@ func (c *Command) init() {
 			"Enabling this will ensure there is only one active controller manager.")
 	c.flagSet.StringVar(&c.flagDatacenter, "datacenter", "",
 		"Name of the Consul datacenter the controller is operating in. This is added as metadata on managed custom resources.")
-	c.flagSet.StringVar(&c.flagPartition, "partition", "",
-		"Name of the Consul Admin Partition the controller is operating in. The config entries are created in this partition.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables Consul Enterprise namespaces, in either a single Consul namespace or mirrored.")
 	c.flagSet.StringVar(&c.flagConsulDestinationNamespace, "consul-destination-namespace", "default",

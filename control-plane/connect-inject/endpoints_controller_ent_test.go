@@ -308,7 +308,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					require.NoError(t, err)
 					require.EqualValues(t, 1, len(check))
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace"}
+					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 					require.True(t, cmp.Equal(check[setup.expectedAgentHealthChecks[i].CheckID], setup.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
 			}
@@ -1308,7 +1308,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						require.NoError(t, err)
 						require.EqualValues(t, 1, len(check))
 						// Ignoring Namespace because the response from ENT includes it and OSS does not.
-						var ignoredFields = []string{"Node", "Definition", "Namespace"}
+						var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
 						require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 					}
 				}
