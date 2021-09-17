@@ -1,0 +1,21 @@
+{{- if .Values.global.gossipEncryption.autoGenerate }}
+# automatically generate encryption key for gossip protocol and save it in Kubernetes secret
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogen
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": 1
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-gossip-encryption-autogen
+
