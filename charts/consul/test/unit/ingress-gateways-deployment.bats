@@ -1406,6 +1406,57 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# partitions
+
+@test "ingressGateways/Deployment: partition command flag is not present by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.command | any(contains("-partition"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-partition"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "ingressGateways/Deployment: partition command flag is specified through partition name" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object | yq -r '.lifecycle.preStop.exec.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: fails if admin partitions are enabled but namespaces aren't" {
+  cd `chart_dir`
+    run helm template \
+        -s templates/ingress-gateways-deployment.yaml  \
+        --set 'ingressGateways.enabled=true' \
+        --set 'connectInject.enabled=true' \
+        --set 'global.enableConsulNamespaces=false' \
+        --set 'global.adminPartitions.enabled=true' .
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" ]]
+}
+
+#--------------------------------------------------------------------
 # multiple gateways
 
 @test "ingressGateways/Deployment: multiple gateways" {

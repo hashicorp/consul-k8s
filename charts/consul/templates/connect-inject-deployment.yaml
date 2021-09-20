@@ -2,6 +2,7 @@
 {{- if not (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}{{ fail "clients must be enabled for connect injection" }}{{ end }}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for connect injection" }}{{ end }}
 {{- if and .Values.connectInject.consulNamespaces.mirroringK8S (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if mirroringK8S=true" }}{{ end }}
+{{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 {{- if .Values.connectInject.centralConfig }}{{- if eq (toString .Values.connectInject.centralConfig.enabled) "false" }}{{ fail "connectInject.centralConfig.enabled cannot be set to false; to disable, set enable_central_service_config to false in server.extraConfig and client.extraConfig" }}{{ end -}}{{ end -}}
 {{- if .Values.connectInject.centralConfig }}{{- if .Values.connectInject.centralConfig.defaultProtocol }}{{ fail "connectInject.centralConfig.defaultProtocol is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.centralConfig }}{{ if .Values.connectInject.centralConfig.proxyDefaults }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end }}{{ end -}}
@@ -130,6 +131,10 @@ spec:
                 {{- end }}
                 {{- range $value := .Values.connectInject.k8sDenyNamespaces }}
                 -deny-k8s-namespace="{{ $value }}" \
+                {{- end }}
+                {{- if .Values.global.adminPartitions.enabled }}
+                -enable-partitions=true \
+                -partition={{ .Values.global.adminPartitions.name }} \
                 {{- end }}
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \

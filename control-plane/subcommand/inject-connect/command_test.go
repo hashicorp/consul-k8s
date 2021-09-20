@@ -49,6 +49,16 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-enable-partitions", "true"},
+			expErr: "-partition-name must set if -enable-partitions is set to 'true'",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
+				"-partition", "default"},
+			expErr: "-enable-partitions must be set to 'true' if -partition-name is set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-envoy-image", "envoy:1.16.0",
 				"-default-sidecar-proxy-cpu-limit=unparseable"},
 			expErr: "-default-sidecar-proxy-cpu-limit is invalid",
 		},

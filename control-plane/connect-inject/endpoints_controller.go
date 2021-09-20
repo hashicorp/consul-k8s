@@ -72,6 +72,9 @@ type EndpointsController struct {
 	AllowK8sNamespacesSet mapset.Set
 	// Endpoints in the DenyK8sNamespacesSet are ignored.
 	DenyK8sNamespacesSet mapset.Set
+	// EnableConsulPartitions indicates that a user is running Consul Enterprise
+	// with version 1.11+ which supports Admin Partitions.
+	EnableConsulPartitions bool
 	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which supports namespaces.
 	EnableConsulNamespaces bool
@@ -805,7 +808,7 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 		for _, raw := range strings.Split(raw, ",") {
 			parts := strings.SplitN(raw, ":", 3)
 
-			var datacenter, serviceName, preparedQuery, namespace string
+			var datacenter, serviceName, preparedQuery, namespace, partition string
 			var port int32
 			if strings.TrimSpace(parts[0]) == "prepared_query" {
 				port, _ = portValue(pod, strings.TrimSpace(parts[2]))
@@ -813,13 +816,19 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 			} else {
 				port, _ = portValue(pod, strings.TrimSpace(parts[1]))
 
-				// If Consul Namespaces are enabled, attempt to parse the
+				// If Consul Namespaces or Admin Partitions are enabled, attempt to parse the
 				// upstream for a namespace.
-				if r.EnableConsulNamespaces {
-					pieces := strings.SplitN(parts[0], ".", 2)
-					serviceName = strings.TrimSpace(pieces[0])
-					if len(pieces) > 1 {
+				if r.EnableConsulNamespaces || r.EnableConsulPartitions {
+					pieces := strings.SplitN(parts[0], ".", 3)
+					switch len(pieces) {
+					case 3:
+						partition = strings.TrimSpace(pieces[2])
+						fallthrough
+					case 2:
 						namespace = strings.TrimSpace(pieces[1])
+						fallthrough
+					default:
+						serviceName = strings.TrimSpace(pieces[0])
 					}
 				} else {
 					serviceName = strings.TrimSpace(parts[0])
@@ -852,6 +861,7 @@ func (r *EndpointsController) processUpstreams(pod corev1.Pod) ([]api.Upstream, 
 			if port > 0 {
 				upstream := api.Upstream{
 					DestinationType:      api.UpstreamDestTypeService,
+					DestinationPartition: partition,
 					DestinationNamespace: namespace,
 					DestinationName:      serviceName,
 					Datacenter:           datacenter,

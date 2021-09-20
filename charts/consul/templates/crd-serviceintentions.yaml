@@ -96,6 +96,9 @@ spec:
                     namespace:
                       description: Namespace is the namespace for the Name parameter.
                       type: string
+                    partition:
+                      description: Partition is the Admin Partition for the Name parameter.
+                      type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes
                         that extend the intention match criteria. Permission precedence

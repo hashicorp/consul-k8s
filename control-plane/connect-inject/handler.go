@@ -61,6 +61,11 @@ type Handler struct {
 	// If not set, will use HTTP.
 	ConsulCACert string
 
+	// ConsulPartition is the name of the Admin Partition that the controller
+	// is deployed in. It is an enterprise feature requiring Consul Enterprise 1.11+.
+	// Its value is an empty string if partitions aren't enabled.
+	ConsulPartition string
+
 	// EnableNamespaces indicates that a user is running Consul Enterprise
 	// with version 1.7+ which is namespace aware. It enables Consul namespaces,
 	// with injection into either a single Consul namespace or mirrored from
@@ -184,7 +189,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
-	h.Log.Info("received pod", "name", pod.Name, "ns", pod.Namespace)
+	h.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.

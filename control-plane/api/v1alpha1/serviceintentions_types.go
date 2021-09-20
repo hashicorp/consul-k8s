@@ -77,6 +77,8 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Admin Partition for the Name parameter.
+	Partition string `json:"partition,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
 	// "allow" or "deny" for the action that should be taken if this intention matches a request.
 	Action IntentionAction `json:"action,omitempty"`
@@ -233,7 +235,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	return cmp.Equal(
 		in.ToConsul(""),
 		configEntry,
-		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
 		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
@@ -306,6 +308,7 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 	return &capi.SourceIntention{
 		Name:        in.Name,
 		Namespace:   in.Namespace,
+		Partition:   in.Partition,
 		Action:      in.Action.toConsul(),
 		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,

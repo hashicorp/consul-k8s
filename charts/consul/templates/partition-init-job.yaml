@@ -1,0 +1,92 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (and .Values.global.adminPartitions.enabled (not $serverEnabled)) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-partition-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-partition-init
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: partition-init
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-partition-init
+      {{- if .Values.global.tls.enabled }}
+      volumes:
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+      {{- end }}
+      containers:
+        - name: post-install-job
+          image: {{ .Values.global.imageK8S }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          {{- if .Values.global.tls.enabled }}
+          volumeMounts:
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+           {{- end }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
+              consul-k8s-control-plane partition-init \
+                -log-level={{ .Values.global.logLevel }} \
+                -log-json={{ .Values.global.logJSON }} \
+
+                {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+                {{- range .Values.externalServers.hosts }}
+                -server-address={{ quote . }} \
+                {{- end }}
+                -server-port={{ .Values.externalServers.httpsPort }} \
+
+                {{- if .Values.global.tls.enabled }}
+                -use-https \
+                -consul-ca-cert=/consul/tls/ca/tls.crt \
+                {{- if not .Values.externalServers.enabled }}
+                -server-port=8501 \
+                {{- end }}
+                {{- if .Values.externalServers.tlsServerName }}
+                -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
+                {{- end }}
+                {{- end }}
+                -partition-name={{ .Values.global.adminPartitions.name }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+{{- end }}

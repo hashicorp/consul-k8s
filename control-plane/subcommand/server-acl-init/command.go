@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -287,18 +286,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	serverAddresses := c.flagServerAddresses
-	// Check if the provided addresses contain a cloud-auto join string.
-	// If yes, call godiscover to discover addresses of the Consul servers.
-	if len(c.flagServerAddresses) == 1 && strings.Contains(c.flagServerAddresses[0], "provider=") {
-		var err error
-		serverAddresses, err = godiscover.ConsulServerAddresses(c.flagServerAddresses[0], c.providers, c.log)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
-			return 1
-		}
-	}
-
 	// The ClientSet might already be set if we're in a test.
 	if c.clientset == nil {
 		if err := c.configureKubeClient(); err != nil {
@@ -307,6 +294,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	serverAddresses, err := common.GetResolvedServerAddresses(c.flagServerAddresses, c.providers, c.log)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to discover any Consul addresses from %q: %s", c.flagServerAddresses[0], err))
+		return 1
+	}
 	scheme := "http"
 	if c.flagUseHTTPS {
 		scheme = "https"

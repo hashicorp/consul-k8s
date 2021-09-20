@@ -90,7 +90,7 @@ func main() {
 	}
 
 	// Parse the values.yaml file.
-	inputBytes, err := ioutil.ReadFile("../../values.yaml")
+	inputBytes, err := ioutil.ReadFile("../../charts/consul/values.yaml")
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

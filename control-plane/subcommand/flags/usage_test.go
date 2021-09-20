@@ -47,6 +47,10 @@ HTTP API Options
      can also be set to HTTPS by setting the environment variable
      CONSUL_HTTP_SSL=true.
 
+  -partition=<value>
+     [Enterprise Only] Name of the Consul Admin Partition to query.
+     Default to "default" if Admin Partitions are enabled.
+
   -tls-server-name=<value>
      The server name to use as the SNI host when connecting via
      TLS. This can also be specified via the CONSUL_TLS_SERVER_NAME
