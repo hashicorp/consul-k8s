@@ -5,67 +5,45 @@ load _helpers
 @test "autogenEncryption/Job: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/autogen-encryption-job.yaml  \
+      -s templates/gossip-encryption-autogen-job.yaml  \
       .
 }
 
-@test "autogenEncryption/Job: enabled with global.gossipEncryption.autogenerate=true" {
+@test "autogenEncryption/Job: enabled with global.gossipEncryption.autoGenerate=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/autogen-encryption-job.yaml  \
-      --set 'global.gossipEncryption.autogenerate=true' \
+      -s templates/gossip-encryption-autogen-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "autogenEncryption/Job: disabled when global.gossipEncryption.autogenerate=false" {
+@test "autogenEncryption/Job: disabled when global.gossipEncryption.autoGenerate=false" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/autogen-encryption-job.yaml  \
-      --set 'global.gossipEncryption.autogenerate=false' \
+      -s templates/gossip-encryption-autogen-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=false' \
       .
 }
 
-@test "autogenEncryption/Job: secretName and secretKey set by user are respected" {
+# TODO find out why this test is failing
+@test "autogenEncryption/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretName and global.gossipEncryption.secretKey are set" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/autogen-encryption-job.yaml \
-      --set 'global.gossipEncryption.autogenerate=true' \
-      --set 'global.gossipEncryption.secretName=userName' \
-      --set 'global.gossipEncryption.secretKey=userKey' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("secretName=userName\nsecretKey=userKey"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  run helm template \
+      -s templates/gossip-encryption-autogen-job.yaml  \
+      --set 'global.gossipEncryption.=true' \
+      --set 'global.gossipEncryption.secretName=name' \
+      --set 'global.gossipEncryption.secretKey=key' . 
+  [ "$status" -eq 1 ] # Test fails here
+  [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
 }
 
-@test "autogenEncryption/Job: secretKey set by user is respected while secretName is generated" {
+@test "autogenEncryption/Job: secretName and secretKey are generated" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/autogen-encryption-job.yaml \
-      --set 'global.gossipEncryption.autogenerate=true' \
-      --set 'global.gossipEncryption.secretKey=userKey' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("secretName=RELEASE-NAME-consul-gossip-encryption-key\nsecretKey=userKey"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "autogenEncryption/Job: secretName set by user is respected while secretKey is generated" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/autogen-encryption-job.yaml \
-      --set 'global.gossipEncryption.autogenerate=true' \
-      --set 'global.gossipEncryption.secretName=userName' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("secretName=userName\nsecretKey=key"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "autogenEncryption/Job: secretName and secretKey are generated if not provided" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/autogen-encryption-job.yaml \
-      --set 'global.gossipEncryption.autogenerate=true' \
+      -s templates/gossip-encryption-autogen-job.yaml \
+      --set 'global.gossipEncryption.autoGenerate=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("secretName=RELEASE-NAME-consul-gossip-encryption-key\nsecretKey=key"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]

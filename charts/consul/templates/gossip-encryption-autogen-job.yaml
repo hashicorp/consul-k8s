@@ -1,4 +1,8 @@
 {{- if .Values.global.gossipEncryption.autoGenerate }}
+{{- if (or .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+  {{ fail "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." }}
+{{ end }}
+---
 # automatically generate encryption key for gossip protocol and save it in Kubernetes secret
 apiVersion: batch/v1
 kind: Job
