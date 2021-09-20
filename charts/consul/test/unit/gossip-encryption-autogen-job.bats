@@ -27,17 +27,40 @@ load _helpers
       .
 }
 
-# TODO find out why this test is failing
 @test "autogenEncryption/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretName and global.gossipEncryption.secretKey are set" {
   cd `chart_dir`
   run helm template \
       -s templates/gossip-encryption-autogen-job.yaml  \
-      --set 'global.gossipEncryption.=true' \
+      --set 'global.gossipEncryption.autoGenerate=true' \
       --set 'global.gossipEncryption.secretName=name' \
-      --set 'global.gossipEncryption.secretKey=key' . 
-  [ "$status" -eq 1 ] # Test fails here
+      --set 'global.gossipEncryption.secretKey=key' \
+      . 
+  [ "$status" -eq 1 ]
   [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
 }
+
+@test "autogenEncryption/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretName are set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/gossip-encryption-autogen-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.gossipEncryption.secretName=name' \
+      . 
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
+}
+
+@test "autogenEncryption/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretKey are set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/gossip-encryption-autogen-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.gossipEncryption.secretKey=key' \
+      . 
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
+}
+
 
 @test "autogenEncryption/Job: secretName and secretKey are generated" {
   cd `chart_dir`
