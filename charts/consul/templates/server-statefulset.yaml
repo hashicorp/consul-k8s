@@ -156,14 +156,17 @@ spec:
                   fieldPath: metadata.namespace
             - name: CONSUL_DISABLE_PERM_MGMT
               value: "true"
-# TODO: properly reference the gossip encryption key here
-# if autoencrypt is true OR secretName and secretKey are non null, load the gossip key
-            {{- if .Values.global.gossipEncryption.autoGenerate }}
+            {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
             - name: GOSSIP_KEY
               valueFrom:
                 secretKeyRef:
+                {{- if .Values.global.gossipEncryption.autoGenerate }}
+                  name: {{ template "consul.fullname" . }}-gossip-encryption-key
+                  key: key
+                {{- else if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
                   name: {{ .Values.global.gossipEncryption.secretName }}
                   key: {{ .Values.global.gossipEncryption.secretKey }}
+                {{- end }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -225,7 +228,7 @@ spec:
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
                 -domain={{ .Values.global.domain }} \
-                {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
                 {{- if .Values.server.connect }}

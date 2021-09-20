@@ -842,6 +842,16 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "server/StatefulSet: gossip encryption autogeneration properly sets secretName and secretKey" {
+  cd `chart_dir`
+  local actual=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.gossipEncryption.autoGenerate=true' \
+    . | tee /dev/stderr |
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="RELEASE-NAME-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretName is missing" {
   cd `chart_dir`
   local actual=$(helm template \
