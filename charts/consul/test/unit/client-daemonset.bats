@@ -606,6 +606,16 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
+@test "client/DaemonSet: gossip encryption autogeneration properly sets secretName and secretKey" {
+  cd `chart_dir`
+  local actual=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.gossipEncryption.autoGenerate=true' \
+    . | tee /dev/stderr |
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | .valueFrom.secretKeyRef | [.name=="RELEASE-NAME-consul-gossip-encryption-key", .key="key"] | all' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "client/DaemonSet: gossip encryption disabled in client DaemonSet when secretName is missing" {
   cd `chart_dir`
   local actual=$(helm template \
