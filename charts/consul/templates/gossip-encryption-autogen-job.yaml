@@ -16,7 +16,7 @@ metadata:
     release: {{ .Release.Name }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": 1
+    "helm.sh/hook-weight": "1"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
 spec:
   template:
@@ -26,14 +26,14 @@ spec:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: autogen-encryption
+        component: gossip-encryption-autogen
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ template "consul.fullname" . }}-autogen-encryption
+      serviceAccountName: {{ template "consul.fullname" . }}-gossip-encryption-autogen
       containers:
-        - name: autogen-encryption
+        - name: gossip-encryption-autogen
           image: "{{ .Values.global.image }}"
           env:
             - name: NAMESPACE
@@ -45,21 +45,27 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              $(consul keygen) > key.txt
               secretName={{ template "consul.fullname" . }}-gossip-encryption-key
               secretKey=key
-              secret_exists=$(curl -i -s -X GET --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/${secretName}/data/${secretKey} \
-                | grep -q "200 OK" 
-                )
-              echo $secret_exists
-              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
+              # Check if secret already exists
+              currentGossipSecret=$(curl -s -X GET --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/${secretName} \
                 -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
                 -H "Content-Type: application/json" \
-                -H "Accept: application/json" \
-                # TODO put the key in a secret
-                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"${secretName}\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": {  }}" > /dev/null
+                -H "Accept: application/json")
+              doesCurrentSecretNameExist=$(echo $currentGossipSecret | jq '.code==200')
+              if [ "$doesCurrentSecretNameExist" = "true" ]; then
+                doesCurrentSecretKeyExist=$(echo $currentGossipSecret | jq '.data.key')
+              fi
+              if [ "$doesCurrentSecretNameExist" = "false" ] || [ "$doesCurrentSecretKeyExist" != "null" ]; then
+                keyValue=$(consul keygen)
+                curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                  https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
+                  -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
+                  -H "Content-Type: application/json" \
+                  -H "Accept: application/json" \
+                  -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"${secretName}\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"${secretKey}\": \"${keyValue}\" }}" > /dev/null
+              fi
           resources:
             requests:
               memory: "50Mi"
