@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ template "consul.fullname" . }}-gossip-encryption-autogen
+  name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
@@ -28,6 +28,6 @@ rules:
   verbs:
     - use
   resourceNames:
-    - {{ template "consul.fullname" . }}-gossip-encryption-autogen
+    - {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
 {{- end }}
 {{- end }}
