@@ -307,7 +307,7 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s uninstall [options]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
+	s := "Usage: consul-k8s uninstall [flags]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
 	return s
 }
 

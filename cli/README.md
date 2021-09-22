@@ -93,7 +93,7 @@ consul-k8s uninstall
 ```
 
 ```
-Usage: kubectl consul uninstall [options]
+Usage: consul-k8s uninstall [flags]
 Uninstall Consul with options to delete data and resources associated with Consul installation.
 
 Command Options:
@@ -107,6 +107,9 @@ Command Options:
 
   -namespace=<string>
       Namespace for the Consul installation.
+
+  -timeout=<string>
+      Timeout to wait for uninstall. The default is 10m.
 
   -wipe-data
       When used in combination with -auto-approve, all persisted data (PVCs
