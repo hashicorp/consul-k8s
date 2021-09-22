@@ -213,11 +213,6 @@ func (c *Command) Run(args []string) int {
 				return 1
 			}
 		}
-		// Recreating settings with the found namespace so that the kube client in Helm is re-initialized with the right namespace facepalm
-		//prevHelmNSEnv := os.Getenv("HELM_NAMESPACE")
-		//os.Setenv("HELM_NAMESPACE", foundReleaseNamespace)
-		//settings = helmCLI.New()
-		//os.Setenv("HELM_NAMESPACE", prevHelmNSEnv)
 
 		// Actually call out to `helm delete`.
 		actionConfig, err = c.initActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
