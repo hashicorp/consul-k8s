@@ -14,6 +14,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -29,6 +30,9 @@ const (
 
 	flagWipeData    = "wipe-data"
 	defaultWipeData = false
+
+	flagTimeout    = "timeout"
+	defaultTimeout = "10m"
 )
 
 type Command struct {
@@ -42,6 +46,8 @@ type Command struct {
 	flagReleaseName string
 	flagAutoApprove bool
 	flagWipeData    bool
+	flagTimeout     string
+	timeoutDuration time.Duration
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -77,6 +83,12 @@ func (c *Command) init() {
 		Default: defaultAnyReleaseName,
 		Usage:   "Name of the installation. This can be used to uninstall and/or delete the resources of a specific Helm release.",
 	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagTimeout,
+		Target:  &c.flagTimeout,
+		Default: defaultTimeout,
+		Usage:   "Timeout to wait for uninstall.",
+	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
@@ -102,15 +114,15 @@ func (c *Command) init() {
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
+	// The logger is initialized in main with the name cli. Here, we reset the name to uninstall so log lines would be prefixed with uninstall.
+	c.Log.ResetNamed("uninstall")
+
 	defer func() {
 		if err := c.Close(); err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			c.Log.Error(err.Error())
 			os.Exit(1)
 		}
 	}()
-
-	// The logger is initialized in main with the name cli. Here, we reset the name to uninstall so log lines would be prefixed with uninstall.
-	c.Log.ResetNamed("uninstall")
 
 	if err := c.set.Parse(args); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -121,13 +133,18 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if c.flagWipeData && !c.flagAutoApprove {
-		c.UI.Output("Can't set -wipe-data alone. Omit this flag to interactively uninstall, or use it with -auto-approve to wipe all data during the uninstall.")
+		c.UI.Output("Can't set -wipe-data alone. Omit this flag to interactively uninstall, or use it with -auto-approve to wipe all data during the uninstall.", terminal.WithErrorStyle())
 		return 1
 	}
+	duration, err := time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Output("unable to parse -%s: %s", flagTimeout, err, terminal.WithErrorStyle())
+		return 1
+	}
+	c.timeoutDuration = duration
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
-
 	if c.flagKubeConfig != "" {
 		settings.KubeConfig = c.flagKubeConfig
 	}
@@ -151,7 +168,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Setup logger to stream Helm library logs
+	// Setup logger to stream Helm library logs.
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
@@ -161,7 +178,7 @@ func (c *Command) Run(args []string) int {
 
 	// Search for Consul installation by calling `helm list`. Depends on what's already specified.
 	actionConfig := new(action.Configuration)
-	actionConfig, err := c.initActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = c.initActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -176,8 +193,8 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("No existing Consul installations.", terminal.WithSuccessStyle())
 	} else {
 		c.UI.Output("Existing Consul installation found.", terminal.WithSuccessStyle())
-		c.UI.Output("Consul Un-Install Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", foundReleaseName, terminal.WithInfoStyle())
+		c.UI.Output("Consul Uninstall Summary", terminal.WithHeaderStyle())
+		c.UI.Output("Name: %s", foundReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", foundReleaseNamespace, terminal.WithInfoStyle())
 
 		// Prompt for approval to uninstall Helm release.
@@ -191,29 +208,35 @@ func (c *Command) Run(args []string) int {
 				c.UI.Output(err.Error(), terminal.WithErrorStyle())
 				return 1
 			}
-			confirmation = strings.TrimSuffix(confirmation, "\n")
-			if !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes") {
-				c.UI.Output("Un-install aborted. To learn how to customize the uninstall, run:\nconsul-k8s uninstall --help", terminal.WithInfoStyle())
+			if common.Abort(confirmation) {
+				c.UI.Output("Uninstall aborted. To learn how to customize the uninstall, run:\nconsul-k8s uninstall --help", terminal.WithInfoStyle())
 				return 1
 			}
 		}
+		// Recreating settings with the found namespace so that the kube client in Helm is re-initialized with the right namespace facepalm
+		//prevHelmNSEnv := os.Getenv("HELM_NAMESPACE")
+		//os.Setenv("HELM_NAMESPACE", foundReleaseNamespace)
+		//settings = helmCLI.New()
+		//os.Setenv("HELM_NAMESPACE", prevHelmNSEnv)
+
 		// Actually call out to `helm delete`.
 		actionConfig, err = c.initActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
+
 		uninstaller := action.NewUninstall(actionConfig)
+		uninstaller.Timeout = c.timeoutDuration
 		res, err := uninstaller.Run(foundReleaseName)
 		if err != nil {
 			c.UI.Output("unable to uninstall: %s", err, terminal.WithErrorStyle())
 			return 1
-		} else if res != nil && res.Info != "" {
-			c.UI.Output("uninstall result: %s", res.Info, terminal.WithErrorStyle())
-			return 1
-		} else {
-			c.UI.Output("Successfully uninstalled Consul Helm release", terminal.WithSuccessStyle())
 		}
+		if res != nil && res.Info != "" {
+			c.UI.Output("Uninstall result: %s", res.Info, terminal.WithInfoStyle())
+		}
+		c.UI.Output("Successfully uninstalled Consul Helm release", terminal.WithSuccessStyle())
 	}
 
 	// If -auto-approve=true and -wipe-data=false, we should only uninstall the release, and skip deleting resources.
@@ -225,21 +248,28 @@ func (c *Command) Run(args []string) int {
 	// At this point, even if no Helm release was found and uninstalled, there could
 	// still be PVCs, Secrets, and Service Accounts left behind from a previous installation.
 	// If there isn't a foundReleaseName and foundReleaseNamespace, we'll use the values of the
-	// flags c.flagReleaseName and c.flagNamespace. If those are empty we'll prompt the user that
-	// those should be provided to fully clean up the installation.
+	// flags c.flagReleaseName and c.flagNamespace. If those are empty we'll fall back to defaults "consul" for the
+	// installation name and "consul" for the namespace.
 	if !found {
 		if c.flagReleaseName == "" || c.flagNamespace == "" {
-			c.UI.Output("No existing Consul Helm installation was found. To search for existing PVCs, secrets, and service accounts left behind by a Consul installation, please provide -release-name and -namespace.", terminal.WithInfoStyle())
-			return 0
+			foundReleaseName = "consul"
+			foundReleaseNamespace = "consul"
+		} else {
+			foundReleaseName = c.flagReleaseName
+			foundReleaseNamespace = c.flagNamespace
 		}
-		foundReleaseName = c.flagReleaseName
-		foundReleaseNamespace = c.flagNamespace
 	}
 
-	// Prompt with a warning for approval before deleting PVCs, Secrets and ServiceAccounts.
+	c.UI.Output("Other Consul Resources", terminal.WithHeaderStyle())
+	if c.flagAutoApprove {
+		c.UI.Output("Deleting data for installation: ", terminal.WithInfoStyle())
+		c.UI.Output("Name: %s", foundReleaseName, terminal.WithInfoStyle())
+		c.UI.Output("Namespace %s", foundReleaseNamespace, terminal.WithInfoStyle())
+	}
+	// Prompt with a warning for approval before deleting PVCs, Secrets, Service Accounts, Roles, and Role Bindings.
 	if !c.flagAutoApprove {
 		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: "WARNING: Proceed with deleting PVCs, Secrets, and ServiceAccounts? \n Only approve if all data from previous installation can be deleted (y/N)",
+			Prompt: fmt.Sprintf("WARNING: Proceed with deleting PVCs, Secrets, Service Accounts, Roles, and Role Bindings for the following installation? \n\n   Name: %s \n   Namespace: %s \n\n   Only approve if all data from this installation can be deleted. (y/N)", foundReleaseName, foundReleaseNamespace),
 			Style:  terminal.WarningStyle,
 			Secret: false,
 		})
@@ -247,27 +277,33 @@ func (c *Command) Run(args []string) int {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-		confirmation = strings.TrimSuffix(confirmation, "\n")
-		if !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes") {
-			c.UI.Output("Uninstall aborted without deleting PVCs, Secrets, and ServiceAccounts.", terminal.WithInfoStyle())
+		if common.Abort(confirmation) {
+			c.UI.Output("Uninstall aborted without deleting PVCs and Secrets.", terminal.WithInfoStyle())
 			return 1
 		}
 	}
 
-	err = c.deletePVCs(foundReleaseName, foundReleaseNamespace)
-	if err != nil {
+	if err := c.deletePVCs(foundReleaseName, foundReleaseNamespace); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	err = c.deleteSecrets(foundReleaseName, foundReleaseNamespace)
-	if err != nil {
+	if err := c.deleteSecrets(foundReleaseName, foundReleaseNamespace); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	err = c.deleteServiceAccounts(foundReleaseName, foundReleaseNamespace)
-	if err != nil {
+	if err := c.deleteServiceAccounts(foundReleaseName, foundReleaseNamespace); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if err := c.deleteRoles(foundReleaseName, foundReleaseNamespace); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if err := c.deleteRoleBindings(foundReleaseName, foundReleaseNamespace); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
@@ -277,7 +313,7 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: kubectl consul uninstall [options]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
+	s := "Usage: consul-k8s uninstall [options]" + "\n" + "Uninstall Consul with options to delete data and resources associated with Consul installation." + "\n\n" + c.help
 	return s
 }
 
@@ -286,14 +322,11 @@ func (c *Command) Synopsis() string {
 }
 
 func (c *Command) initActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger action.DebugLog) (*action.Configuration, error) {
-	var err error
-	if namespace == defaultAllNamespaces {
-		err = actionConfig.Init(settings.RESTClientGetter(), "",
-			os.Getenv("HELM_DRIVER"), logger)
-	} else {
-		err = actionConfig.Init(settings.RESTClientGetter(), namespace,
-			os.Getenv("HELM_DRIVER"), logger)
-	}
+	getter := settings.RESTClientGetter()
+	configFlags := getter.(*genericclioptions.ConfigFlags)
+	configFlags.Namespace = &namespace
+	err := actionConfig.Init(settings.RESTClientGetter(), namespace,
+		os.Getenv("HELM_DRIVER"), logger)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up helm action configuration to find existing installations: %s", err)
 	}
@@ -302,6 +335,8 @@ func (c *Command) initActionConfig(actionConfig *action.Configuration, namespace
 
 func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (bool, string, string, error) {
 	lister := action.NewList(actionConfig)
+	// lister.All will search for helm installations in all states, such as deployed, pending, uninstalling, etc.
+	lister.All = true
 	if c.flagNamespace == defaultAllNamespaces {
 		lister.AllNamespaces = true
 	}
@@ -316,11 +351,15 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 	for _, rel := range res {
 		if rel.Chart.Metadata.Name == "consul" {
 			if c.flagNamespace != defaultAllNamespaces {
-				if c.flagNamespace == rel.Name {
+				// If we found a chart named "consul" and -namespace was specified, we only found the release if the
+				// release namespace matches the -namespace flag.
+				if c.flagNamespace == rel.Namespace {
 					found = true
 					foundReleaseName = rel.Name
 					foundReleaseNamespace = rel.Namespace
 					break
+				} else {
+					continue
 				}
 			}
 			found = true
@@ -333,12 +372,17 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 	return found, foundReleaseName, foundReleaseNamespace, nil
 }
 
+// deletePVCs deletes any pvcs that have the label release={{foundReleaseName}} and waits for them to be deleted.
 func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) error {
 	var pvcNames []string
 	pvcSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
 	pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).List(c.Ctx, pvcSelector)
 	if err != nil {
 		return fmt.Errorf("deletePVCs: %s", err)
+	}
+	if len(pvcs.Items) == 0 {
+		c.UI.Output("No PVCs found.", terminal.WithSuccessStyle())
+		return nil
 	}
 	for _, pvc := range pvcs.Items {
 		err := c.kubernetes.CoreV1().PersistentVolumeClaims(foundReleaseNamespace).Delete(c.Ctx, pvc.Name, metav1.DeleteOptions{})
@@ -353,19 +397,18 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 			return fmt.Errorf("deletePVCs: %s", err)
 		}
 		if len(pvcs.Items) > 0 {
-			err = fmt.Errorf("deletePVCs: pvcs still exist")
-			return err
+			return fmt.Errorf("deletePVCs: pvcs still exist")
 		}
-		return err
+		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 1800))
 	if err != nil {
 		return fmt.Errorf("deletePVCs: timed out waiting for PVCs to be deleted")
 	}
 	if len(pvcNames) > 0 {
-		c.UI.Output(common.PrefixLines(" Deleted PVC => ", strings.Join(pvcNames, "\n")), terminal.WithSuccessStyle())
+		for _, pvc := range pvcNames {
+			c.UI.Output("Deleted PVC => %s", pvc, terminal.WithSuccessStyle())
+		}
 		c.UI.Output("PVCs deleted.", terminal.WithSuccessStyle())
-	} else {
-		c.UI.Output("No PVCs found.", terminal.WithSuccessStyle())
 	}
 	return nil
 }
@@ -377,6 +420,10 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 	if err != nil {
 		return fmt.Errorf("deleteSecrets: %s", err)
 	}
+	if len(secrets.Items) == 0 {
+		c.UI.Output("No Consul secrets found.", terminal.WithSuccessStyle())
+		return nil
+	}
 	for _, secret := range secrets.Items {
 		if strings.HasPrefix(secret.Name, foundReleaseName) {
 			err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
@@ -387,33 +434,94 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 		}
 	}
 	if len(secretNames) > 0 {
+		for _, secret := range secretNames {
+			c.UI.Output("Deleted Secret => %s", secret, terminal.WithSuccessStyle())
+		}
 		c.UI.Output("Consul secrets deleted.", terminal.WithSuccessStyle())
-	} else {
-		c.UI.Output("No Consul secrets found.", terminal.WithSuccessStyle())
 	}
 	return nil
 }
 
-// deleteServiceAccounts deletes service accounts that have foundReleaseName in their name.
+// deleteServiceAccounts deletes service accounts that have the label release={{foundReleaseName}}.
 func (c *Command) deleteServiceAccounts(foundReleaseName, foundReleaseNamespace string) error {
 	var serviceAccountNames []string
-	sas, err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{})
+	saSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	sas, err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).List(c.Ctx, saSelector)
 	if err != nil {
 		return fmt.Errorf("deleteServiceAccounts: %s", err)
 	}
+	if len(sas.Items) == 0 {
+		c.UI.Output("No Consul service accounts found.", terminal.WithSuccessStyle())
+		return nil
+	}
 	for _, sa := range sas.Items {
-		if strings.HasPrefix(sa.Name, foundReleaseName) {
-			err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).Delete(c.Ctx, sa.Name, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("deleteServiceAccounts: error deleting ServiceAccount %q: %s", sa.Name, err)
-			}
-			serviceAccountNames = append(serviceAccountNames, sa.Name)
+		err := c.kubernetes.CoreV1().ServiceAccounts(foundReleaseNamespace).Delete(c.Ctx, sa.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteServiceAccounts: error deleting ServiceAccount %q: %s", sa.Name, err)
 		}
+		serviceAccountNames = append(serviceAccountNames, sa.Name)
 	}
 	if len(serviceAccountNames) > 0 {
+		for _, sa := range serviceAccountNames {
+			c.UI.Output("Deleted Service Account => %s", sa, terminal.WithSuccessStyle())
+		}
 		c.UI.Output("Consul service accounts deleted.", terminal.WithSuccessStyle())
-	} else {
-		c.UI.Output("No Consul service accounts found.", terminal.WithSuccessStyle())
+	}
+	return nil
+}
+
+// deleteRoles deletes roles that have the label release={{foundReleaseName}}.
+func (c *Command) deleteRoles(foundReleaseName, foundReleaseNamespace string) error {
+	var roleNames []string
+	roleSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	roles, err := c.kubernetes.RbacV1().Roles(foundReleaseNamespace).List(c.Ctx, roleSelector)
+	if err != nil {
+		return fmt.Errorf("deleteRoles: %s", err)
+	}
+	if len(roles.Items) == 0 {
+		c.UI.Output("No Consul roles found.", terminal.WithSuccessStyle())
+		return nil
+	}
+	for _, role := range roles.Items {
+		err := c.kubernetes.RbacV1().Roles(foundReleaseNamespace).Delete(c.Ctx, role.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteRoles: error deleting Role %q: %s", role.Name, err)
+		}
+		roleNames = append(roleNames, role.Name)
+	}
+	if len(roleNames) > 0 {
+		for _, role := range roleNames {
+			c.UI.Output("Deleted Role => %s", role, terminal.WithSuccessStyle())
+		}
+		c.UI.Output("Consul roles deleted.", terminal.WithSuccessStyle())
+	}
+	return nil
+}
+
+// deleteRoleBindings deletes rolebindings that have the label release={{foundReleaseName}}.
+func (c *Command) deleteRoleBindings(foundReleaseName, foundReleaseNamespace string) error {
+	var rolebindingNames []string
+	rolebindingSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	rolebindings, err := c.kubernetes.RbacV1().RoleBindings(foundReleaseNamespace).List(c.Ctx, rolebindingSelector)
+	if err != nil {
+		return fmt.Errorf("deleteRoleBindings: %s", err)
+	}
+	if len(rolebindings.Items) == 0 {
+		c.UI.Output("No Consul rolebindings found.", terminal.WithSuccessStyle())
+		return nil
+	}
+	for _, rolebinding := range rolebindings.Items {
+		err := c.kubernetes.RbacV1().RoleBindings(foundReleaseNamespace).Delete(c.Ctx, rolebinding.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteRoleBindings: error deleting Role %q: %s", rolebinding.Name, err)
+		}
+		rolebindingNames = append(rolebindingNames, rolebinding.Name)
+	}
+	if len(rolebindingNames) > 0 {
+		for _, rolebinding := range rolebindingNames {
+			c.UI.Output("Deleted Role Binding => %s", rolebinding, terminal.WithSuccessStyle())
+		}
+		c.UI.Output("Consul rolebindings deleted.", terminal.WithSuccessStyle())
 	}
 	return nil
 }

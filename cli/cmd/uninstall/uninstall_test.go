@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -101,6 +102,66 @@ func TestDeleteServiceAccounts(t *testing.T) {
 	sas, err := c.kubernetes.CoreV1().ServiceAccounts("default").List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
 	require.Len(t, sas.Items, 0)
+}
+
+func TestDeleteRoles(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-role1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	role2 := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-role2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.RbacV1().Roles("default").Create(context.TODO(), role, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.RbacV1().Roles("default").Create(context.TODO(), role2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteRoles("consul", "default")
+	require.NoError(t, err)
+	roles, err := c.kubernetes.RbacV1().Roles("default").List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, roles.Items, 0)
+}
+
+func TestDeleteRoleBindings(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	rolebinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-role1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	rolebinding2 := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-role2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.RbacV1().RoleBindings("default").Create(context.TODO(), rolebinding, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.RbacV1().RoleBindings("default").Create(context.TODO(), rolebinding2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteRoleBindings("consul", "default")
+	require.NoError(t, err)
+	rolebindings, err := c.kubernetes.RbacV1().RoleBindings("default").List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, rolebindings.Items, 0)
 }
 
 // getInitializedCommand sets up a command struct for tests.

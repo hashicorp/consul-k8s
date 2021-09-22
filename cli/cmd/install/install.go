@@ -170,14 +170,15 @@ func (c *Command) init() {
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
-	defer func() {
-		if err := c.Close(); err != nil {
-			c.UI.Output(err.Error())
-		}
-	}()
-
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
+
+	defer func() {
+		if err := c.Close(); err != nil {
+			c.Log.Error(err.Error())
+			os.Exit(1)
+		}
+	}()
 
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())
@@ -290,8 +291,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-		confirmation = strings.TrimSuffix(confirmation, "\n")
-		if !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes") {
+		if common.Abort(confirmation) {
 			c.UI.Output("Install aborted. To learn how to customize your installation, run:\nconsul-k8s install --help", terminal.WithInfoStyle())
 			return 1
 		}
