@@ -14,7 +14,6 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -178,7 +177,7 @@ func (c *Command) Run(args []string) int {
 
 	// Search for Consul installation by calling `helm list`. Depends on what's already specified.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = c.initActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -215,7 +214,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		// Actually call out to `helm delete`.
-		actionConfig, err = c.initActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
+		actionConfig, err = common.InitActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
@@ -314,18 +313,6 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Uninstall Consul deployment."
-}
-
-func (c *Command) initActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger action.DebugLog) (*action.Configuration, error) {
-	getter := settings.RESTClientGetter()
-	configFlags := getter.(*genericclioptions.ConfigFlags)
-	configFlags.Namespace = &namespace
-	err := actionConfig.Init(settings.RESTClientGetter(), namespace,
-		os.Getenv("HELM_DRIVER"), logger)
-	if err != nil {
-		return nil, fmt.Errorf("error setting up helm action configuration to find existing installations: %s", err)
-	}
-	return actionConfig, nil
 }
 
 func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (bool, string, string, error) {

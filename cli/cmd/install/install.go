@@ -301,9 +301,9 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), c.flagNamespace,
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		c.UI.Output(err.Error())
+	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
