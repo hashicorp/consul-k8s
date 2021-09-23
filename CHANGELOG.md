@@ -1,10 +1,10 @@
 ## UNRELEASED
 
-## 0.34.1 (September 17, 2021)
-
 IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
+
+## 0.34.1 (September 17, 2021)
 
 BUG FIXES:
 * Helm
