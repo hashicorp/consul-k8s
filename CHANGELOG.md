@@ -2,7 +2,11 @@
 
 ## 0.34.1 (September 17, 2021)
 
-BUG FIX:
+IMPROVEMENTS:
+* Control Plane
+  * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
+
+BUG FIXES:
 * Helm
   * Fix consul-k8s image version in values file. [[GH-732](https://github.com/hashicorp/consul-k8s/pull/732)]
 
