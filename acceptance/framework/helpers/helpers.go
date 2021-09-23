@@ -52,6 +52,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 			r.Errorf("%d pods are not ready: %s", len(notReadyPods), strings.Join(notReadyPods, ","))
 		}
 	})
+	logger.Log(t, "Finished waiting for pods to be ready.")
 }
 
 // Sets up a goroutine that will wait for interrupt signals

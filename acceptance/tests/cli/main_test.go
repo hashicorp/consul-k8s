@@ -1,4 +1,4 @@
-package connect
+package cli
 
 import (
 	"os"
