@@ -4,10 +4,11 @@ This repository contains a CLI tool for installing and operating [Consul](https:
 
 ## Installation & Setup
 Currently the tool is not available on any releases page. Instead clone the repository and run `go build -o bin/consul-k8s`
-and proceed to run the binary.
+from this directory and proceed to run the binary.
 
 ## Commands
 * [consul-k8s install](#consul-k8s-install)
+* [consul-k8s uninstall](#consul-k8s-uninstall)
 
 ### consul-k8s install
 This command installs Consul on a Kubernetes cluster. It allows `demo` and `secure` installations via preset configurations
@@ -80,4 +81,47 @@ Global Options:
   -kubeconfig=<string>
       Path to kubeconfig file. This is aliased as "-c".
 
+```
+
+### consul-k8s uninstall
+This command uninstalls Consul on Kubernetes, while prompting whether to uninstall the release and whether to delete all
+related resources such as PVCs, Secrets, and ServiceAccounts.
+
+Get started with:
+```bash
+consul-k8s uninstall
+```
+
+```
+Usage: consul-k8s uninstall [flags]
+Uninstall Consul with options to delete data and resources associated with Consul installation.
+
+Command Options:
+
+  -auto-approve
+      Skip approval prompt for uninstalling Consul. The default is false.
+
+  -name=<string>
+      Name of the installation. This can be used to uninstall and/or delete
+      the resources of a specific Helm release.
+
+  -namespace=<string>
+      Namespace for the Consul installation.
+
+  -timeout=<string>
+      Timeout to wait for uninstall. The default is 10m.
+
+  -wipe-data
+      When used in combination with -auto-approve, all persisted data (PVCs
+      and Secrets) from previous installations will be deleted. Only set this
+      to true when data from previous installations is no longer necessary.
+      The default is false.
+
+Global Options:
+
+  -context=<string>
+      Kubernetes context to use.
+
+  -kubeconfig=<string>
+      Path to kubeconfig file. This is aliased as "-c".
 ```

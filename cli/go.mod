@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/bgentry/speakeasy v0.1.0
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fatih/color v1.9.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/go-hclog v0.16.2
@@ -21,6 +22,7 @@ require (
 	helm.sh/helm/v3 v3.6.1
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
+	k8s.io/cli-runtime v0.21.0
 	k8s.io/client-go v0.21.2
 	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/yaml v1.2.0

@@ -26,8 +26,8 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 			Name: "consul-server-test2",
 		},
 	}
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc, metav1.CreateOptions{})
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc2, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc2, metav1.CreateOptions{})
 	err := c.checkForPreviousPVCs()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "found PVCs from previous installations (default/consul-server-test1,default/consul-server-test2), delete before re-installing")
@@ -43,7 +43,7 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 			Name: "irrelevant-pvc",
 		},
 	}
-	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.TODO(), pvc, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc, metav1.CreateOptions{})
 	err = c.checkForPreviousPVCs()
 	require.NoError(t, err)
 }
@@ -56,7 +56,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 			Name: "test-consul-bootstrap-acl-token",
 		},
 	}
-	c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
 	err := c.checkForPreviousSecrets()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "found consul-acl-bootstrap-token secret from previous installations: \"test-consul-bootstrap-acl-token\" in namespace \"default\". To delete, run kubectl delete secret test-consul-bootstrap-acl-token --namespace default")
@@ -72,7 +72,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 			Name: "irrelevant-secret",
 		},
 	}
-	c.kubernetes.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
 	err = c.checkForPreviousSecrets()
 	require.NoError(t, err)
 }
