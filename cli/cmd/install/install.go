@@ -182,17 +182,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// A hack to set namespace via the HELM_NAMESPACE env var until we merge a PR that will allow us to use the latest
-	// Helm templates.
-	prevHelmNSEnv := os.Getenv("HELM_NAMESPACE")
-	os.Setenv("HELM_NAMESPACE", c.flagNamespace)
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
+	settings := helmCLI.New()
+
 	// Any overrides by our kubeconfig and kubecontext flags is done here. The Kube client that
 	// is created will use this command's flags first, then the HELM_KUBECONTEXT environment variable,
 	// then call out to genericclioptions.ConfigFlag
-	settings := helmCLI.New()
-	os.Setenv("HELM_NAMESPACE", prevHelmNSEnv)
-
 	if c.flagKubeConfig != "" {
 		settings.KubeConfig = c.flagKubeConfig
 	}

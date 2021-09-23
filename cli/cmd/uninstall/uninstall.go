@@ -339,14 +339,13 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 				foundReleaseName = rel.Name
 				foundReleaseNamespace = rel.Namespace
 				break
-			} else {
-				continue
 			}
-
-			found = true
-			foundReleaseName = rel.Name
-			foundReleaseNamespace = rel.Namespace
-			break
+			if c.flagNamespace == defaultAllNamespaces {
+				found = true
+				foundReleaseName = rel.Name
+				foundReleaseNamespace = rel.Namespace
+				break
+			}
 		}
 	}
 
