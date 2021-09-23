@@ -27,8 +27,6 @@ const (
 	flagNamePreset = "preset"
 	defaultPreset  = ""
 
-	defaultReleaseName = "consul"
-
 	flagNameConfigFile      = "config-file"
 	flagNameSetStringValues = "set-string"
 	flagNameSetValues       = "set"
@@ -41,7 +39,6 @@ const (
 	defaultAutoApprove  = false
 
 	flagNameNamespace = "namespace"
-	defaultNamespace  = "consul"
 
 	flagNameTimeout = "timeout"
 	defaultTimeout  = "10m"
@@ -86,82 +83,80 @@ func (c *Command) init() {
 	}
 
 	c.set = flag.NewSets()
-	{
-		f := c.set.NewSet("Command Options")
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameAutoApprove,
-			Target:  &c.flagAutoApprove,
-			Default: defaultAutoApprove,
-			Usage:   "Skip confirmation prompt.",
-		})
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameDryRun,
-			Target:  &c.flagDryRun,
-			Default: defaultDryRun,
-			Usage:   "Run pre-install checks and display summary of installation.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:    flagNameConfigFile,
-			Aliases: []string{"f"},
-			Target:  &c.flagValueFiles,
-			Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNameNamespace,
-			Target:  &c.flagNamespace,
-			Default: defaultNamespace,
-			Usage:   "Namespace for the Consul installation.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNamePreset,
-			Target:  &c.flagPreset,
-			Default: defaultPreset,
-			Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameSetValues,
-			Target: &c.flagSetValues,
-			Usage:  "Set a value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameFileValues,
-			Target: &c.flagFileValues,
-			Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
-				"specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringSliceVar(&flag.StringSliceVar{
-			Name:   flagNameSetStringValues,
-			Target: &c.flagSetStringValues,
-			Usage:  "Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    flagNameTimeout,
-			Target:  &c.flagTimeout,
-			Default: defaultTimeout,
-			Usage:   "Timeout to wait for installation to be ready.",
-		})
-		f.BoolVar(&flag.BoolVar{
-			Name:    flagNameWait,
-			Target:  &c.flagWait,
-			Default: defaultWait,
-			Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
-		})
+	f := c.set.NewSet("Command Options")
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameAutoApprove,
+		Target:  &c.flagAutoApprove,
+		Default: defaultAutoApprove,
+		Usage:   "Skip confirmation prompt.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameDryRun,
+		Target:  &c.flagDryRun,
+		Default: defaultDryRun,
+		Usage:   "Run pre-install checks and display summary of installation.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:    flagNameConfigFile,
+		Aliases: []string{"f"},
+		Target:  &c.flagValueFiles,
+		Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameNamespace,
+		Target:  &c.flagNamespace,
+		Default: common.DefaultReleaseNamespace,
+		Usage:   "Namespace for the Consul installation.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNamePreset,
+		Target:  &c.flagPreset,
+		Default: defaultPreset,
+		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameSetValues,
+		Target: &c.flagSetValues,
+		Usage:  "Set a value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameFileValues,
+		Target: &c.flagFileValues,
+		Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
+			"specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringSliceVar(&flag.StringSliceVar{
+		Name:   flagNameSetStringValues,
+		Target: &c.flagSetStringValues,
+		Usage:  "Set a string value to customize. Can be specified multiple times. Supports Consul Helm chart values.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameTimeout,
+		Target:  &c.flagTimeout,
+		Default: defaultTimeout,
+		Usage:   "Timeout to wait for installation to be ready.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameWait,
+		Target:  &c.flagWait,
+		Default: defaultWait,
+		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
+	})
 
-		f = c.set.NewSet("Global Options")
-		f.StringVar(&flag.StringVar{
-			Name:    "kubeconfig",
-			Aliases: []string{"c"},
-			Target:  &c.flagKubeConfig,
-			Default: "",
-			Usage:   "Path to kubeconfig file.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    "context",
-			Target:  &c.flagKubeContext,
-			Default: "",
-			Usage:   "Kubernetes context to use.",
-		})
-	}
+	f = c.set.NewSet("Global Options")
+	f.StringVar(&flag.StringVar{
+		Name:    "kubeconfig",
+		Aliases: []string{"c"},
+		Target:  &c.flagKubeConfig,
+		Default: "",
+		Usage:   "Path to kubeconfig file.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "context",
+		Target:  &c.flagKubeContext,
+		Default: "",
+		Usage:   "Kubernetes context to use.",
+	})
 
 	c.help = c.set.Help()
 
@@ -172,31 +167,27 @@ func (c *Command) init() {
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
-	defer func() {
-		if err := c.Close(); err != nil {
-			c.UI.Output(err.Error())
-		}
-	}()
-
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
+
+	defer func() {
+		if err := c.Close(); err != nil {
+			c.Log.Error(err.Error())
+			os.Exit(1)
+		}
+	}()
 
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())
 		return 1
 	}
 
-	// A hack to set namespace via the HELM_NAMESPACE env var until we merge a PR that will allow us to use the latest
-	// Helm templates.
-	prevHelmNSEnv := os.Getenv("HELM_NAMESPACE")
-	os.Setenv("HELM_NAMESPACE", c.flagNamespace)
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
+	settings := helmCLI.New()
+
 	// Any overrides by our kubeconfig and kubecontext flags is done here. The Kube client that
 	// is created will use this command's flags first, then the HELM_KUBECONTEXT environment variable,
 	// then call out to genericclioptions.ConfigFlag
-	settings := helmCLI.New()
-	os.Setenv("HELM_NAMESPACE", prevHelmNSEnv)
-
 	if c.flagKubeConfig != "" {
 		settings.KubeConfig = c.flagKubeConfig
 	}
@@ -260,7 +251,7 @@ func (c *Command) Run(args []string) int {
 	// Print out the installation summary.
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", defaultReleaseName, terminal.WithInfoStyle())
+		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
 
 		if len(vals) == 0 {
@@ -292,8 +283,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
-		confirmation = strings.TrimSuffix(confirmation, "\n")
-		if !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes") {
+		if common.Abort(confirmation) {
 			c.UI.Output("Install aborted. To learn how to customize your installation, run:\nconsul-k8s install --help", terminal.WithInfoStyle())
 			return 1
 		}
@@ -303,15 +293,15 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), c.flagNamespace,
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		c.UI.Output(err.Error())
+	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
 	// Setup the installation action.
 	install := action.NewInstall(actionConfig)
-	install.ReleaseName = defaultReleaseName
+	install.ReleaseName = common.DefaultReleaseName
 	install.Namespace = c.flagNamespace
 	install.CreateNamespace = true
 	install.ChartPathOptions.RepoURL = helmRepository
