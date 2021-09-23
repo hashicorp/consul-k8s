@@ -107,21 +107,8 @@ spec:
           secret:
             secretName: {{ .Values.server.enterpriseLicense.secretName }}
         {{- end }}
-        {{- range .Values.server.extraVolumes }}
-        - name: userconfig-{{ .name }}
-          {{ .type }}:
-            {{- if (eq .type "configMap") }}
-            name: {{ .name }}
-            {{- else if (eq .type "secret") }}
-            secretName: {{ .name }}
-            {{- end }}
-            {{- with .items }}
-            items:
-            {{- range . }}
-            - key: {{.key}}
-              path: {{.path}}
-            {{- end }}
-            {{- end }}
+        {{- with .Values.server.extraVolumes }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
@@ -215,9 +202,8 @@ spec:
                 {{- /* Always include the extraVolumes at the end so that users can
                     override other Consul settings. The last -config-dir takes
                     precedence. */}}
-                {{- range .Values.server.extraVolumes }}
-                {{- if .load }}
-                -config-dir=/consul/userconfig/{{ .name }} \
+                {{- if .Values.server.configDir }}
+                -config-dir={{ .Values.server.configDir }} \
                 {{- end }}
                 {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
@@ -355,6 +341,7 @@ spec:
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}
       {{- end }}
+  {{- if .Values.server.storage.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: data-{{ .Release.Namespace }}
@@ -363,8 +350,8 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.server.storage }}
-        {{- if .Values.server.storageClass }}
-        storageClassName: {{ .Values.server.storageClass }}
+            storage: {{ .Values.server.storage.size }}
+        {{- if .Values.server.storage.storageClass }}
+        storageClassName: {{ .Values.server.storage.storageClass }}
         {{- end }}
 {{- end }}
