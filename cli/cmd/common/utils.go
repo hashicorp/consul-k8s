@@ -10,6 +10,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
+const (
+	DefaultReleaseName      = "consul"
+	DefaultReleaseNamespace = "consul"
+)
+
 // Abort returns true if the raw input string is not equal to "y" or "yes".
 func Abort(raw string) bool {
 	confirmation := strings.TrimSuffix(raw, "\n")

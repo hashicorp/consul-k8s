@@ -27,8 +27,6 @@ const (
 	flagNamePreset = "preset"
 	defaultPreset  = ""
 
-	defaultReleaseName = "consul"
-
 	flagNameConfigFile      = "config-file"
 	flagNameSetStringValues = "set-string"
 	flagNameSetValues       = "set"
@@ -41,7 +39,6 @@ const (
 	defaultAutoApprove  = false
 
 	flagNameNamespace = "namespace"
-	defaultNamespace  = "consul"
 
 	flagNameTimeout = "timeout"
 	defaultTimeout  = "10m"
@@ -108,7 +105,7 @@ func (c *Command) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
-		Default: defaultNamespace,
+		Default: common.DefaultReleaseNamespace,
 		Usage:   "Namespace for the Consul installation.",
 	})
 	f.StringVar(&flag.StringVar{
@@ -259,7 +256,7 @@ func (c *Command) Run(args []string) int {
 	// Print out the installation summary.
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", defaultReleaseName, terminal.WithInfoStyle())
+		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
 
 		if len(vals) == 0 {
@@ -309,7 +306,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup the installation action.
 	install := action.NewInstall(actionConfig)
-	install.ReleaseName = defaultReleaseName
+	install.ReleaseName = common.DefaultReleaseName
 	install.Namespace = c.flagNamespace
 	install.CreateNamespace = true
 	install.ChartPathOptions.RepoURL = helmRepository

@@ -246,8 +246,8 @@ func (c *Command) Run(args []string) int {
 	// installation name and "consul" for the namespace.
 	if !found {
 		if c.flagReleaseName == "" || c.flagNamespace == "" {
-			foundReleaseName = "consul"
-			foundReleaseNamespace = "consul"
+			foundReleaseName = common.DefaultReleaseName
+			foundReleaseNamespace = common.DefaultReleaseNamespace
 		} else {
 			foundReleaseName = c.flagReleaseName
 			foundReleaseNamespace = c.flagNamespace
@@ -332,18 +332,17 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 	foundReleaseNamespace := ""
 	for _, rel := range res {
 		if rel.Chart.Metadata.Name == "consul" {
-			if c.flagNamespace != defaultAllNamespaces {
+			if c.flagNamespace != defaultAllNamespaces && c.flagNamespace == rel.Namespace {
 				// If we found a chart named "consul" and -namespace was specified, we only found the release if the
 				// release namespace matches the -namespace flag.
-				if c.flagNamespace == rel.Namespace {
-					found = true
-					foundReleaseName = rel.Name
-					foundReleaseNamespace = rel.Namespace
-					break
-				} else {
-					continue
-				}
+				found = true
+				foundReleaseName = rel.Name
+				foundReleaseNamespace = rel.Namespace
+				break
+			} else {
+				continue
 			}
+
 			found = true
 			foundReleaseName = rel.Name
 			foundReleaseNamespace = rel.Namespace
