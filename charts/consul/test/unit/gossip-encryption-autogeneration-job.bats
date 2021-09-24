@@ -50,7 +50,7 @@ load _helpers
   [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
 }
 
-@test "gossipEncryptionAutogeneration/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretKey are set" {
+@test "gossipEncryptionAutogeneration/Job: fails if global.gossipEncryption.autoGenerate=true and global.gossipEncryption.secretKey is set" {
   cd `chart_dir`
   run helm template \
       -s templates/gossip-encryption-autogeneration-job.yaml  \
