@@ -41,31 +41,23 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           workingDir: /tmp
+          # We're using POST requests below to create secrets via Kubernetes API.
+          # Note that in the subsequent runs of the job, POST requests will
+          # return a 409 because these secrets would already exist;
+          # we are ignoring these response codes.
           command:
             - "/bin/sh"
             - "-ec"
             - |
               secretName={{ template "consul.fullname" . }}-gossip-encryption-key
               secretKey=key
-              # Check if secret already exists
-              currentGossipSecret=$(curl -s -X GET --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/${secretName} \
+              keyValue=$(consul keygen | base64)
+              curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
                 -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
                 -H "Content-Type: application/json" \
-                -H "Accept: application/json")
-              doesCurrentSecretNameExist=$(echo $currentGossipSecret | jq '.code==200')
-              if [ "$doesCurrentSecretNameExist" = "true" ]; then
-                doesCurrentSecretKeyExist=$(echo $currentGossipSecret | jq '.data.key')
-              fi
-              if [ "$doesCurrentSecretNameExist" = "false" ] || [ "$doesCurrentSecretKeyExist" != "null" ]; then
-                keyValue=$(consul keygen | base64)
-                curl -s -X POST --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                  https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets \
-                  -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" \
-                  -H "Content-Type: application/json" \
-                  -H "Accept: application/json" \
-                  -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"${secretName}\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"${secretKey}\": \"${keyValue}\" }}" > /dev/null
-              fi
+                -H "Accept: application/json" \
+                -d "{ \"kind\": \"Secret\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"${secretName}\", \"namespace\": \"${NAMESPACE}\" }, \"type\": \"Opaque\", \"data\": { \"${secretKey}\": \"${keyValue}\" }}" > /dev/null
           resources:
             requests:
               memory: "50Mi"
