@@ -26,7 +26,7 @@ spec:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: gossip-encryption-autogen
+        component: gossip-encryption-autogeneneration
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
