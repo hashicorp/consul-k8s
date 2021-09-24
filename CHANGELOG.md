@@ -4,7 +4,9 @@ IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
 * Helm Chart
-  * Enable adding extra containers to server and client Pods.  [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
+  * Enable adding extra containers to server and client Pods. [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
+* CLI
+  * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
 
 ## 0.34.1 (September 17, 2021)
 
