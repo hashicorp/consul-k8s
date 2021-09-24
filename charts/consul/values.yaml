@@ -151,6 +151,10 @@ global:
   # @type: array<string>
   recursors: []
 
+  # A list of sidecar containers. Specified as a raw YAML string.
+  # TODO- Add example
+  extraContainers: []
+
   # Enables TLS (https://learn.hashicorp.com/tutorials/consul/tls-encryption-secure)
   # across the cluster to verify authenticity of the Consul servers and clients.
   # Requires Consul v1.4.1+.
