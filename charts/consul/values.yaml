@@ -128,7 +128,7 @@ global:
   # $ kubectl create secret generic <secretName> --from-literal=<secretKey>=$(consul keygen)
   # ```
   gossipEncryption:
-    # automatically generate a gossip encryption key and load it as a Kubernetes secret
+    # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false
     # secretName is the name of the Kubernetes secret that holds the gossip
     # encryption key. The secret must be in the same namespace that Consul is installed into.
