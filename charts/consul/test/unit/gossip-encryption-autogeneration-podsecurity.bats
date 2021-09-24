@@ -17,7 +17,7 @@ load _helpers
       .
 }
 
-@test "gossipEncryptionAutogeneration/PodSecurityPolicy: enabled with global.gossipEncryption.autoGenerate=test" {
+@test "gossipEncryptionAutogeneration/PodSecurityPolicy: enabled with global.gossipEncryption.autoGenerate=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/gossip-encryption-autogeneration-podsecuritypolicy.yaml  \
