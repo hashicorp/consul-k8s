@@ -125,7 +125,7 @@ global:
   # a Kubernetes secret referencing these values.
   #
   # ```
-  # $ kubectl create secret generic <secretName> --from-literal=<secretKey>=$(consul keygen)
+  # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
