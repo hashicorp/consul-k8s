@@ -176,7 +176,6 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	t.Helper()
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
-	fmt.Printf("********NAMESPACE*******: %s\n", namespace)
 	config := api.DefaultConfig()
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
