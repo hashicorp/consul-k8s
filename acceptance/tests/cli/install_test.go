@@ -7,9 +7,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/tests/connect"
 )
 
-const staticClientName = "static-client"
-const staticServerName = "static-server"
-
 // Test that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
 	cases := []struct {
