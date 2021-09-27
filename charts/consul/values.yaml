@@ -151,10 +151,6 @@ global:
   # @type: array<string>
   recursors: []
 
-  # A list of sidecar containers. Specified as a raw YAML string.
-  # TODO- Add example
-  extraContainers: []
-
   # Enables TLS (https://learn.hashicorp.com/tutorials/consul/tls-encryption-secure)
   # across the cluster to verify authenticity of the Consul servers and clients.
   # Requires Consul v1.4.1+.
@@ -600,6 +596,19 @@ server:
   # @type: array<map>
   extraVolumes: []
 
+  # A list of sidecar containers.
+  # @type: array<string>
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  extraContainers: []
+
   # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
   # minimizes risk of the cluster becoming unusable if a node is lost. If you need
@@ -928,6 +937,19 @@ client:
   #
   # @type: array<map>
   extraVolumes: []
+
+  # A list of sidecar containers.
+  # @type: array<string>
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  extraContainers: []
 
   # Toleration Settings for Client pods
   # This should be a multi-line string matching the Toleration array

@@ -1429,13 +1429,13 @@ rollingUpdate:
   # Test that it defines the extra container
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'server.extraContainers[0].image=test-image' \
-      --set 'server.extraContainers[0].name=test-container' \
-      --set 'server.extraContainers[0].ports[0].name=test-port' \
-      --set 'server.extraContainers[0].ports[0].containerPort=9410' \
-      --set 'server.extraContainers[0].ports[0].protocol=TCP' \
-      --set 'server.extraContainers[0].env[0].name=TEST_ENV' \
-      --set 'server.extraContainers[0].env[0].value=test_env_value' \
+      --set 'client.extraContainers[0].image=test-image' \
+      --set 'client.extraContainers[0].name=test-container' \
+      --set 'client.extraContainers[0].ports[0].name=test-port' \
+      --set 'client.extraContainers[0].ports[0].containerPort=9410' \
+      --set 'client.extraContainers[0].ports[0].protocol=TCP' \
+      --set 'client.extraContainers[0].env[0].name=TEST_ENV' \
+      --set 'client.extraContainers[0].env[0].value=test_env_value' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[] | select(.name == "test-container")' | tee /dev/stderr)
 
@@ -1474,10 +1474,10 @@ rollingUpdate:
 
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'server.extraContainers[0].image=test-image' \
-      --set 'server.extraContainers[0].name=test-container' \
-      --set 'server.extraContainers[1].image=test-image' \
-      --set 'server.extraContainers[1].name=test-container-2' \
+      --set 'client.extraContainers[0].image=test-image' \
+      --set 'client.extraContainers[0].name=test-container' \
+      --set 'client.extraContainers[1].image=test-image' \
+      --set 'client.extraContainers[1].name=test-container-2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers' | tee /dev/stderr)
 
