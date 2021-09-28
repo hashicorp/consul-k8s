@@ -1493,9 +1493,7 @@ rollingUpdate:
   local object=$(helm template \
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
-  local containers_count=$(echo $object |
-      yq -r 'length' | tee /dev/stderr)
-  [ "${containers_count}" = 1 ]
+  [ "${object}" = 1 ]
 }
