@@ -1479,11 +1479,9 @@ rollingUpdate:
       --set 'client.extraContainers[1].image=test-image' \
       --set 'client.extraContainers[1].name=test-container-2' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
-  local containers_count=$(echo $object |
-      yq -r 'length' | tee /dev/stderr)
-  [ "${containers_count}" = 3 ]
+  [ "${object}" = 3 ]
 
 }
 
