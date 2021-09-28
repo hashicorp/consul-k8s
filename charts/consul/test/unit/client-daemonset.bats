@@ -1469,7 +1469,7 @@ rollingUpdate:
 
 }
 
-@test "client/DaemonSet: adds two extra client containers" {
+@test "client/DaemonSet: extraContainers supports adding two containers" {
   cd `chart_dir`
 
   local object=$(helm template \
