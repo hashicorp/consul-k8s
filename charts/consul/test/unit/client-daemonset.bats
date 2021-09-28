@@ -1487,7 +1487,7 @@ rollingUpdate:
 
 }
 
-@test "client/DaemonSet: no extra client containers added" {
+@test "client/DaemonSet: no extra client containers added by default" {
   cd `chart_dir`
 
   local object=$(helm template \
