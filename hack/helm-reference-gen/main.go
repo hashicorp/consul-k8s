@@ -22,6 +22,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	tocPrefix = "## Top-Level Stanzas\n\nUse these links to navigate to a particular top-level stanza.\n\n"
+	tocSuffix = "\n## All Values"
+)
+
 var (
 	// typeAnnotation matches the @type annotation. It captures the value of @type.
 	typeAnnotation = regexp.MustCompile(`(?m).*@type: (.*)$`)
@@ -147,7 +152,15 @@ func GenerateDocs(yamlStr string) (string, error) {
 	}
 
 	children, err := generateDocsFromNode(docNodeTmpl, node)
-	return strings.ReplaceAll(strings.Join(children, "\n\n"), "[Enterprise Only]", "<EnterpriseAlert inline />"), err
+	if err != nil {
+		return "", err
+	}
+
+	enterpriseSubst := strings.ReplaceAll(strings.Join(children, "\n\n"), "[Enterprise Only]", "<EnterpriseAlert inline />")
+
+	// Add table of contents.
+	toc := generateTOC(node)
+	return toc + "\n\n" + enterpriseSubst + "\n", nil
 }
 
 // Parse parses yamlStr into a tree of DocNode's.
@@ -388,4 +401,14 @@ func buildDocNode(nodeContentIdx int, currNode *yaml.Node, nodeContent []*yaml.N
 		}
 	}
 	return DocNode{}, fmt.Errorf("fell through cases unexpectedly at breadcrumb: %s", parentBreadcrumb)
+}
+
+func generateTOC(node DocNode) string {
+	toc := tocPrefix
+
+	for _, c := range node.Children {
+		toc += fmt.Sprintf("- [`%s`](#%s)\n", c.Key, strings.ToLower(c.Key))
+	}
+
+	return toc + tocSuffix
 }

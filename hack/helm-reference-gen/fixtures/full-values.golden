@@ -1,3 +1,23 @@
+## Top-Level Stanzas
+
+Use these links to navigate to a particular top-level stanza.
+
+- [`global`](#global)
+- [`server`](#server)
+- [`externalServers`](#externalservers)
+- [`client`](#client)
+- [`dns`](#dns)
+- [`ui`](#ui)
+- [`syncCatalog`](#synccatalog)
+- [`connectInject`](#connectinject)
+- [`controller`](#controller)
+- [`meshGateway`](#meshgateway)
+- [`ingressGateways`](#ingressgateways)
+- [`terminatingGateways`](#terminatinggateways)
+- [`tests`](#tests)
+
+## All Values
+
 ### global
 
 - `global` ((#v-global)) - Holds values that affect multiple components of the chart.
