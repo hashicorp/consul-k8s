@@ -1385,7 +1385,7 @@ load _helpers
 
 }
 
-@test "server/StatefulSet: no extra containers added" {
+@test "server/StatefulSet: no extra containers added by default" {
   cd `chart_dir`
 
   local object=$(helm template \
