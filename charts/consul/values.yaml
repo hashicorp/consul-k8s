@@ -597,7 +597,6 @@ server:
   extraVolumes: []
 
   # A list of sidecar containers.
-  # @type: array<string>
   # Example:
   #
   # ```yaml
@@ -607,6 +606,7 @@ server:
   #   command:
   #    - ...
   # ```
+  # @type: array<map>
   extraContainers: []
 
   # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
@@ -939,7 +939,6 @@ client:
   extraVolumes: []
 
   # A list of sidecar containers.
-  # @type: array<string>
   # Example:
   #
   # ```yaml
@@ -949,6 +948,7 @@ client:
   #   command:
   #    - ...
   # ```
+  # @type: array<map>
   extraContainers: []
 
   # Toleration Settings for Client pods
