@@ -1423,7 +1423,7 @@ rollingUpdate:
 #--------------------------------------------------------------------
 # extraContainers
 
-@test "client/DaemonSet: adds extra client container" {
+@test "client/DaemonSet: extraContainers adds extra container" {
   cd `chart_dir`
 
   # Test that it defines the extra container
