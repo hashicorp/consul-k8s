@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	consulChart "github.com/hashicorp/consul-k8s/charts"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
@@ -304,19 +305,18 @@ func (c *Command) Run(args []string) int {
 	install.ReleaseName = common.DefaultReleaseName
 	install.Namespace = c.flagNamespace
 	install.CreateNamespace = true
-	install.ChartPathOptions.RepoURL = helmRepository
 	install.Wait = c.flagWait
 	install.Timeout = c.timeoutDuration
 
-	// Locate the chart, install it in some cache locally.
-	chartPath, err := install.ChartPathOptions.LocateChart("consul", settings)
+	// Read the embedded chart files into []*loader.BufferedFile.
+	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
-	// Actually load the chart into memory.
-	chart, err := loader.Load(chartPath)
+	// Create a *chart.Chart object from the files to run the installation from.
+	chart, err := loader.LoadFiles(chartFiles)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
