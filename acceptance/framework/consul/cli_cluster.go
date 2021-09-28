@@ -125,7 +125,7 @@ func (h *CLICluster) Create(t *testing.T) {
 	}
 	kubecontext := h.kubeContext
 	if kubecontext != "" {
-		args = append(args, "-kubecontext", kubecontext)
+		args = append(args, "-context", kubecontext)
 	}
 
 	for k, v := range h.values {
@@ -136,7 +136,11 @@ func (h *CLICluster) Create(t *testing.T) {
 	fmt.Println(args)
 	cmd := exec.Command("consul-k8s", args...)
 
-	require.NoError(t, cmd.Run())
+	err := cmd.Run()
+	if err != nil {
+		h.logger.Logf(t, "error creating cluster: %s", err.Error())
+	}
+	require.NoError(t, err)
 
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, "consul", fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -153,7 +157,7 @@ func (h *CLICluster) Destroy(t *testing.T) {
 	}
 	kubecontext := h.kubeContext
 	if kubecontext != "" {
-		args = append(args, "-kubecontext", kubecontext)
+		args = append(args, "-context", kubecontext)
 	}
 
 	args = append(args, "-auto-approve")
@@ -161,7 +165,11 @@ func (h *CLICluster) Destroy(t *testing.T) {
 	fmt.Println(args)
 	cmd := exec.Command("consul-k8s", args...)
 
-	require.NoError(t, cmd.Run())
+	err := cmd.Run()
+	if err != nil {
+		h.logger.Logf(t, "error creating cluster: %s", err.Error())
+	}
+	require.NoError(t, err)
 }
 
 func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
