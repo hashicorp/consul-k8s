@@ -47,16 +47,16 @@ func NewCLICluster(
 ) Cluster {
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, "consul")
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
-		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configureSCCs(t, ctx.KubernetesClient(t), cfg, "consul")
 	}
 
 	//fmt.Printf("testconfig %+v\n", cfg)
 	if cfg.EnterpriseLicense != "" {
-		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, "consul")
 	} else {
 		fmt.Println("enterprise license is empty")
 	}
