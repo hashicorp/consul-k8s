@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -45,6 +46,13 @@ func NewCLICluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) Cluster {
+
+	ctx.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul",
+		},
+	}, metav1.CreateOptions{})
 
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, "consul")
