@@ -362,6 +362,9 @@ spec:
           securityContext:
             {{- toYaml .Values.client.containerSecurityContext.client | nindent 12 }}
           {{- end }}
+        {{- if .Values.client.extraContainers }}
+        {{ toYaml .Values.client.extraContainers | nindent 8 }}
+        {{- end }}
       {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
