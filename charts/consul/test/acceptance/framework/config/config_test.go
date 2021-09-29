@@ -116,39 +116,38 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 
 func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 	tests := []struct {
-		appVersion string
-		expImage   string
-		expErr     string
+		consulImage string
+		expImage    string
+		expErr      string
 	}{
 		{
-			appVersion: "1.9.0",
-			expImage:   "hashicorp/consul-enterprise:1.9.0-ent",
+			consulImage: "hashicorp/consul:1.9.0",
+			expImage:    "hashicorp/consul-enterprise:1.9.0-ent",
 		},
 		{
-			appVersion: "1.8.5-rc1",
-			expImage:   "hashicorp/consul-enterprise:1.8.5-ent-rc1",
+			consulImage: "hashicorp/consul:1.8.5-rc1",
+			expImage:    "hashicorp/consul-enterprise:1.8.5-ent-rc1",
 		},
 		{
-			appVersion: "1.7.0-beta3",
-			expImage:   "hashicorp/consul-enterprise:1.7.0-ent-beta3",
+			consulImage: "hashicorp/consul:1.7.0-beta3",
+			expImage:    "hashicorp/consul-enterprise:1.7.0-ent-beta3",
 		},
 		{
-			appVersion: "1",
-			expErr:     "unable to cast chartMap.appVersion to string",
+			consulImage: "invalid",
+			expErr:      "could not determine consul version from global.image: invalid",
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.appVersion, func(t *testing.T) {
+		t.Run(tt.consulImage, func(t *testing.T) {
 
-			// Write Chart.yaml to a temp dir which will then get parsed.
-			chartYAML := fmt.Sprintf(`apiVersion: v1
-name: consul
-appVersion: %s
-`, tt.appVersion)
+			// Write values.yaml to a temp dir which will then get parsed.
+			valuesYAML := fmt.Sprintf(`global:
+  image: %s
+`, tt.consulImage)
 			tmp, err := ioutil.TempDir("", "")
 			require.NoError(t, err)
 			defer os.RemoveAll(tmp)
-			require.NoError(t, ioutil.WriteFile(filepath.Join(tmp, "Chart.yaml"), []byte(chartYAML), 0644))
+			require.NoError(t, ioutil.WriteFile(filepath.Join(tmp, "values.yaml"), []byte(valuesYAML), 0644))
 
 			cfg := TestConfig{
 				EnableEnterprise: true,

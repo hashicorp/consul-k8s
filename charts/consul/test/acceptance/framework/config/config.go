@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -91,38 +90,48 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	return helmValues, nil
 }
 
-// entImage parses out consul version from Chart.yaml
+type values struct {
+	Global globalValues `yaml:"global"`
+}
+
+type globalValues struct {
+	Image string `yaml:"image"`
+}
+
+// entImage parses out consul version from values.yaml
 // and sets global.image to the consul enterprise image with that version.
 func (t *TestConfig) entImage() (string, error) {
 	if t.helmChartPath == "" {
 		t.helmChartPath = HelmChartPath
 	}
 
-	// Unmarshal Chart.yaml to get appVersion (i.e. Consul version)
-	chart, err := ioutil.ReadFile(filepath.Join(t.helmChartPath, "Chart.yaml"))
+	// Unmarshal values.yaml to current global.image value.
+	valuesContents, err := ioutil.ReadFile(filepath.Join(t.helmChartPath, "values.yaml"))
 	if err != nil {
 		return "", err
 	}
 
-	var chartMap map[string]interface{}
-	err = yaml.Unmarshal(chart, &chartMap)
+	var v values
+	err = yaml.Unmarshal(valuesContents, &v)
 	if err != nil {
 		return "", err
 	}
 
-	appVersion, ok := chartMap["appVersion"].(string)
-	if !ok {
-		return "", errors.New("unable to cast chartMap.appVersion to string")
+	consulImageSplits := strings.Split(v.Global.Image, ":")
+	if len(consulImageSplits) != 2 {
+		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)
 	}
+	consulImageVersion := consulImageSplits[1]
+
 	var preRelease string
 	// Handle versions like 1.9.0-rc1.
-	if strings.Contains(appVersion, "-") {
-		split := strings.Split(appVersion, "-")
-		appVersion = split[0]
+	if strings.Contains(consulImageVersion, "-") {
+		split := strings.Split(consulImageVersion, "-")
+		consulImageVersion = split[0]
 		preRelease = fmt.Sprintf("-%s", split[1])
 	}
 
-	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent%s", appVersion, preRelease), nil
+	return fmt.Sprintf("hashicorp/consul-enterprise:%s-ent%s", consulImageVersion, preRelease), nil
 }
 
 // setIfNotEmpty sets key to val in map m if value is not empty.
