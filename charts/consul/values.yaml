@@ -2009,6 +2009,18 @@ meshGateway:
         memory: "150Mi"
         cpu: "50m"
 
+  # Resource settings for the `service-init` init container.
+  # @recurse: false
+  # @type: map
+  initServiceInitContainer:
+    resources:
+      requests:
+        memory: "25Mi"
+        cpu: "50m"
+      limits:
+        memory: "150Mi"
+        cpu: "50m"
+
   # By default, we set an anti-affinity so that two gateway pods won't be
   # on the same node. NOTE: Gateways require that Consul client agents are
   # also running on the nodes alongside each gateway pod.
