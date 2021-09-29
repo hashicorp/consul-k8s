@@ -62,7 +62,7 @@ func NewCLICluster(
 	values := map[string]string{
 		"server.replicas":              "1",
 		"server.bootstrapExpect":       "1",
-		"connectInject.envoyExtraArgs": "--log-level debug",
+		"connectInject.envoyExtraArgs": "\"--log-level debug\"",
 		"connectInject.logLevel":       "debug",
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
@@ -136,9 +136,10 @@ func (h *CLICluster) Create(t *testing.T) {
 	fmt.Println(args)
 	cmd := exec.Command("consul-k8s", args...)
 
-	err := cmd.Run()
+	out, err := cmd.Output()
 	if err != nil {
-		h.logger.Logf(t, "error creating cluster: %s", err.Error())
+		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
+		h.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
 
@@ -165,9 +166,10 @@ func (h *CLICluster) Destroy(t *testing.T) {
 	fmt.Println(args)
 	cmd := exec.Command("consul-k8s", args...)
 
-	err := cmd.Run()
+	out, err := cmd.Output()
 	if err != nil {
-		h.logger.Logf(t, "error creating cluster: %s", err.Error())
+		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
+		h.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
 }
