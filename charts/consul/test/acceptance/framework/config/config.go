@@ -117,6 +117,14 @@ func (t *TestConfig) entImage() (string, error) {
 		return "", err
 	}
 
+	// Check if the image contains digest instead of a tag.
+	// If it does, we want to use that image instead rather than
+	// trying to change the tag to an enterprise tag.
+	if strings.Contains(v.Global.Image, "@sha256") {
+		return v.Global.Image, nil
+	}
+
+	// Otherwise, assume that we have an image tag with a version in it.
 	consulImageSplits := strings.Split(v.Global.Image, ":")
 	if len(consulImageSplits) != 2 {
 		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)

@@ -136,6 +136,10 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 			consulImage: "invalid",
 			expErr:      "could not determine consul version from global.image: invalid",
 		},
+		{
+			consulImage: "hashicorp/consul@sha256:oioi2452345kjhlkh",
+			expImage:    "hashicorp/consul@sha256:oioi2452345kjhlkh",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.consulImage, func(t *testing.T) {
