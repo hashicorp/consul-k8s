@@ -54,8 +54,11 @@ func NewCLICluster(
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
+	//fmt.Printf("testconfig %+v\n", cfg)
 	if cfg.EnterpriseLicense != "" {
 		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+	} else {
+		fmt.Println("enterprise license is empty")
 	}
 
 	// Deploy with the following defaults unless helmValues overwrites it.

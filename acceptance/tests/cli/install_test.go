@@ -28,4 +28,5 @@ func TestConnectInject(t *testing.T) {
 
 		})
 	}
+	t.FailNow()
 }
