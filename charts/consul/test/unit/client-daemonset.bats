@@ -1419,3 +1419,79 @@ rollingUpdate:
   [ "$status" -eq 1 ]
   [[ "$output" =~ "global.adminPartitions.name has to be \"default\" in the server cluster" ]]
 }
+
+#--------------------------------------------------------------------
+# extraContainers
+
+@test "client/DaemonSet: extraContainers adds extra container" {
+  cd `chart_dir`
+
+  # Test that it defines the extra container
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.extraContainers[0].image=test-image' \
+      --set 'client.extraContainers[0].name=test-container' \
+      --set 'client.extraContainers[0].ports[0].name=test-port' \
+      --set 'client.extraContainers[0].ports[0].containerPort=9410' \
+      --set 'client.extraContainers[0].ports[0].protocol=TCP' \
+      --set 'client.extraContainers[0].env[0].name=TEST_ENV' \
+      --set 'client.extraContainers[0].env[0].value=test_env_value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[] | select(.name == "test-container")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "test-container" ]
+
+  local actual=$(echo $object |
+      yq -r '.image' | tee /dev/stderr)
+  [ "${actual}" = "test-image" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].name' | tee /dev/stderr)
+  [ "${actual}" = "test-port" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].containerPort' | tee /dev/stderr)
+  [ "${actual}" = "9410" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].protocol' | tee /dev/stderr)
+  [ "${actual}" = "TCP" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[0].name' | tee /dev/stderr)
+  [ "${actual}" = "TEST_ENV" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[0].value' | tee /dev/stderr)
+  [ "${actual}" = "test_env_value" ]
+
+}
+
+@test "client/DaemonSet: extraContainers supports adding two containers" {
+  cd `chart_dir`
+
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.extraContainers[0].image=test-image' \
+      --set 'client.extraContainers[0].name=test-container' \
+      --set 'client.extraContainers[1].image=test-image' \
+      --set 'client.extraContainers[1].name=test-container-2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
+
+  [ "${object}" = 3 ]
+
+}
+
+@test "client/DaemonSet: no extra client containers added by default" {
+  cd `chart_dir`
+
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
+
+  [ "${object}" = 1 ]
+}
