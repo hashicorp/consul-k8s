@@ -225,13 +225,14 @@ spec:
               mountPath: /consul/tls/ca
               readOnly: true
             {{- end }}
+          {{- if .Values.meshGateway.initServiceInitContainer.resources }}
           resources:
-            requests:
-              memory: "50Mi"
-              cpu: "50m"
-            limits:
-              memory: "50Mi"
-              cpu: "50m"
+            {{- if eq (typeOf .Values.meshGateway.initServiceInitContainer.resources) "string" }}
+            {{ tpl .Values.meshGateway.initServiceInitContainer.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 12 }}
+            {{- end }}
+          {{- end }}
       containers:
         - name: mesh-gateway
           image: {{ .Values.global.imageEnvoy | quote }}
