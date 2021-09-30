@@ -18,7 +18,6 @@ rules:
     - secrets
   verbs:
     - create
-    - get
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
   resources:
