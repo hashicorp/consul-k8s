@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
@@ -66,6 +67,11 @@ type initContainerCommandData struct {
 	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
+
+	MultiPort       bool
+	EnvoyAdminPort int
+	EnvoyAddressPort int
+	BearerTokenFile string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -100,7 +106,7 @@ func (h *Handler) initCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for registering the Consul
 // service, setting up the Envoy bootstrap, etc.
-func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcName string, multiPort bool, multiPortIdx int) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
@@ -119,11 +125,20 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
 		EnvoyUID:                   envoyUserAndGroupID,
+		MultiPort:                  multiPort,
+		EnvoyAddressPort:  20000+multiPortIdx,
+		EnvoyAdminPort: 19000+multiPortIdx,
 	}
 
-	if data.AuthMethod != "" {
-		data.ServiceAccountName = pod.Spec.ServiceAccountName
-		data.ServiceName = pod.Annotations[annotationService]
+	if h.AuthMethod != "" {
+		data.ServiceName = svcName
+		if multiPort {
+			// If multi port then we require that the service account name
+			// matches the service name.
+			data.ServiceAccountName = svcName
+		} else {
+			data.ServiceAccountName = pod.Spec.ServiceAccountName
+		}
 	}
 
 	// This determines how to configure the consul connect envoy command: what
@@ -153,10 +168,11 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 
 	if h.AuthMethod != "" {
 		// Extract the service account token's volume mount
-		saTokenVolumeMount, err := findServiceAccountVolumeMount(pod)
+		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, svcName)
 		if err != nil {
 			return corev1.Container{}, err
 		}
+		data.BearerTokenFile = bearerTokenFile
 
 		// Append to volume mounts
 		volMounts = append(volMounts, saTokenVolumeMount)
@@ -171,8 +187,12 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		return corev1.Container{}, err
 	}
 
+	initContainerName := InjectInitContainerName
+	if multiPort {
+		initContainerName = fmt.Sprintf("%s-%s", InjectInitContainerName, svcName)
+	}
 	container := corev1.Container{
-		Name:  InjectInitContainerName,
+		Name:  initContainerName,
 		Image: h.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
@@ -206,6 +226,9 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 	}
 
 	if tproxyEnabled {
+		if multiPort {
+			return container, fmt.Errorf("multi port services are not compatible with tproxy")
+		}
 		// Running consul connect redirect-traffic with iptables
 		// requires both being a root user and having NET_ADMIN capability.
 		container.SecurityContext = &corev1.SecurityContext{
@@ -279,6 +302,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="{{ .AuthMethod }}" \
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
+  -bearer-token-file={{ .BearerTokenFile }} \
+  {{- if .MultiPort }}
+  -acl-token-sink=/consul/connect-inject/acl-token-{{ .ServiceName }} \
+  -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }}
+  {{- end }}
   {{- if .ConsulNamespace }}
   {{- if .NamespaceMirroringEnabled }}
   {{- /* If namespace mirroring is enabled, the auth method is
@@ -298,7 +326,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 # Generate the envoy bootstrap code
 /consul/connect-inject/consul connect envoy \
+  {{- if .MultiPort }}
+  -proxy-id="$(cat /consul/connect-inject/proxyid-{{.ServiceName}})" \
+  {{- else }}
   -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  {{- end }}
   {{- if .PrometheusScrapePath }}
   -prometheus-scrape-path="{{ .PrometheusScrapePath }}" \
   {{- end }}
@@ -306,7 +338,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -prometheus-backend-port="{{ .PrometheusBackendPort }}" \
   {{- end }}
   {{- if .AuthMethod }}
+  {{- if .MultiPort }}
+  -token-file="/consul/connect-inject/acl-token-{{ .ServiceName }}" \
+  {{- else }}
   -token-file="/consul/connect-inject/acl-token" \
+  {{- end }}
   {{- end }}
   {{- if .ConsulPartition }}
   -partition="{{ .ConsulPartition }}" \
@@ -314,7 +350,11 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  -bootstrap > /consul/connect-inject/envoy-bootstrap.yaml
+  {{- if .MultiPort }}
+  -address=127.0.0.1:{{ .EnvoyAddressPort }} \
+  -admin-bind=127.0.0.1:{{ .EnvoyAdminPort }} \
+  {{- end }}
+  -bootstrap > {{ if .MultiPort }}/consul/connect-inject/envoy-bootstrap-{{.ServiceName}}.yaml{{ else }}/consul/connect-inject/envoy-bootstrap.yaml{{ end }}
 
 {{- if .EnableTransparentProxy }}
 {{- /* The newline below is intentional to allow extra space

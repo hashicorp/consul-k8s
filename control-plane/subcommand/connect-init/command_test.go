@@ -159,9 +159,9 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
-				proxyIDFile:                        proxyFile,
+				flagBearerTokenFile:                bearerFile,
+				flagACLTokenSink:                   tokenFile,
+				flagProxyIDFile:                    proxyFile,
 				serviceRegistrationPollingAttempts: 3,
 			}
 
@@ -267,7 +267,7 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				proxyIDFile:                        proxyFile,
+				flagProxyIDFile:                    proxyFile,
 				serviceRegistrationPollingAttempts: 3,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
@@ -460,7 +460,7 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				proxyIDFile:                        proxyFile,
+				flagProxyIDFile:                    proxyFile,
 				serviceRegistrationPollingAttempts: 1,
 			}
 			flags := []string{
@@ -504,7 +504,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		proxyIDFile:                        proxyFile,
+		flagProxyIDFile:                    proxyFile,
 		serviceRegistrationPollingAttempts: 10,
 	}
 	flags := []string{
@@ -544,7 +544,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		proxyIDFile:                        randFileName,
+		flagProxyIDFile:                    randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
 	flags := []string{
@@ -604,8 +604,8 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
+				flagBearerTokenFile:                bearerFile,
+				flagACLTokenSink:                   tokenFile,
 				serviceRegistrationPollingAttempts: uint64(servicesGetRetries),
 			}
 
@@ -675,10 +675,10 @@ func TestRun_LoginWithRetries(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:              ui,
-				tokenSinkFile:   tokenFile,
-				bearerTokenFile: bearerFile,
-				proxyIDFile:     proxyFile,
+				UI:                  ui,
+				flagACLTokenSink:    tokenFile,
+				flagBearerTokenFile: bearerFile,
+				flagProxyIDFile:     proxyFile,
 			}
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,

@@ -360,7 +360,9 @@ func (r *EndpointsController) upsertHealthCheck(pod corev1.Pod, client *api.Clie
 
 func getServiceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	serviceName := serviceEndpoints.Name
-	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" {
+	// We don't want to use the service name from the annotation if the Pod is a
+	// multi port Pod. In that case we always use the name of the endpoint.
+	if serviceNameFromAnnotation, ok := pod.Annotations[annotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
 		serviceName = serviceNameFromAnnotation
 	}
 	return serviceName
@@ -388,6 +390,12 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	// The handler will always set the port annotation if one is not provided on the pod.
 	var consulServicePort int
 	if raw, ok := pod.Annotations[annotationPort]; ok && raw != "" {
+		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
+			// Figure out which index of the ports annotation to use by
+			// finding the index of the service names annotation.
+			raw = multiPort[getMultiPortIdx(pod, serviceEndpoints)]
+		}
+
 		if port, err := portValue(pod, raw); port > 0 {
 			if err != nil {
 				return nil, nil, err
@@ -474,11 +482,15 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	proxyConfig.Upstreams = upstreams
 
+	proxyPort := 20000
+	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 {
+		proxyPort += idx
+	}
 	proxyService := &api.AgentServiceRegistration{
 		Kind:      api.ServiceKindConnectProxy,
 		ID:        proxyServiceID,
 		Name:      proxyServiceName,
-		Port:      20000,
+		Port:      proxyPort,
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
 		Namespace: r.consulNamespace(pod.Namespace),
@@ -486,7 +498,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Checks: api.AgentServiceChecks{
 			{
 				Name:                           "Proxy Public Listener",
-				TCP:                            fmt.Sprintf("%s:20000", pod.Status.PodIP),
+				TCP:                            fmt.Sprintf("%s:%d", pod.Status.PodIP, proxyPort),
 				Interval:                       "10s",
 				DeregisterCriticalServiceAfter: "10m",
 			},
@@ -1010,4 +1022,13 @@ func hasBeenInjected(pod corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
+	for i, name := range strings.Split(pod.Annotations[annotationService], ",") {
+		if name == getServiceName(pod, serviceEndpoints) {
+			return i
+		}
+	}
+	return -1
 }

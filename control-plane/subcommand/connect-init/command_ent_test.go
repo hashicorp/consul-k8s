@@ -184,9 +184,9 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
-				proxyIDFile:                        proxyFile,
+				flagBearerTokenFile:                bearerFile,
+				flagACLTokenSink:                   tokenFile,
+				flagProxyIDFile:                    proxyFile,
 				serviceRegistrationPollingAttempts: 5,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
