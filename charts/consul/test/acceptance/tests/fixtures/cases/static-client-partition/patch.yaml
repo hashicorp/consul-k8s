@@ -7,4 +7,4 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "consul.hashicorp.com/connect-service-upstreams": "static-server.default.secondary"
+        "consul.hashicorp.com/connect-service-upstreams": "static-server.default.secondary:8080"

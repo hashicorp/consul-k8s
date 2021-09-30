@@ -16,7 +16,7 @@ import (
 
 // Test that Connect works in a default installation.
 // i.e. without ACLs because TLS is required for setting up Admin Partitions.
-func TestMeshGatewayDefault(t *testing.T) {
+func TestPartitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -44,7 +44,6 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"server.exposeGossipAndRPCPorts": "true",
 
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
 	}
 
 	if cfg.UseKind {
@@ -54,7 +53,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 
 	releaseName := helpers.RandomName()
 
-	// Install the primary consul cluster in the default kubernetes context
+	// Install the consul cluster with servers in the default kubernetes context.
 	primaryConsulCluster := consul.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 	primaryConsulCluster.Create(t)
 
@@ -86,9 +85,8 @@ func TestMeshGatewayDefault(t *testing.T) {
 	} else {
 		nodeList, err := primaryContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		require.NoError(t, err)
-		for _, node := range nodeList.Items {
-			partitionSvcIP = node.Status.Addresses[0].Address
-		}
+		// Get the address of the (only) node from the Kind cluster.
+		partitionSvcIP = nodeList.Items[0].Status.Addresses[0].Address
 	}
 
 	// Create secondary cluster
@@ -116,14 +114,13 @@ func TestMeshGatewayDefault(t *testing.T) {
 		"client.join[0]":           partitionSvcIP,
 
 		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
 	}
 
 	if cfg.UseKind {
 		secondaryHelmValues["externalServers.httpsPort"] = "30000"
 	}
 
-	// Install the secondary consul cluster in the secondary kubernetes context
+	// Install the consul cluster without servers in the secondary kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
@@ -135,14 +132,15 @@ func TestMeshGatewayDefault(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, output, "Partition: 'secondary'")
 
-	// Check that we can connect services over the mesh gateways
-	logger.Log(t, "creating static-server in workload cluster")
-	k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-
-	logger.Log(t, "creating static-client in server cluster")
-	k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partition")
-
 	// TODO: These can be enabled once mesh gateways are used for communication between services. Currently we cant setup a flat pod network on Kind.
+	// Check that we can connect services over the mesh gateways
+
+	//logger.Log(t, "creating static-server in workload cluster")
+	//k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+
+	//logger.Log(t, "creating static-client in server cluster")
+	//k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partition")
+
 	//logger.Log(t, "checking that connection is successful")
 	//k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), "http://localhost:1234")
 }
