@@ -461,6 +461,7 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 		fmt.Println("found license secret, not creating")
 		require.NoError(t, err)
 	}
+	fmt.Println("finished license secret")
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{})

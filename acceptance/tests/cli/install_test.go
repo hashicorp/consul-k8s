@@ -13,8 +13,8 @@ func TestConnectInject(t *testing.T) {
 		secure      bool
 		autoEncrypt bool
 	}{
-		{false, false},
-		{true, false},
+		//{false, false},
+		//{true, false},
 		{true, true},
 	}
 
