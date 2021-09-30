@@ -356,6 +356,9 @@ spec:
           securityContext:
             {{- toYaml .Values.server.containerSecurityContext.server | nindent 12 }}
           {{- end }}
+          {{- if .Values.server.extraContainers }}
+          {{ toYaml .Values.server.extraContainers | nindent 8 }}
+          {{- end }}
       {{- if .Values.server.nodeSelector }}
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}

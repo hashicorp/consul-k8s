@@ -20,27 +20,42 @@ func Test(t *testing.T) {
 # Line 1
 # Line 2
 key: value`,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($string: value$) - Line 1\n  Line 2`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($string: value$) - Line 1\n  Line 2
+`,
 		},
 		"integer value": {
 			Input: `---
 # Line 1
 # Line 2
 replicas: 3`,
-			Exp: `### replicas
+			Exp: `- [$replicas$](#replicas)
 
-- $replicas$ ((#v-replicas)) ($integer: 3$) - Line 1\n  Line 2`,
+## All Values
+
+### replicas
+
+- $replicas$ ((#v-replicas)) ($integer: 3$) - Line 1\n  Line 2
+`,
 		},
 		"boolean value": {
 			Input: `---
 # Line 1
 # Line 2
 enabled: true`,
-			Exp: `### enabled
+			Exp: `- [$enabled$](#enabled)
 
-- $enabled$ ((#v-enabled)) ($boolean: true$) - Line 1\n  Line 2`,
+## All Values
+
+### enabled
+
+- $enabled$ ((#v-enabled)) ($boolean: true$) - Line 1\n  Line 2
+`,
 		},
 		"map": {
 			Input: `---
@@ -50,11 +65,16 @@ map:
   # Key line 1
   # Key line 2
   key: value`,
-			Exp: `### map
+			Exp: `- [$map$](#map)
+
+## All Values
+
+### map
 
 - $map$ ((#v-map)) - Map line 1\n  Map line 2
 
-  - $key$ ((#v-map-key)) ($string: value$) - Key line 1\n    Key line 2`,
+  - $key$ ((#v-map-key)) ($string: value$) - Key line 1\n    Key line 2
+`,
 		},
 		"map with multiple keys": {
 			Input: `---
@@ -68,7 +88,11 @@ map:
   int: 1
   # Bool docs
   bool: true`,
-			Exp: `### map
+			Exp: `- [$map$](#map)
+
+## All Values
+
+### map
 
 - $map$ ((#v-map)) - Map line 1\n  Map line 2
 
@@ -77,16 +101,22 @@ map:
 
   - $int$ ((#v-map-int)) ($integer: 1$) - Int docs
 
-  - $bool$ ((#v-map-bool)) ($boolean: true$) - Bool docs`,
+  - $bool$ ((#v-map-bool)) ($boolean: true$) - Bool docs
+`,
 		},
 		"null value": {
 			Input: `---
 # key docs
 # @type: string
 key: null`,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($string: null$) - key docs`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($string: null$) - key docs
+`,
 		},
 		"description with empty line": {
 			Input: `---
@@ -94,9 +124,14 @@ key: null`,
 #
 # line 2
 key: value`,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($string: value$) - line 1\n\n  line 2`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($string: value$) - line 1\n\n  line 2
+`,
 		},
 		"array of strings": {
 			Input: `---
@@ -104,9 +139,14 @@ key: value`,
 # @type: array<string>
 serverAdditionalDNSSANs: []
 `,
-			Exp: `### serverAdditionalDNSSANs
+			Exp: `- [$serverAdditionalDNSSANs$](#serveradditionaldnssans)
 
-- $serverAdditionalDNSSANs$ ((#v-serveradditionaldnssans)) ($array<string>: []$) - line 1`,
+## All Values
+
+### serverAdditionalDNSSANs
+
+- $serverAdditionalDNSSANs$ ((#v-serveradditionaldnssans)) ($array<string>: []$) - line 1
+`,
 		},
 		"map with empty string values": {
 			Input: `---
@@ -117,13 +157,18 @@ gossipEncryption:
   # secretKey
   secretKey: ""
 `,
-			Exp: `### gossipEncryption
+			Exp: `- [$gossipEncryption$](#gossipencryption)
+
+## All Values
+
+### gossipEncryption
 
 - $gossipEncryption$ ((#v-gossipencryption)) - gossipEncryption
 
   - $secretName$ ((#v-gossipencryption-secretname)) ($string: ""$) - secretName
 
-  - $secretKey$ ((#v-gossipencryption-secretkey)) ($string: ""$) - secretKey`,
+  - $secretKey$ ((#v-gossipencryption-secretkey)) ($string: ""$) - secretKey
+`,
 		},
 		"map with null string values": {
 			Input: `---
@@ -133,13 +178,18 @@ bootstrapToken:
   # @type: string
   secretKey: null
 `,
-			Exp: `### bootstrapToken
+			Exp: `- [$bootstrapToken$](#bootstraptoken)
+
+## All Values
+
+### bootstrapToken
 
 - $bootstrapToken$ ((#v-bootstraptoken))
 
   - $secretName$ ((#v-bootstraptoken-secretname)) ($string: null$)
 
-  - $secretKey$ ((#v-bootstraptoken-secretkey)) ($string: null$)`,
+  - $secretKey$ ((#v-bootstraptoken-secretkey)) ($string: null$)
+`,
 		},
 		"resource settings": {
 			Input: `---
@@ -167,7 +217,11 @@ lifecycleSidecarContainer:
       memory: "50Mi"
       cpu: "20m"
 `,
-			Exp: `### lifecycleSidecarContainer
+			Exp: `- [$lifecycleSidecarContainer$](#lifecyclesidecarcontainer)
+
+## All Values
+
+### lifecycleSidecarContainer
 
 - $lifecycleSidecarContainer$ ((#v-lifecyclesidecarcontainer)) - lifecycle
 
@@ -196,7 +250,8 @@ lifecycleSidecarContainer:
 
       - $memory$ ((#v-lifecyclesidecarcontainer-resources-limits-memory)) ($string: 50Mi$)
 
-      - $cpu$ ((#v-lifecyclesidecarcontainer-resources-limits-cpu)) ($string: 20m$)`,
+      - $cpu$ ((#v-lifecyclesidecarcontainer-resources-limits-cpu)) ($string: 20m$)
+`,
 		},
 		"default as dash": {
 			Input: `---
@@ -208,22 +263,32 @@ server:
   # @type: boolean
   enabled: "-"
 `,
-			Exp: `### server
+			Exp: `- [$server$](#server)
+
+## All Values
+
+### server
 
 - $server$ ((#v-server))
 
   - $enabled$ ((#v-server-enabled)) ($boolean: global.enabled$) - If true, the chart will install all the resources necessary for a
     Consul server cluster. If you're running Consul externally and want agents
-    within Kubernetes to join that cluster, this should probably be false.`,
+    within Kubernetes to join that cluster, this should probably be false.
+`,
 		},
 		"extraConfig {}": {
 			Input: `---
 extraConfig: |
   {}
 `,
-			Exp: `### extraConfig
+			Exp: `- [$extraConfig$](#extraconfig)
 
-- $extraConfig$ ((#v-extraconfig)) ($string: {}$)`,
+## All Values
+
+### extraConfig
+
+- $extraConfig$ ((#v-extraconfig)) ($string: {}$)
+`,
 		},
 		"affinity": {
 			Input: `---
@@ -238,36 +303,56 @@ affinity: |
             component: server
         topologyKey: kubernetes.io/hostname
 `,
-			Exp: `### affinity
+			Exp: `- [$affinity$](#affinity)
 
-- $affinity$ ((#v-affinity)) ($string$) - Affinity Settings`,
+## All Values
+
+### affinity
+
+- $affinity$ ((#v-affinity)) ($string$) - Affinity Settings
+`,
 		},
 		"k8sAllowNamespaces": {
 			Input: `---
 # @type: array<string>
 k8sAllowNamespaces: ["*"]`,
-			Exp: `### k8sAllowNamespaces
+			Exp: `- [$k8sAllowNamespaces$](#k8sallownamespaces)
 
-- $k8sAllowNamespaces$ ((#v-k8sallownamespaces)) ($array<string>: ["*"]$)`,
+## All Values
+
+### k8sAllowNamespaces
+
+- $k8sAllowNamespaces$ ((#v-k8sallownamespaces)) ($array<string>: ["*"]$)
+`,
 		},
 		"k8sDenyNamespaces": {
 			Input: `---
 # @type: array<string>
 k8sDenyNamespaces: ["kube-system", "kube-public"]`,
-			Exp: `### k8sDenyNamespaces
+			Exp: `- [$k8sDenyNamespaces$](#k8sdenynamespaces)
 
-- $k8sDenyNamespaces$ ((#v-k8sdenynamespaces)) ($array<string>: ["kube-system", "kube-public"]$)`,
+## All Values
+
+### k8sDenyNamespaces
+
+- $k8sDenyNamespaces$ ((#v-k8sdenynamespaces)) ($array<string>: ["kube-system", "kube-public"]$)
+`,
 		},
 		"gateways": {
 			Input: `---
 # @type: array<map>
 gateways:
   - name: ingress-gateway`,
-			Exp: `### gateways
+			Exp: `- [$gateways$](#gateways)
+
+## All Values
+
+### gateways
 
 - $gateways$ ((#v-gateways)) ($array<map>$)
 
-  - $name$ ((#v-gateways-name)) ($string: ingress-gateway$)`,
+  - $name$ ((#v-gateways-name)) ($string: ingress-gateway$)
+`,
 		},
 		"enterprise alert": {
 			Input: `---
@@ -275,9 +360,14 @@ gateways:
 # line 2
 key: value
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($string: value$) - <EnterpriseAlert inline /> line 1\n  line 2`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($string: value$) - <EnterpriseAlert inline /> line 1\n  line 2
+`,
 		},
 		"yaml comments in examples": {
 			Input: `---
@@ -291,7 +381,11 @@ key: value
 # $$$
 key: value
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
+
+## All Values
+
+### key
 
 - $key$ ((#v-key)) ($string: value$) - Examples:
 
@@ -300,7 +394,8 @@ key: value
   image: "consul:1.5.0"
   # Consul Enterprise 1.5.0
   image: "hashicorp/consul-enterprise:1.5.0-ent"
-  $$$`,
+  $$$
+`,
 		},
 		"type override uses last match": {
 			Input: `---
@@ -308,9 +403,14 @@ key: value
 # @type: override-2
 key: value
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($override-2: value$)`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($override-2: value$)
+`,
 		},
 		"recurse false": {
 			Input: `---
@@ -324,33 +424,49 @@ ports:
 - port: 8443
   nodePort: null
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
+- [$ports$](#ports)
+
+## All Values
+
+### key
 
 - $key$ ((#v-key)) ($string: value$)
 
 ### ports
 
-- $ports$ ((#v-ports)) ($array<map>$) - port docs`,
+- $ports$ ((#v-ports)) ($array<map>$) - port docs
+`,
 		},
 		"@type: map": {
 			Input: `---
 # @type: map
 key: null
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
 
-- $key$ ((#v-key)) ($map$)`,
+## All Values
+
+### key
+
+- $key$ ((#v-key)) ($map$)
+`,
 		},
 		"if of type map and not annotated with @type": {
 			Input: `---
 key:
   foo: bar
 `,
-			Exp: `### key
+			Exp: `- [$key$](#key)
+
+## All Values
+
+### key
 
 - $key$ ((#v-key))
 
-  - $foo$ ((#v-key-foo)) ($string: bar$)`,
+  - $foo$ ((#v-key-foo)) ($string: bar$)
+`,
 		},
 	}
 
@@ -367,6 +483,8 @@ key:
 
 			// Swap \n for real \n.
 			exp = strings.Replace(exp, "\\n", "\n", -1)
+
+			exp = tocPrefix + exp
 
 			require.Equal(t, exp, out)
 		})

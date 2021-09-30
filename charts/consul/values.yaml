@@ -589,6 +589,19 @@ server:
   # @type: array<map>
   extraVolumes: []
 
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
+
   # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
   # minimizes risk of the cluster becoming unusable if a node is lost. If you need
@@ -917,6 +930,19 @@ client:
   #
   # @type: array<map>
   extraVolumes: []
+
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
 
   # Toleration Settings for Client pods
   # This should be a multi-line string matching the Toleration array
