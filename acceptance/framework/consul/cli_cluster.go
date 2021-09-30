@@ -73,7 +73,7 @@ func NewCLICluster(
 	values := map[string]string{
 		"server.replicas":              "1",
 		"server.bootstrapExpect":       "1",
-		"connectInject.envoyExtraArgs": "\"--log-level debug\"",
+		"connectInject.envoyExtraArgs": "--log-level debug",
 		"connectInject.logLevel":       "debug",
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
