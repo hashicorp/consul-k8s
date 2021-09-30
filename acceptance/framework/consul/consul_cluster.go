@@ -71,16 +71,7 @@ func NewHelmCluster(
 	}
 
 	// Deploy with the following defaults unless helmValues overwrites it.
-	values := map[string]string{
-		"server.replicas":              "1",
-		"server.bootstrapExpect":       "1",
-		"connectInject.envoyExtraArgs": "--log-level debug",
-		"connectInject.logLevel":       "debug",
-		// Disable DNS since enabling it changes the policy for the anonymous token,
-		// which could result in tests passing due to that token having privileges to read services
-		// (false positive).
-		"dns.enabled": "false",
-	}
+	values := defaultValues()
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
 
@@ -263,9 +254,6 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	}
 
 	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	if h.releaseName == "consul" {
-		serverPod = "consul-server-0"
-	}
 	tunnel := terratestk8s.NewTunnelWithLogger(
 		h.helmOptions.KubectlOptions,
 		terratestk8s.ResourceTypePod,
@@ -512,6 +500,20 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
+}
+
+func defaultValues() map[string]string {
+	values := map[string]string{
+		"server.replicas":              "1",
+		"server.bootstrapExpect":       "1",
+		"connectInject.envoyExtraArgs": "--log-level debug",
+		"connectInject.logLevel":       "debug",
+		// Disable DNS since enabling it changes the policy for the anonymous token,
+		// which could result in tests passing due to that token having privileges to read services
+		// (false positive).
+		"dns.enabled": "false",
+	}
+	return values
 }
 
 // mergeValues will merge the values in b with values in a and save in a.

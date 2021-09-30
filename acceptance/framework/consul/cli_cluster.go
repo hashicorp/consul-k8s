@@ -24,11 +24,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const consulNS = "consul"
+
 // CLICluster
 type CLICluster struct {
 	ctx                environment.TestContext
 	namespace          string
 	helmOptions        *helm.Options
+	kubectlOptions     *terratestk8s.KubectlOptions
 	values             map[string]string
 	releaseName        string
 	kubernetesClient   kubernetes.Interface
@@ -47,39 +50,28 @@ func NewCLICluster(
 	releaseName string,
 ) Cluster {
 
+	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
 	ctx.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "consul",
+			Name: consulNS,
 		},
 	}, metav1.CreateOptions{})
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, "consul")
+		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
-		configureSCCs(t, ctx.KubernetesClient(t), cfg, "consul")
+		configureSCCs(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
-	//fmt.Printf("testconfig %+v\n", cfg)
 	if cfg.EnterpriseLicense != "" {
-		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, "consul")
-	} else {
-		fmt.Println("enterprise license is empty")
+		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
 	// Deploy with the following defaults unless helmValues overwrites it.
-	values := map[string]string{
-		"server.replicas":              "1",
-		"server.bootstrapExpect":       "1",
-		"connectInject.envoyExtraArgs": "--log-level debug",
-		"connectInject.logLevel":       "debug",
-		// Disable DNS since enabling it changes the policy for the anonymous token,
-		// which could result in tests passing due to that token having privileges to read services
-		// (false positive).
-		"dns.enabled": "false",
-	}
+	values := defaultValues()
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
 
@@ -89,23 +81,17 @@ func NewCLICluster(
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
-	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
-	// this from the default of 5 min could help with flakiness in environments
-	// like AKS where volumes take a long time to mount.
-	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m"},
-	}
-
-	opts := &helm.Options{
+	kopts := ctx.KubectlOptions(t)
+	kopts.Namespace = consulNS
+	hopts := &helm.Options{
 		SetValues:      values,
-		KubectlOptions: ctx.KubectlOptions(t),
+		KubectlOptions: kopts,
 		Logger:         logger,
-		ExtraArgs:      extraArgs,
 	}
-	opts.KubectlOptions.Namespace = "consul"
 	return &CLICluster{
 		ctx:                ctx,
-		helmOptions:        opts,
+		helmOptions:        hopts,
+		kubectlOptions:     kopts,
 		namespace:          cfg.KubeNamespace,
 		values:             values,
 		releaseName:        releaseName,
@@ -127,8 +113,8 @@ func (h *CLICluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
-	// Fail if there are any existing installations of the Helm chart.
-	//h.checkForPriorInstallations(t)
+	// The install command itself will fail if there are prior installations, so it's sufficient to just run the install
+	// command.
 	args := []string{"install"}
 	kubeconfig := h.kubeConfig
 	if kubeconfig != "" {
@@ -143,10 +129,12 @@ func (h *CLICluster) Create(t *testing.T) {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 
 	}
-	args = append(args, "-auto-approve")
-	fmt.Println(args)
-	cmd := exec.Command("consul-k8s", args...)
 
+	// Match the timeout for the helm tests.
+	args = append(args, "-timeout", "15m")
+	args = append(args, "-auto-approve")
+
+	cmd := exec.Command("consul-k8s", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
@@ -160,7 +148,7 @@ func (h *CLICluster) Create(t *testing.T) {
 func (h *CLICluster) Destroy(t *testing.T) {
 	t.Helper()
 
-	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
+	k8s.WritePodsDebugInfoIfFailed(t, h.kubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
 	args := []string{"uninstall"}
 	kubeconfig := h.kubeConfig
@@ -174,9 +162,8 @@ func (h *CLICluster) Destroy(t *testing.T) {
 
 	args = append(args, "-auto-approve")
 	args = append(args, "-wipe-data")
-	fmt.Println(args)
-	cmd := exec.Command("consul-k8s", args...)
 
+	cmd := exec.Command("consul-k8s", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
@@ -196,7 +183,7 @@ func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	t.Helper()
 
-	namespace := h.helmOptions.KubectlOptions.Namespace
+	namespace := h.kubectlOptions.Namespace
 	config := api.DefaultConfig()
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
@@ -240,7 +227,7 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		serverPod = "consul-server-0"
 	}
 	tunnel := terratestk8s.NewTunnelWithLogger(
-		h.helmOptions.KubectlOptions,
+		h.kubectlOptions,
 		terratestk8s.ResourceTypePod,
 		serverPod,
 		localPort,
