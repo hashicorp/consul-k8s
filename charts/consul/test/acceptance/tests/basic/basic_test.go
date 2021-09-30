@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test that the basic installation, i.e. just
@@ -77,7 +77,7 @@ func TestBasicInstallation(t *testing.T) {
 				require.NoError(t, err)
 
 				testContext := suite.Environment().DefaultContext(t)
-				secret, err := testContext.KubernetesClient(t).CoreV1().Secrets(testContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, v1.GetOptions{})
+				secret, err := testContext.KubernetesClient(t).CoreV1().Secrets(testContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metaV1.GetOptions{})
 				require.NoError(t, err)
 				gossipEncryptionKey := strings.TrimSpace(string(secret.Data[secretKey]))
 
