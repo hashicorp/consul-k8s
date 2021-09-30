@@ -83,6 +83,7 @@ func TestBasicInstallation(t *testing.T) {
 
 				require.Len(t, keyring, 2)
 				require.Contains(t, keyring[0].Keys, gossipEncryptionKey)
+				require.Contains(t, keyring[1].Keys, gossipEncryptionKey)
 			}
 		})
 	}
