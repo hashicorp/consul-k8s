@@ -61,14 +61,3 @@ load _helpers
   [[ "$output" =~ "If global.gossipEncryption.autoGenerate is true, global.gossipEncryption.secretName and global.gossipEncryption.secretKey must not be set." ]]
 }
 
-
-@test "gossipEncryptionAutogenerate/Job: secretName and secretKey are generated" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/gossip-encryption-autogenerate-job.yaml \
-      --set 'global.gossipEncryption.autoGenerate=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("secretName=RELEASE-NAME-consul-gossip-encryption-key\nsecretKey=key"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
