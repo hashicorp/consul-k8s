@@ -25,9 +25,9 @@ func (c *Command) Run(_ []string) int {
 }
 
 func (c *Command) Synopsis() string {
-	return "Prints the version."
+	return "Prints the version of the CLI."
 }
 
 func (c *Command) Help() string {
-	return ""
+	return "Usage: consul version [options]\n"
 }
