@@ -68,10 +68,10 @@ type initContainerCommandData struct {
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
 
-	MultiPort       bool
-	EnvoyAdminPort int
+	MultiPort        bool
+	EnvoyAdminPort   int
 	EnvoyAddressPort int
-	BearerTokenFile string
+	BearerTokenFile  string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -126,8 +126,8 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcN
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
 		EnvoyUID:                   envoyUserAndGroupID,
 		MultiPort:                  multiPort,
-		EnvoyAddressPort:  20000+multiPortIdx,
-		EnvoyAdminPort: 19000+multiPortIdx,
+		EnvoyAddressPort:           20000 + multiPortIdx,
+		EnvoyAdminPort:             19000 + multiPortIdx,
 	}
 
 	if h.AuthMethod != "" {

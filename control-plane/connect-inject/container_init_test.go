@@ -91,8 +91,7 @@ export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -acl-auth-method="an-auth-method" \
   -service-account-name="a-service-account-name" \
-  -service-name="web" \
-`,
+  -service-name="web" \`,
 			"",
 		},
 		{
@@ -130,7 +129,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 
 			h := tt.Handler
 			pod := *tt.Pod(minimal())
-			container, err := h.containerInit(testNS, pod)
+			container, err := h.containerInit(testNS, pod, pod.Annotations[annotationService], false, 0)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(actual, tt.Cmd)
@@ -295,7 +294,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			}
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			container, err := h.containerInit(ns, *pod)
+			container, err := h.containerInit(ns, *pod, "", false, 0)
 			require.NoError(t, err)
 			actualCmd := strings.Join(container.Command, " ")
 
@@ -463,6 +462,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
+  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
   -auth-method-namespace="non-default" \
   -partition="default" \
   -consul-service-namespace="non-default" \
@@ -495,6 +495,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="" \
+  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
   -auth-method-namespace="default" \
   -partition="non-default" \
   -consul-service-namespace="k8snamespace" \
@@ -592,6 +593,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="auth-method" \
   -service-account-name="web" \
   -service-name="web" \
+  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
   -auth-method-namespace="default" \
   -partition="non-default" \
   -consul-service-namespace="k8snamespace" \
@@ -619,7 +621,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 			require := require.New(t)
 
 			h := tt.Handler
-			container, err := h.containerInit(testNS, *tt.Pod(minimal()))
+			pod := *tt.Pod(minimal())
+			container, err := h.containerInit(testNS, pod, pod.Annotations[annotationService], false, 0)
 			require.NoError(err)
 			actual := strings.Join(container.Command, " ")
 			require.Equal(tt.Cmd, actual)
@@ -655,7 +658,7 @@ func TestHandlerContainerInit_authMethod(t *testing.T) {
 			ServiceAccountName: "foo",
 		},
 	}
-	container, err := h.containerInit(testNS, *pod)
+	container, err := h.containerInit(testNS, *pod, "", false, 0)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -692,7 +695,7 @@ func TestHandlerContainerInit_WithTLS(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(testNS, *pod)
+	container, err := h.containerInit(testNS, *pod, "", false, 0)
 	require.NoError(err)
 	actual := strings.Join(container.Command, " ")
 	require.Contains(actual, `
@@ -736,7 +739,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.containerInit(testNS, *pod)
+	container, err := h.containerInit(testNS, *pod, "", false, 0)
 	require.NoError(err)
 	require.Equal(corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{

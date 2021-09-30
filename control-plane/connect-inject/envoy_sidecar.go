@@ -55,8 +55,7 @@ func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, servi
 	// skip setting the security context and let OpenShift set it for us.
 	// When transparent proxy is enabled, then Envoy needs to run as our specific user
 	// so that traffic redirection will work.
-	// todo: fix this conditional to work when tproxy is disabled.
-	if tproxyEnabled /*|| !h.EnableOpenShift */ {
+	if tproxyEnabled && !h.EnableOpenShift {
 		if pod.Spec.SecurityContext != nil {
 			// User container and Envoy container cannot have the same UID.
 			if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == envoyUserAndGroupID {
