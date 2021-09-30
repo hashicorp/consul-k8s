@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test that the basic installation, i.e. just
