@@ -44,7 +44,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          workingDir: /tmp
           # We're using POST requests below to create secrets via Kubernetes API.
           # Note that in the subsequent runs of the job, POST requests will
           # return a 409 because these secrets would already exist;
