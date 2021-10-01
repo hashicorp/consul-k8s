@@ -75,13 +75,13 @@ func TestComponentMetrics(t *testing.T) {
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
 	// Ingress Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
 
 	// Terminating Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
 
 	// Mesh Gateway Metrics
-	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+	assertGatewayMetricsEnabled(t, ctx, ns, "mesh-gateway", `envoy_cluster_assignment_stale{local_cluster="mesh-gateway",consul_source_service="mesh-gateway"`)
 }
 
 // Test that merged service and envoy metrics are accessible from the
@@ -124,7 +124,7 @@ func TestAppMetrics(t *testing.T) {
 	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
 	require.NoError(t, err)
 	// This assertion represents the metrics from the envoy sidecar.
-	require.Contains(t, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server",consul_source_namespace="default",consul_source_datacenter="dc1",envoy_cluster_name="local_agent"} 0`)
+	require.Contains(t, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
 	// This assertion represents the metrics from the application.
 	require.Contains(t, metricsOutput, `service_started_total 1`)
 }
