@@ -67,6 +67,10 @@ type Command struct {
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
 
+	// Flags to support partitions
+	flagEnablePartitions bool   // true if Admin Partitions are enabled
+	flagPartitionName    string // name of the Admin Partition
+
 	// Flags to support namespaces
 	flagEnableNamespaces                 bool   // Use namespacing on all components
 	flagConsulSyncDestinationNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
@@ -168,6 +172,11 @@ func (c *Command) init() {
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
+
+	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
+		"[Enterprise Only] Enables Admin Partitions [Enterprise only feature]")
+	c.flags.StringVar(&c.flagPartitionName, "partition", "",
+		"[Enterprise Only] Name of the Admin Partition")
 
 	c.flags.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored [Enterprise only feature]")
@@ -349,7 +358,7 @@ func (c *Command) Run(args []string) int {
 
 	// For all of the next operations we'll need a Consul client.
 	serverAddr := fmt.Sprintf("%s:%d", serverAddresses[0], c.flagServerPort)
-	consulClient, err := consul.NewClient(&api.Config{
+	clientConfig := &api.Config{
 		Address: serverAddr,
 		Scheme:  scheme,
 		Token:   bootstrapToken,
@@ -357,7 +366,12 @@ func (c *Command) Run(args []string) int {
 			Address: c.flagConsulTLSServerName,
 			CAFile:  c.flagConsulCACert,
 		},
-	})
+	}
+	if c.flagEnablePartitions {
+		clientConfig.Partition = c.flagPartitionName
+	}
+
+	consulClient, err := consul.NewClient(clientConfig)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", serverAddr, err))
 		return 1
@@ -382,6 +396,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagEnablePartitions && c.flagPartitionName == "default" && isPrimary {
+		// Partition token must be local because only the Primary datacenter can have Admin Partitions.
+		err := c.createLocalACL("partitions", partitionRules, consulDC, isPrimary, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
 	// If namespaces are enabled, to allow cross-Consul-namespace permissions
 	// for services from k8s, the Consul `default` namespace needs a policy
 	// allowing service discovery in all namespaces. Each namespace that is
@@ -389,12 +412,17 @@ func (c *Command) Run(args []string) int {
 	// connect inject) needs to reference this policy on namespace creation
 	// to finish the cross namespace permission setup.
 	if c.flagEnableNamespaces {
+		crossNamespaceRule, err := c.crossNamespaceRule()
+		if err != nil {
+			c.log.Error("Error templating cross namespace rules", "err", err)
+			return 1
+		}
 		policyTmpl := api.ACLPolicy{
 			Name:        "cross-namespace-policy",
 			Description: "Policy to allow permissions to cross Consul namespaces for k8s services",
-			Rules:       crossNamespaceRules,
+			Rules:       crossNamespaceRule,
 		}
-		err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+		err = c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 			func() error {
 				return c.createOrUpdateACLPolicy(policyTmpl, consulClient)
 			})
@@ -497,7 +525,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateEntLicenseToken {
-		err := c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
+		var err error
+		if c.flagEnablePartitions {
+			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, isPrimary, consulClient)
+		} else {
+			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, isPrimary, consulClient)
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -827,6 +860,12 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
+	if c.flagEnablePartitions && c.flagPartitionName == "" {
+		return errors.New("-partition must be set if -enable-partitions is true")
+	}
+	if !c.flagEnablePartitions && c.flagPartitionName != "" {
+		return fmt.Errorf("-enable-partitions must be 'true' if setting -partition to %s", c.flagPartitionName)
+	}
 	return nil
 }
 

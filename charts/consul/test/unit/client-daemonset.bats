@@ -1407,7 +1407,7 @@ rollingUpdate:
 #--------------------------------------------------------------------
 # partitions
 
-@test "client/DaemonSet: -partitions can be set by global.adminPartition.enabled" {
+@test "client/DaemonSet: -partitions can be set by global.adminPartitions.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
@@ -1417,7 +1417,7 @@ rollingUpdate:
   [ "${actual}" = "true" ]
 }
 
-@test "client/DaemonSet: -partitions can be overridden by global.adminPartition.name" {
+@test "client/DaemonSet: -partitions can be overridden by global.adminPartitions.name" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \

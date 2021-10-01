@@ -134,7 +134,10 @@ spec:
                 -sync-consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
                 {{- end }}
                 {{- end }}
-
+                {{- if .Values.global.adminPartitions.enabled }}
+                -enable-partitions=true \
+                -partition={{ .Values.global.adminPartitions.name }} \
+                {{- end }}
                 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.global.enabled)) }}
                 -allow-dns=true \
                 {{- end }}

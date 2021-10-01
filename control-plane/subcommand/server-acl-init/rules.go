@@ -7,6 +7,8 @@ import (
 )
 
 type rulesData struct {
+	EnablePartitions        bool
+	PartitionName           string
 	EnableNamespaces        bool
 	SyncConsulDestNS        string
 	SyncEnableNSMirroring   bool
@@ -35,28 +37,55 @@ service "consul-snapshot" {
 }`
 
 const entLicenseRules = `operator = "write"`
+const entPartitionLicenseRules = `acl = "write"`
 
-const crossNamespaceRules = `namespace_prefix "" {
-  service_prefix "" {
-    policy = "read"
+const partitionRules = `acl = "write"
+operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
+partition_prefix "" {
+  acl = "write"
+  mesh = "write"
+}`
+
+func (c *Command) crossNamespaceRule() (string, error) {
+	crossNamespaceRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  namespace_prefix "" {
+    service_prefix "" {
+      policy = "read"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
-  node_prefix "" {
-    policy = "read"
-  }
-} `
+{{- if .EnablePartitions }}
+}
+{{- end }}`
+
+	return c.renderRules(crossNamespaceRulesTpl)
+}
 
 func (c *Command) agentRules() (string, error) {
 	agentRulesTpl := `
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
   node_prefix "" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
-namespace_prefix "" {
+  namespace_prefix "" {
 {{- end }}
-  service_prefix "" {
-    policy = "read"
-  }
+    service_prefix "" {
+      policy = "read"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -80,16 +109,22 @@ func (c *Command) anonymousTokenRules() (string, error) {
 	// ACL token. Thus the anonymous policy must
 	// allow reading all services.
 	anonTokenRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
+{{- if .EnablePartitions }}
+partition_prefix "" {
 {{- end }}
-  node_prefix "" {
-     policy = "read"
-  }
-  service_prefix "" {
-     policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    node_prefix "" {
+       policy = "read"
+    }
+    service_prefix "" {
+       policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -133,19 +168,25 @@ namespace_prefix "" {
 
 func (c *Command) ingressGatewayRules(name, namespace string) (string, error) {
 	ingressGatewayRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace "{{ .GatewayNamespace }}" {
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
 {{- end }}
-  service "{{ .GatewayName }}" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+    service "{{ .GatewayName }}" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -159,16 +200,22 @@ namespace "{{ .GatewayNamespace }}" {
 // of the initial implementation
 func (c *Command) terminatingGatewayRules(name, namespace string) (string, error) {
 	terminatingGatewayRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace "{{ .GatewayNamespace }}" {
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
 {{- end }}
-  service "{{ .GatewayName }}" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+    service "{{ .GatewayName }}" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -207,22 +254,34 @@ func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
 	// It must also create/update service health checks via the endpoints controller.
 	// When ACLs are enabled, the endpoints controller needs "acl:write" permissions
-	// to delete ACL tokens created via "consul login".
+	// to delete ACL tokens created via "consul login". policy = "write" is required when
+	// creating namespaces within a partition.
 	injectRulesTpl := `
-{{- if .EnableNamespaces }}
-operator = "write"
-{{- end }}
-node_prefix "" {
-  policy = "write"
-}
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
-{{- end }}
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
   acl = "write"
-  service_prefix "" {
+{{- else }}
+{{- if .EnableNamespaces }}
+  operator = "write"
+{{- end }}
+{{- end }}
+  node_prefix "" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+{{- if .EnablePartitions }}
+    policy = "write"
+{{- end }}
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}`
 	return c.renderRules(injectRulesTpl)
@@ -237,43 +296,62 @@ func (c *Command) aclReplicationRules() (string, error) {
 	// datacenters during federation since in order to start ACL replication,
 	// we need a token with both replication and agent permissions.
 	aclReplicationRulesTpl := `
-operator = "write"
-agent_prefix "" {
-  policy = "read"
-}
-node_prefix "" {
-  policy = "write"
-}
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
+{{- if .EnablePartitions }}
+partition "default" {
 {{- end }}
-  acl = "write"
-  service_prefix "" {
+  operator = "write"
+  agent_prefix "" {
     policy = "read"
-    intentions = "read"
+  }
+  node_prefix "" {
+    policy = "write"
   }
 {{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    acl = "write"
+    service_prefix "" {
+      policy = "read"
+      intentions = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
+// policy = "write" is required when creating namespaces within a partition.
 func (c *Command) controllerRules() (string, error) {
 	controllerRules := `
-operator = "write"
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
+{{- else }}
+  operator = "write"
+{{- end }}
 {{- if .EnableNamespaces }}
 {{- if .InjectEnableNSMirroring }}
-namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
+  namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
 {{- else }}
-namespace "{{ .InjectConsulDestNS }}" {
+  namespace "{{ .InjectConsulDestNS }}" {
 {{- end }}
 {{- end }}
-  service_prefix "" {
+{{- if .EnablePartitions }}
     policy = "write"
-    intentions = "write"
-  }
+{{- end }}
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -282,6 +360,8 @@ namespace "{{ .InjectConsulDestNS }}" {
 
 func (c *Command) rulesData() rulesData {
 	return rulesData{
+		EnablePartitions:        c.flagEnablePartitions,
+		PartitionName:           c.flagPartitionName,
 		EnableNamespaces:        c.flagEnableNamespaces,
 		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
 		SyncEnableNSMirroring:   c.flagEnableSyncK8SNSMirroring,

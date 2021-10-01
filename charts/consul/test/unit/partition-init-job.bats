@@ -94,3 +94,19 @@ load _helpers
   actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
+
+#--------------------------------------------------------------------
+# global.acls.bootstrapToken
+
+@test "partitionInit/Job: HTTP_TOKEN when global.acls.bootstrapToken is provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.acls.bootstrapToken.secretName=partition-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
