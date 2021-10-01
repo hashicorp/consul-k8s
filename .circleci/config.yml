@@ -877,14 +877,14 @@ workflows:
           requires:
             - go-fmt-and-vet-control-plane
             - lint-control-plane
-      - test-enterprise-control-plane:
-          filters:
-            branches:
-              # Forked pull requests have CIRCLE_BRANCH set to pull/XXX.
-              ignore: /pull\/[0-9]+/
-          requires:
-            - go-fmt-and-vet-control-plane
-            - lint-control-plane
+#      - test-enterprise-control-plane:
+#          filters:
+#            branches:
+#              # Forked pull requests have CIRCLE_BRANCH set to pull/XXX.
+#              ignore: /pull\/[0-9]+/
+#          requires:
+#            - go-fmt-and-vet-control-plane
+#            - lint-control-plane
       # Unit tests for go modules in helm and bats tests for templates
       - unit-acceptance-framework:
           requires:
@@ -901,21 +901,21 @@ workflows:
           name: build-distros-386
           requires:
             - test-control-plane
-            - test-enterprise-control-plane
+#            - test-enterprise-control-plane
       - build-distro:
           OS: "darwin freebsd linux solaris windows"
           ARCH: "amd64"
           name: build-distros-amd64
           requires:
             - test-control-plane
-            - test-enterprise-control-plane
+#            - test-enterprise-control-plane
       - build-distro:
           OS: "linux"
           ARCH: "arm arm64"
           name: build-distros-arm-arm64
           requires:
             - test-control-plane
-            - test-enterprise-control-plane
+#            - test-enterprise-control-plane
       - dev-upload-docker:
           context: consul-ci
           requires:
