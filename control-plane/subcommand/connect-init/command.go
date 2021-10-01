@@ -63,24 +63,15 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulServiceNamespace, "consul-service-namespace", "", "Consul destination namespace of the service.")
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
 	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name as specified via the pod annotation.")
-	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", "", "Path to service account token file.")
-	c.flagSet.StringVar(&c.flagACLTokenSink, "acl-token-sink", "", "Service name as specified via the pod annotation.")
-	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", "", "Service name as specified via the pod annotation.")
+	c.flagSet.StringVar(&c.flagBearerTokenFile, "bearer-token-file", defaultBearerTokenFile, "Path to service account token file.")
+	c.flagSet.StringVar(&c.flagACLTokenSink, "acl-token-sink", defaultTokenSinkFile, "Service name as specified via the pod annotation.")
+	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "Service name as specified via the pod annotation.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	if c.flagBearerTokenFile == "" {
-		c.flagBearerTokenFile = defaultBearerTokenFile
-	}
-	if c.flagACLTokenSink == "" {
-		c.flagACLTokenSink = defaultTokenSinkFile
-	}
-	if c.flagProxyIDFile == "" {
-		c.flagProxyIDFile = defaultProxyIDFile
-	}
 	if c.serviceRegistrationPollingAttempts == 0 {
 		c.serviceRegistrationPollingAttempts = defaultServicePollingRetries
 	}
