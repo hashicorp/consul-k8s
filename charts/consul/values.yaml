@@ -120,7 +120,9 @@ global:
   # Configures Consul's gossip encryption key, set as a Kubernetes secret
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
-  # To automatically generate and set a gossip encryption key, set autoGenerate to true. 
+  # The recommended method is to automatically generate the key.
+  # To automatically generate and set a gossip encryption key, set autoGenerate to true.
+  # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
   # a Kubernetes secret referencing these values.
   #
