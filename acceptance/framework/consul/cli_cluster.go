@@ -51,13 +51,7 @@ func NewCLICluster(
 ) Cluster {
 
 	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
-	_, err := ctx.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: consulNS,
-		},
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
+	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
 
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
@@ -252,4 +246,19 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	require.NoError(t, err)
 
 	return consulClient
+}
+
+func createOrUpdateNamespace(t *testing.T, client kubernetes.Interface, namespace string) {
+	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err := client.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
 }
