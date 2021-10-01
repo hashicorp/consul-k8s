@@ -44,7 +44,6 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 }
 
 func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
-	t.SkipNow()
 	cases := map[string]struct {
 		tproxyEnabled      bool
 		openShiftEnabled   bool
@@ -117,7 +116,6 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 // Test that if the user specifies a pod security context with the same uid as `envoyUserAndGroupID` that we return
 // an error to the handler.
 func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
-	t.SkipNow()
 	require := require.New(t)
 	h := Handler{}
 	pod := corev1.Pod{
@@ -139,7 +137,6 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 // Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID`
 // that we return an error to the handler.
 func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
-	t.SkipNow()
 	require := require.New(t)
 	h := Handler{}
 	pod := corev1.Pod{
@@ -151,6 +148,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: pointerToInt64(1),
 					},
+					Image: "web",
 				},
 				{
 					Name: "app",
@@ -158,6 +156,7 @@ func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *te
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: pointerToInt64(envoyUserAndGroupID),
 					},
+					Image: "envoy",
 				},
 			},
 		},
