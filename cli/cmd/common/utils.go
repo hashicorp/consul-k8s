@@ -51,19 +51,21 @@ func ReadChartFiles(chart embed.FS) ([]*loader.BufferedFile, error) {
 		return []*loader.BufferedFile{}, err
 	}
 	for _, dir := range dirs {
-		// Read each template file from the embedded file system, i.e consul/templates/client-configmap.yaml, and store
-		// it in a buffered file with the name templates/client-configmap.yaml. The Helm file loader expects to find
-		// templates under the name "templates/*".
-		bytes, err = chart.ReadFile(fmt.Sprintf("%s/%s/%s", chartDirName, templatesDirName, dir.Name()))
-		if err != nil {
-			return []*loader.BufferedFile{}, err
+		if !dir.IsDir() {
+			// Read each template file from the embedded file system, i.e consul/templates/client-configmap.yaml, and store
+			// it in a buffered file with the name templates/client-configmap.yaml. The Helm file loader expects to find
+			// templates under the name "templates/*".
+			bytes, err = chart.ReadFile(fmt.Sprintf("%s/%s/%s", chartDirName, templatesDirName, dir.Name()))
+			if err != nil {
+				return []*loader.BufferedFile{}, err
+			}
+			chartFiles = append(chartFiles,
+				&loader.BufferedFile{
+					Name: fmt.Sprintf("%s/%s", templatesDirName, dir.Name()),
+					Data: bytes,
+				},
+			)
 		}
-		chartFiles = append(chartFiles,
-			&loader.BufferedFile{
-				Name: fmt.Sprintf("%s/%s", templatesDirName, dir.Name()),
-				Data: bytes,
-			},
-		)
 	}
 
 	return chartFiles, nil
