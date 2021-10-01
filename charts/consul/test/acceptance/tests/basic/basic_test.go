@@ -77,7 +77,7 @@ func TestBasicInstallation(t *testing.T) {
 				require.NoError(t, err)
 
 				testContext := suite.Environment().DefaultContext(t)
-				secret, err := testContext.KubernetesClient(t).CoreV1().Secrets(testContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metaV1.GetOptions{})
+				secret, err := testContext.KubernetesClient(t).CoreV1().Secrets(testContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 				require.NoError(t, err)
 				gossipEncryptionKey := strings.TrimSpace(string(secret.Data[secretKey]))
 
