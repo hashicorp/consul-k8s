@@ -51,12 +51,13 @@ func NewCLICluster(
 ) Cluster {
 
 	// Create the namespace so the PSPs, SCCs, and enterprise secret can be created in the right namespace.
-	ctx.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
+	_, err := ctx.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: consulNS,
 		},
 	}, metav1.CreateOptions{})
+	require.NoError(t, err)
 
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
