@@ -929,12 +929,12 @@ workflows:
       - acceptance:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
+#            - unit-test-helm-templates
             - unit-acceptance-framework
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
-            - unit-test-helm-templates
+#            - unit-test-helm-templates
             - unit-acceptance-framework
   nightly-acceptance-tests:
     triggers:
