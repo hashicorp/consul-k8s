@@ -18,10 +18,10 @@ const (
 	chartFileName           = "Chart.yaml"
 	valuesFileName          = "values.yaml"
 	templatesDirName        = "templates"
-	chartDirName            = "consul"
+	TopLevelChartDirName    = "consul"
 )
 
-func ReadChartFiles(chart embed.FS) ([]*loader.BufferedFile, error) {
+func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile, error) {
 	var chartFiles []*loader.BufferedFile
 
 	bytes, err := chart.ReadFile(fmt.Sprintf("%s/%s", chartDirName, chartFileName))

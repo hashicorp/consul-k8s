@@ -309,7 +309,7 @@ func (c *Command) Run(args []string) int {
 	install.Timeout = c.timeoutDuration
 
 	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart)
+	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1

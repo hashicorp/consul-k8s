@@ -1,0 +1,42 @@
+package common
+
+import (
+	"embed"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
+var testChart embed.FS
+
+func TestReadChartFiles(t *testing.T) {
+	files, err := ReadChartFiles(testChart, "fixtures/consul")
+	require.NoError(t, err)
+	foundChart := false
+	foundValues := false
+	foundTemplate := false
+	foundHelper := false
+	for _, f := range files {
+		if f.Name == "Chart.yaml" {
+			require.Equal(t, "chart", string(f.Data))
+			foundChart = true
+		}
+		if f.Name == "values.yaml" {
+			require.Equal(t, "values", string(f.Data))
+			foundValues = true
+		}
+		if f.Name == "templates/foo.yaml" {
+			require.Equal(t, "foo", string(f.Data))
+			foundTemplate = true
+		}
+		if f.Name == "templates/_helpers.tpl" {
+			require.Equal(t, "helpers", string(f.Data))
+			foundHelper = true
+		}
+	}
+	require.True(t, foundChart)
+	require.True(t, foundValues)
+	require.True(t, foundTemplate)
+	require.True(t, foundHelper)
+}
