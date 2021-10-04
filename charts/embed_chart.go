@@ -1,8 +1,6 @@
 package charts
 
-import (
-	"embed"
-)
+import "embed"
 
 // ConsulHelmChart embeds the Consul Helm Chart files into an exported variable from this package. Changes to the chart
 // files referenced below will be reflected in the embedded templates in the CLI at CLI compile time.
