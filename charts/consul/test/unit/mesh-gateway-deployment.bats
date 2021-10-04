@@ -447,7 +447,7 @@ key2: value2' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initServiceInitContainer[0].resources' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
 
   [ $(echo "${actual}" | yq -r '.requests.memory') = "25Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
@@ -466,7 +466,7 @@ key2: value2' \
       --set 'meshGateway.initServiceInitContainer.resources.limits.memory=memory2' \
       --set 'meshGateway.initServiceInitContainer.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initServiceInitContainer[0].resources' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
   [ "${actual}" = "memory" ]
