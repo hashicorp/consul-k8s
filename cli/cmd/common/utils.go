@@ -21,6 +21,11 @@ const (
 	TopLevelChartDirName    = "consul"
 )
 
+// ReadChartFiles reads the chart files from the embedded FS, and loads their contents into []*loader.BufferedFile. This
+// is a format that the Helm Go SDK functions can read from to create a chart to install from. The names of these files
+// are important, as there are case statements in the Helm Go SDK looking for files named "Chart.yaml" or
+// "templates/<templatename>.yaml", which is why even though the embedded FS has them named "consul/Chart.yaml" we have
+// to strip the "consul" prefix out.
 func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile, error) {
 	var chartFiles []*loader.BufferedFile
 
