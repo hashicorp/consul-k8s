@@ -449,7 +449,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.20.7"
+          version: "v1.21.2"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -481,7 +481,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.20.7"
+          version: "v1.21.2"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -561,7 +561,7 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-17:
+  acceptance-gke-1-18:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -623,11 +623,11 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-19:
+  acceptance-aks-1-20:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -682,7 +682,7 @@ jobs:
 #          fail_only: true
 #          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-18:
+  acceptance-eks-1-19:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -796,7 +796,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-21:
+  acceptance-kind-1-22:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -806,7 +806,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.1"
+          version: "v1.22.1"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -825,9 +825,9 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.21 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   update-helm-charts-index:
     docker:
@@ -926,8 +926,10 @@ workflows:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
-      - acceptance-eks-1-18
-      - acceptance-aks-1-19
+      - acceptance-eks-1-19
+      - acceptance-aks-1-20
+      - acceptance-gke-1-18
+      - acceptance-kind-1-22
   nightly-acceptance-tests:
     triggers:
       - schedule:
@@ -944,16 +946,16 @@ workflows:
 #      - acceptance-openshift:
 #          requires:
 #          - cleanup-azure-resources
-      - acceptance-gke-1-17:
+      - acceptance-gke-1-18:
           requires:
             - cleanup-gcp-resources
-      - acceptance-eks-1-18:
+      - acceptance-eks-1-19:
           requires:
             - cleanup-eks-resources
-      - acceptance-aks-1-19:
+      - acceptance-aks-1-20:
           requires:
             - cleanup-azure-resources
-      - acceptance-kind-1-21
+      - acceptance-kind-1-22
 #  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
 #    jobs:
 #      - helm-chart-pipeline-approval:

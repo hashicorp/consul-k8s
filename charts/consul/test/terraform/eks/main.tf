@@ -54,7 +54,7 @@ module "eks" {
   version = "17.20.0"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
-  cluster_version = "1.18"
+  cluster_version = "1.19"
   subnets         = module.vpc[count.index].private_subnets
 
   vpc_id = module.vpc[count.index].vpc_id
