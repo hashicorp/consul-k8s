@@ -858,7 +858,7 @@ load _helpers
     -s templates/server-statefulset.yaml \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any(contains("-encrypt=\"${GOSSIP_KEY}\""))'
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
     | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
