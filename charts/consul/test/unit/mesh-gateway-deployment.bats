@@ -438,6 +438,50 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
+# service-init container resources
+
+@test "meshGateway/Deployment: init service-init container has default resources" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "50Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "50Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
+}
+
+@test "meshGateway/Deployment: init service-init container resources can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.initServiceInitContainer.resources.requests.memory=memory' \
+      --set 'meshGateway.initServiceInitContainer.resources.requests.cpu=cpu' \
+      --set 'meshGateway.initServiceInitContainer.resources.limits.memory=memory2' \
+      --set 'meshGateway.initServiceInitContainer.resources.limits.cpu=cpu2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory" ]
+
+  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu" ]
+
+  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
+  [ "${actual}" = "memory2" ]
+
+  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = "cpu2" ]
+}
+
+#--------------------------------------------------------------------
 # consul sidecar resources
 
 @test "meshGateway/Deployment: consul sidecar has default resources" {
