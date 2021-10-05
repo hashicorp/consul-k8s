@@ -449,9 +449,9 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[1].resources' | tee /dev/stderr)
 
-  [ $(echo "${actual}" | yq -r '.requests.memory') = "25Mi" ]
+  [ $(echo "${actual}" | yq -r '.requests.memory') = "50Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "50m" ]
-  [ $(echo "${actual}" | yq -r '.limits.memory') = "150Mi" ]
+  [ $(echo "${actual}" | yq -r '.limits.memory') = "50Mi" ]
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
 }
 
