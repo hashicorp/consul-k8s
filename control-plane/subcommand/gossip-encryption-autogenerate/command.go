@@ -12,13 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const synopsis = "Generate a secret for gossip encryption"
-const help = `
-Usage: consul-k8s-control-plane gossip-encryption-autogenerate [options]
-
-  Bootstraps the installation with a secret for gossip encryption.
-`
-
 type Command struct {
 	UI        cli.Ui
 	clientset kubernetes.Interface
@@ -88,7 +81,7 @@ func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create")
-	c.flags.StringVar(&c.flagSecretKey, "secret-key", "", "Name of the secret key to create")
+	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create")
 
 	c.help = flags.Usage(help, c.flags)
 }
@@ -113,3 +106,10 @@ func generateSecret() string {
 	// TODO: generate the secret using Consul Keygen. How do I connect into Consul from here?
 	return ""
 }
+
+const synopsis = "Generate a secret for gossip encryption"
+const help = `
+Usage: consul-k8s-control-plane gossip-encryption-autogenerate [options]
+
+  Bootstraps the installation with a secret for gossip encryption.
+`
