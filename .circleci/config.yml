@@ -678,9 +678,9 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-18:
     environment:
@@ -717,11 +717,6 @@ jobs:
             echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
             echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-            # Change file permissions of the kubecofig files to avoid warnings by helm.
-            # TODO: remove when https://github.com/terraform-aws-modules/terraform-aws-eks/pull/1114 is merged.
-            chmod 600 "$primary_kubeconfig"
-            chmod 600 "$secondary_kubeconfig"
-
       # Restore go module cache if there is one
       - restore_cache:
           keys:
@@ -744,9 +739,9 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "EKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-openshift:
     environment:
@@ -931,6 +926,8 @@ workflows:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
+      - acceptance-eks-1-18
+      - acceptance-aks-1-19
   nightly-acceptance-tests:
     triggers:
       - schedule:
