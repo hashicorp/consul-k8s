@@ -226,12 +226,7 @@ spec:
               readOnly: true
             {{- end }}
           {{- if .Values.meshGateway.initServiceInitContainer.resources }}
-          resources:
-            {{- if eq (typeOf .Values.meshGateway.initServiceInitContainer.resources) "string" }}
-            {{ tpl .Values.meshGateway.initServiceInitContainer.resources . | nindent 12 | trim }}
-            {{- else }}
-            {{- toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 12 }}
-            {{- end }}
+          resources: {{ toYaml .Values.meshGateway.initServiceInitContainer.resources | nindent 12 }}
           {{- end }}
       containers:
         - name: mesh-gateway
