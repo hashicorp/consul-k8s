@@ -2015,10 +2015,10 @@ meshGateway:
   initServiceInitContainer:
     resources:
       requests:
-        memory: "25Mi"
+        memory: "50Mi"
         cpu: "50m"
       limits:
-        memory: "150Mi"
+        memory: "50Mi"
         cpu: "50m"
 
   # By default, we set an anti-affinity so that two gateway pods won't be
