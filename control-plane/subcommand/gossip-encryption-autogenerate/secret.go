@@ -1,8 +1,9 @@
 package gossipencryptionautogenerate
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	"os/exec"
 )
 
 type Secret struct {
@@ -14,14 +15,18 @@ type Secret struct {
 
 // Generates a random 32 byte secret
 func (s *Secret) Generate() error {
-	gossipSecret, err := exec.Command("consul", "keygen").Output()
+	key := make([]byte, 32)
+	n, err := rand.Reader.Read(key)
 
 	if err != nil {
-		return err
-	} else {
-		s.value = string(gossipSecret)
-		return nil
+		return fmt.Errorf("error reading random data: %s", err)
 	}
+	if n != 32 {
+		return fmt.Errorf("couldn't read enough entropy")
+	}
+
+	s.value = base64.StdEncoding.EncodeToString(key)
+	return nil
 }
 
 // Value returns the value of the secret
