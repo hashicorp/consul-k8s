@@ -9,21 +9,16 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
-	"k8s.io/client-go/kubernetes"
 )
 
 type Command struct {
-	UI        cli.Ui
-	clientset kubernetes.Interface
+	UI cli.Ui
 
 	flags *flag.FlagSet
 
 	// flags that dictate where the Kubernetes secret will be stored
 	flagSecretName string
 	flagSecretKey  string
-
-	// secret for encrypting gossip
-	gossipEncryptionSecret string
 
 	// log
 	log          hclog.Logger
@@ -39,13 +34,14 @@ func (c *Command) Run(args []string) int {
 	var err error
 
 	c.once.Do(c.init)
+
 	if err := c.flags.Parse(args); err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to parse args: %v", err))
+		c.UI.Error(fmt.Errorf("failed to parse args: %v", err).Error())
 		return 1
 	}
 
 	if err = c.validateFlags(); err != nil {
-		c.UI.Error(err.Error())
+		c.UI.Error(fmt.Errorf("failed to validate flags: %v", err).Error())
 		return 1
 	}
 
@@ -55,10 +51,18 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	c.gossipEncryptionSecret = generateSecret()
+	secret := Secret{
+		Name: c.flagSecretName,
+		Key:  c.flagSecretKey,
+	}
 
-	if err := c.postSecretToKubernetes(); err != nil {
-		c.UI.Error(err.Error())
+	if err = secret.Generate(); err != nil {
+		c.UI.Error(fmt.Errorf("failed to generate gossip secret: %v", err).Error())
+		return 1
+	}
+
+	if err = secret.PostToKubernetes(); err != nil {
+		c.UI.Error(fmt.Errorf("failed to add secret to Kubernetes: %v", err).Error())
 		return 1
 	}
 
@@ -98,19 +102,7 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-// postSecretToKubernetes stores the generated secret in the Kubernetes secret store.
-func (c *Command) postSecretToKubernetes() error {
-	// TODO: post the secret to the Kubernetes secret store. How do I connect into Kubernetes from here?
-	return nil
-}
-
-// generateSecret uses Consul Keygen to generate a secret for gossip encryption.
-func generateSecret() string {
-	// TODO: generate the secret using Consul Keygen. How do I connect into Consul from here?
-	return ""
-}
-
-const synopsis = "Generate a secret for gossip encryption"
+const synopsis = "Generate a secret for gossip encryption."
 const help = `
 Usage: consul-k8s-control-plane gossip-encryption-autogenerate [options]
 
