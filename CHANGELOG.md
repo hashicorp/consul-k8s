@@ -3,6 +3,7 @@
 FEATURES:
 * Helm Chart
   * Add automatic generation of gossip encryption with `global.gossipEncryption.autoGenerate=true`. [[GH-738](https://github.com/hashicorp/consul-k8s/pull/738)]
+  * Add support for configuring resources for mesh gateway `service-init` container. [[GH-758](https://github.com/hashicorp/consul-k8s/pull/758)]
 
 IMPROVEMENTS:
 * Control Plane
