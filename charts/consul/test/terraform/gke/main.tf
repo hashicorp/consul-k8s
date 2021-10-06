@@ -10,7 +10,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.18."
+  version_prefix = "1.19."
 }
 
 resource "google_container_cluster" "cluster" {
