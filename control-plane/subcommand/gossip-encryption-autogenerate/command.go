@@ -82,7 +82,10 @@ func (c *Command) init() {
 
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create")
-
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
 	c.help = flags.Usage(help, c.flags)
 }
 
