@@ -265,6 +265,127 @@ func TestHandlerHandle(t *testing.T) {
 		},
 
 		{
+			"pod with empty volume mount annotation",
+			Handler{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationInjectMountVolumes: "",
+							},
+						},
+						Spec: basicSpec,
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
+		{
+			"pod with volume mount annotation",
+			Handler{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								annotationInjectMountVolumes: "web,unknown,web_three_point_oh",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+								},
+								{
+									Name: "web_two_point_oh",
+								},
+								{
+									Name: "web_three_point_oh",
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/3",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(keyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(annotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
+
+		{
 			"pod with service annotation",
 			Handler{
 				Log:                   logrtest.TestLogger{T: t},
