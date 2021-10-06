@@ -84,19 +84,20 @@ func (c *Command) Synopsis() string {
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create")
-	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
+	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
+	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
+
 	c.help = flags.Usage(help, c.flags)
 }
 
 // validateFlags ensures that all required flags are set.
 func (c *Command) validateFlags() error {
-	if (c.flagSecretName == "") || (c.flagSecretKey == "") {
-		return fmt.Errorf("-secret-name and -secret-key must be set")
+	if c.flagSecretName == "" {
+		return fmt.Errorf("-secret-name must be set")
 	}
 
 	return nil
