@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSecretGeneration(t *testing.T) {
+func TestGenerate(t *testing.T) {
 
 	secret := Secret{}
 
@@ -18,9 +18,9 @@ func TestSecretGeneration(t *testing.T) {
 	t.Logf(secretValue)
 }
 
-func TestPostToKubernetesWithNoSecretGenerated(t *testing.T) {
+func TestWrite_WithNoSecretGenerated(t *testing.T) {
 	secret := Secret{}
 
-	err := secret.PostToKubernetes()
+	err := secret.Write(nil)
 	require.Error(t, err)
 }

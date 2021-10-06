@@ -1,9 +1,14 @@
 package gossipencryptionautogenerate
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type Secret struct {
@@ -34,14 +39,24 @@ func (s *Secret) Value() string {
 	return s.value
 }
 
-// PostToKubernetes uses the Kubernetes client to create a secret in the Kubernetes cluster
+// Write uses the Kubernetes client to create a secret in the Kubernetes cluster
 // at the given Name and Key with the contents of the secret value
-func (s *Secret) PostToKubernetes() error {
+func (s *Secret) Write(k8sSecretClient corev1.SecretInterface) error {
 	if s.value == "" {
 		return fmt.Errorf("no secret generated to be stored. Execute Secret.Generate() first")
 	}
 
-	// TODO: post secret to Kubernetes
+	_, err := k8sSecretClient.Create(
+		context.TODO(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: s.Name,
+			},
+			Data: map[string][]byte{
+				s.Key: []byte(s.value),
+			},
+		},
+		metav1.CreateOptions{})
 
-	return nil
+	return err
 }
