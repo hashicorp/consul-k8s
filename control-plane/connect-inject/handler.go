@@ -355,7 +355,7 @@ func (h *Handler) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	return nil
 }
 
-func (h *Handler) injectVolumeMount(pod corev1.Pod) error {
+func (h *Handler) injectVolumeMount(pod corev1.Pod) {
 	containersToInject := splitCommaSeparatedItemsFromAnnotation(annotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
@@ -366,8 +366,6 @@ func (h *Handler) injectVolumeMount(pod corev1.Pod) error {
 			})
 		}
 	}
-
-	return nil
 }
 
 func (h *Handler) shouldInject(pod corev1.Pod, namespace string) (bool, error) {
