@@ -5,20 +5,26 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"k8s.io/client-go/kubernetes"
 )
 
 type Command struct {
 	UI cli.Ui
 
 	flags *flag.FlagSet
+	k8s   *flags.K8SFlags
 
 	// flags that dictate where the Kubernetes secret will be stored
 	flagSecretName string
 	flagSecretKey  string
+	flagNamespace  string
+
+	k8sClient kubernetes.Interface
 
 	// log
 	log          hclog.Logger
@@ -61,7 +67,16 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err = secret.PostToKubernetes(); err != nil {
+	if c.k8sClient == nil {
+		err = c.createK8sClient()
+		if err != nil {
+			c.UI.Error(fmt.Errorf("failed to create k8s client: %v", err).Error())
+			return 1
+		}
+	}
+
+	secretsInterface := c.k8sClient.CoreV1().Secrets(c.flagNamespace)
+	if err = secret.Write(secretsInterface); err != nil {
 		c.UI.Error(fmt.Errorf("failed to add secret to Kubernetes: %v", err).Error())
 		return 1
 	}
@@ -98,6 +113,21 @@ func (c *Command) init() {
 func (c *Command) validateFlags() error {
 	if c.flagSecretName == "" {
 		return fmt.Errorf("-secret-name must be set")
+	}
+
+	return nil
+}
+
+// createK8sClient creates a Kubernetes client on the command object.
+func (c *Command) createK8sClient() error {
+	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create Kubernetes config: %v", err)
+	}
+
+	c.k8sClient, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error initializing Kubernetes client: %s", err)
 	}
 
 	return nil
