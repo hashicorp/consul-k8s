@@ -219,11 +219,24 @@ func realMain(ctx context.Context) error {
 			}
 
 			if err := destroyBackoff(ctx, "NAT gateway", *gateway.NatGatewayId, func() error {
+				// We only care about Nat gateways whose state is not "deleted."
+				// Deleted Nat gateways will show in the output for about 1hr
+				// (https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html#nat-gateway-deleting),
+				// but we can proceed with deleting other resources once its state is deleted.
 				currNatGateways, err := ec2Client.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 					Filter: []*ec2.Filter{
 						{
 							Name:   aws.String("vpc-id"),
 							Values: []*string{vpcID},
+						},
+						{
+							Name: aws.String("state"),
+							Values: []*string{
+								aws.String(ec2.NatGatewayStatePending),
+								aws.String(ec2.NatGatewayStateFailed),
+								aws.String(ec2.NatGatewayStateDeleting),
+								aws.String(ec2.NatGatewayStateAvailable),
+							},
 						},
 					},
 				})
@@ -238,6 +251,18 @@ func realMain(ctx context.Context) error {
 				return err
 			}
 			fmt.Printf("NAT gateway: Destroyed [id=%s]\n", *gateway.NatGatewayId)
+
+			// Release Elastic IP associated with the NAT gateway (if any).
+			for _, address := range gateway.NatGatewayAddresses {
+				if address.AllocationId != nil {
+					fmt.Printf("NAT gateway: Releasing Elastic IP... [id=%s]\n", *address.AllocationId)
+					_, err := ec2Client.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId})
+					if err != nil {
+						return err
+					}
+					fmt.Printf("NAT gateway: Elastic IP released [id=%s]\n", *address.AllocationId)
+				}
+			}
 		}
 
 		// Delete ELBs (usually left from mesh gateway tests).
