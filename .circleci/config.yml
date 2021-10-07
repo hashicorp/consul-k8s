@@ -296,6 +296,40 @@ jobs:
           working_directory: *control-plane-path
           command: make ci.dev-docker
 
+  unit-cli:
+    executor: go
+    steps:
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+
+      - run:
+          name: go mod download
+          working_directory: *cli-path
+          command: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+          paths:
+            - "/go/pkg/mod"
+
+      - run: mkdir -p $TEST_RESULTS
+
+      - run:
+          name: Run tests
+          working_directory: *cli-path
+          command: |
+            gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
   go-fmt-and-vet-acceptance:
     executor: go
     steps:
@@ -890,6 +924,8 @@ workflows:
           requires:
             - go-fmt-and-vet-control-plane
             - lint-control-plane
+      # Unit test CLI
+      - unit-cli
       # Unit tests for go modules in helm and bats tests for templates
       - unit-acceptance-framework:
           requires:
@@ -931,11 +967,13 @@ workflows:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
+            - unit-cli
       - acceptance-tproxy:
           requires:
             - dev-upload-docker
             - unit-test-helm-templates
             - unit-acceptance-framework
+            - unit-cli
   nightly-acceptance-tests:
     triggers:
       - schedule:
