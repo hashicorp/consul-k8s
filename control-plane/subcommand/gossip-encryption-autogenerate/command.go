@@ -20,9 +20,9 @@ type Command struct {
 	k8s   *flags.K8SFlags
 
 	// flags that dictate where the Kubernetes secret will be stored
-	flagSecretName string
-	flagSecretKey  string
-	flagNamespace  string
+	flagK8sNamespace string
+	flagSecretName   string
+	flagSecretKey    string
 
 	k8sClient kubernetes.Interface
 
@@ -75,7 +75,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	secretsInterface := c.k8sClient.CoreV1().Secrets(c.flagNamespace)
+	secretsInterface := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace)
 	if err = secret.Write(secretsInterface); err != nil {
 		c.UI.Error(fmt.Errorf("failed to add secret to Kubernetes: %v", err).Error())
 		return 1
@@ -105,6 +105,9 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
+
+	c.k8s = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)
 }
