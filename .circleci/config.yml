@@ -541,7 +541,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
     steps:
       - checkout
       - run:
