@@ -45,11 +45,10 @@ commands:
             chmod +x ./kubectl
             sudo mv ./kubectl /usr/local/bin/kubectl
 
-            curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
-            sudo apt-get install apt-transport-https --yes
-            echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-            sudo apt-get update
-            sudo apt-get install helm
+            wget https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
+            tar -zxvf helm-v3.7.0-linux-amd64.tar.gz
+            sudo mv linux-amd64/helm /usr/local/bin/helm
+
   create-kind-clusters:
     parameters:
       version:
@@ -450,7 +449,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.20.7"
+          version: "v1.21.2"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -482,7 +481,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.20.7"
+          version: "v1.21.2"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -562,7 +561,7 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-17:
+  acceptance-gke-1-19:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -628,7 +627,7 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-19:
+  acceptance-aks-1-20:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -718,11 +717,6 @@ jobs:
             echo "export primary_kubeconfig=$primary_kubeconfig" >> $BASH_ENV
             echo "export secondary_kubeconfig=$secondary_kubeconfig" >> $BASH_ENV
 
-            # Change file permissions of the kubecofig files to avoid warnings by helm.
-            # TODO: remove when https://github.com/terraform-aws-modules/terraform-aws-eks/pull/1114 is merged.
-            chmod 600 "$primary_kubeconfig"
-            chmod 600 "$secondary_kubeconfig"
-
       # Restore go module cache if there is one
       - restore_cache:
           keys:
@@ -802,7 +796,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-21:
+  acceptance-kind-1-22:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -812,7 +806,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.1"
+          version: "v1.22.1"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "charts/consul/test/acceptance/go.mod" }}
@@ -833,7 +827,7 @@ jobs:
           path: /tmp/test-results
       - slack/status:
           fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.21 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   update-helm-charts-index:
     docker:
@@ -948,16 +942,16 @@ workflows:
 #      - acceptance-openshift:
 #          requires:
 #          - cleanup-azure-resources
-      - acceptance-gke-1-17:
+      - acceptance-gke-1-19:
           requires:
             - cleanup-gcp-resources
       - acceptance-eks-1-18:
           requires:
             - cleanup-eks-resources
-      - acceptance-aks-1-19:
+      - acceptance-aks-1-20:
           requires:
             - cleanup-azure-resources
-      - acceptance-kind-1-21
+      - acceptance-kind-1-22
 #  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
 #    jobs:
 #      - helm-chart-pipeline-approval:

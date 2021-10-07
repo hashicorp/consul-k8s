@@ -12,7 +12,7 @@ type Command struct {
 }
 
 func (c *Command) Run(_ []string) int {
-	c.UI.Output(fmt.Sprintf("consul-k8s %s", c.Version))
+	c.UI.Output(fmt.Sprintf("consul-k8s-control-plane %s", c.Version))
 	return 0
 }
 
