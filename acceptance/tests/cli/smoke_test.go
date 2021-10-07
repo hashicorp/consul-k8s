@@ -7,11 +7,11 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/tests/connect"
 )
 
-// TestCLIConnectInject is a smoke test that the CLI works with Helm hooks. It sets the connect.ConnectInject cli flag
-// to true, causing the Create() and Destroy() methods to use the CLI for installation/uninstallation. The
-// connect.ConnectInject test leverages secure mode which will enable ACLs and TLS, which are set up via Helm hooks.
-// This allows us to verify that core service mesh functionality with non-trivial Helm settings are set up appropriately
-// with the CLI.
+// TestCLIConnectInject is a smoke test that the CLI works with Helm hooks. It sets the
+// connect.ConnectInjectConnectivityCheck cli flag to true, causing the Create() and Destroy() methods to use the CLI
+// for installation/uninstallation. The connect.ConnectInjectConnectivityCheck test leverages secure mode which will
+// enable ACLs and TLS, which are set up via Helm hooks. This allows us to verify that core service mesh functionality
+// with non-trivial Helm settings are set up appropriately with the CLI.
 func TestCLIConnectInject(t *testing.T) {
 	cases := []struct {
 		secure      bool
