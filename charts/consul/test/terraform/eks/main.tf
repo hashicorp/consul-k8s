@@ -51,7 +51,7 @@ module "eks" {
   count = var.cluster_count
 
   source  = "terraform-aws-modules/eks/aws"
-  version = "12.2.0"
+  version = "17.20.0"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
   cluster_version = "1.18"
@@ -69,9 +69,9 @@ module "eks" {
     }
   }
 
-  manage_aws_auth    = false
-  write_kubeconfig   = true
-  config_output_path = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
+  manage_aws_auth        = false
+  write_kubeconfig       = true
+  kubeconfig_output_path = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
 
   tags = var.tags
 }

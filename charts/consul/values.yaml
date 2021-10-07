@@ -117,26 +117,21 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures which Kubernetes secret to retrieve Consul's
-  # gossip encryption key from (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)). If secretName or
-  # secretKey are not set, gossip encryption will not be enabled. The secret must
-  # be in the same namespace that Consul is installed into.
+  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
+  # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
+  # The recommended method is to automatically generate the key.
+  # To automatically generate and set a gossip encryption key, set autoGenerate to true.
+  # Values for secretName and secretKey should not be set if autoGenerate is true.
+  # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
+  # a Kubernetes secret referencing these values.
   #
-  # The secret can be created by running:
-  #
-  # ```shell
+  # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
-  #
-  # To reference, use:
-  #
-  # ```yaml
-  # global:
-  #   gossipEncryption:
-  #     secretName: consul-gossip-encryption-key
-  #     secretKey: key
-  # ```
   gossipEncryption:
+    # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
+    autoGenerate: false
     # secretName is the name of the Kubernetes secret that holds the gossip
     # encryption key. The secret must be in the same namespace that Consul is installed into.
     secretName: ""
@@ -596,6 +591,19 @@ server:
   # @type: array<map>
   extraVolumes: []
 
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
+
   # This value defines the affinity (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
   # minimizes risk of the cluster becoming unusable if a node is lost. If you need
@@ -924,6 +932,19 @@ client:
   #
   # @type: array<map>
   extraVolumes: []
+
+  # A list of sidecar containers.
+  # Example:
+  #
+  # ```yaml
+  # extraContainers:
+  # - name: extra-container
+  #   image: example-image:latest
+  #   command:
+  #    - ...
+  # ```
+  # @type: array<map>
+  extraContainers: []
 
   # Toleration Settings for Client pods
   # This should be a multi-line string matching the Toleration array
@@ -1981,6 +2002,18 @@ meshGateway:
         cpu: "50m"
       limits:
         memory: "150Mi"
+        cpu: "50m"
+
+  # Resource settings for the `service-init` init container.
+  # @recurse: false
+  # @type: map
+  initServiceInitContainer:
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
         cpu: "50m"
 
   # By default, we set an anti-affinity so that two gateway pods won't be

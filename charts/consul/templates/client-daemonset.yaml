@@ -168,12 +168,17 @@ spec:
                   fieldPath: status.podIP
             - name: CONSUL_DISABLE_PERM_MGMT
               value: "true"
-            {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+            {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
             - name: GOSSIP_KEY
               valueFrom:
                 secretKeyRef:
+                {{- if .Values.global.gossipEncryption.autoGenerate }}
+                  name: {{ template "consul.fullname" . }}-gossip-encryption-key
+                  key: key
+                {{- else if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
                   name: {{ .Values.global.gossipEncryption.secretName }}
                   key: {{ .Values.global.gossipEncryption.secretKey }}
+                {{- end }}
             {{- end }}
             {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
             - name: CONSUL_LICENSE_PATH
@@ -252,7 +257,7 @@ spec:
                 {{- end }}
                 -datacenter={{ .Values.global.datacenter }} \
                 -data-dir=/consul/data \
-                {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
                 {{- end }}
                 {{- if .Values.client.join }}
@@ -362,6 +367,9 @@ spec:
           securityContext:
             {{- toYaml .Values.client.containerSecurityContext.client | nindent 12 }}
           {{- end }}
+        {{- if .Values.client.extraContainers }}
+        {{ toYaml .Values.client.extraContainers | nindent 8 }}
+        {{- end }}
       {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
