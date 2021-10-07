@@ -1,6 +1,9 @@
 package gossipencryptionautogenerate
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"sync"
@@ -10,6 +13,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -57,27 +62,27 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	secret := Secret{
-		Name: c.flagSecretName,
-		Key:  c.flagSecretKey,
-	}
-
-	if err = secret.Generate(); err != nil {
+	gossipSecret, err := generateGossipSecret()
+	if err != nil {
 		c.UI.Error(fmt.Errorf("failed to generate gossip secret: %v", err).Error())
 		return 1
 	}
 
+	kubernetesSecret, err := c.createKubernetesSecret(gossipSecret)
+	if err != nil {
+		c.UI.Error(fmt.Errorf("failed to create kubernetes secret: %v", err).Error())
+		return 1
+	}
+
 	if c.k8sClient == nil {
-		err = c.createK8sClient()
-		if err != nil {
+		if err = c.createK8sClient(); err != nil {
 			c.UI.Error(fmt.Errorf("failed to create k8s client: %v", err).Error())
 			return 1
 		}
 	}
 
-	secretsInterface := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace)
-	if err = secret.Write(secretsInterface); err != nil {
-		c.UI.Error(fmt.Errorf("failed to add secret to Kubernetes: %v", err).Error())
+	if err = c.writeToKubernetes(*kubernetesSecret); err != nil {
+		c.UI.Error(fmt.Errorf("failed to write to k8s: %v", err).Error())
 		return 1
 	}
 
@@ -139,6 +144,53 @@ func (c *Command) createK8sClient() error {
 	}
 
 	return nil
+}
+
+// createKubernetesSecret creates a Kubernetes secret from the gossip secret using given secret name and key.
+func (c *Command) createKubernetesSecret(gossipSecret string) (*v1.Secret, error) {
+	if (c.flagSecretName == "") || (c.flagSecretKey == "") {
+		return nil, fmt.Errorf("secret name and key must be set")
+	}
+
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: c.flagSecretName,
+		},
+		Data: map[string][]byte{
+			c.flagSecretKey: []byte(gossipSecret),
+		},
+	}, nil
+}
+
+// writeSecretToKubernetes uses the Kubernetes client to write the gossip secret
+// in the Kubernetes cluster at set namespace, secret name, and key.
+func (c *Command) writeToKubernetes(secret v1.Secret) error {
+	if c.k8sClient == nil {
+		return fmt.Errorf("k8s client is not initialized")
+	}
+
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(
+		context.TODO(),
+		&secret,
+		metav1.CreateOptions{},
+	)
+
+	return err
+}
+
+// Generates a random 32 byte secret.
+func generateGossipSecret() (string, error) {
+	key := make([]byte, 32)
+	n, err := rand.Reader.Read(key)
+
+	if err != nil {
+		return "", fmt.Errorf("error reading random data: %s", err)
+	}
+	if n != 32 {
+		return "", fmt.Errorf("couldn't read enough entropy")
+	}
+
+	return base64.StdEncoding.EncodeToString(key), nil
 }
 
 const synopsis = "Generate a secret for gossip encryption."
