@@ -132,7 +132,11 @@ func (h *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	cmd := exec.Command("consul-k8s", args...)
+	// Use `go run` so that the CLI is recompiled and therefore uses the local
+	// charts directory rather than the directory from whenever it was last
+	// compiled.
+	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
+	cmd.Dir = config.CLIPath
 	out, err := cmd.Output()
 	if err != nil {
 		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
@@ -159,7 +163,11 @@ func (h *CLICluster) Destroy(t *testing.T) {
 	}
 	args = append(args, "-auto-approve", "-wipe-data")
 
-	cmd := exec.Command("consul-k8s", args...)
+	// Use `go run` so that the CLI is recompiled and therefore uses the local
+	// charts directory rather than the directory from whenever it was last
+	// compiled.
+	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
+	cmd.Dir = config.CLIPath
 	out, err := cmd.Output()
 	if err != nil {
 		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
