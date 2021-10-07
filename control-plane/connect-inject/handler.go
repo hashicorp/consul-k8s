@@ -225,7 +225,30 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	}
 	multiPort := len(annotatedSvcNames) > 1
 
+	admErr := func(err error) admission.Response {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
 	for i, svc := range annotatedSvcNames {
+		if svc != "" && pod.Spec.ServiceAccountName != svc {
+			sa, err := h.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+			if err != nil {
+				return admErr(err)
+			}
+			if len(sa.Secrets) == 0 {
+				return admErr(fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
+			}
+			saSecret := sa.Secrets[0].Name
+			pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+				Name: fmt.Sprintf("%s-service-account", svc),
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: saSecret,
+					},
+				},
+			})
+		}
+
 		// Add the init container that registers the service and sets up the Envoy configuration.
 		initContainer, err := h.containerInit(*ns, pod, svc, multiPort, i)
 		if err != nil {
@@ -483,7 +506,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcN
 	// If not we'll fall back to the service account for the pod.
 	if multiPort {
 		for _, v := range pod.Spec.Volumes {
-			if v.Name == fmt.Sprintf("%s-serviceaccount", multiPortSvcName) {
+			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
 				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
 				return corev1.VolumeMount{
 					Name:      v.Name,
