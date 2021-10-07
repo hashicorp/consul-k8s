@@ -14,7 +14,7 @@ variable "role_arn" {
 }
 
 variable "tags" {
-  type = map
-  default = {}
+  type        = map
+  default     = {}
   description = "Tags to attach to the created resources."
 }
