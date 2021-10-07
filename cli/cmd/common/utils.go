@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -25,55 +26,54 @@ const (
 // []*loader.BufferedFile. This is a format that the Helm Go SDK functions can read from to create a chart to install
 // from. The names of these files are important, as there are case statements in the Helm Go SDK looking for files named
 // "Chart.yaml" or "templates/<templatename>.yaml", which is why even though the embedded file system has them named
-// "consul/Chart.yaml" we have to strip the "consul" prefix out.
+// "consul/Chart.yaml" we have to strip the "consul" prefix out, which is done by the call to the helper method readFile.
 func ReadChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile, error) {
 	var chartFiles []*loader.BufferedFile
 
-	bytes, err := chart.ReadFile(fmt.Sprintf("%s/%s", chartDirName, chartFileName))
-	if err != nil {
-		return []*loader.BufferedFile{}, err
-	}
-	chartFiles = append(chartFiles,
-		&loader.BufferedFile{
-			Name: chartFileName,
-			Data: bytes,
-		},
-	)
-
-	bytes, err = chart.ReadFile(fmt.Sprintf("%s/%s", chartDirName, valuesFileName))
-	if err != nil {
-		return []*loader.BufferedFile{}, err
-	}
-	chartFiles = append(chartFiles,
-		&loader.BufferedFile{
-			Name: valuesFileName,
-			Data: bytes,
-		},
-	)
-
-	dirs, err := chart.ReadDir(fmt.Sprintf("%s/%s", chartDirName, templatesDirName))
-	if err != nil {
-		return []*loader.BufferedFile{}, err
-	}
-	for _, dir := range dirs {
-		if !dir.IsDir() {
-			// Read each template file from the embedded file system, i.e consul/templates/client-configmap.yaml, and store
-			// it in a buffered file with the name templates/client-configmap.yaml. The Helm file loader expects to find
-			// templates under the name "templates/*".
-			bytes, err = chart.ReadFile(fmt.Sprintf("%s/%s/%s", chartDirName, templatesDirName, dir.Name()))
-			if err != nil {
-				return []*loader.BufferedFile{}, err
-			}
-			chartFiles = append(chartFiles,
-				&loader.BufferedFile{
-					Name: fmt.Sprintf("%s/%s", templatesDirName, dir.Name()),
-					Data: bytes,
-				},
-			)
+	// Load Chart.yaml and values.yaml first.
+	for _, f := range []string{chartFileName, valuesFileName} {
+		file, err := readFile(chart, filepath.Join(chartDirName, f), chartDirName)
+		if err != nil {
+			return nil, err
 		}
+		chartFiles = append(chartFiles, file)
+	}
+
+	// Now load everything under templates/.
+	dirs, err := chart.ReadDir(filepath.Join(chartDirName, templatesDirName))
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range dirs {
+		if f.IsDir() {
+			// We only need to include files in the templates directory.
+			continue
+		}
+
+		file, err := readFile(chart, filepath.Join(chartDirName, templatesDirName, f.Name()), chartDirName)
+		if err != nil {
+			return nil, err
+		}
+		chartFiles = append(chartFiles, file)
 	}
 
 	return chartFiles, nil
+}
+
+func readFile(chart embed.FS, f string, pathPrefix string) (*loader.BufferedFile, error) {
+	bytes, err := chart.ReadFile(f)
+	if err != nil {
+		return nil, err
+	}
+	// Remove the path prefix.
+	rel, err := filepath.Rel(pathPrefix, f)
+	if err != nil {
+		return nil, err
+	}
+	return &loader.BufferedFile{
+		Name: rel,
+		Data: bytes,
+	}, nil
 }
 
 // Abort returns true if the raw input string is not equal to "y" or "yes".

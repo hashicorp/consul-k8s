@@ -9,5 +9,8 @@ import "embed"
 // CLI allows us to embed the templates at compilation time. Since this is in a monorepo, we can directly reference this
 // charts module as relative to the CLI module (with a replace directive), which allows us to not need to bump the
 // charts module dependency manually or as part of a Makefile.
+//
+// The embed directive does not include files with underscores unless explicitly listed, which is why _helpers.tpl is
+// explicitly embedded.
 //go:embed consul/Chart.yaml consul/values.yaml consul/templates consul/templates/_helpers.tpl
 var ConsulHelmChart embed.FS

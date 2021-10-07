@@ -13,10 +13,7 @@ var testChart embed.FS
 func TestReadChartFiles(t *testing.T) {
 	files, err := ReadChartFiles(testChart, "fixtures/consul")
 	require.NoError(t, err)
-	foundChart := false
-	foundValues := false
-	foundTemplate := false
-	foundHelper := false
+	var foundChart, foundValues, foundTemplate, foundHelper bool
 	for _, f := range files {
 		if f.Name == "Chart.yaml" {
 			require.Equal(t, "chart", string(f.Data))
