@@ -33,7 +33,7 @@ func TestConnectInject(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			ConnectInject(t, ctx, cfg, c.secure, c.autoEncrypt, false)
+			ConnectInjectConnectivityCheck(t, ctx, cfg, c.secure, c.autoEncrypt, false)
 
 		})
 	}

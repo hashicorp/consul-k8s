@@ -20,7 +20,9 @@ import (
 const staticClientName = "static-client"
 const staticServerName = "static-server"
 
-func ConnectInject(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, secure bool, autoEncrypt bool, cli bool) {
+// ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service
+// mesh connectivity.
+func ConnectInjectConnectivityCheck(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, secure bool, autoEncrypt bool, cli bool) {
 	helmValues := map[string]string{
 		"connectInject.enabled": "true",
 
@@ -32,7 +34,7 @@ func ConnectInject(t *testing.T, ctx environment.TestContext, cfg *config.TestCo
 	releaseName := helpers.RandomName()
 	var consulCluster consul.Cluster
 	if cli {
-		consulCluster = consul.NewCLICluster(t, helmValues, ctx, cfg, "consul")
+		consulCluster = consul.NewCLICluster(t, helmValues, ctx, cfg, consul.CLIReleaseName)
 	} else {
 		consulCluster = consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 	}

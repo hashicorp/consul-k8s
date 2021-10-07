@@ -24,7 +24,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const consulNS = "consul"
+const (
+	consulNS       = "consul"
+	CLIReleaseName = "consul"
+)
 
 // CLICluster
 type CLICluster struct {
@@ -132,12 +135,12 @@ func (h *CLICluster) Create(t *testing.T) {
 	cmd := exec.Command("consul-k8s", args...)
 	out, err := cmd.Output()
 	if err != nil {
-		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
+		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
 		h.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
 
-	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, "consul", fmt.Sprintf("release=%s", h.releaseName))
+	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, consulNS, fmt.Sprintf("release=%s", h.releaseName))
 }
 
 func (h *CLICluster) Destroy(t *testing.T) {
@@ -154,14 +157,12 @@ func (h *CLICluster) Destroy(t *testing.T) {
 	if kubecontext != "" {
 		args = append(args, "-context", kubecontext)
 	}
-
-	args = append(args, "-auto-approve")
-	args = append(args, "-wipe-data")
+	args = append(args, "-auto-approve", "-wipe-data")
 
 	cmd := exec.Command("consul-k8s", args...)
 	out, err := cmd.Output()
 	if err != nil {
-		h.logger.Logf(t, "error running command [ consul-k8s %s]: %s", args, err.Error())
+		h.logger.Logf(t, "error running command [ consul-k8s %s ]: %s", args, err.Error())
 		h.logger.Logf(t, "command stdout: %s", string(out))
 	}
 	require.NoError(t, err)
@@ -198,13 +199,13 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		// Instead, we provide a replication token that serves the role of the bootstrap token.
 
 		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", h.releaseName)
-		if h.releaseName == "consul" {
+		if h.releaseName == CLIReleaseName {
 			aclSecretName = "consul-bootstrap-acl-token"
 		}
 		aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
-			if h.releaseName == "consul" {
+			if h.releaseName == CLIReleaseName {
 				federationSecret = "consul-federation"
 			}
 			aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
@@ -218,7 +219,7 @@ func (h *CLICluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	}
 
 	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
-	if h.releaseName == "consul" {
+	if h.releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
 	tunnel := terratestk8s.NewTunnelWithLogger(

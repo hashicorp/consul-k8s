@@ -28,7 +28,7 @@ func TestCLIConnectInject(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			connect.ConnectInject(t, ctx, cfg, c.secure, c.autoEncrypt, true)
+			connect.ConnectInjectConnectivityCheck(t, ctx, cfg, c.secure, c.autoEncrypt, true)
 
 		})
 	}
