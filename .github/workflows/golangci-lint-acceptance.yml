@@ -20,4 +20,4 @@ jobs:
           # TODO: we may need to modify this when monorepo comes, it could be helpful for when we test
           # only control-plane components in a PR, or some other scenario.
           # working-directory: somedir
-          working-directory: charts/consul/test/acceptance
+          working-directory: acceptance
