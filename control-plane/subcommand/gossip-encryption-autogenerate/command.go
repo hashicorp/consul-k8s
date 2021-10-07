@@ -103,6 +103,7 @@ func (c *Command) init() {
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
+	c.flags.StringVar(&c.flagK8sNamespace, "namespace", "", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
 
@@ -114,6 +115,10 @@ func (c *Command) init() {
 
 // validateFlags ensures that all required flags are set.
 func (c *Command) validateFlags() error {
+	if c.flagK8sNamespace == "" {
+		return fmt.Errorf("-namespace must be set")
+	}
+
 	if c.flagSecretName == "" {
 		return fmt.Errorf("-secret-name must be set")
 	}
