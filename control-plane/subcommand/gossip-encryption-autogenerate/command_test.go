@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRun_FlagValidation(t *testing.T) {
+func TestRun_FlagFailures(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		flags  []string
@@ -15,7 +15,15 @@ func TestRun_FlagValidation(t *testing.T) {
 	}{
 		{
 			flags:  []string{},
+			expErr: "-namespace must be set",
+		},
+		{
+			flags:  []string{"-namespace", "default"},
 			expErr: "-secret-name must be set",
+		},
+		{
+			flags:  []string{"-namespace", "default", "-secret-name", "my-secret", "-log-level", "oak"},
+			expErr: "unknown log level",
 		},
 	}
 
