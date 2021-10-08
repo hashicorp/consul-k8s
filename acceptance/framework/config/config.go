@@ -14,6 +14,7 @@ import (
 // Note: this will need to be changed if this file is moved.
 const (
 	HelmChartPath     = "../../../charts/consul"
+	CLIPath           = "../../../cli"
 	LicenseSecretName = "license"
 	LicenseSecretKey  = "key"
 )

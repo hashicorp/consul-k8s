@@ -79,11 +79,6 @@ commands:
           condition: << parameters.failfast >>
           steps:
             - run:
-                name: Build CLI binary
-                working_directory: *cli-path
-                command: |
-                  go build -o << parameters.go-path >>/bin/consul-k8s
-            - run:
                 name: Run acceptance tests
                 working_directory: *acceptance-test-path
                 no_output_timeout: 2h
