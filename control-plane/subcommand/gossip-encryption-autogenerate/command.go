@@ -38,6 +38,7 @@ type Command struct {
 	flagLogJSON  bool
 
 	once sync.Once
+	ctx  context.Context
 	help string
 }
 
@@ -63,6 +64,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+
 	if c.k8sClient == nil {
 		if err = c.createK8sClient(); err != nil {
 			c.UI.Error(fmt.Errorf("failed to create k8s client: %v", err).Error())
@@ -74,6 +79,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Errorf("failed to check if k8s secret exists: %v", err).Error())
 		return 1
 	} else if exists {
+		// Safe exit if secret already exists
 		c.UI.Info(fmt.Sprintf("A Kubernetes secret with the name `%s` already exists.", c.flagSecretName))
 		return 0
 	}
@@ -161,7 +167,7 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 		return false, fmt.Errorf("k8s client is not initialized")
 	}
 
-	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.Background(), c.flagSecretName, metav1.GetOptions{})
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -195,12 +201,7 @@ func (c *Command) writeToK8s(secret v1.Secret) error {
 		return fmt.Errorf("k8s client is not initialized")
 	}
 
-	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(
-		context.TODO(),
-		&secret,
-		metav1.CreateOptions{},
-	)
-
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &secret, metav1.CreateOptions{})
 	return err
 }
 
