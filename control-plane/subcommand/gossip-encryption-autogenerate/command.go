@@ -26,9 +26,9 @@ type Command struct {
 	k8sFlags *flags.K8SFlags
 
 	// flags that dictate where the Kubernetes secret will be stored
-	flagK8sNamespace string
-	flagSecretName   string
-	flagSecretKey    string
+	flagNamespace  string
+	flagSecretName string
+	flagSecretKey  string
 
 	k8sClient kubernetes.Interface
 
@@ -123,7 +123,7 @@ func (c *Command) init() {
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
-	c.flags.StringVar(&c.flagK8sNamespace, "namespace", "", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
+	c.flags.StringVar(&c.flagNamespace, "namespace", "", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
 
@@ -135,7 +135,7 @@ func (c *Command) init() {
 
 // validateFlags ensures that all required flags are set.
 func (c *Command) validateFlags() error {
-	if c.flagK8sNamespace == "" {
+	if c.flagNamespace == "" {
 		return fmt.Errorf("-namespace must be set")
 	}
 
@@ -171,11 +171,13 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 		return false, fmt.Errorf("k8s client is not initialized")
 	}
 
-	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
+		} else {
+			return false, nil
 		}
 	}
 
@@ -184,13 +186,14 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 
 // createK8sSecret creates a Kubernetes secret from the gossip secret using given secret name and key.
 func (c *Command) createK8sSecret(gossipSecret string) (*v1.Secret, error) {
-	if (c.flagSecretName == "") || (c.flagSecretKey == "") {
-		return nil, fmt.Errorf("secret name and key must be set")
+	if (c.flagNamespace == "") || (c.flagSecretName == "") || (c.flagSecretKey == "") {
+		return nil, fmt.Errorf("namespace, secret name, and key must be set")
 	}
 
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: c.flagSecretName,
+			Name:      c.flagSecretName,
+			Namespace: c.flagNamespace,
 		},
 		Data: map[string][]byte{
 			c.flagSecretKey: []byte(gossipSecret),
@@ -205,7 +208,7 @@ func (c *Command) writeToK8s(secret v1.Secret) error {
 		return fmt.Errorf("k8s client is not initialized")
 	}
 
-	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, &secret, metav1.CreateOptions{})
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &secret, metav1.CreateOptions{})
 	return err
 }
 
