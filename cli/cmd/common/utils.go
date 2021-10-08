@@ -79,10 +79,7 @@ func readFile(chart embed.FS, f string, pathPrefix string) (*loader.BufferedFile
 // Abort returns true if the raw input string is not equal to "y" or "yes".
 func Abort(raw string) bool {
 	confirmation := strings.TrimSuffix(raw, "\n")
-	if !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes") {
-		return true
-	}
-	return false
+	return !(strings.ToLower(confirmation) == "y" || strings.ToLower(confirmation) == "yes")
 }
 
 // InitActionConfig initializes a Helm Go SDK action configuration. This function currently uses a hack to override the

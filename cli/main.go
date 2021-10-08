@@ -26,15 +26,17 @@ func main() {
 
 	basecmd, commands := initializeCommands(ctx, log)
 	c.Commands = commands
-	defer basecmd.Close()
+	defer func() {
+		_ = basecmd.Close()
+	}()
 
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-ch
 		// Any cleanups, such as cancelling contexts
 		cancel()
-		basecmd.Close()
+		_ = basecmd.Close()
 		os.Exit(1)
 	}()
 

@@ -133,8 +133,8 @@ func (ui *basicUI) NamedValues(rows []NamedValue, opts ...Option) {
 		}
 	}
 
-	tr.Flush()
-	colorInfo.Fprintln(cfg.Writer, buf.String())
+	_ = tr.Flush()
+	_, _ = colorInfo.Fprintln(cfg.Writer, buf.String())
 }
 
 // OutputWriters implements UI

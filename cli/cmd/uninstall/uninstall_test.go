@@ -182,10 +182,8 @@ func getInitializedCommand(t *testing.T) *Command {
 		Level:  hclog.Info,
 		Output: os.Stdout,
 	})
-	ctx, _ := context.WithCancel(context.Background())
 
 	baseCommand := &common.BaseCommand{
-		Ctx: ctx,
 		Log: log,
 	}
 
