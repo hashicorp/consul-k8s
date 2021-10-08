@@ -22,8 +22,8 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags *flag.FlagSet
-	k8s   *flags.K8SFlags
+	flags    *flag.FlagSet
+	k8sFlags *flags.K8SFlags
 
 	// flags that dictate where the Kubernetes secret will be stored
 	flagK8sNamespace string
@@ -127,8 +127,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
 
-	c.k8s = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.k8s.Flags())
+	c.k8sFlags = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.k8sFlags.Flags())
 
 	c.help = flags.Usage(help, c.flags)
 }
@@ -148,7 +148,11 @@ func (c *Command) validateFlags() error {
 
 // createK8sClient creates a Kubernetes client on the command object.
 func (c *Command) createK8sClient() error {
-	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
+	if c.k8sFlags == nil {
+		return fmt.Errorf("k8s flags are nil")
+	}
+
+	config, err := subcommand.K8SConfig(c.k8sFlags.KubeConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes config: %v", err)
 	}
