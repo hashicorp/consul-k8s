@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -62,18 +63,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	gossipSecret, err := generateGossipSecret()
-	if err != nil {
-		c.UI.Error(fmt.Errorf("failed to generate gossip secret: %v", err).Error())
-		return 1
-	}
-
-	kubernetesSecret, err := c.createKubernetesSecret(gossipSecret)
-	if err != nil {
-		c.UI.Error(fmt.Errorf("failed to create kubernetes secret: %v", err).Error())
-		return 1
-	}
-
 	if c.k8sClient == nil {
 		if err = c.createK8sClient(); err != nil {
 			c.UI.Error(fmt.Errorf("failed to create k8s client: %v", err).Error())
@@ -81,7 +70,27 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if err = c.writeToKubernetes(*kubernetesSecret); err != nil {
+	if exists, err := c.doesK8sSecretExist(); err != nil {
+		c.UI.Error(fmt.Errorf("failed to check if k8s secret exists: %v", err).Error())
+		return 1
+	} else if exists {
+		c.UI.Info(fmt.Sprintf("A Kubernetes secret with the name `%s` already exists.", c.flagSecretName))
+		return 0
+	}
+
+	gossipSecret, err := generateGossipSecret()
+	if err != nil {
+		c.UI.Error(fmt.Errorf("failed to generate gossip secret: %v", err).Error())
+		return 1
+	}
+
+	kubernetesSecret, err := c.createK8sSecret(gossipSecret)
+	if err != nil {
+		c.UI.Error(fmt.Errorf("failed to create kubernetes secret: %v", err).Error())
+		return 1
+	}
+
+	if err = c.writeToK8s(*kubernetesSecret); err != nil {
 		c.UI.Error(fmt.Errorf("failed to write to k8s: %v", err).Error())
 		return 1
 	}
@@ -146,8 +155,25 @@ func (c *Command) createK8sClient() error {
 	return nil
 }
 
-// createKubernetesSecret creates a Kubernetes secret from the gossip secret using given secret name and key.
-func (c *Command) createKubernetesSecret(gossipSecret string) (*v1.Secret, error) {
+// doesK8sSecretExist checks if a secret with the given name exists in the given namespace.
+func (c *Command) doesK8sSecretExist() (bool, error) {
+	if c.k8sClient == nil {
+		return false, fmt.Errorf("k8s client is not initialized")
+	}
+
+	_, err := c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Get(context.Background(), c.flagSecretName, metav1.GetOptions{})
+
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
+		}
+	}
+
+	return true, nil
+}
+
+// createK8sSecret creates a Kubernetes secret from the gossip secret using given secret name and key.
+func (c *Command) createK8sSecret(gossipSecret string) (*v1.Secret, error) {
 	if (c.flagSecretName == "") || (c.flagSecretKey == "") {
 		return nil, fmt.Errorf("secret name and key must be set")
 	}
@@ -162,9 +188,9 @@ func (c *Command) createKubernetesSecret(gossipSecret string) (*v1.Secret, error
 	}, nil
 }
 
-// writeSecretToKubernetes uses the Kubernetes client to write the gossip secret
+// writeToK8s uses the Kubernetes client to write the gossip secret
 // in the Kubernetes cluster at set namespace, secret name, and key.
-func (c *Command) writeToKubernetes(secret v1.Secret) error {
+func (c *Command) writeToK8s(secret v1.Secret) error {
 	if c.k8sClient == nil {
 		return fmt.Errorf("k8s client is not initialized")
 	}
