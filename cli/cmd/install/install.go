@@ -46,8 +46,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-
-	helmRepository = "https://helm.releases.hashicorp.com"
 )
 
 type Command struct {
@@ -472,14 +470,14 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
-		return errors.New(fmt.Sprintf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset))
+		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if _, ok := presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
-		return errors.New(fmt.Sprintf("'%s' is not a valid preset", c.flagPreset))
+		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !validLabel(c.flagNamespace) {
-		return errors.New(fmt.Sprintf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric.", c.flagNamespace))
+		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
@@ -489,7 +487,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return errors.New(fmt.Sprintf("File '%s' does not exist.", filename))
+				return fmt.Errorf("File '%s' does not exist.", filename)
 			}
 		}
 	}
