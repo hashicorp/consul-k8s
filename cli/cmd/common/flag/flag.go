@@ -1,11 +1,8 @@
 package flag
 
 import (
-	"os"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/kr/text"
 )
@@ -28,37 +25,6 @@ type FlagExample interface {
 // on "internal-only" flags.
 type FlagVisibility interface {
 	Hidden() bool
-}
-
-// helpers
-
-func envDefault(key, def string) string {
-	if v, exist := os.LookupEnv(key); exist {
-		return v
-	}
-	return def
-}
-
-func envBoolDefault(key string, def bool) bool {
-	if v, exist := os.LookupEnv(key); exist {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			panic(err)
-		}
-		return b
-	}
-	return def
-}
-
-func envDurationDefault(key string, def time.Duration) time.Duration {
-	if v, exist := os.LookupEnv(key); exist {
-		d, err := time.ParseDuration(v)
-		if err != nil {
-			panic(err)
-		}
-		return d
-	}
-	return def
 }
 
 // wrapAtLengthWithPadding wraps the given text at the maxLineLength, taking

@@ -46,6 +46,6 @@ global:
 // convert is a helper function that converts a YAML string to a map.
 func convert(s string) map[string]interface{} {
 	var m map[string]interface{}
-	yaml.Unmarshal([]byte(s), &m)
+	_ = yaml.Unmarshal([]byte(s), &m)
 	return m
 }
