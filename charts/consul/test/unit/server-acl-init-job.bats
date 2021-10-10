@@ -1119,6 +1119,45 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# global.acls.extraLabels
+
+@test "serverACLInit/Job: no extra labels defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "serverACLInit/Job: can set extra labels" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.extraLabels.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+
+  [ "${actual}" = "bar" ]
+}
+
+@test "serverACLInit/Job: multiple extra labels can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.extraLabels.foo=bar' \
+      --set 'global.acls.extraLabels.baz=qux' \
+      . | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualFoo}" = "bar" ]
+  [ "${actualBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
 # externalServers.enabled
 
 @test "serverACLInit/Job: fails if external servers are enabled but externalServers.hosts are not set" {

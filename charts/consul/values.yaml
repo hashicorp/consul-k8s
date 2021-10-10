@@ -262,6 +262,19 @@ global:
       # The key of the Kubernetes secret.
       secretKey: null
 
+    # Extra labels to attach to the acl init jobs. This should be a YAML map.
+    #
+    # Example:
+    #
+    # ```yaml
+    # extraLabels:
+    #   labelKey: label-value
+    #   anotherLabelKey: another-label-value
+    # ```
+    #
+    # @type: map
+    extraLabels: null
+
   # Configure federation.
   federation:
     # If enabled, this datacenter will be federation-capable. Only federation
@@ -1579,6 +1592,19 @@ connectInject:
   # Optional priorityClassName.
   priorityClassName: ""
 
+  # Extra labels to attach to the connect inject pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
+
   # The Docker image for Consul to use when performing Connect injection.
   # Defaults to global.image.
   # @type: string
@@ -2039,6 +2065,19 @@ meshGateway:
 
   # Optional priorityClassName.
   priorityClassName: ""
+
+  # Extra labels to attach to the mesh gateway pods. This should be a YAML map.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraLabels:
+  #   labelKey: label-value
+  #   anotherLabelKey: another-label-value
+  # ```
+  #
+  # @type: map
+  extraLabels: null
 
   # Annotations to apply to the mesh gateway deployment.
   #

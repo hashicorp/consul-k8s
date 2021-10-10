@@ -686,6 +686,48 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
+# extraLabels
+
+@test "meshGateway/Deployment: no extra labels defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "meshGateway/Deployment: can set extra labels" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.extraLabels.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+
+  [ "${actual}" = "bar" ]
+}
+
+@test "meshGateway/Deployment: multiple extra labels can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.extraLabels.foo=bar' \
+      --set 'meshGateway.extraLabels.baz=qux' \
+      . | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualFoo}" = "bar" ]
+  [ "${actualBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
 # nodeSelector
 
 @test "meshGateway/Deployment: no nodeSelector by default" {

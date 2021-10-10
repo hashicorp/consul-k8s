@@ -31,6 +31,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: server-acl-init
+        {{- if .Values.global.acls.extraLabels }}
+          {{- toYaml .Values.global.acls.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:

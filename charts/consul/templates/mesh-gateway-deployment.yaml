@@ -33,6 +33,9 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: mesh-gateway
+        {{- if .Values.meshGateway.extraLabels }}
+          {{- toYaml .Values.meshGateway.extraLabels | nindent 8 }}
+        {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
