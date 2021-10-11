@@ -46,7 +46,7 @@ func TestRun_FlagFailures(t *testing.T) {
 	}
 }
 
-func TestRun_SafeFailIfSecretExists(t *testing.T) {
+func TestRun_EarlyTerminationWithSuccessCodeIfSecretExists(t *testing.T) {
 	namespace := "default"
 	secretName := "my-secret"
 	secretKey := "my-secret-key"
@@ -75,20 +75,6 @@ func TestRun_SafeFailIfSecretExists(t *testing.T) {
 
 	require.Equal(t, 0, code)
 	require.Contains(t, ui.OutputWriter.String(), fmt.Sprintf("A Kubernetes secret with the name `%s` already exists.", secretName))
-}
-
-func TestCreateK8sClient_FailIfNoK8s(t *testing.T) {
-	cmd := Command{}
-
-	err := cmd.createK8sClient()
-	require.Error(t, err)
-}
-
-func TestK8sSecretExists_FailIfNoClient(t *testing.T) {
-	cmd := Command{}
-
-	_, err := cmd.doesK8sSecretExist()
-	require.Error(t, err)
 }
 
 func TestK8sSecretExists_WithTrue(t *testing.T) {
@@ -139,42 +125,6 @@ func TestK8sSecretExists_WithFalse(t *testing.T) {
 	actual, err := cmd.doesK8sSecretExist()
 	require.NoError(t, err)
 	require.False(t, actual)
-}
-
-func TestCreateK8sSecret_FailIfNamespaceNameOrKeyIsEmpty(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		namespace, name, key string
-	}{
-		{"", "name", "key"},
-		{"namespace", "", "key"},
-		{"namespace", "name", ""},
-	}
-
-	for _, c := range cases {
-		t.Run(
-			fmt.Sprintf("flagSecretName: %s, flagSecretKey %s", c.name, c.key),
-			func(t *testing.T) {
-				cmd := Command{
-					flagSecretName: c.name,
-					flagSecretKey:  c.key,
-				}
-
-				_, err := cmd.createK8sSecret("")
-				require.Error(t, err)
-			})
-	}
-}
-
-func TestWriteToK8s_FailIfNoClient(t *testing.T) {
-	cmd := Command{}
-
-	secret := v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{},
-		Data:       map[string][]byte{},
-	}
-	err := cmd.writeToK8s(secret)
-	require.Error(t, err)
 }
 
 func TestGenerateGossipSecret(t *testing.T) {
