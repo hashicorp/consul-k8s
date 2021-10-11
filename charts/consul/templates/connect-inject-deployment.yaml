@@ -36,6 +36,9 @@ spec:
         component: connect-injector
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if .Values.connectInject.annotations }}
+          {{- tpl .Values.connectInject.annotations . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
       containers:
