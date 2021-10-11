@@ -62,8 +62,6 @@ func (c *Command) init() {
 
 // Run parses flags and runs the command.
 func (c *Command) Run(args []string) int {
-	var err error
-
 	c.once.Do(c.init)
 
 	if err := c.flags.Parse(args); err != nil {
@@ -71,11 +69,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if err = c.validateFlags(); err != nil {
+	if err := c.validateFlags(); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to validate flags: %v", err))
 		return 1
 	}
 
+	var err error
 	c.log, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
 		c.UI.Error(err.Error())
