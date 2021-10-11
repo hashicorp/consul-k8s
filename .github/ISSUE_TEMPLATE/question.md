@@ -13,7 +13,7 @@ You've selected this issue type since you'd like to clarify your understanding a
 
 <!--
 
-Provide a clear description of the question you would like answered with as much detail as you can provide (links to docs, gists of commands). If you are reporting a feature requqest or issue please use the other issue types instead. If appropriate, please use sections below for providing your configuration, CLI commands, logs, and environment details!
+Provide a clear description of the question you would like answered with as much detail as you can provide (links to docs, gists of commands). If you are reporting a feature request or issue, please use the other issue types instead. If appropriate, please use the sections below for providing more details around your configuration, CLI commands, logs, and environment details!
 
 Please search the existing issues for relevant questions, and use the reaction feature (https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/) to add upvotes to pre-existing questions.
 
