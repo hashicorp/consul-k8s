@@ -77,62 +77,27 @@ func TestRun_EarlyTerminationWithSuccessCodeIfSecretExists(t *testing.T) {
 	require.Contains(t, ui.OutputWriter.String(), fmt.Sprintf("A Kubernetes secret with the name `%s` already exists.", secretName))
 }
 
-func TestK8sSecretExists_WithTrue(t *testing.T) {
+func TestRun_SecretIsGeneratedIfNoneExists(t *testing.T) {
 	namespace := "default"
 	secretName := "my-secret"
 	secretKey := "my-secret-key"
 
+	ui := cli.NewMockUi()
 	k8s := fake.NewSimpleClientset()
 
-	cmd := Command{
-		flagNamespace:  namespace,
-		flagSecretName: secretName,
-		flagSecretKey:  secretKey,
-		k8sClient:      k8s,
-	}
+	cmd := Command{UI: ui, k8sClient: k8s}
 
-	secret := v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			secretKey: []byte(secretKey),
-		},
-	}
-	_, err := k8s.CoreV1().Secrets(namespace).Create(context.Background(), &secret, metav1.CreateOptions{})
+	// Run the command
+	flags := []string{"-namespace", namespace, "-secret-name", secretName, "-secret-key", secretKey}
+	code := cmd.Run(flags)
+
+	require.Equal(t, 0, code)
+	require.Contains(t, ui.OutputWriter.String(), fmt.Sprintf("Successfully created Kubernetes secret `%s` in namespace `%s`.", secretName, namespace))
+
+	// Check the secret was created
+	secret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	require.NoError(t, err)
-
-	actual, err := cmd.doesK8sSecretExist()
+	gossipSecret, err := base64.StdEncoding.DecodeString(string(secret.Data[secretKey]))
 	require.NoError(t, err)
-	require.True(t, actual)
-}
-
-func TestK8sSecretExists_WithFalse(t *testing.T) {
-	namespace := "default"
-	secretName := "my-secret-2"
-	secretKey := "my-secret-key"
-
-	k8s := fake.NewSimpleClientset()
-
-	cmd := Command{
-		flagNamespace:  namespace,
-		flagSecretName: secretName,
-		flagSecretKey:  secretKey,
-		k8sClient:      k8s,
-	}
-
-	actual, err := cmd.doesK8sSecretExist()
-	require.NoError(t, err)
-	require.False(t, actual)
-}
-
-func TestGenerateGossipSecret(t *testing.T) {
-	actual, err := generateGossipSecret()
-	require.NoError(t, err)
-
-	actualDecoded, err := base64.StdEncoding.DecodeString(actual)
-	require.NoError(t, err)
-
-	require.Len(t, actualDecoded, 32)
+	require.Len(t, gossipSecret, 32)
 }
