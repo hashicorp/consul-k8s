@@ -1,19 +1,24 @@
 ---
 name: Question
-about: If you have a question.
+about: You'd like to clarify your understanding about a particular area within Consul K8s. There are situations when an issue or feature request does not really classify the type of help you are requesting from the Consul K8s team. We'd like to help and engage the community through Github!
 labels: question
 
 ---
-Please search the existing issues for relevant questions, and use the reaction feature (https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/) to add upvotes to pre-existing questions.
+
+<!--
+It sounds lik you'd like to clarify your understanding about a particular area within Consul K8s. There are situations when an issue or feature request does not really classify the type of help you are requesting from the Consul K8s team. We'd like to help and engage the community through Github!
+-->
 
 #### Question
 
-Please provide as many details as you can, including but not limited to
-- CLI commands you are issuing (consul-k8s, consul-k8s-control-plane, helm)
-- Any helm values you've configured
-- Your current understanding, and what you're trying to figure out
+<!--
 
-More details will help us answer questions more accurately and with less delay :)
+Provide a clear description of the question you would like answered with as much detail as you can provide (links to docs, gists of commands). If you are reporting a feature requqest or issue please use the other issue types instead. If appropriate, please use sections below for providing your configuration, CLI commands, logs, and environment details!
+
+Please search the existing issues for relevant questions, and use the reaction feature (https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/) to add upvotes to pre-existing questions.
+
+More details will help us answer questions more accurately and with less delay :) 
+-->
 
 ### CLI Commands (consul-k8s, consul-k8s-control-plane, helm)
 
