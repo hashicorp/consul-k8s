@@ -169,10 +169,6 @@ func (c *Command) createK8sClient() error {
 
 // doesK8sSecretExist checks if a secret with the given name exists in the given namespace.
 func (c *Command) doesK8sSecretExist() (bool, error) {
-	if c.k8sClient == nil {
-		return false, fmt.Errorf("k8s client is not initialized")
-	}
-
 	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
 
 	if err != nil {
