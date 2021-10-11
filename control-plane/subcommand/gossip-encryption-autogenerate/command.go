@@ -119,8 +119,13 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write to Kubernetes
-	c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &kubernetesSecret, metav1.CreateOptions{})
+	_, err = c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &kubernetesSecret, metav1.CreateOptions{})
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("failed to create k8s secret: %v", err))
+		return 1
+	}
 
+	c.UI.Info(fmt.Sprintf("Successfully created Kubernetes secret `%s` in namespace `%s`.", c.flagSecretName, c.flagNamespace))
 	return 0
 }
 
