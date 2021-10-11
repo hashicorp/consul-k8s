@@ -6,7 +6,7 @@ labels: question
 ---
 
 <!--
-It sounds lik you'd like to clarify your understanding about a particular area within Consul K8s. There are situations when an issue or feature request does not really classify the type of help you are requesting from the Consul K8s team. We'd like to help and engage the community through Github!
+You've selected this issue type since you'd like to clarify your understanding about a particular area within Consul K8s. There are situations when an issue or feature request does not really classify the type of help you are requesting from the Consul K8s team. We'd like to help and engage the community through Github!
 -->
 
 #### Question
