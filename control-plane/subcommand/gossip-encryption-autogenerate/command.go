@@ -174,9 +174,8 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
-		} else {
-			return false, nil
 		}
+		return false, nil
 	}
 
 	return true, nil
