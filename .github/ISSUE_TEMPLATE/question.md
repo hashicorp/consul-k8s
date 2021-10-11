@@ -31,11 +31,11 @@ consul-k8s install
 
 <!--- 
 
-In order to effectively and answer you question, please provide exact steps that allow us the reproduce the problem. If no steps are provided, then it will likely take longer to get your question answered. An example that you can follow is provided below. 
+In order to effectively understand and answer your question, please provide exact steps that allow us the reproduce the problem. If no steps are provided, then it will likely take longer to get your question answered. An example that you can follow is provided below. 
 
 Steps to reproduce this issue, eg:
 
-1. When running helm install with the following `values.yml`:
+1. When running helm install with the following `values.yaml`:
 ```
 global:
   domain: consul
