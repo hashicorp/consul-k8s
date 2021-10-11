@@ -90,16 +90,19 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	kubernetesSecret, err := c.createK8sSecret(gossipSecret)
-	if err != nil {
-		c.UI.Error(fmt.Errorf("failed to create kubernetes secret: %v", err).Error())
-		return 1
+	// Create the Kubernetes secret
+	kubernetesSecret := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.flagSecretName,
+			Namespace: c.flagNamespace,
+		},
+		Data: map[string][]byte{
+			c.flagSecretKey: []byte(gossipSecret),
+		},
 	}
 
-	if err = c.writeToK8s(*kubernetesSecret); err != nil {
-		c.UI.Error(fmt.Errorf("failed to write to k8s: %v", err).Error())
-		return 1
-	}
+	// Write to Kubernetes
+	c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &kubernetesSecret, metav1.CreateOptions{})
 
 	return 0
 }
@@ -182,34 +185,6 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 	}
 
 	return true, nil
-}
-
-// createK8sSecret creates a Kubernetes secret from the gossip secret using given secret name and key.
-func (c *Command) createK8sSecret(gossipSecret string) (*v1.Secret, error) {
-	if (c.flagNamespace == "") || (c.flagSecretName == "") || (c.flagSecretKey == "") {
-		return nil, fmt.Errorf("namespace, secret name, and key must be set")
-	}
-
-	return &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.flagSecretName,
-			Namespace: c.flagNamespace,
-		},
-		Data: map[string][]byte{
-			c.flagSecretKey: []byte(gossipSecret),
-		},
-	}, nil
-}
-
-// writeToK8s uses the Kubernetes client to write the gossip secret
-// in the Kubernetes cluster at set namespace, secret name, and key.
-func (c *Command) writeToK8s(secret v1.Secret) error {
-	if c.k8sClient == nil {
-		return fmt.Errorf("k8s client is not initialized")
-	}
-
-	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &secret, metav1.CreateOptions{})
-	return err
 }
 
 // Generates a random 32 byte secret.
