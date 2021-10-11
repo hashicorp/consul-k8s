@@ -42,6 +42,24 @@ type Command struct {
 	help string
 }
 
+// init is run once to set up usage documentation for flags.
+func (c *Command) init() {
+	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
+
+	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
+		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+			"\"debug\", \"info\", \"warn\", and \"error\".")
+	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
+	c.flags.StringVar(&c.flagNamespace, "namespace", "", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
+	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
+	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
+
+	c.k8sFlags = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.k8sFlags.Flags())
+
+	c.help = flags.Usage(help, c.flags)
+}
+
 // Run parses flags and runs the command.
 func (c *Command) Run(args []string) int {
 	var err error
@@ -116,24 +134,6 @@ func (c *Command) Help() string {
 // Synopsis returns a one-line synopsis of the command.
 func (c *Command) Synopsis() string {
 	return synopsis
-}
-
-// init is run once to set up usage documentation for flags.
-func (c *Command) init() {
-	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-
-	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
-		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
-			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flags.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
-	c.flags.StringVar(&c.flagNamespace, "namespace", "", "Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
-	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
-	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
-
-	c.k8sFlags = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.k8sFlags.Flags())
-
-	c.help = flags.Usage(help, c.flags)
 }
 
 // validateFlags ensures that all required flags are set.
