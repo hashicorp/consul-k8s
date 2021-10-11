@@ -67,12 +67,12 @@ func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
 	if err := c.flags.Parse(args); err != nil {
-		c.UI.Error(fmt.Errorf("failed to parse args: %v", err).Error())
+		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
 		return 1
 	}
 
 	if err = c.validateFlags(); err != nil {
-		c.UI.Error(fmt.Errorf("failed to validate flags: %v", err).Error())
+		c.UI.Error(fmt.Sprintf("failed to validate flags: %v", err))
 		return 1
 	}
 
@@ -88,13 +88,13 @@ func (c *Command) Run(args []string) int {
 
 	if c.k8sClient == nil {
 		if err = c.createK8sClient(); err != nil {
-			c.UI.Error(fmt.Errorf("failed to create k8s client: %v", err).Error())
+			c.UI.Error(fmt.Sprintf("failed to create k8s client: %v", err))
 			return 1
 		}
 	}
 
 	if exists, err := c.doesK8sSecretExist(); err != nil {
-		c.UI.Error(fmt.Errorf("failed to check if k8s secret exists: %v", err).Error())
+		c.UI.Error(fmt.Sprintf("failed to check if k8s secret exists: %v", err))
 		return 1
 	} else if exists {
 		// Safe exit if secret already exists
@@ -104,7 +104,7 @@ func (c *Command) Run(args []string) int {
 
 	gossipSecret, err := generateGossipSecret()
 	if err != nil {
-		c.UI.Error(fmt.Errorf("failed to generate gossip secret: %v", err).Error())
+		c.UI.Error(fmt.Sprintf("failed to generate gossip secret: %v", err))
 		return 1
 	}
 
