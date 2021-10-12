@@ -234,3 +234,25 @@ load _helpers
     yq -r '.spec.rules[0].http.paths[0].pathType' | tee /dev/stderr)
   [ "${actual}" = "ImplementationSpecific" ]
 }
+
+#--------------------------------------------------------------------
+# ingressClassName
+
+@test "ui/Ingress: no ingressClassName by default" {
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    . | tee /dev/stderr |
+    yq -r '.spec.ingressClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ui/Ingress: no ingressClassName by default" {
+  local actual=$(helm template \
+    -s templates/ui-ingress.yaml  \
+    --set 'ui.ingress.enabled=true' \
+    --set 'ui.ingress.ingressClassName=nginx' \
+    . | tee /dev/stderr |
+    yq -r '.spec.ingressClassName' | tee /dev/stderr)
+  [ "${actual}" = "nginx" ]
+}

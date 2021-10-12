@@ -1220,7 +1220,8 @@ ui:
   ingress:
     # This will create an Ingress resource for the Consul UI.
     # @type: boolean
-    enabled: false
+    enabled: true
+    className: ""
 
     # pathType override - see: https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
     pathType: Prefix
