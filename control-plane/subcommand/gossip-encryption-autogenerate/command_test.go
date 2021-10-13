@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestRun_FlagFailures(t *testing.T) {
+func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		flags  []string
@@ -56,7 +56,7 @@ func TestRun_EarlyTerminationWithSuccessCodeIfSecretExists(t *testing.T) {
 
 	cmd := Command{UI: ui, k8sClient: k8s}
 
-	// Create a secret
+	// Create a secret.
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -69,7 +69,7 @@ func TestRun_EarlyTerminationWithSuccessCodeIfSecretExists(t *testing.T) {
 	_, err := k8s.CoreV1().Secrets(namespace).Create(context.Background(), &secret, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Run the command
+	// Run the command.
 	flags := []string{"-namespace", namespace, "-secret-name", secretName, "-secret-key", secretKey}
 	code := cmd.Run(flags)
 
@@ -87,14 +87,14 @@ func TestRun_SecretIsGeneratedIfNoneExists(t *testing.T) {
 
 	cmd := Command{UI: ui, k8sClient: k8s}
 
-	// Run the command
+	// Run the command.
 	flags := []string{"-namespace", namespace, "-secret-name", secretName, "-secret-key", secretKey}
 	code := cmd.Run(flags)
 
 	require.Equal(t, 0, code)
 	require.Contains(t, ui.OutputWriter.String(), fmt.Sprintf("Successfully created Kubernetes secret `%s` in namespace `%s`.", secretName, namespace))
 
-	// Check the secret was created
+	// Check the secret was created.
 	secret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	require.NoError(t, err)
 	gossipSecret, err := base64.StdEncoding.DecodeString(string(secret.Data[secretKey]))

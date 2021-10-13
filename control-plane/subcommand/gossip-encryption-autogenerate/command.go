@@ -22,20 +22,20 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags    *flag.FlagSet
-	k8sFlags *flags.K8SFlags
+	flags *flag.FlagSet
+	k8s   *flags.K8SFlags
 
-	// These flags dictate where the Kubernetes secret will be stored.
+	// These flags determine where the Kubernetes secret will be stored.
 	flagNamespace  string
 	flagSecretName string
 	flagSecretKey  string
 
-	k8sClient kubernetes.Interface
-
-	log          hclog.Logger
 	flagLogLevel string
 	flagLogJSON  bool
 
+	k8sClient kubernetes.Interface
+
+	log  hclog.Logger
 	once sync.Once
 	ctx  context.Context
 	help string
@@ -53,8 +53,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagSecretName, "secret-name", "", "Name of the secret to create.")
 	c.flags.StringVar(&c.flagSecretKey, "secret-key", "key", "Name of the secret key to create.")
 
-	c.k8sFlags = &flags.K8SFlags{}
-	flags.Merge(c.flags, c.k8sFlags.Flags())
+	c.k8s = &flags.K8SFlags{}
+	flags.Merge(c.flags, c.k8s.Flags())
 
 	c.help = flags.Usage(help, c.flags)
 }
@@ -64,12 +64,12 @@ func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
 	if err := c.flags.Parse(args); err != nil {
-		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to parse args: %v", err))
 		return 1
 	}
 
 	if err := c.validateFlags(); err != nil {
-		c.UI.Error(fmt.Sprintf("failed to validate flags: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to validate flags: %v", err))
 		return 1
 	}
 
@@ -85,14 +85,14 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.k8sClient == nil {
-		if err = c.createK8sClient(); err != nil {
-			c.UI.Error(fmt.Sprintf("failed to create k8s client: %v", err))
+		if err = c.createKubernetesClient(); err != nil {
+			c.UI.Error(fmt.Sprintf("Failed to create Kubernetes client: %v", err))
 			return 1
 		}
 	}
 
 	if exists, err := c.doesKubernetesSecretExist(); err != nil {
-		c.UI.Error(fmt.Sprintf("failed to check if k8s secret exists: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to check if Kubernetes secret exists: %v", err))
 		return 1
 	} else if exists {
 		// Safe exit if secret already exists
@@ -102,7 +102,7 @@ func (c *Command) Run(args []string) int {
 
 	gossipSecret, err := generateGossipSecret()
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("failed to generate gossip secret: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to generate gossip secret: %v", err))
 		return 1
 	}
 
@@ -120,7 +120,7 @@ func (c *Command) Run(args []string) int {
 	// Write the secret to Kubernetes.
 	_, err = c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &kubernetesSecret, metav1.CreateOptions{})
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("failed to create k8s secret: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to create Kubernetes secret: %v", err))
 		return 1
 	}
 
@@ -152,13 +152,9 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-// createK8sClient creates a Kubernetes client on the command object.
-func (c *Command) createK8sClient() error {
-	if c.k8sFlags == nil {
-		return fmt.Errorf("k8s flags are nil")
-	}
-
-	config, err := subcommand.K8SConfig(c.k8sFlags.KubeConfig())
+// createKubernetesClient creates a Kubernetes client on the command object.
+func (c *Command) createKubernetesClient() error {
+	config, err := subcommand.K8SConfig(c.k8s.KubeConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes config: %v", err)
 	}
@@ -182,7 +178,7 @@ func (c *Command) doesKubernetesSecretExist() (bool, error) {
 
 	// If the error is not a NotFound error, return the error.
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
+		return false, fmt.Errorf("failed to get Kubernetes secret: %v", err)
 	}
 
 	// The secret exists.
