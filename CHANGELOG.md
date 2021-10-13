@@ -2,7 +2,7 @@
 
 FEATURES:
 * Control Plane
-  * Add `gossip-encryption-autogenerate` command which takes in a `-namespace` and `-secret-name` and generates a random 32 byte Kubernetes secret at the given values or exits early if a secret already exists. [[GH-772](https://github.com/hashicorp/consul-k8s/pull/772)]
+  * Add `gossip-encryption-autogenerate` subcommand generates a random 32 byte Kubernetes secret to be used as a gossip encryption key. [[GH-772](https://github.com/hashicorp/consul-k8s/pull/772)]
 * Helm Chart
   * Add automatic generation of gossip encryption with `global.gossipEncryption.autoGenerate=true`. [[GH-738](https://github.com/hashicorp/consul-k8s/pull/738)]
   * Add support for configuring resources for mesh gateway `service-init` container. [[GH-758](https://github.com/hashicorp/consul-k8s/pull/758)]
