@@ -175,13 +175,17 @@ func (c *Command) createK8sClient() error {
 func (c *Command) doesK8sSecretExist() (bool, error) {
 	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
 
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
-		}
+	// If the secret does not exist, the error will be a NotFound error.
+	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	}
 
+	// If the error is not a NotFound error, return the error.
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, fmt.Errorf("failed to get kubernetes secret: %v", err)
+	}
+
+	// The secret exists.
 	return true, nil
 }
 
