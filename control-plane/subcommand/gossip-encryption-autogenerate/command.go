@@ -25,14 +25,13 @@ type Command struct {
 	flags    *flag.FlagSet
 	k8sFlags *flags.K8SFlags
 
-	// flags that dictate where the Kubernetes secret will be stored
+	// These flags dictate where the Kubernetes secret will be stored.
 	flagNamespace  string
 	flagSecretName string
 	flagSecretKey  string
 
 	k8sClient kubernetes.Interface
 
-	// log
 	log          hclog.Logger
 	flagLogLevel string
 	flagLogJSON  bool
@@ -60,7 +59,7 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flags)
 }
 
-// Run parses flags and runs the command.
+// Run parses input and creates a gossip secret in Kubernetes if none exists at the given namespace and secret name.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
@@ -107,7 +106,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Create the Kubernetes secret
+	// Create the Kubernetes secret object.
 	kubernetesSecret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.flagSecretName,
@@ -118,7 +117,7 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	// Write to Kubernetes
+	// Write the secret to Kubernetes.
 	_, err = c.k8sClient.CoreV1().Secrets(c.flagNamespace).Create(c.ctx, &kubernetesSecret, metav1.CreateOptions{})
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("failed to create k8s secret: %v", err))
@@ -186,8 +185,11 @@ func (c *Command) doesK8sSecretExist() (bool, error) {
 	return true, nil
 }
 
-// Generates a random 32 byte secret.
+// generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
 func generateGossipSecret() (string, error) {
+	// This code was copied from Consul's Keygen command:
+	// https://github.com/hashicorp/consul/blob/d652cc86e3d0322102c2b5e9026c6a60f36c17a5/command/keygen/keygen.go
+
 	key := make([]byte, 32)
 	n, err := rand.Reader.Read(key)
 
@@ -201,7 +203,7 @@ func generateGossipSecret() (string, error) {
 	return base64.StdEncoding.EncodeToString(key), nil
 }
 
-const synopsis = "Generate a secret for gossip encryption."
+const synopsis = "Generate and store a secret for gossip encryption."
 const help = `
 Usage: consul-k8s-control-plane gossip-encryption-autogenerate [options]
 
