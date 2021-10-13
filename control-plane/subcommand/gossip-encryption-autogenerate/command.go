@@ -91,7 +91,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if exists, err := c.doesK8sSecretExist(); err != nil {
+	if exists, err := c.doesKubernetesSecretExist(); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to check if k8s secret exists: %v", err))
 		return 1
 	} else if exists {
@@ -171,8 +171,8 @@ func (c *Command) createK8sClient() error {
 	return nil
 }
 
-// doesK8sSecretExist checks if a secret with the given name exists in the given namespace.
-func (c *Command) doesK8sSecretExist() (bool, error) {
+// doesKubernetesSecretExist checks if a secret with the given name exists in the given namespace.
+func (c *Command) doesKubernetesSecretExist() (bool, error) {
 	_, err := c.k8sClient.CoreV1().Secrets(c.flagNamespace).Get(c.ctx, c.flagSecretName, metav1.GetOptions{})
 
 	// If the secret does not exist, the error will be a NotFound error.
