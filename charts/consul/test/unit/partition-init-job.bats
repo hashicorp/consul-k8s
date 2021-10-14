@@ -98,7 +98,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken
 
-@test "partitionInit/Job: HTTP_TOKEN when global.acls.bootstrapToken is provided" {
+@test "partitionInit/Job: HTTP_TOKEN is set when global.acls.bootstrapToken is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/partition-init-job.yaml  \

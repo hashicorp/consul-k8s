@@ -354,12 +354,13 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				case "connect-inject-token":
 					// The connect inject token doesn't have namespace config,
 					// but does change to operator:write from an empty string.
-					require.Contains(actRules, "acl = \"write\"")
+					require.Contains(actRules, "policy = \"write\"")
 				case "client-snapshot-agent-token", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
 					require.NotContains(actRules, "namespace")
+					require.Contains(actRules, "acl = \"write\"")
 				case "partitions-token":
-					require.Contains(actRules, "acl = \"write\"\noperator = \"write\"")
+					require.Contains(actRules, "operator = \"write\"")
 				default:
 					// Assert that the policies have the word namespace in them. This
 					// tests that they were updated. The actual contents are tested

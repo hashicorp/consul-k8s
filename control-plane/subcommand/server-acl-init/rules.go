@@ -39,14 +39,14 @@ service "consul-snapshot" {
 const entLicenseRules = `operator = "write"`
 const entPartitionLicenseRules = `acl = "write"`
 
-const partitionRules = `acl = "write"
-operator = "write"
+const partitionRules = `operator = "write"
 agent_prefix "" {
   policy = "read"
 }
 partition_prefix "" {
-  acl = "write"
-  mesh = "write"
+  namespace_prefix "" {
+    acl = "write"
+  }
 }`
 
 func (c *Command) crossNamespaceRule() (string, error) {
@@ -259,7 +259,6 @@ func (c *Command) injectRules() (string, error) {
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
-  acl = "write"
 {{- else }}
 {{- if .EnableNamespaces }}
   operator = "write"

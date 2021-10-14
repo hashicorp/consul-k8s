@@ -56,22 +56,22 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
-	// Flags to configure Consul connection
+	// Flags to configure Consul connection.
 	flagServerAddresses     []string
 	flagServerPort          uint
 	flagConsulCACert        string
 	flagConsulTLSServerName string
 	flagUseHTTPS            bool
 
-	// Flags for ACL replication
+	// Flags for ACL replication.
 	flagCreateACLReplicationToken bool
 	flagACLReplicationTokenFile   string
 
-	// Flags to support partitions
+	// Flags to support partitions.
 	flagEnablePartitions bool   // true if Admin Partitions are enabled
 	flagPartitionName    string // name of the Admin Partition
 
-	// Flags to support namespaces
+	// Flags to support namespaces.
 	flagEnableNamespaces                 bool   // Use namespacing on all components
 	flagConsulSyncDestinationNamespace   string // Consul namespace to register all catalog sync services into if not mirroring
 	flagEnableSyncK8SNSMirroring         bool   // Enables mirroring of k8s namespaces into Consul for catalog sync
@@ -80,7 +80,7 @@ type Command struct {
 	flagEnableInjectK8SNSMirroring       bool   // Enables mirroring of k8s namespaces into Consul for Connect inject
 	flagInjectK8SNSMirroringPrefix       string // Prefix added to Consul namespaces created when mirroring injected services
 
-	// Flag to support a custom bootstrap token
+	// Flag to support a custom bootstrap token.
 	flagBootstrapTokenFile string
 
 	flagLogLevel string
@@ -396,7 +396,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagEnablePartitions && c.flagPartitionName == "default" && isPrimary {
+	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && isPrimary {
 		// Partition token must be local because only the Primary datacenter can have Admin Partitions.
 		err := c.createLocalACL("partitions", partitionRules, consulDC, isPrimary, consulClient)
 		if err != nil {
@@ -870,6 +870,7 @@ func (c *Command) validateFlags() error {
 }
 
 const consulDefaultNamespace = "default"
+const consulDefaultPartition = "default"
 const synopsis = "Initialize ACLs on Consul servers and other components."
 const help = `
 Usage: consul-k8s-control-plane server-acl-init [options]

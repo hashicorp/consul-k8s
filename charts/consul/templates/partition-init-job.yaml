@@ -42,7 +42,7 @@ spec:
                 path: tls.crt
       {{- end }}
       containers:
-        - name: partition-create-job
+        - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
           env:
             - name: NAMESPACE

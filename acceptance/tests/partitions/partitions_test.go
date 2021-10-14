@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/environment"
-	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-k8s/charts/consul/test/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,10 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
 	}
 
-	consulDestNS := "consul-dest"
+	if cfg.EnableTransparentProxy {
+		t.Skipf("skipping this test because -enable-transparent-proxy is true")
+	}
+
 	cases := []struct {
 		name                 string
 		destinationNamespace string
@@ -58,25 +61,25 @@ func TestPartitions(t *testing.T) {
 		},
 		{
 			"single destination namespace",
-			consulDestNS,
+			staticServerNamespace,
 			false,
 			false,
 		},
 		{
 			"single destination namespace; secure",
-			consulDestNS,
+			staticServerNamespace,
 			false,
 			true,
 		},
 		{
 			"mirror k8s namespaces",
-			consulDestNS,
+			staticServerNamespace,
 			true,
 			false,
 		},
 		{
 			"mirror k8s namespaces; secure",
-			consulDestNS,
+			staticServerNamespace,
 			true,
 			true,
 		},
@@ -84,20 +87,20 @@ func TestPartitions(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cfg := suite.Config()
-			primaryContext := env.DefaultContext(t)
-			secondaryContext := env.Context(t, environment.SecondaryContextName)
+			serverClusterContext := env.DefaultContext(t)
+			clientClusterContext := env.Context(t, environment.SecondaryContextName)
 
 			ctx := context.Background()
 
-			primaryHelmValues := map[string]string{
+			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "ashwinvenkatesh/consul@sha256:2b19b62963306a312acaa223d19afa493fe02ec033a15ad5e6d31f1879408e49",
-				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:8a10fcf7ef80dd540389bc9b10c03a4629a7d08b5e9317b9cc3499c6df71a03b",
+				"global.image":      "ashwinvenkatesh/consul@sha256:82224b464d55df267ea5ef20d02fdbd2907b9732155125f6a26ab819557b6c22",
+				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:1a0529b38a2cd40a4838d6c0824ebeb2b8ef9b39b81f2936bb581e6210f4ea9c",
 
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
 				"global.tls.enabled":             "true",
+				"global.tls.httpsOnly":           strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt":   strconv.FormatBool(c.secure),
 
 				"server.exposeGossipAndRPCPorts": "true",
@@ -106,48 +109,51 @@ func TestPartitions(t *testing.T) {
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
+				"connectInject.transparentProxy.defaultEnabled":             "false",
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 			}
 
 			if cfg.UseKind {
-				primaryHelmValues["global.adminPartitions.service.type"] = "NodePort"
-				primaryHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
+				serverHelmValues["global.adminPartitions.service.type"] = "NodePort"
+				serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
 			}
 
 			releaseName := helpers.RandomName()
 
 			// Install the consul cluster with servers in the default kubernetes context.
-			primaryConsulCluster := consul.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
-			primaryConsulCluster.Create(t)
+			serverConsulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterContext, cfg, releaseName)
+			serverConsulCluster.Create(t)
 
-			// Get the TLS CA certificate and key secret from the primary cluster and apply it to secondary cluster
+			// Get the TLS CA certificate and key secret from the server cluster and apply it to client cluster.
 			tlsCert := fmt.Sprintf("%s-consul-ca-cert", releaseName)
 			tlsKey := fmt.Sprintf("%s-consul-ca-key", releaseName)
 
-			logger.Logf(t, "retrieving ca cert secret %s from the primary cluster and applying to the secondary", tlsCert)
-			caCertSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(ctx, tlsCert, metav1.GetOptions{})
+			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", tlsCert)
+			caCertSecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsCert, metav1.GetOptions{})
 			caCertSecret.ResourceVersion = ""
 			require.NoError(t, err)
-			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(ctx, caCertSecret, metav1.CreateOptions{})
+			_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caCertSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			if !c.secure {
-				logger.Logf(t, "retrieving ca key secret %s from the primary cluster and applying to the secondary", tlsKey)
-				caKeySecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(ctx, tlsKey, metav1.GetOptions{})
+				// When running in the insecure mode, auto-encrypt is disabled which requires both
+				// the CA cert and CA key to be available in the clients cluster.
+				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", tlsKey)
+				caKeySecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsKey, metav1.GetOptions{})
 				caKeySecret.ResourceVersion = ""
 				require.NoError(t, err)
-				_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(ctx, caKeySecret, metav1.CreateOptions{})
+				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caKeySecret, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
 			if c.secure {
-				logger.Logf(t, "retrieving partition token secret %s from the primary cluster and applying to the secondary", tlsKey)
-				token, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(ctx, partitionToken, metav1.GetOptions{})
+				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", tlsKey)
+				token, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionToken, metav1.GetOptions{})
 				token.ResourceVersion = ""
 				require.NoError(t, err)
-				_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(ctx, token, metav1.CreateOptions{})
+				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, token, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -156,24 +162,31 @@ func TestPartitions(t *testing.T) {
 				// Get the IP of the partition service to configure the external server address in the values file for the workload cluster.
 				partitionServiceName := fmt.Sprintf("%s-partition-secret", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external IP for servers")
-				partitionsSvc, err := primaryContext.KubernetesClient(t).CoreV1().Services(primaryContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
+				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
 				require.NoError(t, err)
 				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
 			} else {
-				nodeList, err := primaryContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				nodeList, err := serverClusterContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				require.NoError(t, err)
 				// Get the address of the (only) node from the Kind cluster.
 				partitionSvcIP = nodeList.Items[0].Status.Addresses[0].Address
 			}
 
-			// Create secondary cluster
-			secondaryHelmValues := map[string]string{
+			// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
+			// this can be identified by reading the cluster config.
+			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(ctx, "kubernetes", metav1.GetOptions{})
+			require.NoError(t, err)
+			k8sAuthMethodHost := fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+
+			// Create client cluster.
+			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "ashwinvenkatesh/consul@sha256:2b19b62963306a312acaa223d19afa493fe02ec033a15ad5e6d31f1879408e49",
-				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:8a10fcf7ef80dd540389bc9b10c03a4629a7d08b5e9317b9cc3499c6df71a03b",
+				"global.image":      "ashwinvenkatesh/consul@sha256:82224b464d55df267ea5ef20d02fdbd2907b9732155125f6a26ab819557b6c22",
+				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:1a0529b38a2cd40a4838d6c0824ebeb2b8ef9b39b81f2936bb581e6210f4ea9c",
 				"global.enabled":    "false",
 
 				"global.tls.enabled":           "true",
+				"global.tls.httpsOnly":         strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.secure),
 
 				"server.exposeGossipAndRPCPorts": "true",
@@ -182,6 +195,7 @@ func TestPartitions(t *testing.T) {
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
+				"connectInject.transparentProxy.defaultEnabled":             "false",
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 
@@ -192,9 +206,10 @@ func TestPartitions(t *testing.T) {
 				"global.tls.caCert.secretName": tlsCert,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcIP,
-				"externalServers.tlsServerName": "server.dc1.consul",
+				"externalServers.enabled":           "true",
+				"externalServers.hosts[0]":          partitionSvcIP,
+				"externalServers.tlsServerName":     "server.dc1.consul",
+				"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
 				"client.enabled":           "true",
 				"client.exposeGossipPorts": "true",
@@ -203,86 +218,90 @@ func TestPartitions(t *testing.T) {
 
 			if c.secure {
 				// setup partition token if ACLs enabled.
-				secondaryHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
-				secondaryHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
+				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
+				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
 			} else {
 				// provide CA key when auto-encrypt is disabled.
-				secondaryHelmValues["global.tls.caKey.secretName"] = tlsKey
-				secondaryHelmValues["global.tls.caKey.secretKey"] = "tls.key"
+				clientHelmValues["global.tls.caKey.secretName"] = tlsKey
+				clientHelmValues["global.tls.caKey.secretKey"] = "tls.key"
 			}
 
 			if cfg.UseKind {
-				secondaryHelmValues["externalServers.httpsPort"] = "30000"
+				clientHelmValues["externalServers.httpsPort"] = "30000"
 			}
 
-			// Install the consul cluster without servers in the secondary kubernetes context.
-			secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
-			secondaryConsulCluster.Create(t)
+			// Install the consul cluster without servers in the client cluster kubernetes context.
+			clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterContext, cfg, releaseName)
+			clientConsulCluster.Create(t)
 
-			agentPodList, err := secondaryContext.KubernetesClient(t).CoreV1().Pods(secondaryContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
+			agentPodList, err := clientClusterContext.KubernetesClient(t).CoreV1().Pods(clientClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 			require.NoError(t, err)
 			require.Len(t, agentPodList.Items, 1)
 
-			output, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", secondaryContext.KubectlOptions(t).Namespace)
+			output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", clientClusterContext.KubectlOptions(t).Namespace)
 			require.NoError(t, err)
 			require.Contains(t, output, "Partition: 'secondary'")
 
 			serverClusterStaticServerOpts := &terratestk8s.KubectlOptions{
-				ContextName: primaryContext.KubectlOptions(t).ContextName,
-				ConfigPath:  primaryContext.KubectlOptions(t).ConfigPath,
+				ContextName: serverClusterContext.KubectlOptions(t).ContextName,
+				ConfigPath:  serverClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
 			serverClusterStaticClientOpts := &terratestk8s.KubectlOptions{
-				ContextName: primaryContext.KubectlOptions(t).ContextName,
-				ConfigPath:  primaryContext.KubectlOptions(t).ConfigPath,
+				ContextName: serverClusterContext.KubectlOptions(t).ContextName,
+				ConfigPath:  serverClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 			clientClusterStaticServerOpts := &terratestk8s.KubectlOptions{
-				ContextName: secondaryContext.KubectlOptions(t).ContextName,
-				ConfigPath:  secondaryContext.KubectlOptions(t).ConfigPath,
+				ContextName: clientClusterContext.KubectlOptions(t).ContextName,
+				ConfigPath:  clientClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
 			clientClusterStaticClientOpts := &terratestk8s.KubectlOptions{
-				ContextName: secondaryContext.KubectlOptions(t).ContextName,
-				ConfigPath:  secondaryContext.KubectlOptions(t).ConfigPath,
+				ContextName: clientClusterContext.KubectlOptions(t).ContextName,
+				ConfigPath:  clientClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 
 			logger.Logf(t, "creating namespaces %s and %s in servers cluster", staticServerNamespace, staticClientNamespace)
-			k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+			k8s.RunKubectl(t, serverClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				k8s.RunKubectl(t, serverClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			k8s.RunKubectl(t, serverClusterContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				// Note: this deletion will take longer in cases when the static-client deployment
 				// hasn't yet fully terminated.
-				k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, serverClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s and %s in clients cluster", staticServerNamespace, staticClientNamespace)
-			k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+			k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
+			k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				// Note: this deletion will take longer in cases when the static-client deployment
 				// hasn't yet fully terminated.
-				k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+				k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			serverClusterConsulClient := primaryConsulCluster.SetupConsulClient(t, c.secure)
-			clientClusterConsulClient := secondaryConsulCluster.SetupConsulClient(t, c.secure)
+			consulClient := serverConsulCluster.SetupConsulClient(t, c.secure)
 
-			serverQueryOpts := &api.QueryOptions{Namespace: staticServerNamespace}
-			clientQueryOpts := &api.QueryOptions{Namespace: staticClientNamespace}
+			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: "default"}
+			clientQueryServerOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: "default"}
+
+			serverQueryClientOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: "secondary"}
+			clientQueryClientOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: "secondary"}
 
 			if !c.mirrorK8S {
-				serverQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
-				clientQueryOpts = &api.QueryOptions{Namespace: c.destinationNamespace}
+				serverQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "default"}
+				clientQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "default"}
+				serverQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "secondary"}
+				clientQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "secondary"}
 			}
 
 			// Check that the ACL token is deleted.
@@ -293,24 +312,24 @@ func TestPartitions(t *testing.T) {
 				t.Cleanup(func() {
 					if c.secure {
 						retry.Run(t, func(r *retry.R) {
-							tokens, _, err := serverClusterConsulClient.ACL().TokenList(serverQueryOpts)
+							tokens, _, err := consulClient.ACL().TokenList(serverQueryServerOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
 								require.NotContains(r, token.Description, staticServerName)
 							}
 
-							tokens, _, err = serverClusterConsulClient.ACL().TokenList(clientQueryOpts)
+							tokens, _, err = consulClient.ACL().TokenList(clientQueryServerOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
 								require.NotContains(r, token.Description, staticClientName)
 							}
-							tokens, _, err = clientClusterConsulClient.ACL().TokenList(serverQueryOpts)
+							tokens, _, err = consulClient.ACL().TokenList(serverQueryClientOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
 								require.NotContains(r, token.Description, staticServerName)
 							}
 
-							tokens, _, err = clientClusterConsulClient.ACL().TokenList(clientQueryOpts)
+							tokens, _, err = consulClient.ACL().TokenList(clientQueryClientOpts)
 							require.NoError(r, err)
 							for _, token := range tokens {
 								require.NotContains(r, token.Description, staticClientName)
@@ -322,23 +341,21 @@ func TestPartitions(t *testing.T) {
 
 			logger.Log(t, "creating static-server and static-client deployments in server cluster")
 			k8s.DeployKustomize(t, serverClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, serverClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			if c.destinationNamespace == "default" {
+				k8s.DeployKustomize(t, serverClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			} else {
 				k8s.DeployKustomize(t, serverClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 			}
-
 			logger.Log(t, "creating static-server and static-client deployments in client cluster")
 			k8s.DeployKustomize(t, clientClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, clientClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			if c.destinationNamespace == "default" {
+				k8s.DeployKustomize(t, clientClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			} else {
 				k8s.DeployKustomize(t, clientClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 			}
-
 			// Check that both static-server and static-client have been injected and now have 2 containers in server cluster.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := primaryContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+				podList, err := serverClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 					LabelSelector: labelSelector,
 				})
 				require.NoError(t, err)
@@ -348,7 +365,7 @@ func TestPartitions(t *testing.T) {
 
 			// Check that both static-server and static-client have been injected and now have 2 containers in client cluster.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := secondaryContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+				podList, err := clientClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
 					LabelSelector: labelSelector,
 				})
 				require.NoError(t, err)
@@ -363,32 +380,27 @@ func TestPartitions(t *testing.T) {
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
 			// Server cluster.
-			services, _, err := serverClusterConsulClient.Catalog().Service(staticServerName, "", serverQueryOpts)
+			services, _, err := consulClient.Catalog().Service(staticServerName, "", serverQueryServerOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
-			services, _, err = serverClusterConsulClient.Catalog().Service(staticClientName, "", clientQueryOpts)
+			services, _, err = consulClient.Catalog().Service(staticClientName, "", clientQueryServerOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			// Client cluster.
-			services, _, err = clientClusterConsulClient.Catalog().Service(staticServerName, "", serverQueryOpts)
+			services, _, err = consulClient.Catalog().Service(staticServerName, "", serverQueryClientOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
-			services, _, err = clientClusterConsulClient.Catalog().Service(staticClientName, "", clientQueryOpts)
+			services, _, err = consulClient.Catalog().Service(staticClientName, "", clientQueryClientOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
 
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
-				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-					k8s.CheckStaticServerConnectionFailing(t, clientClusterStaticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-				} else {
-					k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, "http://localhost:1234")
-					k8s.CheckStaticServerConnectionFailing(t, clientClusterStaticClientOpts, "http://localhost:1234")
-				}
+				k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionFailing(t, clientClusterStaticClientOpts, "http://localhost:1234")
 
 				intention := &api.Intention{
 					SourceName:      staticClientName,
@@ -406,26 +418,21 @@ func TestPartitions(t *testing.T) {
 				}
 
 				logger.Log(t, "creating intention")
-				_, err := serverClusterConsulClient.Connect().IntentionUpsert(intention, nil)
+				_, err := consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: "default"})
 				require.NoError(t, err)
-				_, err = clientClusterConsulClient.Connect().IntentionUpsert(intention, nil)
+				_, err = consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: "secondary"})
 				require.NoError(t, err)
 			}
 
 			logger.Log(t, "checking that connection is successful")
-			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, serverClusterStaticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-				k8s.CheckStaticServerConnectionSuccessful(t, clientClusterStaticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, serverClusterStaticClientOpts, "http://localhost:1234")
-				k8s.CheckStaticServerConnectionSuccessful(t, clientClusterStaticClientOpts, "http://localhost:1234")
-			}
+			k8s.CheckStaticServerConnectionSuccessful(t, serverClusterStaticClientOpts, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, clientClusterStaticClientOpts, "http://localhost:1234")
 
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
 			k8s.RunKubectl(t, serverClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-			k8s.RunKubectl(t, clientClusterStaticClientOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, clientClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -433,13 +440,8 @@ func TestPartitions(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
-			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
-			}
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
 		})
 	}
 }

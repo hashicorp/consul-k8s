@@ -644,7 +644,6 @@ func TestInjectRules(t *testing.T) {
 			PartitionName:    "part-1",
 			Expected: `
 partition "part-1" {
-  acl = "write"
   node_prefix "" {
     policy = "write"
   }
