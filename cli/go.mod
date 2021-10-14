@@ -19,6 +19,7 @@ require (
 	github.com/posener/complete v1.1.1
 	github.com/stretchr/testify v1.7.0
 	go.starlark.net v0.0.0-20200707032745-474f21a9602d // indirect
+	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 	google.golang.org/grpc v1.33.1 // indirect
 	helm.sh/helm/v3 v3.6.1
 	k8s.io/api v0.21.2
