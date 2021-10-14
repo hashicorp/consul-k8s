@@ -95,7 +95,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Failed to check if Kubernetes secret exists: %v", err))
 		return 1
 	} else if exists {
-		// Safe exit if secret already exists
+		// Safe exit if secret already exists.
 		c.UI.Info(fmt.Sprintf("A Kubernetes secret with the name `%s` already exists.", c.flagSecretName))
 		return 0
 	}
