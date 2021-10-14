@@ -1,9 +1,5 @@
 # Consul + Kubernetes (consul-k8s)
 
-> :warning: **Please note**: This repository has recently been merged with [consul-helm](https://www.consul.io/docs/platform/k8s/index.html). For more information on this change, please see [PR #1051](https://github.com/hashicorp/consul-helm/issues/1051).
-
----
-
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
 
 ## Overview
