@@ -12,6 +12,7 @@ IMPROVEMENTS:
   * Enable adding extra containers to server and client Pods. [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
 * CLI
   * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
+  * Add `uninstall` command. [[GH-725](https://github.com/hashicorp/consul-k8s/pull/725)]
 
 ## 0.34.1 (September 17, 2021)
 
