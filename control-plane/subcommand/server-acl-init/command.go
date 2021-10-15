@@ -174,7 +174,7 @@ func (c *Command) init() {
 		"Toggle for using HTTPS for all API calls to Consul.")
 
 	c.flags.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
-		"[Enterprise Only] Enables Admin Partitions [Enterprise only feature]")
+		"[Enterprise Only] Enables Admin Partitions")
 	c.flags.StringVar(&c.flagPartitionName, "partition", "",
 		"[Enterprise Only] Name of the Admin Partition")
 
@@ -397,7 +397,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && isPrimary {
-		// Partition token must be local because only the Primary datacenter can have Admin Partitions.
+		// Partition token is local because only the Primary datacenter can have Admin Partitions.
 		err := c.createLocalACL("partitions", partitionRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
@@ -412,7 +412,7 @@ func (c *Command) Run(args []string) int {
 	// connect inject) needs to reference this policy on namespace creation
 	// to finish the cross namespace permission setup.
 	if c.flagEnableNamespaces {
-		crossNamespaceRule, err := c.crossNamespaceRule()
+		crossNamespaceRule, err := c.crossNamespaceRules()
 		if err != nil {
 			c.log.Error("Error templating cross namespace rules", "err", err)
 			return 1
@@ -864,7 +864,7 @@ func (c *Command) validateFlags() error {
 		return errors.New("-partition must be set if -enable-partitions is true")
 	}
 	if !c.flagEnablePartitions && c.flagPartitionName != "" {
-		return fmt.Errorf("-enable-partitions must be 'true' if setting -partition to %s", c.flagPartitionName)
+		return errors.New("-enable-partitions must be 'true' if -partition is set")
 	}
 	return nil
 }

@@ -36,9 +36,15 @@ service "consul-snapshot" {
    policy = "write"
 }`
 
+// The enterprise license rules are acl="write" inside partitions as operator="write"
+// is unsupported in partitions.
 const entLicenseRules = `operator = "write"`
 const entPartitionLicenseRules = `acl = "write"`
 
+// The partition token is utilized by the partition-init job and server-acl-init in
+// non-default partitions. This token requires permissions to create partitions, read the
+// agent endpoint during startup and have the ability to create an auth-method within a namespace
+// for any partition.
 const partitionRules = `operator = "write"
 agent_prefix "" {
   policy = "read"
@@ -49,7 +55,7 @@ partition_prefix "" {
   }
 }`
 
-func (c *Command) crossNamespaceRule() (string, error) {
+func (c *Command) crossNamespaceRules() (string, error) {
 	crossNamespaceRulesTpl := `{{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
 {{- end }}
