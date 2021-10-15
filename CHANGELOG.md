@@ -10,6 +10,105 @@ IMPROVEMENTS:
   * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
 * Helm Chart
   * Enable adding extra containers to server and client Pods. [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
+  * ACL support for Admin Partitions. **(Consul Enterprise only)**
+  **BETA** [[GH-766](https://github.com/hashicorp/consul-k8s/pull/766)]
+    * This feature now enabled ACL support for Admin Partitions. The server-acl-init job now creates a Partition token. This token
+can be used to bootstrap new partitions as well as manage ACLs in the non-default partitions.
+    * Partition to partition networking is disabled if ACLs are enabled.
+
+To enabled ACLs on the server cluster use the following config:
+```yaml
+global:
+  enableConsulNamespaces: true
+  tls:
+    enabled: true
+  image: hashicorp/consul-enterprise:1.11.0-ent-beta1
+  adminPartitions:
+    enabled: true
+  acls:
+    manageSystemACLs: true
+server:
+  exposeGossipAndRPCPorts: true
+  enterpriseLicense:
+    secretName: license
+    secretKey: key
+  replicas: 1
+connectInject:
+  enabled: true
+  transparentProxy:
+    defaultEnabled: false
+  consulNamespaces:
+    mirroringK8S: true
+controller:
+  enabled: true
+```
+
+Identify the LoadBalancer External IP of the `partition-service`
+```bash
+kubectl get svc consul-consul-partition-service -o json | jq -r '.status.loadBalancer.ingress[0].ip'
+```
+
+Migrate the TLS CA credentials from the server cluster to the workload clusters
+```bash
+kubectl get secret consul-consul-ca-key --context "server-context" -o json | kubectl apply --context "workload-context" -f -
+kubectl get secret consul-consul-ca-cert --context "server-context" -o json | kubectl apply --context "workload-context" -f -
+```
+
+Migrate the Partition token from the server cluster to the workload clusters
+```bash
+kubectl get secret consul-consul-partitions-acl-token --context "server-context" -o json | kubectl apply --context "workload-context" -f -
+```
+
+Identify the Kubernetes AuthMethod URL of the workload cluster to use as the `k8sAuthMethodHost`:
+```bash
+kubectl config view -o "jsonpath={.clusters[?(@.name=='workload-cluster-name')].cluster.server}"
+```
+
+Configure the workload cluster using the following:
+
+```yaml
+global:
+  enabled: false
+  enableConsulNamespaces: true
+  image: hashicorp/consul-enterprise:1.11.0-ent-beta1
+  adminPartitions:
+    enabled: true
+    name: "partition-name"
+  tls:
+    enabled: true
+    caCert:
+      secretName: consul-consul-ca-cert
+      secretKey: tls.crt
+    caKey:
+      secretName: consul-consul-ca-key
+      secretKey: tls.key
+  acls:
+    manageSystemACLs: true
+    bootstrapToken:
+      secretName: consul-consul-partitions-acl-token
+      secretKey: token
+server:
+  enterpriseLicense:
+    secretName: license
+    secretKey: key
+externalServers:
+  enabled: true
+  hosts: [ "loadbalancer IP" ]
+  tlsServerName: server.dc1.consul
+  k8sAuthMethodHost: "authmethod-host IP"
+client:
+  enabled: true
+  exposeGossipPorts: true
+  join: [ "loadbalancer IP" ]
+connectInject:
+  enabled: true
+  consulNamespaces:
+    mirroringK8S: true
+controller:
+  enabled: true
+```
+This should create clusters that have Admin Partitions deployed on them with ACLs enabled.
+
 * CLI
   * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
 
