@@ -42,19 +42,26 @@ spec:
                 path: tls.crt
       {{- end }}
       containers:
-        - name: post-install-job
+        - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
           env:
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if .Values.global.tls.enabled }}
+            {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+            {{- end }}
+          {{- if .Values.global.tls.enabled  }}
           volumeMounts:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
-           {{- end }}
+          {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
