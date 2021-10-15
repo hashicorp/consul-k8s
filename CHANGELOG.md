@@ -113,6 +113,7 @@ This should create clusters that have Admin Partitions deployed on them with ACL
 
 * CLI
   * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
+  * Add `uninstall` command. [[GH-725](https://github.com/hashicorp/consul-k8s/pull/725)]
 
 ## 0.34.1 (September 17, 2021)
 
