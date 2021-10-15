@@ -19,7 +19,6 @@ import (
 // and there's a single consul destination namespace.
 func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	t.Parallel()
-
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
@@ -40,6 +39,8 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-create-inject-token",
+				"-enable-partitions",
+				"-partition=default",
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", consulDestNamespace,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
@@ -160,6 +161,8 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
 				"-create-inject-token",
+				"-enable-partitions",
+				"-partition=default",
 				"-enable-namespaces",
 				"-enable-inject-k8s-namespace-mirroring",
 				"-inject-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
@@ -203,7 +206,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 	}
 }
 
-// Test that ACL policies get updated if namespaces config changes.
+// Test that ACL policies get updated if namespaces/partition config changes.
 func TestRun_ACLPolicyUpdates(t *testing.T) {
 	t.Parallel()
 
@@ -234,9 +237,11 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=anothergw",
 				"-create-controller-token",
 			}
-			// Our second run, we're going to update from namespaces disabled to
-			// namespaces enabled with a single destination ns.
+			// Our second run, we're going to update from partitions and namespaces disabled to
+			// namespaces enabled with a single destination ns and partitions enabled.
 			secondRunArgs := append(firstRunArgs,
+				"-enable-partitions",
+				"-partition=default",
 				"-enable-namespaces",
 				"-consul-sync-destination-namespace=sync",
 				"-consul-inject-destination-namespace=dest")
@@ -322,6 +327,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"gw-terminating-gateway-token",
 				"anothergw-terminating-gateway-token",
 				"controller-token",
+				"partitions-token",
 			}
 			policies, _, err = consul.ACL().PolicyList(nil)
 			require.NoError(err)
@@ -348,10 +354,13 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				case "connect-inject-token":
 					// The connect inject token doesn't have namespace config,
 					// but does change to operator:write from an empty string.
-					require.Contains(actRules, "operator = \"write\"")
+					require.Contains(actRules, "policy = \"write\"")
 				case "client-snapshot-agent-token", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
 					require.NotContains(actRules, "namespace")
+					require.Contains(actRules, "acl = \"write\"")
+				case "partitions-token":
+					require.Contains(actRules, "operator = \"write\"")
 				default:
 					// Assert that the policies have the word namespace in them. This
 					// tests that they were updated. The actual contents are tested
@@ -528,6 +537,8 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-server-port=" + strings.Split(testAgent.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
+				"-enable-partitions",
+				"-partition=default",
 				"-create-inject-token",
 			}
 
@@ -693,6 +704,13 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
 			LocalToken:  false,
 		},
+		"partitions token": {
+			TokenFlags:  []string{"-enable-partitions", "-partition=default"},
+			PolicyNames: []string{"partitions-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-partitions-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
@@ -713,6 +731,8 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-k8s-namespace=" + ns,
+				"-enable-partitions",
+				"-partition=default",
 				"-enable-namespaces",
 			}, c.TokenFlags...)
 
@@ -779,37 +799,43 @@ func TestRun_GatewayNamespaceParsing(t *testing.T) {
 				"gateway-ingress-gateway-token",
 				"another-gateway-ingress-gateway-token"},
 			ExpectedPolicies: []string{`
-namespace "default" {
-  service "ingress" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
-  }
-}`, `
-namespace "default" {
-  service "gateway" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
+partition "default" {
+  namespace "default" {
+    service "ingress" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
 }`, `
-namespace "default" {
-  service "another-gateway" {
-     policy = "write"
+partition "default" {
+  namespace "default" {
+    service "gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
+}`, `
+partition "default" {
+  namespace "default" {
+    service "another-gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
 }`},
 		},
@@ -822,37 +848,43 @@ namespace "default" {
 				"gateway-ingress-gateway-token",
 				"another-gateway-ingress-gateway-token"},
 			ExpectedPolicies: []string{`
-namespace "default" {
-  service "ingress" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
-  }
-}`, `
-namespace "namespace1" {
-  service "gateway" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
+partition "default" {
+  namespace "default" {
+    service "ingress" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
 }`, `
-namespace "namespace2" {
-  service "another-gateway" {
-     policy = "write"
+partition "default" {
+  namespace "namespace1" {
+    service "gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
+}`, `
+partition "default" {
+  namespace "namespace2" {
+    service "another-gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
   }
 }`},
 		},
@@ -865,28 +897,34 @@ namespace "namespace2" {
 				"gateway-terminating-gateway-token",
 				"another-gateway-terminating-gateway-token"},
 			ExpectedPolicies: []string{`
-namespace "default" {
-  service "terminating" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-}`, `
-namespace "default" {
-  service "gateway" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
+partition "default" {
+  namespace "default" {
+    service "terminating" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
 }`, `
-namespace "default" {
-  service "another-gateway" {
-     policy = "write"
+partition "default" {
+  namespace "default" {
+    service "gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
-  node_prefix "" {
-    policy = "read"
+}`, `
+partition "default" {
+  namespace "default" {
+    service "another-gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
 }`},
 		},
@@ -899,28 +937,34 @@ namespace "default" {
 				"gateway-terminating-gateway-token",
 				"another-gateway-terminating-gateway-token"},
 			ExpectedPolicies: []string{`
-namespace "default" {
-  service "terminating" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-}`, `
-namespace "namespace1" {
-  service "gateway" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
+partition "default" {
+  namespace "default" {
+    service "terminating" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
 }`, `
-namespace "namespace2" {
-  service "another-gateway" {
-     policy = "write"
+partition "default" {
+  namespace "namespace1" {
+    service "gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
-  node_prefix "" {
-    policy = "read"
+}`, `
+partition "default" {
+  namespace "namespace2" {
+    service "another-gateway" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
 }`},
 		},
@@ -944,6 +988,8 @@ namespace "namespace2" {
 				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
 				"-resource-prefix=" + resourcePrefix,
 				"-enable-namespaces=true",
+				"-enable-partitions",
+				"-partition=default",
 			}, c.TokenFlags...)
 
 			responseCode := cmd.Run(cmdArgs)
