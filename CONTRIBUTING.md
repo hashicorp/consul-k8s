@@ -1,6 +1,5 @@
 # Contributing to Consul on Kubernetes
 
-# Table of Contents
 1. [Contributing 101](#contributing-101)
     1. [Running Linters Locally](#running-linters-locally)
     2. [Rebasing Contributions against main](#rebasing-contributions-against-main)
@@ -15,14 +14,12 @@
     8. [Updating consul-helm](#updating-consul-helm)
     9. [Testing a new CRD](#testing-a-new-crd)
     10. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
-5. [The the Helm chart](#testing-the-helm-chart)
+5. [Testing the Helm chart](#testing-the-helm-chart)
 6. [Running the tests](#running-the-tests)
      1. [Writing Unit tests](#writing-unit-tests)
      2. [Writing Acceptance tests](#writing-acceptance-tests)
 8. [Helm Reference Docs](#helm-reference-docs)
 
-
----
 
 ## Contributing 101
 
