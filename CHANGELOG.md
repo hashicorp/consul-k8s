@@ -10,15 +10,15 @@ FEATURES:
 IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
+  * CRDs: tune failure backoff so invalid config entries are re-synced more quickly. [[GH-788](https://github.com/hashicorp/consul-k8s/pull/788)]
 * Helm Chart
   * Enable adding extra containers to server and client Pods. [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
   * ACL support for Admin Partitions. **(Consul Enterprise only)**
   **BETA** [[GH-766](https://github.com/hashicorp/consul-k8s/pull/766)]
     * This feature now enabled ACL support for Admin Partitions. The server-acl-init job now creates a Partition token. This token
-can be used to bootstrap new partitions as well as manage ACLs in the non-default partitions.
+      can be used to bootstrap new partitions as well as manage ACLs in the non-default partitions.
     * Partition to partition networking is disabled if ACLs are enabled.
     * Documentation for the installation can be found [here](https://github.com/hashicorp/consul-k8s/blob/main/docs/admin-partitions-with-acls.md).
-
 * CLI
   * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
   * Add `uninstall` command. [[GH-725](https://github.com/hashicorp/consul-k8s/pull/725)]
