@@ -36,7 +36,5 @@ func (r *ServiceDefaultsController) UpdateStatus(ctx context.Context, obj client
 }
 
 func (r *ServiceDefaultsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceDefaults{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceDefaults{}, r)
 }
