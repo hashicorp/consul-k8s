@@ -14,12 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-/* Just using this to play around with the Go debugger. */
-func TestDebugger(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.Run([]string{})
-}
-
 // TestCheckConsulServers creates a fake stateful set and tests the checkConsulServers function.
 func TestCheckConsulServers(t *testing.T) {
 	c := getInitializedCommand(t)
