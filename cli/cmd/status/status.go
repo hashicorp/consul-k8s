@@ -3,10 +3,11 @@ package status
 import (
 	"errors"
 	"fmt"
-	"helm.sh/helm/v3/pkg/release"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"sync"
+
+	"helm.sh/helm/v3/pkg/release"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
@@ -20,15 +21,15 @@ import (
 type Command struct {
 	*common.BaseCommand
 
-	kubernetes 			kubernetes.Interface
+	kubernetes kubernetes.Interface
 
-	set 				*flag.Sets
+	set *flag.Sets
 
-	flagKubeConfig		string
-	flagKubeContext		string
+	flagKubeConfig  string
+	flagKubeContext string
 
-	once 				sync.Once
-	help				string
+	once sync.Once
+	help string
 }
 
 func (c *Command) init() {
@@ -131,11 +132,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(s, terminal.WithSuccessStyle())
 	}
 
-
-
-
-
-
 	return 0
 }
 
@@ -200,11 +196,11 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 
 	valuesYaml, err := yaml.Marshal(rel.Config)
 	if err != nil {
-		c.UI.Output("Config:" + "\n" + "%+v", err, terminal.WithInfoStyle())
+		c.UI.Output("Config:"+"\n"+"%+v", err, terminal.WithInfoStyle())
 	} else if len(rel.Config) == 0 {
-		c.UI.Output("Config: " + string(valuesYaml), terminal.WithInfoStyle())
+		c.UI.Output("Config: "+string(valuesYaml), terminal.WithInfoStyle())
 	} else {
-		c.UI.Output("Config:" + "\n" + string(valuesYaml), terminal.WithInfoStyle())
+		c.UI.Output("Config:"+"\n"+string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Check the status of the hooks.
@@ -219,7 +215,6 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		}
 		c.UI.Output("")
 	}
-
 
 	return nil
 }
@@ -249,7 +244,7 @@ func (c *Command) checkConsulServers(namespace string) (string, error) {
 	desiredReplicas := int(*servers.Items[0].Spec.Replicas)
 	readyReplicas := int(servers.Items[0].Status.ReadyReplicas)
 	if readyReplicas < desiredReplicas {
-		return "", fmt.Errorf("%d/%d Consul servers unhealthy", desiredReplicas - readyReplicas, desiredReplicas)
+		return "", fmt.Errorf("%d/%d Consul servers unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
 	}
 	return fmt.Sprintf("Consul servers healthy (%d/%d)", readyReplicas, desiredReplicas), nil
 }
@@ -268,7 +263,7 @@ func (c *Command) checkConsulClients(namespace string) (string, error) {
 	desiredReplicas := int(clients.Items[0].Status.DesiredNumberScheduled)
 	readyReplicas := int(clients.Items[0].Status.NumberReady)
 	if readyReplicas < desiredReplicas {
-		return "", fmt.Errorf("%d/%d Consul clients unhealthy", desiredReplicas - readyReplicas, desiredReplicas)
+		return "", fmt.Errorf("%d/%d Consul clients unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
 	}
 	return fmt.Sprintf("Consul clients healthy (%d/%d)", readyReplicas, desiredReplicas), nil
 }
