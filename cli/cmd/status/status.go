@@ -70,6 +70,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
+	if err := c.set.Parse(args); err != nil {
+		c.UI.Output(err.Error())
+		return 1
+	}
+
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())
 		return 1
@@ -84,20 +89,9 @@ func (c *Command) Run(args []string) int {
 		settings.KubeContext = c.flagKubeContext
 	}
 
-	// Set up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
-	// The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
-	// use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
-	if c.kubernetes == nil {
-		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
-		if err != nil {
-			c.UI.Output("retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
-			return 1
-		}
-		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
-		if err != nil {
-			c.UI.Output("initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
-			return 1
-		}
+	if err := c.setupKubeClient(settings); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
 	}
 
 	// Setup logger to stream Helm library logs.
@@ -106,11 +100,14 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
-	c.UI.Output("Consul-K8s Status Summary", terminal.WithHeaderStyle())
-	releaseName, namespace, err := c.checkForPreviousInstallations(settings, uiLogger)
+	//c.UI.Output("Consul-K8s Status Summary", terminal.WithHeaderStyle())
+	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
+	} else {
+		//c.UI.Output("Installation name: %s", releaseName, terminal.WithInfoStyle())
+		//c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
 	}
 
 	if err := c.checkHelmInstallation(settings, uiLogger, releaseName, namespace); err != nil {
@@ -135,43 +132,12 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// validateFlags is a helper function that performs sanity checks on the user's provided flags.
+// validateFlags is a helper function that performs checks on the user's provided flags.
 func (c *Command) validateFlags(args []string) error {
-	if err := c.set.Parse(args); err != nil {
-		return err
-	}
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
 	}
 	return nil
-}
-
-// checkForPreviousInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
-// "consul", and returns the release name and namespace if found, or an error if not found.
-func (c *Command) checkForPreviousInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (string, string, error) {
-	// Need a specific action config to call helm list, where namespace is NOT specified.
-	listConfig := new(action.Configuration)
-	if err := listConfig.Init(settings.RESTClientGetter(), "",
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		return "", "", fmt.Errorf("couldn't initialize helm config: %s", err)
-	}
-
-	lister := action.NewList(listConfig)
-	lister.AllNamespaces = true
-	res, err := lister.Run()
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't check for installations: %s", err)
-	}
-
-	for _, rel := range res {
-		if rel.Chart.Metadata.Name == "consul" {
-			c.UI.Output("Installation name: %s", rel.Name, terminal.WithInfoStyle())
-			c.UI.Output("Namespace: %s", rel.Namespace, terminal.WithInfoStyle())
-			return rel.Name, rel.Namespace, nil
-		}
-	}
-	c.UI.Output("Consul installation found.", terminal.WithSuccessStyle())
-	return "", "", errors.New("couldn't find installation")
 }
 
 // checkHelmInstallation uses the helm Go SDK to depict the status of a named release. This function then prints
@@ -179,9 +145,9 @@ func (c *Command) checkForPreviousInstallations(settings *helmCLI.EnvSettings, u
 func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) error {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
-	if err := statusConfig.Init(settings.RESTClientGetter(), namespace,
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		return fmt.Errorf("couldn't initialize helm config: %s", err)
+	statusConfig, err := common.InitActionConfig(statusConfig, namespace, settings, uiLogger)
+	if err != nil {
+		return err
 	}
 
 	statuser := action.NewStatus(statusConfig)
@@ -190,17 +156,45 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
 
-	c.UI.Output("Status: %s", rel.Info.Status, terminal.WithInfoStyle())
-	c.UI.Output("Version: %d", rel.Version, terminal.WithInfoStyle())
-	c.UI.Output("Time Deployed: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
+	//c.UI.Output("Status: %s", rel.Info.Status, terminal.WithInfoStyle())
+	//c.UI.Output("Chart Version: %s", rel.Chart.Metadata.Version, terminal.WithInfoStyle())
+	//c.UI.Output("App Version: %s", rel.Chart.Metadata.AppVersion, terminal.WithInfoStyle())
+	//c.UI.Output("Revision: %d", rel.Version, terminal.WithInfoStyle())
+	//c.UI.Output("Last Updated: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
+
+	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion"}...)
+	trow := []terminal.TableEntry{
+		{
+			Value: releaseName,
+		},
+		{
+			Value: namespace,
+		},
+		{
+			Value: string(rel.Info.Status),
+		},
+		{
+			Value: rel.Chart.Metadata.Version,
+		},
+		{
+			Value: rel.Chart.Metadata.AppVersion,
+		},
+	}
+	tbl.Rows = [][]terminal.TableEntry{}
+	tbl.Rows = append(tbl.Rows, trow)
+
+	c.UI.Table(tbl)
+	fmt.Println()
+	c.UI.Output("Last Updated: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
 
 	valuesYaml, err := yaml.Marshal(rel.Config)
+	c.UI.Output("Config:", terminal.WithHeaderStyle())
 	if err != nil {
-		c.UI.Output("Config:"+"\n"+"%+v", err, terminal.WithInfoStyle())
+		c.UI.Output("%+v", err, terminal.WithInfoStyle())
 	} else if len(rel.Config) == 0 {
-		c.UI.Output("Config: "+string(valuesYaml), terminal.WithInfoStyle())
+		c.UI.Output(string(valuesYaml), terminal.WithInfoStyle())
 	} else {
-		c.UI.Output("Config:"+"\n"+string(valuesYaml), terminal.WithInfoStyle())
+		c.UI.Output(string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Check the status of the hooks.
@@ -266,6 +260,26 @@ func (c *Command) checkConsulClients(namespace string) (string, error) {
 		return "", fmt.Errorf("%d/%d Consul clients unhealthy", desiredReplicas-readyReplicas, desiredReplicas)
 	}
 	return fmt.Sprintf("Consul clients healthy (%d/%d)", readyReplicas, desiredReplicas), nil
+}
+
+/// setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
+// settings.RESTClientGetter for its calls as well, so this will use a consistent method to
+// target the right cluster for both Helm SDK and non Helm SDK calls.
+func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
+	if c.kubernetes == nil {
+		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
+		if err != nil {
+			c.UI.Output("Retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
+			return err
+		}
+		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			c.UI.Output("Initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *Command) Help() string {

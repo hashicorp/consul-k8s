@@ -14,36 +14,13 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-
-// getInitializedCommand sets up a command struct for tests.
-func getInitializedCommand(t *testing.T) *Command {
-	t.Helper()
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "cli",
-		Level:  hclog.Info,
-		Output: os.Stdout,
-	})
-	ctx, _ := context.WithCancel(context.Background())
-
-	baseCommand := &common.BaseCommand{
-		Ctx: ctx,
-		Log: log,
-	}
-
-	c := &Command{
-		BaseCommand: baseCommand,
-	}
-	c.init()
-	return c
-}
-
 /* Just using this to play around with the Go debugger. */
 func TestDebugger(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.Run([]string{})
 }
 
-//Any feedback on this test is much appreciated! My first time using the K8s Testing library. -- Saad.
+// TestCheckConsulServers creates a fake stateful set and tests the checkConsulServers function.
 func TestCheckConsulServers(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
@@ -124,7 +101,7 @@ func TestCheckConsulServers(t *testing.T) {
 	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul servers unhealthy", 1, replicas))
 }
 
-// This test is very similar to TestCheckConsulServers() in structure.
+// TestCheckConsulClients is very similar to TestCheckConsulServers() in structure.
 func TestCheckConsulClients(t *testing.T) {
 	c := getInitializedCommand(t)
 	c.kubernetes = fake.NewSimpleClientset()
@@ -193,4 +170,24 @@ func TestCheckConsulClients(t *testing.T) {
 	_, err = c.checkConsulClients("default")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), fmt.Sprintf("%d/%d Consul clients unhealthy", 1, desired))
+}
+
+// getInitializedCommand sets up a command struct for tests.
+func getInitializedCommand(t *testing.T) *Command {
+	t.Helper()
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "cli",
+		Level:  hclog.Info,
+		Output: os.Stdout,
+	})
+
+	baseCommand := &common.BaseCommand{
+		Log: log,
+	}
+
+	c := &Command{
+		BaseCommand: baseCommand,
+	}
+	c.init()
+	return c
 }

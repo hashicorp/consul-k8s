@@ -2,6 +2,7 @@ package common
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,4 +95,30 @@ func InitActionConfig(actionConfig *action.Configuration, namespace string, sett
 		return nil, fmt.Errorf("error setting up helm action configuration to find existing installations: %s", err)
 	}
 	return actionConfig, nil
+}
+
+// CheckForPreviousInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
+// "consul", and returns the release name and namespace if found, or an error if not found.
+func CheckForInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (string, string, error) {
+	// Need a specific action config to call helm list, where namespace is NOT specified.
+	listConfig := new(action.Configuration)
+	if err := listConfig.Init(settings.RESTClientGetter(), "",
+		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
+		return "", "", fmt.Errorf("couldn't initialize helm config: %s", err)
+	}
+
+	lister := action.NewList(listConfig)
+	lister.AllNamespaces = true
+	lister.StateMask = action.ListAll
+	res, err := lister.Run()
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't check for installations: %s", err)
+	}
+
+	for _, rel := range res {
+		if rel.Chart.Metadata.Name == "consul" {
+			return rel.Name, rel.Namespace, nil
+		}
+	}
+	return "", "", errors.New("couldn't find installation")
 }
