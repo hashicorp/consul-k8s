@@ -91,7 +91,7 @@ func TestHasBeenInjected(t *testing.T) {
 		{
 			name: "Pod with injected annotation",
 			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				return *pod1
 			},
 			expected: true,
@@ -99,7 +99,7 @@ func TestHasBeenInjected(t *testing.T) {
 		{
 			name: "Pod without injected annotation",
 			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", false, true)
+				pod1 := createPod("pod1", "1.2.3.4", false, true, true)
 				return *pod1
 			},
 			expected: false,
@@ -165,7 +165,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 		DenyK8sNamespacesSet:  mapset.NewSetWith(),
 	}
 
-	pod := createPod("pod1", "1.2.3.4", true, true)
+	pod := createPod("pod1", "1.2.3.4", true, true, true)
 	pod.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 
 	upstreams, err := ep.processUpstreams(*pod)
@@ -193,23 +193,21 @@ func TestProcessUpstreams(t *testing.T) {
 		configEntry             func() api.ConfigEntry
 		consulUnavailable       bool
 		consulNamespacesEnabled bool
-		consulPartitionsEnabled bool
 	}{
 		{
 			name: "upstream with datacenter without ProxyDefaults",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
 			expErr:                  "upstream \"upstream1:1234:dc1\" is invalid: there is no ProxyDefaults config to set mesh gateway mode",
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults whose mesh gateway mode is not local or remote",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -221,12 +219,11 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway is in local mode",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -245,12 +242,11 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "upstream with datacenter with ProxyDefaults and mesh gateway in remote mode",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -269,12 +265,11 @@ func TestProcessUpstreams(t *testing.T) {
 				return pd
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "when consul is unavailable, we don't return an error",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234:dc1"
 				return pod1
 			},
@@ -295,12 +290,11 @@ func TestProcessUpstreams(t *testing.T) {
 			},
 			consulUnavailable:       true,
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "single upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream:1234"
 				return pod1
 			},
@@ -312,12 +306,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "single upstream with namespace",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream.foo:1234"
 				return pod1
 			},
@@ -330,12 +323,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: true,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "single upstream with namespace and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream.foo.bar:1234"
 				return pod1
 			},
@@ -349,12 +341,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: true,
-			consulPartitionsEnabled: true,
 		},
 		{
 			name: "multiple upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2:2234"
 				return pod1
 			},
@@ -371,12 +362,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "multiple upstreams with consul namespaces, partitions and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2.bar:2234, upstream3.foo.baz:3234:dc2"
 				return pod1
 			},
@@ -407,12 +397,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: true,
-			consulPartitionsEnabled: true,
 		},
 		{
 			name: "multiple upstreams with consul namespaces and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234, upstream2.bar:2234, upstream3.foo:3234:dc2"
 				return pod1
 			},
@@ -446,7 +435,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "prepared query upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234"
 				return pod1
 			},
@@ -458,12 +447,11 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "prepared query and non-query upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationUpstreams] = "prepared_query:queryname:1234, upstream1:2234, prepared_query:6687bd19-5654-76be-d764:8202"
 				return pod1
 			},
@@ -485,7 +473,6 @@ func TestProcessUpstreams(t *testing.T) {
 				},
 			},
 			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 	}
 	for _, tt := range cases {
@@ -521,7 +508,6 @@ func TestProcessUpstreams(t *testing.T) {
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSetWith(),
 				EnableConsulNamespaces: tt.consulNamespacesEnabled,
-				EnableConsulPartitions: tt.consulPartitionsEnabled,
 			}
 
 			upstreams, err := ep.processUpstreams(*tt.pod())
@@ -580,7 +566,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Basic endpoints",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -648,8 +634,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Endpoints with multiple addresses",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
+				pod2 := createPod("pod2", "2.2.3.4", true, true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -760,8 +746,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Endpoints with multiple addresses but one is invalid",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
+				pod2 := createPod("pod2", "2.2.3.4", true, true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -881,7 +867,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationPort] = "1234"
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				pod1.Annotations[fmt.Sprintf("%sname", annotationMeta)] = "abc"
@@ -985,7 +971,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			// code gets the agent pods via the label component=client, and
 			// makes requests against the agent API, it will actually hit the
 			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Add the default namespace.
@@ -1065,6 +1051,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceName, instance.ServiceName)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceProxy, instance.ServiceProxy)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
 
@@ -1139,7 +1126,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Legacy service: Health check is added when the pod is healthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, false)
+				pod1 := createPod("pod1", "1.2.3.4", true, false, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1210,7 +1197,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Legacy service: Health check is added when the pod is unhealthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, false)
+				pod1 := createPod("pod1", "1.2.3.4", true, false, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1281,7 +1268,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Legacy service: Service health check is updated when the pod goes from healthy --> unhealthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, false)
+				pod1 := createPod("pod1", "1.2.3.4", true, false, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1360,7 +1347,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Legacy service: Service health check is updated when the pod goes from unhealthy --> healthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, false)
+				pod1 := createPod("pod1", "1.2.3.4", true, false, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1439,7 +1426,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address because health check changes from unhealthy to healthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1520,7 +1507,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address because health check changes from healthy to unhealthy",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1601,7 +1588,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has an updated address (pod IP change).",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "4.4.4.4", true, true)
+				pod1 := createPod("pod1", "4.4.4.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1673,7 +1660,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Endpoints has an updated address (pod IP change).",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "4.4.4.4", true, true)
+				pod1 := createPod("pod1", "4.4.4.4", true, true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1746,8 +1733,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Endpoints has additional address not in Consul",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
-				pod2 := createPod("pod2", "2.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
+				pod2 := createPod("pod2", "2.2.3.4", true, true, true)
 				endpointWithTwoAddresses := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1845,7 +1832,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -1926,7 +1913,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "Different Consul service name: Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "different-consul-svc-name",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2122,7 +2109,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "ACLs enabled: Endpoints has an updated address because the target pod changes",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod2 := createPod("pod2", "4.4.4.4", true, true)
+				pod2 := createPod("pod2", "4.4.4.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2207,7 +2194,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			name:          "ACLs enabled: Consul has instances that are not in the Endpoints addresses",
 			consulSvcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
-				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1 := createPod("pod1", "1.2.3.4", true, true, true)
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -2326,7 +2313,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			// code gets the agent pods via the label component=client, and
 			// makes requests against the agent API, it will actually hit the
 			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Add the default namespace.
@@ -2445,7 +2432,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					require.NoError(t, err)
 					require.EqualValues(t, len(check), 1)
 					// Ignoring Namespace because the response from ENT includes it and OSS does not.
-					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
+					var ignoredFields = []string{"Node", "Definition", "Namespace"}
 					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
 				}
 			}
@@ -2614,7 +2601,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// code gets the agent pods via the label component=client, and
 			// makes requests against the agent API, it will actually hit the
 			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 
 			// Add the default namespace.
@@ -4671,7 +4658,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			pod := createPod("test-pod-1", "1.2.3.4", true, true)
+			pod := createPod("test-pod-1", "1.2.3.4", true, true, true)
 			if c.podAnnotations != nil {
 				pod.Annotations = c.podAnnotations
 			}
@@ -4761,7 +4748,14 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 	}
 }
 
-func createPod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
+func createPod(name, ip string, inject bool, managedByEndpointsController bool, ready bool) *corev1.Pod {
+	condition := func() corev1.ConditionStatus {
+		if ready {
+			return corev1.ConditionTrue
+		} else {
+			return corev1.ConditionFalse
+		}
+	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -4772,6 +4766,12 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 		Status: corev1.PodStatus{
 			PodIP:  ip,
 			HostIP: "127.0.0.1",
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: condition(),
+				},
+			},
 		},
 	}
 	if inject {

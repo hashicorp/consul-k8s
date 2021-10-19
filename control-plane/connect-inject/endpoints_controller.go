@@ -679,6 +679,18 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
 	for _, agent := range agents.Items {
+
+		ready := false
+		for _, status := range agent.Status.Conditions {
+			if status.Type == corev1.PodReady {
+				ready = status.Status == corev1.ConditionTrue
+			}
+		}
+		if !ready {
+			r.Log.Info("Consul agent is not ready, skipping sync", "consul-agent", agent.Name)
+			continue
+		}
+
 		client, err := r.remoteConsulClient(agent.Status.PodIP, r.consulNamespace(k8sSvcNamespace))
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", agent.Status.PodIP)
