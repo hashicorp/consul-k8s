@@ -978,3 +978,129 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# extraVolumes
+
+@test "syncCatalog/Deployment: adds extra configMap volume" {
+  cd `chart_dir`
+
+  # Test that it defines it
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraVolumes[0].type=configMap' \
+      --set 'syncCatalog.extraVolumes[0].name=foo' \
+      . | tee /dev/stderr |
+      yq -r -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.configMap.name' | tee /dev/stderr)
+  [ "$actual" = "foo" ]
+
+  local actual=$(echo $object |
+      yq -r '.configMap.secretName' | tee /dev/stderr)
+  [ "$actual" = "null" ]
+
+  # Test that it mounts it
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraVolumes[0].type=configMap' \
+      --set 'syncCatalog.extraVolumes[0].name=foo' \
+      . | tee /dev/stderr |
+      yq -r -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/userconfig/foo" ]
+}
+
+@test "syncCatalog/Deployment: adds extra secret volume" {
+  cd `chart_dir`
+
+  # Test that it defines it
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraVolumes[0].type=secret' \
+      --set 'syncCatalog.extraVolumes[0].name=foo' \
+      . | tee /dev/stderr |
+      yq -r -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.secret.name' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object |
+      yq -r '.secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+
+  # Test that it mounts it
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraVolumes[0].type=secret' \
+      --set 'syncCatalog.extraVolumes[0].name=foo' \
+      . | tee /dev/stderr |
+      yq -r -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.readOnly' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.mountPath' | tee /dev/stderr)
+  [ "${actual}" = "/consul/userconfig/foo" ]
+}
+
+@test "syncCatalog/Deployment: adds extra secret volume with items" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraVolumes[0].type=secret' \
+      --set 'syncCatalog.extraVolumes[0].name=foo' \
+      --set 'syncCatalog.extraVolumes[0].items[0].key=key' \
+      --set 'syncCatalog.extraVolumes[0].items[0].path=path' \
+      . | tee /dev/stderr |
+      yq -c -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+  [ "${actual}" = "{\"name\":\"userconfig-foo\",\"secret\":{\"secretName\":\"foo\",\"items\":[{\"key\":\"key\",\"path\":\"path\"}]}}" ]
+}
+
+#--------------------------------------------------------------------
+# extraEnvironmentVariables
+
+@test "syncCatalog/Deployment: add custom environment variable with value" {
+  cd `chart_dir`
+
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraEnvironmentVars.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "foo")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+@test "syncCatalog/Deployment: add custom environment variable with value reference" {
+  cd `chart_dir`
+
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.extraEnvironmentVars.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "foo")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

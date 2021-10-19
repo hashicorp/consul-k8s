@@ -1496,6 +1496,26 @@ syncCatalog:
   # @type: map
   extraLabels: null
 
+  # A list of extra volumes to mount. These will be exposed to Consul in the path `/consul/userconfig/<name>/`.
+  #
+  # Example:
+  #
+  # ```yaml
+  # extraVolumes:
+  #   - type: secret
+  #     name: my-secret
+  #     items: # optional items array
+  #       - key: key
+  #         path: path # secret will now mount to /consul/userconfig/my-secret/path
+  # ```
+  # @type: array<map>
+  extraVolumes: []
+
+  # A set of extra environment variables to set within the sync catalog container.
+  # These can be used to configure custom Consul parameters.
+  # @type: map
+  extraEnvironmentVars: {}
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from

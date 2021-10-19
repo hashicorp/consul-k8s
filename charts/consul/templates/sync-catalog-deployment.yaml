@@ -33,8 +33,9 @@ spec:
         "consul.hashicorp.com/connect-inject": "false"
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
-      {{- if .Values.global.tls.enabled }}
+      {{- if or .Values.global.tls.enabled .Values.syncCatalog.extraVolumes }}
       volumes:
+      {{- if .Values.global.tls.enabled }}
       {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       - name: consul-ca-cert
         secret:
@@ -51,6 +52,23 @@ spec:
       - name: consul-auto-encrypt-ca-cert
         emptyDir:
           medium: "Memory"
+      {{- end }}
+      {{- end }}
+      {{- range .Values.syncCatalog.extraVolumes }}
+      - name: userconfig-{{ .name }}
+        {{ .type }}:
+          {{- if (eq .type "configMap") }}
+          name: {{ .name }}
+          {{- else if (eq .type "secret") }}
+          secretName: {{ .name }}
+          {{- end }}
+          {{- with .items }}
+          items:
+          {{- range . }}
+          - key: {{ .key }}
+            path: {{ .path }}
+          {{- end }}
+          {{- end }}
       {{- end }}
       {{- end }}
       containers:
@@ -98,8 +116,10 @@ spec:
               value: http://{{ template "consul.fullname" . }}-server:8500
             {{- end }}
             {{- end }}
-          {{- if .Values.global.tls.enabled }}
+          {{- include "consul.extraEnvironmentVars" .Values.syncCatalog | nindent 12 }}
+          {{- if or .Values.global.tls.enabled .Values.syncCatalog.extraVolumes}}
           volumeMounts:
+            {{- if .Values.global.tls.enabled }}
             {{- if (and .Values.global.tls.enableAutoEncrypt $clientEnabled) }}
             - name: consul-auto-encrypt-ca-cert
             {{- else }}
@@ -107,6 +127,12 @@ spec:
             {{- end }}
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
+            {{- range .Values.syncCatalog.extraVolumes }}
+            - name: userconfig-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
           {{- end }}
           command:
             - "/bin/sh"
