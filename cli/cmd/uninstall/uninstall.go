@@ -321,6 +321,7 @@ func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (
 	lister.All = true
 	if c.flagNamespace == defaultAllNamespaces {
 		lister.AllNamespaces = true
+		lister.StateMask = action.ListAll
 	}
 	res, err := lister.Run()
 	if err != nil {

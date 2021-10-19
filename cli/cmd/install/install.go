@@ -169,12 +169,7 @@ func (c *Command) Run(args []string) int {
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
 
-	defer func() {
-		if err := c.Close(); err != nil {
-			c.Log.Error(err.Error())
-			os.Exit(1)
-		}
-	}()
+	defer common.CloseWithError(c.BaseCommand)
 
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())

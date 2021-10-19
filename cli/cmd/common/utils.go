@@ -120,5 +120,12 @@ func CheckForInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugL
 			return rel.Name, rel.Namespace, nil
 		}
 	}
-	return "", "", errors.New("couldn't find installation")
+	return "", "", errors.New("couldn't find consul installation")
+}
+
+func CloseWithError(c *BaseCommand) {
+	if err := c.Close(); err != nil {
+		c.Log.Error(err.Error())
+		os.Exit(1)
+	}
 }

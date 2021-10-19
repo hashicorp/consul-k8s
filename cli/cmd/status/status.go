@@ -3,7 +3,6 @@ package status
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"helm.sh/helm/v3/pkg/release"
@@ -63,12 +62,7 @@ func (c *Command) Run(args []string) int {
 	// The logger is initialized in main with the name cli. Here, we reset the name to status so log lines would be prefixed with status.
 	c.Log.ResetNamed("status")
 
-	defer func() {
-		if err := c.Close(); err != nil {
-			c.Log.Error(err.Error())
-			os.Exit(1)
-		}
-	}()
+	defer common.CloseWithError(c.BaseCommand)
 
 	if err := c.set.Parse(args); err != nil {
 		c.UI.Output(err.Error())
@@ -162,7 +156,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 	//c.UI.Output("Revision: %d", rel.Version, terminal.WithInfoStyle())
 	//c.UI.Output("Last Updated: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
 
-	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion"}...)
+	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion", "Revision"}...)
 	trow := []terminal.TableEntry{
 		{
 			Value: releaseName,
@@ -178,6 +172,9 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		},
 		{
 			Value: rel.Chart.Metadata.AppVersion,
+		},
+		{
+			Value: string(rel.Version),
 		},
 	}
 	tbl.Rows = [][]terminal.TableEntry{}
