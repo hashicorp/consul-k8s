@@ -2103,7 +2103,6 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 		}
 	})
 	require.NoError(t, err)
-	secondarySvr.WaitForLeader(t)
 
 	// Our consul client will use the secondary dc.
 	clientToken := bootToken
@@ -2126,6 +2125,8 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	// WAN join primary to the secondary
 	err = consul.Agent().Join(secondarySvr.WANAddr, true)
 	require.NoError(t, err)
+
+	secondarySvr.WaitForLeader(t)
 
 	// Overwrite consul client, pointing it to the secondary DC
 	consul, err = api.NewClient(&api.Config{
