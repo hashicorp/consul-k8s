@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.35.0 (October 19, 2021)
 
 FEATURES:
 * Control Plane
