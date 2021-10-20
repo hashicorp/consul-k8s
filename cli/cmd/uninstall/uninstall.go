@@ -183,13 +183,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	found, foundReleaseName, foundReleaseNamespace, err := c.findExistingInstallation(actionConfig)
+	found, foundReleaseName, foundReleaseNamespace, err := c.findExistingInstallation(settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
-	}
-	if !found {
-		c.UI.Output("No existing Consul installations.", terminal.WithSuccessStyle())
 	} else {
 		c.UI.Output("Existing Consul installation found.", terminal.WithSuccessStyle())
 		c.UI.Output("Consul Uninstall Summary", terminal.WithHeaderStyle())
@@ -315,42 +312,16 @@ func (c *Command) Synopsis() string {
 	return "Uninstall Consul deployment."
 }
 
-func (c *Command) findExistingInstallation(actionConfig *action.Configuration) (bool, string, string, error) {
-	lister := action.NewList(actionConfig)
-	// lister.All will search for helm installations in all states, such as deployed, pending, uninstalling, etc.
-	lister.All = true
-	if c.flagNamespace == defaultAllNamespaces {
-		lister.AllNamespaces = true
-		lister.StateMask = action.ListAll
-	}
-	res, err := lister.Run()
+func (c *Command) findExistingInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (bool, string, string, error) {
+	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
-		return false, "", "", fmt.Errorf("error finding existing installations: %s", err)
+		return false, "", "", err
+	} else if (c.flagNamespace != defaultAllNamespaces && c.flagNamespace == namespace) ||
+		(c.flagNamespace == defaultAllNamespaces) {
+		return true, releaseName, namespace, nil
+	} else {
+		return false, "", "", fmt.Errorf("could not find consul installation in namespace %s", c.flagNamespace)
 	}
-
-	found := false
-	foundReleaseName := ""
-	foundReleaseNamespace := ""
-	for _, rel := range res {
-		if rel.Chart.Metadata.Name == "consul" {
-			if c.flagNamespace != defaultAllNamespaces && c.flagNamespace == rel.Namespace {
-				// If we found a chart named "consul" and -namespace was specified, we only found the release if the
-				// release namespace matches the -namespace flag.
-				found = true
-				foundReleaseName = rel.Name
-				foundReleaseNamespace = rel.Namespace
-				break
-			}
-			if c.flagNamespace == defaultAllNamespaces {
-				found = true
-				foundReleaseName = rel.Name
-				foundReleaseNamespace = rel.Namespace
-				break
-			}
-		}
-	}
-
-	return found, foundReleaseName, foundReleaseNamespace, nil
 }
 
 // deletePVCs deletes any pvcs that have the label release={{foundReleaseName}} and waits for them to be deleted.

@@ -95,7 +95,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
-	//c.UI.Output("Consul-K8s Status Summary", terminal.WithHeaderStyle())
 	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
