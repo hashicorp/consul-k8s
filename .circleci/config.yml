@@ -866,9 +866,9 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-      - slack/status:
-          fail_only: true
-          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   update-helm-charts-index:
     docker:
@@ -982,6 +982,10 @@ workflows:
       - acceptance-tproxy
       - acceptance-kind-1-22
   test-and-build-4:
+    jobs:
+      - acceptance-tproxy
+      - acceptance-kind-1-22
+  test-and-build-5:
     jobs:
       - acceptance-tproxy
       - acceptance-kind-1-22
