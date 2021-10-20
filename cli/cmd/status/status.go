@@ -169,7 +169,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 			Value: strconv.Itoa(rel.Version),
 		},
 		{
-			Value: rel.Info.LastDeployed.Format("YYYY/MM/DD HH:MM:SS"),
+			Value: rel.Info.LastDeployed.Format("2006/01/02 15:04:05"),
 		},
 	}
 	tbl.Rows = [][]terminal.TableEntry{}
