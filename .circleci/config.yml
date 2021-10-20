@@ -972,14 +972,18 @@ workflows:
 #            - unit-acceptance-framework
 #            - unit-cli
       - acceptance-tproxy
-      - acceptance-tproxy
-      - acceptance-tproxy
-      - acceptance-tproxy
+      - acceptance-kind-1-22
+  test-and-build-2:
+    jobs:
       - acceptance-tproxy
       - acceptance-kind-1-22
+  test-and-build-3:
+    jobs:
+      - acceptance-tproxy
       - acceptance-kind-1-22
-      - acceptance-kind-1-22
-      - acceptance-kind-1-22
+  test-and-build-4:
+    jobs:
+      - acceptance-tproxy
       - acceptance-kind-1-22
   nightly-acceptance-tests:
     triggers:
