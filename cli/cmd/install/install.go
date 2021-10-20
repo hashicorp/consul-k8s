@@ -211,7 +211,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-
 	c.UI.Output("Pre-Install Checks", terminal.WithHeaderStyle())
 
 	// Note the logic here, common's CheckForPreviousInstallations function returns an error if

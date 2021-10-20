@@ -25,20 +25,19 @@ func TestCheckConsulServers(t *testing.T) {
 	require.Contains(t, err.Error(), "no server stateful set found")
 
 	// Next create a stateful set with 3 desired replicas and 3 ready replicas.
-	var replicas int32
-	replicas = 3
+	var replicas int32 = 3
 
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-server-test1",
+			Name:      "consul-server-test1",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm", "component": "server"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 		},
 		Status: appsv1.StatefulSetStatus{
-			Replicas: replicas,
+			Replicas:      replicas,
 			ReadyReplicas: replicas,
 		},
 	}
@@ -53,15 +52,15 @@ func TestCheckConsulServers(t *testing.T) {
 	// If you then create another stateful set it should error.
 	ss2 := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-server-test2",
+			Name:      "consul-server-test2",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm", "component": "server"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 		},
 		Status: appsv1.StatefulSetStatus{
-			Replicas: replicas,
+			Replicas:      replicas,
 			ReadyReplicas: replicas,
 		},
 	}
@@ -76,15 +75,15 @@ func TestCheckConsulServers(t *testing.T) {
 
 	ss3 := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-server-test3",
+			Name:      "consul-server-test3",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm", "component": "server"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 		},
 		Status: appsv1.StatefulSetStatus{
-			Replicas: replicas,
+			Replicas:      replicas,
 			ReadyReplicas: replicas - 1, // Let's just set one of the servers to unhealthy
 		},
 	}
@@ -106,17 +105,17 @@ func TestCheckConsulClients(t *testing.T) {
 	require.Contains(t, err.Error(), "no client daemon set found")
 
 	// Next create a daemon set.
-	var desired int32
-	desired = 3
+	var desired int32 = 3
+
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-client-test1",
+			Name:      "consul-client-test1",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
 		},
 		Status: appsv1.DaemonSetStatus{
 			DesiredNumberScheduled: desired,
-			NumberReady: desired,
+			NumberReady:            desired,
 		},
 	}
 
@@ -130,13 +129,13 @@ func TestCheckConsulClients(t *testing.T) {
 	// Creating another daemon set should cause an error.
 	ds2 := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-client-test2",
+			Name:      "consul-client-test2",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
 		},
 		Status: appsv1.DaemonSetStatus{
 			DesiredNumberScheduled: desired,
-			NumberReady: desired,
+			NumberReady:            desired,
 		},
 	}
 	c.kubernetes.AppsV1().DaemonSets("default").Create(context.Background(), ds2, metav1.CreateOptions{})
@@ -150,13 +149,13 @@ func TestCheckConsulClients(t *testing.T) {
 
 	ds3 := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:	   "consul-client-test2",
+			Name:      "consul-client-test2",
 			Namespace: "default",
-			Labels: map[string]string{"app":"consul", "chart": "consul-helm"},
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm"},
 		},
 		Status: appsv1.DaemonSetStatus{
 			DesiredNumberScheduled: desired,
-			NumberReady: desired - 1,
+			NumberReady:            desired - 1,
 		},
 	}
 	c.kubernetes.AppsV1().DaemonSets("default").Create(context.Background(), ds3, metav1.CreateOptions{})
