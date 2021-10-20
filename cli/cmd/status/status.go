@@ -3,6 +3,7 @@ package status
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 
 	"helm.sh/helm/v3/pkg/release"
@@ -99,9 +100,6 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
-	} else {
-		//c.UI.Output("Installation name: %s", releaseName, terminal.WithInfoStyle())
-		//c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
 	}
 
 	if err := c.checkHelmInstallation(settings, uiLogger, releaseName, namespace); err != nil {
@@ -150,13 +148,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
 
-	//c.UI.Output("Status: %s", rel.Info.Status, terminal.WithInfoStyle())
-	//c.UI.Output("Chart Version: %s", rel.Chart.Metadata.Version, terminal.WithInfoStyle())
-	//c.UI.Output("App Version: %s", rel.Chart.Metadata.AppVersion, terminal.WithInfoStyle())
-	//c.UI.Output("Revision: %d", rel.Version, terminal.WithInfoStyle())
-	//c.UI.Output("Last Updated: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
-
-	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion", "Revision"}...)
+	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion", "Revision", "Last Updated"}...)
 	trow := []terminal.TableEntry{
 		{
 			Value: releaseName,
@@ -174,15 +166,16 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 			Value: rel.Chart.Metadata.AppVersion,
 		},
 		{
-			Value: string(rel.Version),
+			Value: strconv.Itoa(rel.Version),
+		},
+		{
+			Value: rel.Info.LastDeployed.Format("YYYY/MM/DD HH:MM:SS"),
 		},
 	}
 	tbl.Rows = [][]terminal.TableEntry{}
 	tbl.Rows = append(tbl.Rows, trow)
 
 	c.UI.Table(tbl)
-	fmt.Println()
-	c.UI.Output("Last Updated: %v", rel.Info.LastDeployed, terminal.WithInfoStyle())
 
 	valuesYaml, err := yaml.Marshal(rel.Config)
 	c.UI.Output("Config:", terminal.WithHeaderStyle())
