@@ -264,7 +264,7 @@ func (v *VaultCluster) Create(t *testing.T) {
 	// step 1: install Vault
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
 	// Wait for the injector pod to become Ready.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("app.kubernetes.io/name=vault-agent-injector"))
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
 	// Wait for the Server Pod to be online, it will not be Ready because it has not been Init+Unseal'd yet, this is done
 	// in the Bootstrap method.
 	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
