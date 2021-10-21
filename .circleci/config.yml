@@ -864,9 +864,9 @@ jobs:
           path: /tmp/test-results
       - store_artifacts:
           path: /tmp/test-results
-#      - slack/status:
-#          fail_only: true
-#          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+      - slack/status:
+          fail_only: true
+          failure_message: "Acceptance tests against Kind with Kubernetes v1.22 failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   update-helm-charts-index:
     docker:
@@ -901,7 +901,7 @@ workflows:
   version: 2
   test-and-build:
     jobs:
-#      # Fmt, vet, lint control plane and helm code
+      # Fmt, vet, lint control plane and helm code
       - go-fmt-and-vet-control-plane
       - lint-control-plane
       - go-fmt-and-vet-acceptance
