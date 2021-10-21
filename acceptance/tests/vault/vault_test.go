@@ -12,15 +12,14 @@ import (
 // Installs Vault, bootstraps it with the kube auth method
 // and then validates that the KV2 secrets engine is online
 // and the Kube Auth Method is enabled.
-func TestVault_CreateAndBootstrap(t *testing.T) {
+func TestVault_Create(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
 	vaultReleaseName := helpers.RandomName()
-	vaultCluster := vault.NewHelmCluster(t, nil, ctx, cfg, vaultReleaseName)
-	vaultCluster.Create(t)
-	vaultCluster.Bootstrap(t, ctx)
-	logger.Log(t, "Finished Bootstrap")
+	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
+	vaultCluster.Create(t, ctx)
+	logger.Log(t, "Finished Installing and Bootstrapping")
 
 	vaultClient := vaultCluster.VaultClient(t)
 
