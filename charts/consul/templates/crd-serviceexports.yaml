@@ -1,0 +1,137 @@
+{{- if .Values.controller.enabled }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: serviceexports.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: ServiceExports
+    listKind: ServiceExportsList
+    plural: serviceexports
+    singular: serviceexports
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServiceExports is the Schema for the serviceexports API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceExportsSpec defines the desired state of ServiceExports
+            properties:
+              services:
+                description: Services is a list of services to be exported and the
+                  list of partitions to expose them to.
+                items:
+                  description: ExportedService manages the exporting of a service
+                    in the local partition to other partitions.
+                  properties:
+                    consumers:
+                      description: Consumers is a list of downstream consumers of
+                        the service to be exported.
+                      items:
+                        description: ServiceConsumer represents a downstream consumer
+                          of the service to be exported.
+                        properties:
+                          partition:
+                            description: Partition is the admin partition to export
+                              the service to.
+                            type: string
+                        type: object
+                      type: array
+                    name:
+                      description: Name is the name of the service to be exported.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace to export the service
+                        from.
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

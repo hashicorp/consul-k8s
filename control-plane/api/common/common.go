@@ -8,11 +8,13 @@ const (
 	ServiceRouter      string = "servicerouter"
 	ServiceSplitter    string = "servicesplitter"
 	ServiceIntentions  string = "serviceintentions"
+	ServiceExports     string = "serviceexports"
 	IngressGateway     string = "ingressgateway"
 	TerminatingGateway string = "terminatinggateway"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
+	Exports                string = "exports"
 	DefaultConsulNamespace string = "default"
 	WildcardNamespace      string = "*"
 
