@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,21 +20,24 @@ import (
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-// Cluster represents a vault cluster object, it is modeled off of the consul_cluster implementation and will
-// provide thea ability to rapidly install and bootrstap a vault cluster so that end-to-end testing may be done.
-type Cluster interface {
-	// Create will install a vault cluster via helm using the default config defined at the end of this file.
-	Create(t *testing.T)
+/*
+	// High level description of the functions implemented for the VaultCluster object:
 
-	// Bootstrap will execute the Init(), Unseal() process and bootstrap the vault cluster by enabling the KV2 secret
+	// Create will install a vault cluster via helm using the default config defined at the end of this file. It will
+	// then also call bootstrap() to setup the vault cluster for testing.
+	Create(t *testing.T, ctx environment.TestContext)
+
+	// bootstrap will execute the Init(), Unseal() process and bootstrap the vault cluster by enabling the KV2 secret
 	// engine and also enabling the Kube Auth Method.
-	Bootstrap(t *testing.T, ctx environment.TestContext)
+	bootstrap(t *testing.T, ctx environment.TestContext)
 
-	// Destroy will do a helm uninstall of the Vault installation and then delete the data PVC used by Vault.
+	// Destroy will do a helm uninstall of the Vault installation and then delete the data PVC used by Vault and the
+	// helm secrets.
 	Destroy(t *testing.T)
 
 	// SetupVaultClient will setup the port-forwarding to the Vault server so that we can create a vault client connection.
@@ -44,7 +46,7 @@ type Cluster interface {
 
 	// VaultClient returns the client that was built as part of SetupVaultClient.
 	VaultClient(t *testing.T) *vapi.Client
-}
+*/
 
 const (
 	vaultNS = "default"
@@ -72,14 +74,14 @@ type VaultCluster struct {
 	logger             terratestLogger.TestLogger
 }
 
-// NewHelmCluster installs Vault into Kubernetes using Helm.
-func NewHelmCluster(
+// NewVaultCluster creates a VaultCluster which will be used to install Vault using Helm.
+func NewVaultCluster(
 	t *testing.T,
 	helmValues map[string]string,
 	ctx environment.TestContext,
 	cfg *config.TestConfig,
 	releaseName string,
-) Cluster {
+) *VaultCluster {
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
@@ -188,9 +190,9 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 	return vaultClient
 }
 
-// Bootstrap runs Init, Unseals the Vault installation
+// bootstrap runs Init, Unseals the Vault installation
 // and then does the setup of Auth Methods and Enables Secrets Engines.
-func (v *VaultCluster) Bootstrap(t *testing.T, ctx environment.TestContext) {
+func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 
 	v.vaultClient = v.SetupVaultClient(t)
 
@@ -243,8 +245,8 @@ func (v *VaultCluster) Bootstrap(t *testing.T, ctx environment.TestContext) {
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)
 }
 
-// Create installs Vault via Helm.
-func (v *VaultCluster) Create(t *testing.T) {
+// Create installs Vault via Helm and then calls bootstrap to initialize it.
+func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	t.Helper()
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
@@ -267,7 +269,8 @@ func (v *VaultCluster) Create(t *testing.T) {
 		require.NoError(r, err)
 		require.Equal(r, pod.Status.Phase, corev1.PodRunning)
 	})
-
+	// Now call bootstrap()
+	v.bootstrap(t, ctx)
 }
 
 func (v *VaultCluster) Destroy(t *testing.T) {
