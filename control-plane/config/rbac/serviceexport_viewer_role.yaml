@@ -1,0 +1,20 @@
+# permissions for end users to view serviceexports.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: serviceexport-viewer-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceexports
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - serviceexports/status
+  verbs:
+  - get
