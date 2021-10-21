@@ -34,22 +34,21 @@ type Command struct {
 
 func (c *Command) init() {
 	c.set = flag.NewSets()
-	{
-		f := c.set.NewSet("Global Options")
-		f.StringVar(&flag.StringVar{
-			Name:    "kubeconfig",
-			Aliases: []string{"c"},
-			Target:  &c.flagKubeConfig,
-			Default: "",
-			Usage:   "Path to kubeconfig file.",
-		})
-		f.StringVar(&flag.StringVar{
-			Name:    "context",
-			Target:  &c.flagKubeContext,
-			Default: "",
-			Usage:   "Kubernetes context to use.",
-		})
-	}
+
+	f := c.set.NewSet("Global Options")
+	f.StringVar(&flag.StringVar{
+		Name:    "kubeconfig",
+		Aliases: []string{"c"},
+		Target:  &c.flagKubeConfig,
+		Default: "",
+		Usage:   "Path to kubeconfig file.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "context",
+		Target:  &c.flagKubeContext,
+		Default: "",
+		Usage:   "Kubernetes context to use.",
+	})
 
 	c.help = c.set.Help()
 
@@ -94,6 +93,8 @@ func (c *Command) Run(args []string) int {
 		logMsg := fmt.Sprintf(s, args...)
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
+
+	c.UI.Output("Consul-K8s Status Summary", terminal.WithHeaderStyle())
 
 	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
@@ -147,6 +148,8 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
 
+	timezone, _ := rel.Info.LastDeployed.Zone()
+
 	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion", "Revision", "Last Updated"}...)
 	trow := []terminal.TableEntry{
 		{
@@ -168,7 +171,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 			Value: strconv.Itoa(rel.Version),
 		},
 		{
-			Value: rel.Info.LastDeployed.Format("2006/01/02 15:04:05"),
+			Value: rel.Info.LastDeployed.Format("2006/01/02 15:04:05") + " " + timezone,
 		},
 	}
 	tbl.Rows = [][]terminal.TableEntry{}
@@ -188,7 +191,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 
 	// Check the status of the hooks.
 	if len(rel.Hooks) > 1 {
-		c.UI.Output("Status Of Helm Hooks:")
+		c.UI.Output("Status Of Helm Hooks:", terminal.WithHeaderStyle())
 
 		for _, hook := range rel.Hooks {
 			// Remember that we only report the status of pre-install or pre-upgrade hooks.
@@ -196,13 +199,15 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 				c.UI.Output("%s %s: %s", hook.Name, hook.Kind, hook.LastRun.Phase.String())
 			}
 		}
-		c.UI.Output("")
+		fmt.Println("")
 	}
 
 	return nil
 }
 
-// Helper function that checks if the given hook's events are pre-install or pre-upgrade.
+// validEvent is a helper function that checks if the given hook's events are pre-install or pre-upgrade.
+// Only pre-install and pre-upgrade hooks are expected to have run when using the status command against
+// a running installation.
 func validEvent(events []release.HookEvent) bool {
 	for _, event := range events {
 		if event.String() == "pre-install" || event.String() == "pre-upgrade" {
@@ -251,7 +256,7 @@ func (c *Command) checkConsulClients(namespace string) (string, error) {
 	return fmt.Sprintf("Consul clients healthy (%d/%d)", readyReplicas, desiredReplicas), nil
 }
 
-/// setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
+// setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
 // settings.RESTClientGetter for its calls as well, so this will use a consistent method to
 // target the right cluster for both Helm SDK and non Helm SDK calls.
 func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
@@ -273,11 +278,10 @@ func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
 
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s status" + "\n\n" + "Get the status of the current Consul installation." + "\n" +
-		c.help
+	s := "Usage: consul-k8s status" + "\n\n" + "Get the status of the current Consul installation." + "\n"
 	return s
 }
 
 func (c *Command) Synopsis() string {
-	return "Status of Consul-K8s install."
+	return "Status of Consul-K8s installation."
 }
