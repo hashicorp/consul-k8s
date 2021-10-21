@@ -18,13 +18,10 @@ import (
 
 type ServiceIntentionsWebhook struct {
 	client.Client
-	ConsulClient               *capi.Client
-	Logger                     logr.Logger
-	decoder                    *admission.Decoder
-	EnableConsulNamespaces     bool
-	EnableNSMirroring          bool
-	ConsulDestinationNamespace string
-	NSMirroringPrefix          string
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
+	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -44,12 +41,12 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	defaultingPatches, err := common.DefaultingPatches(&svcIntentions, v.EnableConsulNamespaces, v.EnableNSMirroring, v.ConsulDestinationNamespace, v.NSMirroringPrefix)
+	defaultingPatches, err := common.DefaultingPatches(&svcIntentions, v.ConsulMeta)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	singleConsulDestNS := !(v.EnableConsulNamespaces && v.EnableNSMirroring)
+	singleConsulDestNS := !(v.ConsulMeta.NamespacesEnabled && v.ConsulMeta.Mirroring)
 	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", svcIntentions.KubernetesName())
 
@@ -89,7 +86,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	}
 
 	// ServiceIntentions are invalid if destination namespaces or source namespaces are set when Consul Namespaces are not enabled.
-	if err := svcIntentions.Validate(v.EnableConsulNamespaces); err != nil {
+	if err := svcIntentions.Validate(v.ConsulMeta.NamespacesEnabled); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

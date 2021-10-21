@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -312,7 +313,7 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 
 // DefaultNamespaceFields has no behaviour here as service-resolver have namespace fields
 // that do not default.
-func (in *ServiceResolver) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ServiceResolver) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSubset {

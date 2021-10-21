@@ -29,12 +29,9 @@ func ValidateConfigEntry(
 	logger logr.Logger,
 	configEntryLister ConfigEntryLister,
 	cfgEntry ConfigEntryResource,
-	enableConsulNamespaces bool,
-	nsMirroring bool,
-	consulDestinationNamespace string,
-	nsMirroringPrefix string) admission.Response {
+	consulMeta ConsulMeta) admission.Response {
 
-	defaultingPatches, err := DefaultingPatches(cfgEntry, enableConsulNamespaces, nsMirroring, consulDestinationNamespace, nsMirroringPrefix)
+	defaultingPatches, err := DefaultingPatches(cfgEntry, consulMeta)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
@@ -43,7 +40,7 @@ func ValidateConfigEntry(
 	// resources to a single Consul namespace. The only case where we're not
 	// mapping all kube resources to a single Consul namespace is when we
 	// are running Consul enterprise with namespace mirroring.
-	singleConsulDestNS := !(enableConsulNamespaces && nsMirroring)
+	singleConsulDestNS := !(consulMeta.NamespacesEnabled && consulMeta.Mirroring)
 	if req.Operation == admissionv1.Create && singleConsulDestNS {
 		logger.Info("validate create", "name", cfgEntry.KubernetesName())
 
@@ -61,7 +58,7 @@ func ValidateConfigEntry(
 			}
 		}
 	}
-	if err := cfgEntry.Validate(enableConsulNamespaces); err != nil {
+	if err := cfgEntry.Validate(consulMeta.NamespacesEnabled); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Patched(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()), defaultingPatches...)
@@ -69,12 +66,12 @@ func ValidateConfigEntry(
 
 // DefaultingPatches returns the patches needed to set fields to their
 // defaults.
-func DefaultingPatches(cfgEntry ConfigEntryResource, enableConsulNamespaces bool, nsMirroring bool, consulDestinationNamespace string, nsMirroringPrefix string) ([]jsonpatch.Operation, error) {
+func DefaultingPatches(cfgEntry ConfigEntryResource, consulMeta ConsulMeta) ([]jsonpatch.Operation, error) {
 	beforeDefaulting, err := json.Marshal(cfgEntry)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)
 	}
-	cfgEntry.DefaultNamespaceFields(enableConsulNamespaces, consulDestinationNamespace, nsMirroring, nsMirroringPrefix)
+	cfgEntry.DefaultNamespaceFields(consulMeta)
 	afterDefaulting, err := json.Marshal(cfgEntry)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling after defaulting: %s", err)

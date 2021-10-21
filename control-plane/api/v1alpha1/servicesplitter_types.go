@@ -177,7 +177,7 @@ func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 
 // DefaultNamespaceFields has no behaviour here as service-splitter have namespace fields
 // that do not default.
-func (in *ServiceSplitter) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ServiceSplitter) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 func (in ServiceSplits) toConsul() []capi.ServiceSplit {

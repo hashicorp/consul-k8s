@@ -611,39 +611,44 @@ func TestServiceRouter_Validate(t *testing.T) {
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -712,7 +717,7 @@ func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}

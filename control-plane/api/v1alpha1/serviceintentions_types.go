@@ -279,14 +279,14 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
-func (in *ServiceIntentions) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *ServiceIntentions) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	// If namespaces are enabled we want to set the destination namespace field to it's
 	// default. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
+	if consulMeta.NamespacesEnabled {
 		// Default to the current namespace (i.e. the namespace of the config entry).
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulMeta.NamespacesEnabled, consulMeta.DestinationNamespace, consulMeta.Mirroring, consulMeta.Prefix)
 		if in.Spec.Destination.Namespace == "" {
 			in.Spec.Destination.Namespace = namespace
 		}

@@ -115,10 +115,12 @@ func TestValidateConfigEntry(t *testing.T) {
 				logrtest.TestLogger{T: t},
 				lister,
 				c.newResource,
-				c.enableNamespaces,
-				c.nsMirroring,
-				c.consulDestinationNS,
-				c.nsMirroringPrefix)
+				ConsulMeta{
+					NamespacesEnabled:    c.enableNamespaces,
+					DestinationNamespace: c.consulDestinationNS,
+					Mirroring:            c.nsMirroring,
+					Prefix:               c.nsMirroringPrefix,
+				})
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
@@ -134,7 +136,7 @@ func TestDefaultingPatches(t *testing.T) {
 	}
 
 	// This test validates that DefaultingPatches invokes DefaultNamespaceFields on the Config Entry.
-	patches, err := DefaultingPatches(cfgEntry, false, false, "", "")
+	patches, err := DefaultingPatches(cfgEntry, ConsulMeta{})
 	require.NoError(t, err)
 
 	require.Equal(t, []jsonpatch.Operation{
@@ -327,7 +329,7 @@ func (in *mockConfigEntry) Validate(bool) error {
 	return nil
 }
 
-func (in *mockConfigEntry) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *mockConfigEntry) DefaultNamespaceFields(_ ConsulMeta) {
 	in.MockNamespace = "bar"
 }
 

@@ -21,7 +21,6 @@ type ProxyDefaultsWebhook struct {
 	Logger                 logr.Logger
 	decoder                *admission.Decoder
 	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

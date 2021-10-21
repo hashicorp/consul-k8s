@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,11 +81,11 @@ func TestValidatePartitionExports(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &PartitionExportsWebhook{
-				Client:        client,
-				ConsulClient:  nil,
-				Logger:        logrtest.TestLogger{T: t},
-				PartitionName: otherPartition,
-				decoder:       decoder,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				ConsulMeta:   common.ConsulMeta{Partitions: otherPartition},
+				decoder:      decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

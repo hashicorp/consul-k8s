@@ -178,7 +178,7 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 		cmp.Comparer(transparentProxyConfigComparer))
 }
 
-func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
+func (in *ProxyDefaults) Validate(_ bool) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -205,7 +205,7 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields has no behaviour here as proxy-defaults have no namespace specific fields.
-func (in *ProxyDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ProxyDefaults) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 // convertConfig converts the config of type json.RawMessage which is stored

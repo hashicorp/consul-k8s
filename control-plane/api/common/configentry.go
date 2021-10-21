@@ -61,10 +61,33 @@ type ConfigEntryResource interface {
 	Validate(namespacesEnabled bool) error
 	// DefaultNamespaceFields sets Consul namespace fields on the config entry
 	// spec to their default values if namespaces are enabled.
-	DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string)
+	DefaultNamespaceFields(consulMeta ConsulMeta)
 
 	// ConfigEntryResource has to implement metav1.Object so that structs
 	// that implement it effectively implement client.Object which is
 	// the interface supported by controller-runtime reconcile-able resources.
 	metav1.Object
+}
+
+type ConsulMeta struct {
+	PartitionsEnabled bool
+	Partitions        string
+
+	// NamespacesEnabled indicates that a user is running Consul Enterprise
+	// with version 1.7+ which supports namespaces.
+	NamespacesEnabled bool
+	// DestinationNamespace is the namespace in Consul that the config entry created
+	// in k8s will get mapped into. If the Consul namespace does not already exist, it will
+	// be created.
+	DestinationNamespace string
+	// Mirroring causes Consul namespaces to be created to match the
+	// k8s namespace of any config entry custom resource. Config entries will
+	// be created in the matching Consul namespace.
+	Mirroring bool
+	// Prefix works in conjunction with Mirroring.
+	// It is the prefix added to the Consul namespace to map to a specific.
+	// k8s namespace. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+	// service in the k8s `staging` namespace will be registered into the
+	// `k8s-staging` Consul namespace.
+	Prefix string
 }

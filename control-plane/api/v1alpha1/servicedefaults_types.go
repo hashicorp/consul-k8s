@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -357,7 +358,7 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 }
 
 // DefaultNamespaceFields has no behaviour here as service-defaults have no namespace specific fields.
-func (in *ServiceDefaults) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ServiceDefaults) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 // MatchesConsul returns true if entry has the same config as this struct.

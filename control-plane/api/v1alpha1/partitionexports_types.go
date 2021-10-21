@@ -182,5 +182,5 @@ func (in *PartitionExports) Validate(_ bool) error {
 	return nil
 }
 
-func (in *PartitionExports) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *PartitionExports) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
