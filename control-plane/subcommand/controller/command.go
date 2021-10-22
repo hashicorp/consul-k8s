@@ -270,10 +270,10 @@ func (c *Command) Run(args []string) int {
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
 			&webhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
-				Client:                 mgr.GetClient(),
-				ConsulClient:           consulClient,
-				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
-				EnableConsulNamespaces: c.flagEnableNamespaces,
+				Client:       mgr.GetClient(),
+				ConsulClient: consulClient,
+				Logger:       ctrl.Log.WithName("webhooks").WithName(common.ProxyDefaults),
+				ConsulMeta:   consulMeta,
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
 			&webhook.Admission{Handler: &v1alpha1.MeshWebhook{

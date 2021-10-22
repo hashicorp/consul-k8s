@@ -153,7 +153,7 @@ func (in *Mesh) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.MeshConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *Mesh) Validate(_ bool) error {
+func (in *Mesh) Validate(_ common.ConsulMeta) error {
 	return nil
 }
 

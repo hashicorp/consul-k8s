@@ -177,7 +177,7 @@ func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
+func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -185,7 +185,7 @@ func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {
 		errs = append(errs, v.validate(path.Child("services").Index(i))...)
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(

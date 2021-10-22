@@ -178,7 +178,7 @@ func (in *PartitionExports) MatchesConsul(candidate api.ConfigEntry) bool {
 
 }
 
-func (in *PartitionExports) Validate(_ bool) error {
+func (in *PartitionExports) Validate(_ common.ConsulMeta) error {
 	return nil
 }
 

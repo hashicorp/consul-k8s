@@ -58,7 +58,7 @@ type ConfigEntryResource interface {
 	// DeepCopyObject should be implemented by the generated code.
 	DeepCopyObject() runtime.Object
 	// Validate returns an error if the resource is invalid.
-	Validate(namespacesEnabled bool) error
+	Validate(consulMeta ConsulMeta) error
 	// DefaultNamespaceFields sets Consul namespace fields on the config entry
 	// spec to their default values if namespaces are enabled.
 	DefaultNamespaceFields(consulMeta ConsulMeta)

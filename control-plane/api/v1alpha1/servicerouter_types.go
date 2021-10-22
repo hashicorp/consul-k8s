@@ -244,14 +244,14 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ServiceRouter) Validate(namespacesEnabled bool) error {
+func (in *ServiceRouter) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	for i, r := range in.Spec.Routes {
 		errs = append(errs, r.validate(path.Child("routes").Index(i))...)
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(

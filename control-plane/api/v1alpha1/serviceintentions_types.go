@@ -249,7 +249,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	)
 }
 
-func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
+func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	if len(in.Spec.Sources) == 0 {
@@ -268,7 +268,7 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 		}
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(

@@ -771,7 +771,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(false)
+			err := testCase.input.Validate(common.ConsulMeta{})
 			if testCase.expectedErrMsg != "" {
 				require.EqualError(t, err, testCase.expectedErrMsg)
 			} else {

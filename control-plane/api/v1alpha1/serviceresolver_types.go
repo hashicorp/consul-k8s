@@ -289,7 +289,7 @@ func (in *ServiceResolver) ConsulGlobalResource() bool {
 	return false
 }
 
-func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
+func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -301,7 +301,7 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(

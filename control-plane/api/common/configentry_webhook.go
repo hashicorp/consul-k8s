@@ -58,7 +58,7 @@ func ValidateConfigEntry(
 			}
 		}
 	}
-	if err := cfgEntry.Validate(consulMeta.NamespacesEnabled); err != nil {
+	if err := cfgEntry.Validate(consulMeta); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Patched(fmt.Sprintf("valid %s request", cfgEntry.KubeKind()), defaultingPatches...)

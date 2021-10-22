@@ -178,7 +178,7 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 		cmp.Comparer(transparentProxyConfigComparer))
 }
 
-func (in *ProxyDefaults) Validate(_ bool) error {
+func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 

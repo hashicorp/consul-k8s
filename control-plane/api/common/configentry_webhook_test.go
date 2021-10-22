@@ -322,7 +322,7 @@ func (in *mockConfigEntry) ToConsul(string) capi.ConfigEntry {
 	return &capi.ServiceConfigEntry{}
 }
 
-func (in *mockConfigEntry) Validate(bool) error {
+func (in *mockConfigEntry) Validate(_ ConsulMeta) error {
 	if !in.Valid {
 		return errors.New("invalid")
 	}
