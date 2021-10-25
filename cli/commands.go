@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
+	"github.com/hashicorp/consul-k8s/cli/cmd/status"
 	"github.com/hashicorp/consul-k8s/cli/cmd/uninstall"
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
 	"github.com/hashicorp/consul-k8s/cli/version"
@@ -27,6 +28,11 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 		},
 		"uninstall": func() (cli.Command, error) {
 			return &uninstall.Command{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"status": func() (cli.Command, error) {
+			return &status.Command{
 				BaseCommand: baseCommand,
 			}, nil
 		},

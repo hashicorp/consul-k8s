@@ -3,6 +3,8 @@
 IMPROVEMENTS:
 * Helm Chart
   * Automatic retry for `gossip-encryption-autogenerate-job` on failure [[GH-789](https://github.com/hashicorp/consul-k8s/pull/789)]
+* CLI
+  * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
 
 ## 0.35.0 (October 19, 2021)
 
