@@ -1625,6 +1625,11 @@ connectInject:
   # See https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
   # for more details.
   #
+  # By default, we exclude the kube-system namespace since usually users won't
+  # want those pods injected and also the local-path-storage namespace so that
+  # Kind (Kubernetes In Docker) can provision Pods used to create PVCs.
+  # Note that this exclusion is only supported in Kubernetes v1.21.1+.
+  #
   # Example:
   #
   # ```yaml
@@ -1633,7 +1638,11 @@ connectInject:
   #     namespace-label: label-value
   # ```
   # @type: string
-  namespaceSelector: null
+  namespaceSelector: |
+    matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: "NotIn"
+        values: ["kube-system","local-path-storage"]
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
