@@ -3,8 +3,18 @@
 BREAKING CHANGES:
 * Helm Chart
   * The `kube-system` and `local-path-storage` namespaces are now _excluded_ from connect injection by default on Kubernetes versions >= 1.21. If you wish to enable injection on those namespaces, set `connectInject.namespaceSelector` to `null`. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
+IMPROVEMENTS:
+* Helm Chart
+  * Automatic retry for `gossip-encryption-autogenerate-job` on failure [[GH-789](https://github.com/hashicorp/consul-k8s/pull/789)]
+  * `kube-system` and `local-path-storage` namespaces are now excluded from connect injection by default on Kubernetes versions >= 1.21. This prevents deadlock issues when `kube-system` components go down and allows Kind to work without changing the failure policy of the mutating webhook. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
+* CLI
+  * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
+
+## 0.35.0 (October 19, 2021)
 
 FEATURES:
+* Control Plane
+  * Add `gossip-encryption-autogenerate` subcommand to generate a random 32 byte Kubernetes secret to be used as a gossip encryption key. [[GH-772](https://github.com/hashicorp/consul-k8s/pull/772)]
 * Helm Chart
   * Add automatic generation of gossip encryption with `global.gossipEncryption.autoGenerate=true`. [[GH-738](https://github.com/hashicorp/consul-k8s/pull/738)]
   * Add support for configuring resources for mesh gateway `service-init` container. [[GH-758](https://github.com/hashicorp/consul-k8s/pull/758)]
@@ -12,12 +22,18 @@ FEATURES:
 IMPROVEMENTS:
 * Control Plane
   * Upgrade Docker image Alpine version from 3.13 to 3.14. [[GH-737](https://github.com/hashicorp/consul-k8s/pull/737)]
+  * CRDs: tune failure backoff so invalid config entries are re-synced more quickly. [[GH-788](https://github.com/hashicorp/consul-k8s/pull/788)]
 * Helm Chart
   * Enable adding extra containers to server and client Pods. [[GH-749](https://github.com/hashicorp/consul-k8s/pull/749)]
-  * `kube-system` and `local-path-storage` namespaces are now excluded from connect injection by default on Kubernetes versions >= 1.21. This prevents deadlock issues when `kube-system` components go down and allows Kind to work without changing the failure policy of the mutating webhook. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
-
+  * ACL support for Admin Partitions. **(Consul Enterprise only)**
+  **BETA** [[GH-766](https://github.com/hashicorp/consul-k8s/pull/766)]
+    * This feature now enabled ACL support for Admin Partitions. The server-acl-init job now creates a Partition token. This token
+      can be used to bootstrap new partitions as well as manage ACLs in the non-default partitions.
+    * Partition to partition networking is disabled if ACLs are enabled.
+    * Documentation for the installation can be found [here](https://github.com/hashicorp/consul-k8s/blob/main/docs/admin-partitions-with-acls.md).
 * CLI
   * Add `version` command. [[GH-741](https://github.com/hashicorp/consul-k8s/pull/741)]
+  * Add `uninstall` command. [[GH-725](https://github.com/hashicorp/consul-k8s/pull/725)]
 
 ## 0.34.1 (September 17, 2021)
 

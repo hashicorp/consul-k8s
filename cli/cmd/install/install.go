@@ -46,8 +46,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-
-	helmRepository = "https://helm.releases.hashicorp.com"
 )
 
 type Command struct {
@@ -171,12 +169,7 @@ func (c *Command) Run(args []string) int {
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("install")
 
-	defer func() {
-		if err := c.Close(); err != nil {
-			c.Log.Error(err.Error())
-			os.Exit(1)
-		}
-	}()
+	defer common.CloseWithError(c.BaseCommand)
 
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())
@@ -220,9 +213,14 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Pre-Install Checks", terminal.WithHeaderStyle())
 
-	if err := c.checkForPreviousInstallations(settings, uiLogger); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+	// Note the logic here, common's CheckForPreviousInstallations function returns an error if
+	// the release is not found, which in the install command is what we need for a successful install.
+	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
+		c.UI.Output(fmt.Sprintf("existing Consul installation found (name=%s, namespace=%s) - run "+
+			"consul-k8s uninstall if you wish to re-install", name, ns), terminal.WithErrorStyle())
 		return 1
+	} else {
+		c.UI.Output("No existing installations found.")
 	}
 
 	// Ensure there's no previous PVCs lying around.
@@ -343,37 +341,6 @@ func (c *Command) Synopsis() string {
 	return "Install Consul on Kubernetes."
 }
 
-// checkForPreviousInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
-// "consul", and returns an error if there is an existing installation.
-// Note that this function is tricky to test because mocking out the action.Configuration struct requires a
-// RegistryClient field that is from an internal helm package, so we are not unit testing it.
-func (c *Command) checkForPreviousInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) error {
-	// Need a specific action config to call helm list, where namespace is NOT specified.
-	listConfig := new(action.Configuration)
-	if err := listConfig.Init(settings.RESTClientGetter(), "",
-		os.Getenv("HELM_DRIVER"), uiLogger); err != nil {
-		return fmt.Errorf("couldn't initialize helm config: %s", err)
-	}
-
-	lister := action.NewList(listConfig)
-	lister.AllNamespaces = true
-	res, err := lister.Run()
-	if err != nil {
-		return fmt.Errorf("couldn't check for installations: %s", err)
-	}
-
-	for _, rel := range res {
-		if rel.Chart.Metadata.Name == "consul" {
-			// TODO: In the future the user will be prompted with our own uninstall command.
-			return fmt.Errorf("existing Consul installation found (name=%s, namespace=%s) - run helm "+
-				"delete %s -n %s if you wish to re-install",
-				rel.Name, rel.Namespace, rel.Name, rel.Namespace)
-		}
-	}
-	c.UI.Output("No existing installations found", terminal.WithSuccessStyle())
-	return nil
-}
-
 // checkForPreviousPVCs checks for existing PVCs with a name containing "consul-server" and returns an error and lists
 // the PVCs it finds matches.
 func (c *Command) checkForPreviousPVCs() error {
@@ -472,14 +439,14 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
-		return errors.New(fmt.Sprintf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset))
+		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if _, ok := presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
-		return errors.New(fmt.Sprintf("'%s' is not a valid preset", c.flagPreset))
+		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !validLabel(c.flagNamespace) {
-		return errors.New(fmt.Sprintf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric.", c.flagNamespace))
+		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
@@ -489,7 +456,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return errors.New(fmt.Sprintf("File '%s' does not exist.", filename))
+				return fmt.Errorf("File '%s' does not exist.", filename)
 			}
 		}
 	}

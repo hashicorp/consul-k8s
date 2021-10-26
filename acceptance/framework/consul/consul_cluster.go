@@ -509,6 +509,10 @@ func defaultValues() map[string]string {
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).
 		"dns.enabled": "false",
+
+		// Enable trace logs for servers and clients.
+		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
+		"client.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
 	}
 	return values
 }

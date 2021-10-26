@@ -23,6 +23,7 @@ type Command struct {
 
 	flags *flag.FlagSet
 	k8s   *k8sflags.K8SFlags
+	http  *flags.HTTPFlags
 
 	flagPartitionName string
 
@@ -65,7 +66,6 @@ func (c *Command) init() {
 		"The server name to set as the SNI header when sending HTTPS requests to Consul.")
 	c.flags.BoolVar(&c.flagUseHTTPS, "use-https", false,
 		"Toggle for using HTTPS for all API calls to Consul.")
-
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap Partitions for before timing out, e.g. 1ms, 2s, 3m")
 	c.flags.StringVar(&c.flagLogLevel, "log-level", "info",
@@ -75,7 +75,9 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 
 	c.k8s = &k8sflags.K8SFlags{}
+	c.http = &flags.HTTPFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
+	flags.Merge(c.flags, c.http.Flags())
 	c.help = flags.Usage(help, c.flags)
 
 	// Default retry to 1s. This is exposed for setting in tests.

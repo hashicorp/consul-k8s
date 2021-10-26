@@ -36,7 +36,5 @@ func (r *MeshController) UpdateStatus(ctx context.Context, obj client.Object, op
 }
 
 func (r *MeshController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.Mesh{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.Mesh{}, r)
 }

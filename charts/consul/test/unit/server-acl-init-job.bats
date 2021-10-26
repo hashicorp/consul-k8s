@@ -996,6 +996,45 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# admin partitions
+
+@test "serverACLInit/Job: admin partitions disabled by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-partitions"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("partition"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: admin partitions enabled when admin partitions are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("enable-partitions"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'any(contains("partition"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # global.acls.createReplicationToken
 
 @test "serverACLInit/Job: -create-acl-replication-token is not set by default" {

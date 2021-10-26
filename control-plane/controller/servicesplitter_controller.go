@@ -36,7 +36,5 @@ func (r *ServiceSplitterController) UpdateStatus(ctx context.Context, obj client
 }
 
 func (r *ServiceSplitterController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceSplitter{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceSplitter{}, r)
 }

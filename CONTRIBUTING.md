@@ -1,4 +1,27 @@
-# Contributing
+# Contributing to Consul on Kubernetes
+
+1. [Contributing 101](#contributing-101)
+    1. [Running Linters Locally](#running-linters-locally)
+    2. [Rebasing Contributions against main](#rebasing-contributions-against-main)
+3. [Creating a new CRD](#creating-a-new-crd)
+    1. [The Structs](#the-structs) 
+    2. [Spec Methods](#spec-methods)
+    3. [Spec Tests](#spec-tests)
+    4. [Controller](#controller)
+    5. [Webhook](#webhook)
+    6. [Update command.go](#update-commandgo)
+    7. [Generating YAML](#generating-yaml)
+    8. [Updating consul-helm](#updating-consul-helm)
+    9. [Testing a new CRD](#testing-a-new-crd)
+    10. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
+5. [Testing the Helm chart](#testing-the-helm-chart)
+6. [Running the tests](#running-the-tests)
+     1. [Writing Unit tests](#writing-unit-tests)
+     2. [Writing Acceptance tests](#writing-acceptance-tests)
+8. [Helm Reference Docs](#helm-reference-docs)
+
+
+## Contributing 101
 
 To build and install the control plane binary `consul-k8s` locally, Go version 1.11.4+ is required because this repository uses go modules and go 1.11.4 introduced changes to checksumming of modules to correct a symlink problem.
 You will also need to install the Docker engine:
@@ -52,6 +75,14 @@ To create a docker image with your local changes:
 $ make dev-docker
 ```
 
+### Running linters locally
+[`golangci-lint`](https://golangci-lint.run/) is used in CI to enforce coding and style standards and help catch bugs ahead of time.
+The configuration that CI runs is stored in `.golangci.yml` at the top level of the repository.
+Please ensure your code passes by running `golangci-lint run` at the top level of the repository and addressing
+any issues prior to submitting a PR.
+
+Version 1.41.1 or higher of [`golangci-lint`](https://github.com/golangci/golangci-lint/releases/tag/v1.41.1) is currently required.
+
 ### Rebasing contributions against main
 
 PRs in this repo are merged using the [`rebase`](https://git-scm.com/docs/git-rebase) method. This keeps
@@ -63,6 +94,8 @@ If the changes in your PR do not conflict with any of the existing code in the p
 automatic rebasing when the PR is accepted into the code. However, if there are conflicts (there will be
 a warning on the PR that reads "This branch cannot be rebased due to conflicts"), you will need to manually
 rebase the branch on main, fixing any conflicts along the way before the code can be merged.
+
+---
 
 ## Creating a new CRD
 
@@ -379,15 +412,16 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     }
     ```
 
-### Update consul-helm Acceptance Tests
+### Update consul-k8s Acceptance Tests
 1. Add a test resource to `test/acceptance/tests/fixtures/crds/ingressgateway.yaml`. Ideally it requires
    no other resources. For example, I used a `tcp` service so it didn't require a `ServiceDefaults`
    resource to set its protocol to something else.
 1. Update `charts/consul/test/acceptance/tests/controller/controller_test.go` and `charts/consul/test/acceptance/tests/controller/controller_namespaces_test.go`.
 1. Test locally, then submit a PR that uses your Docker image as `global.imageK8S`.
 
+---
 
-## Testing Helm Chart
+## Testing the Helm Chart
 The Helm chart ships with both unit and acceptance tests.
 
 The unit tests don't require any active Kubernetes cluster and complete
@@ -411,6 +445,8 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install golang
   ```
+  
+---
 
 ### Running The Tests
 
@@ -753,6 +789,8 @@ Here are some things to consider before adding a test:
   either Consul itself or consul-k8s? In that case, it should be tested there rather than in the Helm chart.
   For example, we don't expect acceptance tests to include all the permutations of the consul-k8s commands
   and their respective flags. Something like that should be tested in the consul-k8s repository.
+
+---
 
 ## Helm Reference Docs
  

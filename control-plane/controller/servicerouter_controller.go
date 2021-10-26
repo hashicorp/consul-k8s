@@ -36,7 +36,5 @@ func (r *ServiceRouterController) UpdateStatus(ctx context.Context, obj client.O
 }
 
 func (r *ServiceRouterController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceRouter{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceRouter{}, r)
 }
