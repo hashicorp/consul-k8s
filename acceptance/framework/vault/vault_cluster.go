@@ -2,7 +2,6 @@ package vault
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -113,47 +112,6 @@ func NewVaultCluster(
 // VaultClient returns the vault client.
 func (v *VaultCluster) VaultClient(t *testing.T) *vapi.Client { return v.vaultClient }
 
-// checkForPriorInstallations checks if there is an existing Helm release
-// for this Helm chart already installed. If there is, it fails the tests.
-func (v *VaultCluster) checkForPriorVaultInstallations(t *testing.T) {
-	t.Helper()
-
-	var helmListOutput string
-	// Check if there's an existing cluster and fail if there is one.
-	// We may need to retry since this is the first command run once the Kube
-	// cluster is created and sometimes the API server returns errors.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		var err error
-		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
-		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
-		// get used to fail the test, just for logging.
-		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(t, v.vaultHelmOptions, "list", "--output", "json")
-		require.NoError(r, err)
-	})
-
-	var installedReleases []map[string]string
-
-	err := json.Unmarshal([]byte(helmListOutput), &installedReleases)
-	require.NoError(t, err, "unmarshalling %q", helmListOutput)
-
-	for _, r := range installedReleases {
-		require.NotContains(t, r["chart"], "vault", fmt.Sprintf("detected an existing installation of Vault %s, release name: %s", r["chart"], r["name"]))
-	}
-	// Wait for all pods in the "default" namespace to exit. A previous
-	// release may not be listed by Helm but its pods may still be terminating.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
-		vaultPods, err := v.kubernetesClient.CoreV1().Pods(v.vaultHelmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
-		require.NoError(r, err)
-		if len(vaultPods.Items) > 0 {
-			var podNames []string
-			for _, p := range vaultPods.Items {
-				podNames = append(podNames, p.Name)
-			}
-			r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
-		}
-	})
-}
-
 // Setup Vault Client returns a Vault Client.
 // TODO: We need to support Vault with TLS enabled.
 func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
@@ -256,14 +214,14 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	v.checkForPriorVaultInstallations(t)
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, "vault")
 
-	// step 1: install Vault
+	// Install Vault.
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
-	// Wait for the injector pod to become Ready.
+	// Wait for the injector pod to become Ready, but not the server.
 	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
-	// Wait for the Server Pod to be online, it will not be Ready because it has not been Init+Unseal'd yet, this is done
-	// in the Bootstrap method.
+	// Wait for the server pod to be PodRunning, it will not be Ready because it has not been Init+Unseal'd yet.
+	// The vault server has health checks bound to unseal status, and Unseal is done as part of bootstrap (below).
 	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
 		pod, err := v.kubernetesClient.CoreV1().Pods(v.vaultHelmOptions.KubectlOptions.Namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.vaultReleaseName), metav1.GetOptions{})
 		require.NoError(r, err)
@@ -273,6 +231,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	v.bootstrap(t, ctx)
 }
 
+// Destroy issues an helm delete and deletes the PVC + any helm secrets related to the release that are leftover.
 func (v *VaultCluster) Destroy(t *testing.T) {
 	t.Helper()
 
@@ -281,11 +240,12 @@ func (v *VaultCluster) Destroy(t *testing.T) {
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
 	_ = helm.DeleteE(t, v.vaultHelmOptions, v.vaultReleaseName, false)
-	// Delete PVCs.
+
+	// Delete PVCs, these are the only parts that need to be cleaned up in Vault installs.
 	err := v.kubernetesClient.CoreV1().PersistentVolumeClaims(v.vaultHelmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", v.vaultReleaseName)})
 	require.NoError(t, err)
 
-	// Delete any secrets that have v.releaseName in their name, this is only needed to delete the Helm release secret.
+	// Delete any secrets that have v.releaseName in their name, this is only needed to delete the Helm release secret if it is still around.
 	secrets, err := v.kubernetesClient.CoreV1().Secrets(v.vaultHelmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	for _, secret := range secrets.Items {
@@ -299,12 +259,11 @@ func (v *VaultCluster) Destroy(t *testing.T) {
 }
 
 func defaultVaultValues() map[string]string {
-	values := map[string]string{
+	return map[string]string{
 		"server.replicas":        "1",
 		"server.bootstrapExpect": "1",
 		//"ui.enabled":             "true",
 		"injector.enabled": "true",
 		"global.enabled":   "true",
 	}
-	return values
 }
