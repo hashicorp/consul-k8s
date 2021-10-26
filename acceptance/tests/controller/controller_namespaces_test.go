@@ -74,7 +74,8 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image": "hashicorp/consul-enterprise:1.11.0-ent-beta1",
+				"global.image":    "ashwinvenkatesh/consul@sha256:7426f47fa7065e38a2488042be66325aa37cda17a3bc15e58178104ff4619c1b",
+				"global.imageK8S": "ashwinvenkatesh/consul-k8s@sha256:0d8f6d1601eb4b36001fae948acc6f8b2f768e823a12874ae1aeda198815879d",
 
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",
@@ -232,7 +233,7 @@ func TestControllerNamespaces(t *testing.T) {
 
 				logger.Log(t, "patching partition-exports custom resource")
 				patchServiceName := "backend"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "partitionexports", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s"}]}}`, patchServiceName), "--type=merge")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "partitionexports", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s", "namespace": "front", "consumers":[{"partition": "foo"}]}]}}`, patchServiceName), "--type=merge")
 
 				logger.Log(t, "patching mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")

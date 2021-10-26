@@ -185,6 +185,7 @@ func (in *PartitionExports) MatchesConsul(candidate api.ConfigEntry) bool {
 }
 
 func (in *PartitionExports) Validate(consulMeta common.ConsulMeta) error {
+	var errs field.ErrorList
 	if !consulMeta.PartitionsEnabled {
 		return apierrors.NewForbidden(
 			schema.GroupResource{Group: ConsulHashicorpGroup, Resource: common.PartitionExports},
@@ -192,7 +193,27 @@ func (in *PartitionExports) Validate(consulMeta common.ConsulMeta) error {
 			errors.New("Consul Enterprise Admin Partitions must be enabled to create PartitionExports"))
 	}
 	if in.Name != consulMeta.Partition {
-		return field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be the same name as the partition, "%s"`, in.KubeKind(), consulMeta.Partition))
+		errs = append(errs, field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be the same name as the partition, "%s"`, in.KubeKind(), consulMeta.Partition)))
+	}
+	if len(in.Spec.Services) == 0 {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("services"), in.Spec.Services, "at least one service must be exported"))
+	}
+	for i, service := range in.Spec.Services {
+		if err := service.validate(field.NewPath("spec").Child("services").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PartitionExportsKubeKind},
+			in.KubernetesName(), errs)
+	}
+	return nil
+}
+
+func (in *ExportedService) validate(path *field.Path) *field.Error {
+	if len(in.Consumers) == 0 {
+		return field.Invalid(path, in.Consumers, "service must have at least 1 consumer.")
 	}
 	return nil
 }

@@ -30,6 +30,7 @@ import (
 // exist in the global namespace.
 
 func TestPartitionExportsController_createsPartitionExports(tt *testing.T) {
+	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -149,6 +150,7 @@ func TestPartitionExportsController_createsPartitionExports(tt *testing.T) {
 }
 
 func TestPartitionExportsController_updatesPartitionExports(tt *testing.T) {
+	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -291,6 +293,7 @@ func TestPartitionExportsController_updatesPartitionExports(tt *testing.T) {
 }
 
 func TestPartitionExportsController_deletesPartitionExports(tt *testing.T) {
+	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
