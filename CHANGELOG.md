@@ -1,8 +1,12 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm Chart
+  * The `kube-system` and `local-path-storage` namespaces are now _excluded_ from connect injection by default on Kubernetes versions >= 1.21. If you wish to enable injection on those namespaces, set `connectInject.namespaceSelector` to `null`. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
 IMPROVEMENTS:
 * Helm Chart
   * Automatic retry for `gossip-encryption-autogenerate-job` on failure [[GH-789](https://github.com/hashicorp/consul-k8s/pull/789)]
+  * `kube-system` and `local-path-storage` namespaces are now excluded from connect injection by default on Kubernetes versions >= 1.21. This prevents deadlock issues when `kube-system` components go down and allows Kind to work without changing the failure policy of the mutating webhook. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
 * CLI
   * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
 
@@ -38,6 +42,7 @@ BUG FIXES:
   * Fix consul-k8s image version in values file. [[GH-732](https://github.com/hashicorp/consul-k8s/pull/732)]
 
 ## 0.34.0 (September 17, 2021)
+
 FEATURES:
 * CLI
   * The `consul-k8s` CLI enables users to deploy and operate Consul on Kubernetes.
