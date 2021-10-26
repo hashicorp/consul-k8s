@@ -75,7 +75,6 @@ func TestControllerNamespaces(t *testing.T) {
 
 			helmValues := map[string]string{
 				"global.image":    "ashwinvenkatesh/consul@sha256:7426f47fa7065e38a2488042be66325aa37cda17a3bc15e58178104ff4619c1b",
-				"global.imageK8S": "ashwinvenkatesh/consul-k8s@sha256:0d8f6d1601eb4b36001fae948acc6f8b2f768e823a12874ae1aeda198815879d",
 
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",

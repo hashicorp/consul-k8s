@@ -23,11 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// NOTE: We're not testing each controller type here because that's done in
-// the OSS tests and it would result in too many permutations. Instead
-// we're only testing with the ServiceDefaults and PartitionExports controller which will exercise
-// all the namespaces code for config entries that are namespaced and those that
-// exist in the global namespace.
+// This tests explicitly tests PartitionExportsController instead of using the existing
+// pattern of adding tests for the controller to configentry_controller test. That is because
+// unlike the other CRDs, PartitionExports are only supported in Consul Enterprise. But the
+// test pattern of the enterprise tests already covers a config-entry similar to partition-exports
+// ie a "global" configentry. Hence a separate file has been created to test this controller.
+
+// TODO: remove skips once 1.11-beta2 image is released.
 
 func TestPartitionExportsController_createsPartitionExports(tt *testing.T) {
 	tt.Skip()
