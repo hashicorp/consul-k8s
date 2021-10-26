@@ -10,38 +10,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ServiceExportsKubeKind = "serviceexports"
+const PartitionExportsKubeKind = "partitionexports"
 
 func init() {
-	SchemeBuilder.Register(&ServiceExports{}, &ServiceExportsList{})
+	SchemeBuilder.Register(&PartitionExports{}, &PartitionExportsList{})
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ServiceExports is the Schema for the serviceexports API
+// PartitionExports is the Schema for the partitionexports API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-type ServiceExports struct {
+type PartitionExports struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ServiceExportsSpec `json:"spec,omitempty"`
+	Spec   PartitionExportsSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ServiceExportsList contains a list of ServiceExports
-type ServiceExportsList struct {
+// PartitionExportsList contains a list of PartitionExports
+type PartitionExportsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceExports `json:"items"`
+	Items           []PartitionExports `json:"items"`
 }
 
-// ServiceExportsSpec defines the desired state of ServiceExports
-type ServiceExportsSpec struct {
+// PartitionExportsSpec defines the desired state of PartitionExports
+type PartitionExportsSpec struct {
 	// Services is a list of services to be exported and the list of partitions
 	// to expose them to.
 	Services []ExportedService `json:"services,omitempty"`
@@ -66,15 +66,15 @@ type ServiceConsumer struct {
 	Partition string `json:"partition,omitempty"`
 }
 
-func (in *ServiceExports) GetObjectMeta() metav1.ObjectMeta {
+func (in *PartitionExports) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
 
-func (in *ServiceExports) AddFinalizer(name string) {
+func (in *PartitionExports) AddFinalizer(name string) {
 	in.ObjectMeta.Finalizers = append(in.Finalizers(), name)
 }
 
-func (in *ServiceExports) RemoveFinalizer(name string) {
+func (in *PartitionExports) RemoveFinalizer(name string) {
 	var newFinalizers []string
 	for _, oldF := range in.Finalizers() {
 		if oldF != name {
@@ -84,35 +84,35 @@ func (in *ServiceExports) RemoveFinalizer(name string) {
 	in.ObjectMeta.Finalizers = newFinalizers
 }
 
-func (in *ServiceExports) Finalizers() []string {
+func (in *PartitionExports) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *ServiceExports) ConsulKind() string {
-	return capi.ServiceExports
+func (in *PartitionExports) ConsulKind() string {
+	return capi.PartitionExports
 }
 
-func (in *ServiceExports) ConsulGlobalResource() bool {
+func (in *PartitionExports) ConsulGlobalResource() bool {
 	return true
 }
 
-func (in *ServiceExports) ConsulMirroringNS() string {
+func (in *PartitionExports) ConsulMirroringNS() string {
 	return common.DefaultConsulNamespace
 }
 
-func (in *ServiceExports) KubeKind() string {
-	return ServiceExportsKubeKind
+func (in *PartitionExports) KubeKind() string {
+	return PartitionExportsKubeKind
 }
 
-func (in *ServiceExports) ConsulName() string {
+func (in *PartitionExports) ConsulName() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *ServiceExports) KubernetesName() string {
+func (in *PartitionExports) KubernetesName() string {
 	return in.ObjectMeta.Name
 }
 
-func (in *ServiceExports) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
+func (in *PartitionExports) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
 	in.Status.Conditions = Conditions{
 		{
 			Type:               ConditionSynced,
@@ -124,11 +124,11 @@ func (in *ServiceExports) SetSyncedCondition(status corev1.ConditionStatus, reas
 	}
 }
 
-func (in *ServiceExports) SetLastSyncedTime(time *metav1.Time) {
+func (in *PartitionExports) SetLastSyncedTime(time *metav1.Time) {
 	in.Status.LastSyncedTime = time
 }
 
-func (in *ServiceExports) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
+func (in *PartitionExports) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
 		return corev1.ConditionUnknown, "", ""
@@ -136,7 +136,7 @@ func (in *ServiceExports) SyncedCondition() (status corev1.ConditionStatus, reas
 	return cond.Status, cond.Reason, cond.Message
 }
 
-func (in *ServiceExports) SyncedConditionStatus() corev1.ConditionStatus {
+func (in *PartitionExports) SyncedConditionStatus() corev1.ConditionStatus {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
 		return corev1.ConditionUnknown
@@ -144,12 +144,13 @@ func (in *ServiceExports) SyncedConditionStatus() corev1.ConditionStatus {
 	return cond.Status
 }
 
-func (in *ServiceExports) ToConsul(datacenter string) api.ConfigEntry {
+func (in *PartitionExports) ToConsul(datacenter string) api.ConfigEntry {
 	var services []capi.ExportedService
 	for _, service := range in.Spec.Services {
 		services = append(services, service.toConsul())
 	}
-	return &capi.ServiceExportsConfigEntry{
+	return &capi.PartitionExportsConfigEntry{
+		Name:     in.Name,
 		Services: services,
 		Meta:     meta(datacenter),
 	}
@@ -167,19 +168,19 @@ func (in *ExportedService) toConsul() capi.ExportedService {
 	}
 }
 
-func (in *ServiceExports) MatchesConsul(candidate api.ConfigEntry) bool {
-	configEntry, ok := candidate.(*capi.ServiceExportsConfigEntry)
+func (in *PartitionExports) MatchesConsul(candidate api.ConfigEntry) bool {
+	configEntry, ok := candidate.(*capi.PartitionExportsConfigEntry)
 	if !ok {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceExportsConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.PartitionExportsConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 
 }
 
-func (in *ServiceExports) Validate(_ bool) error {
+func (in *PartitionExports) Validate(_ bool) error {
 	return nil
 }
 
-func (in *ServiceExports) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *PartitionExports) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
 }

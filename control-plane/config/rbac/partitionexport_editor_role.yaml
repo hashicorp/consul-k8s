@@ -1,13 +1,13 @@
-# permissions for end users to edit serviceexports.
+# permissions for end users to edit partitionexports.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: serviceexport-editor-role
+  name: partitionexport-editor-role
 rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
-  - serviceexports
+  - partitionexports
   verbs:
   - create
   - delete
@@ -19,6 +19,6 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
-  - serviceexports/status
+  - partitionexports/status
   verbs:
   - get

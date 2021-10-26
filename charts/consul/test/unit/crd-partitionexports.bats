@@ -2,17 +2,17 @@
 
 load _helpers
 
-@test "serviceExports/CustomerResourceDefinition: disabled by default" {
+@test "partitionExports/CustomerResourceDefinition: disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/crd-serviceexports.yaml  \
+      -s templates/crd-partitionexports.yaml  \
       .
 }
 
-@test "serviceExports/CustomerResourceDefinition: enabled with controller.enabled=true" {
+@test "partitionExports/CustomerResourceDefinition: enabled with controller.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/crd-serviceexports.yaml  \
+      -s templates/crd-partitionexports.yaml  \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
       # The generated CRDs have "---" at the top which results in two objects

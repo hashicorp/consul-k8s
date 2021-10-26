@@ -1,7 +1,7 @@
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: ServiceExport
+kind: PartitionExport
 metadata:
-  name: serviceexport-sample
+  name: exports
 spec:
   # Add fields here
   foo: bar

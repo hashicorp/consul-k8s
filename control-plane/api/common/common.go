@@ -8,14 +8,14 @@ const (
 	ServiceRouter      string = "servicerouter"
 	ServiceSplitter    string = "servicesplitter"
 	ServiceIntentions  string = "serviceintentions"
-	ServiceExports     string = "serviceexports"
+	PartitionExports   string = "partitionexports"
 	IngressGateway     string = "ingressgateway"
 	TerminatingGateway string = "terminatinggateway"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
-	Exports                string = "exports"
 	DefaultConsulNamespace string = "default"
+	DefaultConsulPartition string = "default"
 	WildcardNamespace      string = "*"
 
 	SourceKey        string = "external-source"

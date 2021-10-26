@@ -12,20 +12,21 @@ import (
 )
 
 // Test MatchesConsul for cases that should return true.
-func TestServiceExports_MatchesConsul(t *testing.T) {
+func TestPartitionExports_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours    ServiceExports
+		Ours    PartitionExports
 		Theirs  capi.ConfigEntry
 		Matches bool
 	}{
 		"empty fields matches": {
-			Ours: ServiceExports{
+			Ours: PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: common.Exports,
+					Name: common.DefaultConsulPartition,
 				},
-				Spec: ServiceExportsSpec{},
+				Spec: PartitionExportsSpec{},
 			},
-			Theirs: &capi.ServiceExportsConfigEntry{
+			Theirs: &capi.PartitionExportsConfigEntry{
+				Name:        common.DefaultConsulPartition,
 				CreateIndex: 1,
 				ModifyIndex: 2,
 				Meta: map[string]string{
@@ -36,11 +37,11 @@ func TestServiceExports_MatchesConsul(t *testing.T) {
 			Matches: true,
 		},
 		"all fields set matches": {
-			Ours: ServiceExports{
+			Ours: PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: common.Exports,
+					Name: common.DefaultConsulPartition,
 				},
-				Spec: ServiceExportsSpec{
+				Spec: PartitionExportsSpec{
 					Services: []ExportedService{
 						{
 							Name:      "service-frontend",
@@ -69,8 +70,8 @@ func TestServiceExports_MatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			Theirs: &capi.ServiceExportsConfigEntry{
-				Partition: "default",
+			Theirs: &capi.PartitionExportsConfigEntry{
+				Name: common.DefaultConsulPartition,
 				Services: []capi.ExportedService{
 					{
 						Name:      "service-frontend",
@@ -107,15 +108,15 @@ func TestServiceExports_MatchesConsul(t *testing.T) {
 			Matches: true,
 		},
 		"mismatched types does not match": {
-			Ours: ServiceExports{
+			Ours: PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: common.Exports,
+					Name: common.DefaultConsulPartition,
 				},
-				Spec: ServiceExportsSpec{},
+				Spec: PartitionExportsSpec{},
 			},
 			Theirs: &capi.ServiceConfigEntry{
-				Name: common.Exports,
-				Kind: capi.ServiceExports,
+				Name: common.DefaultConsulPartition,
+				Kind: capi.PartitionExports,
 			},
 			Matches: false,
 		},
@@ -127,19 +128,20 @@ func TestServiceExports_MatchesConsul(t *testing.T) {
 	}
 }
 
-func TestServiceExports_ToConsul(t *testing.T) {
+func TestPartitionExports_ToConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours ServiceExports
-		Exp  *capi.ServiceExportsConfigEntry
+		Ours PartitionExports
+		Exp  *capi.PartitionExportsConfigEntry
 	}{
 		"empty fields": {
-			Ours: ServiceExports{
+			Ours: PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: common.Exports,
+					Name: common.DefaultConsulPartition,
 				},
-				Spec: ServiceExportsSpec{},
+				Spec: PartitionExportsSpec{},
 			},
-			Exp: &capi.ServiceExportsConfigEntry{
+			Exp: &capi.PartitionExportsConfigEntry{
+				Name: common.DefaultConsulPartition,
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -147,11 +149,11 @@ func TestServiceExports_ToConsul(t *testing.T) {
 			},
 		},
 		"every field set": {
-			Ours: ServiceExports{
+			Ours: PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: common.Exports,
+					Name: common.DefaultConsulPartition,
 				},
-				Spec: ServiceExportsSpec{
+				Spec: PartitionExportsSpec{
 					Services: []ExportedService{
 						{
 							Name:      "service-frontend",
@@ -180,7 +182,8 @@ func TestServiceExports_ToConsul(t *testing.T) {
 					},
 				},
 			},
-			Exp: &capi.ServiceExportsConfigEntry{
+			Exp: &capi.PartitionExportsConfigEntry{
+				Name: common.DefaultConsulPartition,
 				Services: []capi.ExportedService{
 					{
 						Name:      "service-frontend",
@@ -217,49 +220,49 @@ func TestServiceExports_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			serviceExports, ok := act.(*capi.ServiceExportsConfigEntry)
+			partitionExports, ok := act.(*capi.PartitionExportsConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, serviceExports)
+			require.Equal(t, c.Exp, partitionExports)
 		})
 	}
 }
 
-func TestServiceExports_AddFinalizer(t *testing.T) {
-	serviceExports := &ServiceExports{}
-	serviceExports.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, serviceExports.ObjectMeta.Finalizers)
+func TestPartitionExports_AddFinalizer(t *testing.T) {
+	partitionExports := &PartitionExports{}
+	partitionExports.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, partitionExports.ObjectMeta.Finalizers)
 }
 
-func TestServiceExports_RemoveFinalizer(t *testing.T) {
-	serviceExports := &ServiceExports{
+func TestPartitionExports_RemoveFinalizer(t *testing.T) {
+	partitionExports := &PartitionExports{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	serviceExports.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, serviceExports.ObjectMeta.Finalizers)
+	partitionExports.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, partitionExports.ObjectMeta.Finalizers)
 }
 
-func TestServiceExports_SetSyncedCondition(t *testing.T) {
-	serviceExports := &ServiceExports{}
-	serviceExports.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+func TestPartitionExports_SetSyncedCondition(t *testing.T) {
+	partitionExports := &PartitionExports{}
+	partitionExports.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, serviceExports.Status.Conditions[0].Status)
-	require.Equal(t, "reason", serviceExports.Status.Conditions[0].Reason)
-	require.Equal(t, "message", serviceExports.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, partitionExports.Status.Conditions[0].Status)
+	require.Equal(t, "reason", partitionExports.Status.Conditions[0].Reason)
+	require.Equal(t, "message", partitionExports.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, serviceExports.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, partitionExports.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
-func TestServiceExports_SetLastSyncedTime(t *testing.T) {
-	serviceExports := &ServiceExports{}
+func TestPartitionExports_SetLastSyncedTime(t *testing.T) {
+	partitionExports := &PartitionExports{}
 	syncedTime := metav1.NewTime(time.Now())
-	serviceExports.SetLastSyncedTime(&syncedTime)
+	partitionExports.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, &syncedTime, serviceExports.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, partitionExports.Status.LastSyncedTime)
 }
 
-func TestServiceExports_GetSyncedConditionStatus(t *testing.T) {
+func TestPartitionExports_GetSyncedConditionStatus(t *testing.T) {
 	cases := []corev1.ConditionStatus{
 		corev1.ConditionUnknown,
 		corev1.ConditionFalse,
@@ -267,7 +270,7 @@ func TestServiceExports_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			serviceExports := &ServiceExports{
+			partitionExports := &PartitionExports{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -276,57 +279,57 @@ func TestServiceExports_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, serviceExports.SyncedConditionStatus())
+			require.Equal(t, status, partitionExports.SyncedConditionStatus())
 		})
 	}
 }
 
-func TestServiceExports_GetConditionWhenStatusNil(t *testing.T) {
-	require.Nil(t, (&ServiceExports{}).GetCondition(ConditionSynced))
+func TestPartitionExports_GetConditionWhenStatusNil(t *testing.T) {
+	require.Nil(t, (&PartitionExports{}).GetCondition(ConditionSynced))
 }
 
-func TestServiceExports_SyncedConditionStatusWhenStatusNil(t *testing.T) {
-	require.Equal(t, corev1.ConditionUnknown, (&ServiceExports{}).SyncedConditionStatus())
+func TestPartitionExports_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+	require.Equal(t, corev1.ConditionUnknown, (&PartitionExports{}).SyncedConditionStatus())
 }
 
-func TestServiceExports_SyncedConditionWhenStatusNil(t *testing.T) {
-	status, reason, message := (&ServiceExports{}).SyncedCondition()
+func TestPartitionExports_SyncedConditionWhenStatusNil(t *testing.T) {
+	status, reason, message := (&PartitionExports{}).SyncedCondition()
 	require.Equal(t, corev1.ConditionUnknown, status)
 	require.Equal(t, "", reason)
 	require.Equal(t, "", message)
 }
 
-func TestServiceExports_ConsulKind(t *testing.T) {
-	require.Equal(t, capi.ServiceExports, (&ServiceExports{}).ConsulKind())
+func TestPartitionExports_ConsulKind(t *testing.T) {
+	require.Equal(t, capi.PartitionExports, (&PartitionExports{}).ConsulKind())
 }
 
-func TestServiceExports_KubeKind(t *testing.T) {
-	require.Equal(t, "serviceexports", (&ServiceExports{}).KubeKind())
+func TestPartitionExports_KubeKind(t *testing.T) {
+	require.Equal(t, "partitionexports", (&PartitionExports{}).KubeKind())
 }
 
-func TestServiceExports_ConsulName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceExports{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+func TestPartitionExports_ConsulName(t *testing.T) {
+	require.Equal(t, "foo", (&PartitionExports{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
 }
 
-func TestServiceExports_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceExports{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+func TestPartitionExports_KubernetesName(t *testing.T) {
+	require.Equal(t, "foo", (&PartitionExports{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
 }
 
-func TestServiceExports_ConsulNamespace(t *testing.T) {
-	require.Equal(t, common.DefaultConsulNamespace, (&ServiceExports{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
+func TestPartitionExports_ConsulNamespace(t *testing.T) {
+	require.Equal(t, common.DefaultConsulNamespace, (&PartitionExports{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
 }
 
-func TestServiceExports_ConsulGlobalResource(t *testing.T) {
-	require.True(t, (&ServiceExports{}).ConsulGlobalResource())
+func TestPartitionExports_ConsulGlobalResource(t *testing.T) {
+	require.True(t, (&PartitionExports{}).ConsulGlobalResource())
 }
 
-func TestServiceExports_ObjectMeta(t *testing.T) {
+func TestPartitionExports_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	ServiceExports := &ServiceExports{
+	partitionExports := &PartitionExports{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, ServiceExports.GetObjectMeta())
+	require.Equal(t, meta, partitionExports.GetObjectMeta())
 }
