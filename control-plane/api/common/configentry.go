@@ -69,7 +69,7 @@ type ConfigEntryResource interface {
 	metav1.Object
 }
 
-// ConsulMeta contains metadata which can represents installation specific
+// ConsulMeta contains metadata which represents installation specific
 // information about Consul.
 type ConsulMeta struct {
 	// PartitionsEnabled indicates that a user is running Consul Enterprise
