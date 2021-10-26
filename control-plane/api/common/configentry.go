@@ -70,8 +70,12 @@ type ConfigEntryResource interface {
 }
 
 type ConsulMeta struct {
+	// PartitionsEnabled indicates that a user is running Consul Enterprise
+	// with version 1.11+ which supports Admin Partitions.
 	PartitionsEnabled bool
-	Partitions        string
+	// Partition is the name of the Admin Partition in Consul that the config
+	// entry will be created in.
+	Partition string
 
 	// NamespacesEnabled indicates that a user is running Consul Enterprise
 	// with version 1.7+ which supports namespaces.

@@ -269,6 +269,7 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validatePartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -447,6 +448,19 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 		for i, source := range in.Spec.Sources {
 			if source.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `Consul Enterprise namespaces must be enabled to set source.namespace`))
+			}
+		}
+	}
+	return errs
+}
+
+func (in *ServiceIntentions) validatePartitions(partitionsEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	if !partitionsEnabled {
+		for i, source := range in.Spec.Sources {
+			if source.Partition != "" {
+				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
 			}
 		}
 	}

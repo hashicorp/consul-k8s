@@ -1,13 +1,19 @@
 package v1alpha1
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const PartitionExportsKubeKind = "partitionexports"
@@ -178,7 +184,16 @@ func (in *PartitionExports) MatchesConsul(candidate api.ConfigEntry) bool {
 
 }
 
-func (in *PartitionExports) Validate(_ common.ConsulMeta) error {
+func (in *PartitionExports) Validate(consulMeta common.ConsulMeta) error {
+	if !consulMeta.PartitionsEnabled {
+		return apierrors.NewForbidden(
+			schema.GroupResource{Group: ConsulHashicorpGroup, Resource: common.PartitionExports},
+			in.KubernetesName(),
+			errors.New("Consul Enterprise Admin Partitions must be enabled to create PartitionExports"))
+	}
+	if in.Name != consulMeta.Partition {
+		return field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be the same name as the partition, "%s"`, in.KubeKind(), consulMeta.Partition))
+	}
 	return nil
 }
 

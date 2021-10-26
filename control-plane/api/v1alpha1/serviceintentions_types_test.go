@@ -602,9 +602,10 @@ func TestServiceIntentions_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceIntentions
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
-		"namespaces enabled: valid": {
+		"partitions enabled: valid": {
 			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-matter",
@@ -656,6 +657,59 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"namespaces enabled: valid": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Namespace: "web",
+							Action:    "allow",
+						},
+						{
+							Name:      "db",
+							Namespace: "db",
+							Action:    "deny",
+						},
+						{
+							Name:      "bar",
+							Namespace: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/foo",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"namespaces disabled: valid": {
@@ -703,6 +757,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"no sources": {
@@ -1182,10 +1237,84 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`spec.sources[2].namespace: Invalid value: "namespace-d": Consul Enterprise namespaces must be enabled to set source.namespace`,
 			},
 		},
+		"partitions disabled: single source partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-d",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+			},
+		},
+		"partitions disabled: multiple source partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: Destination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Partition: "partition-first",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-d",
+							Partition: "partition-foo",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+				`spec.sources[1].partition: Invalid value: "partition-first": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+				`spec.sources[2].partition: Invalid value: "partition-foo": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled})
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

@@ -138,9 +138,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	partitionsEnabled := c.httpFlags.Partition() != ""
 	consulMeta := common.ConsulMeta{
-		PartitionsEnabled:    false,
-		Partitions:           c.httpFlags.Partition(),
+		PartitionsEnabled:    partitionsEnabled,
+		Partition:            c.httpFlags.Partition(),
 		NamespacesEnabled:    c.flagEnableNamespaces,
 		DestinationNamespace: c.flagConsulDestinationNamespace,
 		Mirroring:            c.flagEnableNSMirroring,

@@ -22,6 +22,7 @@ func TestValidatePartitionExports(t *testing.T) {
 	cases := map[string]struct {
 		existingResources []runtime.Object
 		newResource       *PartitionExports
+		consulMeta        common.ConsulMeta
 		expAllow          bool
 		expErrMessage     string
 	}{
@@ -32,6 +33,10 @@ func TestValidatePartitionExports(t *testing.T) {
 					Name: otherPartition,
 				},
 				Spec: PartitionExportsSpec{},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
 			},
 			expAllow: true,
 		},
@@ -55,18 +60,40 @@ func TestValidatePartitionExports(t *testing.T) {
 					},
 				},
 			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
+			},
 			expAllow:      false,
 			expErrMessage: "partitionexports resource already defined - only one partitionexports entry is supported per Kubernetes cluster",
 		},
-		"name not exports": {
+		"name not partition name": {
 			existingResources: []runtime.Object{},
 			newResource: &PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "local",
 				},
 			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
+			},
 			expAllow:      false,
-			expErrMessage: "partitionexports resource name must be the same name as the partition, \"other\"",
+			expErrMessage: "name: Invalid value: \"local\": partitionexports resource name must be the same name as the partition, \"other\"",
+		},
+		"partitions disabled": {
+			existingResources: []runtime.Object{},
+			newResource: &PartitionExports{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: otherPartition,
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: false,
+				Partition:         "",
+			},
+			expAllow:      false,
+			expErrMessage: "partitionexports.consul.hashicorp.com \"other\" is forbidden: Consul Enterprise Admin Partitions must be enabled to create PartitionExports",
 		},
 	}
 	for name, c := range cases {
@@ -84,8 +111,8 @@ func TestValidatePartitionExports(t *testing.T) {
 				Client:       client,
 				ConsulClient: nil,
 				Logger:       logrtest.TestLogger{T: t},
-				ConsulMeta:   common.ConsulMeta{Partitions: otherPartition},
 				decoder:      decoder,
+				ConsulMeta:   c.consulMeta,
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

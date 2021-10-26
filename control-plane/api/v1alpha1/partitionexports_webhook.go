@@ -43,12 +43,6 @@ func (v *PartitionExportsWebhook) Handle(ctx context.Context, req admission.Requ
 	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", exports.KubernetesName())
 
-		if exports.KubernetesName() != v.ConsulMeta.Partitions {
-			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf(`%s resource name must be the same name as the partition, "%s"`,
-					exports.KubeKind(), v.ConsulMeta.Partitions))
-		}
-
 		if err := v.Client.List(ctx, &exportsList); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
@@ -58,6 +52,10 @@ func (v *PartitionExportsWebhook) Handle(ctx context.Context, req admission.Requ
 				fmt.Errorf("%s resource already defined - only one partitionexports entry is supported per Kubernetes cluster",
 					exports.KubeKind()))
 		}
+	}
+
+	if err := exports.Validate(v.ConsulMeta); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	return admission.Allowed(fmt.Sprintf("valid %s request", exports.KubeKind()))

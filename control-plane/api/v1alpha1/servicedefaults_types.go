@@ -240,7 +240,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 
 // Validate validates the fields provided in the spec of the ServiceDefaults and
 // returns an error which lists all invalid fields in the resource spec.
-func (in *ServiceDefaults) Validate(_ common.ConsulMeta) error {
+func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -257,7 +257,7 @@ func (in *ServiceDefaults) Validate(_ common.ConsulMeta) error {
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"))...)
+	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 
 	if len(allErrs) > 0 {
@@ -269,16 +269,16 @@ func (in *ServiceDefaults) Validate(_ common.ConsulMeta) error {
 	return nil
 }
 
-func (in *Upstreams) validate(path *field.Path) field.ErrorList {
+func (in *Upstreams) validate(path *field.Path, partitionsEnabled bool) field.ErrorList {
 	if in == nil {
 		return nil
 	}
 	var errs field.ErrorList
-	if err := in.Defaults.validate(path.Child("defaults"), defaultUpstream); err != nil {
+	if err := in.Defaults.validate(path.Child("defaults"), defaultUpstream, partitionsEnabled); err != nil {
 		errs = append(errs, err...)
 	}
 	for i, override := range in.Overrides {
-		if err := override.validate(path.Child("overrides").Index(i), overrideUpstream); err != nil {
+		if err := override.validate(path.Child("overrides").Index(i), overrideUpstream, partitionsEnabled); err != nil {
 			errs = append(errs, err...)
 		}
 	}
@@ -297,7 +297,7 @@ func (in *Upstreams) toConsul() *capi.UpstreamConfiguration {
 	return upstreams
 }
 
-func (in *Upstream) validate(path *field.Path, kind string) field.ErrorList {
+func (in *Upstream) validate(path *field.Path, kind string, partitionsEnabled bool) field.ErrorList {
 	if in == nil {
 		return nil
 	}
@@ -311,6 +311,9 @@ func (in *Upstream) validate(path *field.Path, kind string) field.ErrorList {
 		if in.Name == "" {
 			errs = append(errs, field.Invalid(path.Child("name"), in.Name, "upstream.name for an override upstream cannot be \"\""))
 		}
+	}
+	if !partitionsEnabled && in.Partition != "" {
+		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "Consul Enterprise Admin Partitions must be enabled to set upstream.partition"))
 	}
 	if err := in.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		errs = append(errs, err)
