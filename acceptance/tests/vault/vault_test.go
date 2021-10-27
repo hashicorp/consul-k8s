@@ -33,7 +33,7 @@ func TestVault_Create(t *testing.T) {
 	_, err := vaultClient.Logical().Write("consul/data/secret/test", params)
 	require.NoError(t, err)
 
-	// Validate that the Auth Methods exist.
+	// Validate that the Auth Method exists.
 	authList, err := vaultClient.Sys().ListAuth()
 	require.NoError(t, err)
 	logger.Log(t, "Auth List: ", authList)

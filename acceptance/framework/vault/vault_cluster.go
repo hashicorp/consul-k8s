@@ -31,8 +31,8 @@ import (
 	// then also call bootstrap() to setup the vault cluster for testing.
 	Create(t *testing.T, ctx environment.TestContext)
 
-	// bootstrap will execute the Init(), Unseal() process and bootstrap the vault cluster by enabling the KV2 secret
-	// engine and also enabling the Kube Auth Method.
+	// bootstrap will init and unseal the Vault cluster and enable the KV2 secret
+	// engine and the Kube Auth Method.
 	bootstrap(t *testing.T, ctx environment.TestContext)
 
 	// Destroy will do a helm uninstall of the Vault installation and then delete the data PVC used by Vault and the
@@ -148,8 +148,8 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 	return vaultClient
 }
 
-// bootstrap runs Init, Unseals the Vault installation
-// and then does the setup of Auth Methods and Enables Secrets Engines.
+// bootstrap initializes and unseals the Vault installation.
+// It then sets up Kubernetes auth method and enables secrets engines.
 func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 
 	v.vaultClient = v.SetupVaultClient(t)
@@ -262,7 +262,6 @@ func defaultVaultValues() map[string]string {
 	return map[string]string{
 		"server.replicas":        "1",
 		"server.bootstrapExpect": "1",
-		//"ui.enabled":             "true",
 		"injector.enabled": "true",
 		"global.enabled":   "true",
 	}
