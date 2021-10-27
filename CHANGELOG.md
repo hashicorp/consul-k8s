@@ -5,9 +5,11 @@
 FEATURES:
 * Control Plane
   * Add `gossip-encryption-autogenerate` subcommand to generate a random 32 byte Kubernetes secret to be used as a gossip encryption key. [[GH-772](https://github.com/hashicorp/consul-k8s/pull/772)]
+  * Add support for `partition-exports` config entry. [[GH-802](https://github.com/hashicorp/consul-k8s/pull/802)], [[GH-803](https://github.com/hashicorp/consul-k8s/pull/803)]
 * Helm Chart
   * Add automatic generation of gossip encryption with `global.gossipEncryption.autoGenerate=true`. [[GH-738](https://github.com/hashicorp/consul-k8s/pull/738)]
   * Add support for configuring resources for mesh gateway `service-init` container. [[GH-758](https://github.com/hashicorp/consul-k8s/pull/758)]
+  * Add support for `PartitionExports` CRD. [[GH-802](https://github.com/hashicorp/consul-k8s/pull/802)], [[GH-803](https://github.com/hashicorp/consul-k8s/pull/803)]
 
 IMPROVEMENTS:
 * Control Plane
