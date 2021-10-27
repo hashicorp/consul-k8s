@@ -2,6 +2,7 @@ package vault
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -38,4 +39,5 @@ func TestVault_Create(t *testing.T) {
 	require.NoError(t, err)
 	logger.Log(t, "Auth List: ", authList)
 	require.NotNil(t, authList["kubernetes/"])
+	time.Sleep(time.Second * 60)
 }

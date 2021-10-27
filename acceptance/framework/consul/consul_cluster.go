@@ -114,7 +114,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul")
+	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm")
 
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 

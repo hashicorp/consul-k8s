@@ -3,7 +3,10 @@ package vault
 import (
 	"context"
 	"fmt"
-	"strings"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 	"time"
 
@@ -12,43 +15,17 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-/*
-	// High level description of the functions implemented for the VaultCluster object:
-
-	// Create will install a vault cluster via helm using the default config defined at the end of this file. It will
-	// then also call bootstrap() to setup the vault cluster for testing.
-	Create(t *testing.T, ctx environment.TestContext)
-
-	// bootstrap will init and unseal the Vault cluster and enable the KV2 secret
-	// engine and the Kube Auth Method.
-	bootstrap(t *testing.T, ctx environment.TestContext)
-
-	// Destroy will do a helm uninstall of the Vault installation and then delete the data PVC used by Vault and the
-	// helm secrets.
-	Destroy(t *testing.T)
-
-	// SetupVaultClient will setup the port-forwarding to the Vault server so that we can create a vault client connection.
-	// This is run as part of Bootstrap.
-	SetupVaultClient(t *testing.T) *vapi.Client
-
-	// VaultClient returns the client that was built as part of SetupVaultClient.
-	VaultClient(t *testing.T) *vapi.Client
-*/
-
 const (
-	vaultNS = "default"
+	vaultNS           = "default"
+	vaultChartVersion = "0.17.0"
+	vaultRootToken    = "abcd1234"
 )
 
 // VaultCluster
@@ -58,8 +35,8 @@ type VaultCluster struct {
 
 	vaultHelmOptions *helm.Options
 	vaultReleaseName string
+	vaultChartName   string
 	vaultClient      *vapi.Client
-	rootToken        string
 
 	kubectlOptions *terratestk8s.KubectlOptions
 	values         map[string]string
@@ -91,7 +68,11 @@ func NewVaultCluster(
 		SetValues:      defaultVaultValues(),
 		KubectlOptions: kopts,
 		Logger:         logger,
+		Version:        vaultChartVersion,
 	}
+	// Add the vault helm repo in case it is missing, and do an update so we can utilise `vaultChartVersion` to install.
+	helm.AddRepo(t, &helm.Options{}, "hashicorp/vault", "https://helm.releases.hashicorp.com")
+	helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
 
 	return &VaultCluster{
 		ctx:                ctx,
@@ -106,6 +87,7 @@ func NewVaultCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		vaultReleaseName:   releaseName,
+		vaultChartName:     fmt.Sprintf("vault-%s", vaultChartVersion),
 	}
 }
 
@@ -148,37 +130,14 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 	return vaultClient
 }
 
-// bootstrap initializes and unseals the Vault installation.
-// It then sets up Kubernetes auth method and enables secrets engines.
+// bootstrap sets up Kubernetes auth method and enables secrets engines.
 func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 
 	v.vaultClient = v.SetupVaultClient(t)
+	v.vaultClient.SetToken(vaultRootToken)
 
-	// Init the Vault Cluster and store the rootToken.
-	initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
-		// Init the cluster and only request a single Secret to be used for Unsealing.
-		SecretShares:      1,
-		SecretThreshold:   1,
-		StoredShares:      1,
-		RecoveryShares:    0,
-		RecoveryThreshold: 0,
-	})
-	if err != nil {
-		t.Fatal("unable to init Vault cluster", "err", err)
-	}
-	// Store the RootToken and set the client to use it so it can Unseal and finish bootstrapping.
-	v.rootToken = initResp.RootToken
-	v.vaultClient.SetToken(v.rootToken)
-
-	// Unseal the Vault Cluster using the Unseal Keys from Init().
-	sealResp, err := v.vaultClient.Sys().Unseal(initResp.KeysB64[0])
-	if err != nil {
-		t.Fatal("unable to unseal Vault cluster", "err", err)
-	}
-	require.Equal(t, false, sealResp.Sealed)
-
-	// Enable the KV-V2 Secrets engine
-	err = v.vaultClient.Sys().Mount("consul", &vapi.MountInput{
+	// Enable the KV-V2 Secrets engine.
+	err := v.vaultClient.Sys().Mount("consul", &vapi.MountInput{
 		Type:   "kv-v2",
 		Config: vapi.MountConfigInput{},
 	})
@@ -197,7 +156,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	}
 	// We need to kubectl exec this one on the vault server:
 	// This is taken from https://learn.hashicorp.com/tutorials/vault/kubernetes-google-cloud-gke?in=vault/kubernetes#configure-kubernetes-authentication
-	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", v.rootToken)
+	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)
@@ -214,7 +173,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, "vault")
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, v.vaultChartName)
 
 	// Install Vault.
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
@@ -231,38 +190,24 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	v.bootstrap(t, ctx)
 }
 
-// Destroy issues an helm delete and deletes the PVC + any helm secrets related to the release that are leftover.
+// Destroy issues a helm delete and deletes the PVC + any helm secrets related to the release that are leftover.
 func (v *VaultCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, v.kubectlOptions, v.debugDirectory, "release="+v.vaultReleaseName)
-
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
-	_ = helm.DeleteE(t, v.vaultHelmOptions, v.vaultReleaseName, false)
-
-	// Delete PVCs, these are the only parts that need to be cleaned up in Vault installs.
-	err := v.kubernetesClient.CoreV1().PersistentVolumeClaims(v.vaultHelmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", v.vaultReleaseName)})
-	require.NoError(t, err)
-
-	// Delete any secrets that have v.releaseName in their name, this is only needed to delete the Helm release secret if it is still around.
-	secrets, err := v.kubernetesClient.CoreV1().Secrets(v.vaultHelmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
-	require.NoError(t, err)
-	for _, secret := range secrets.Items {
-		if strings.Contains(secret.Name, v.vaultReleaseName) {
-			err := v.kubernetesClient.CoreV1().Secrets(v.vaultHelmOptions.KubectlOptions.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
-			if !errors.IsNotFound(err) {
-				require.NoError(t, err)
-			}
-		}
-	}
+	_ = helm.DeleteE(t, v.vaultHelmOptions, v.vaultReleaseName, true)
+	// We do not need to do any PVC deletion in vault dev mode.
 }
 
 func defaultVaultValues() map[string]string {
 	return map[string]string{
-		"server.replicas":        "1",
-		"server.bootstrapExpect": "1",
-		"injector.enabled": "true",
-		"global.enabled":   "true",
+		"server.replicas":         "1",
+		"server.dev.enabled":      "true",
+		"server.dev.devRootToken": vaultRootToken,
+		"server.bootstrapExpect":  "1",
+		"injector.enabled":        "true",
+		"global.enabled":          "true",
 	}
 }
