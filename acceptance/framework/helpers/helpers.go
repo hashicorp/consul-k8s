@@ -57,18 +57,14 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 	// Wait for all pods in the "default" namespace to exit. A previous
 	// release may not be listed by Helm but its pods may still be terminating.
 	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
-		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("chart=%s", chartName)})
 		require.NoError(r, err)
 		if len(pods.Items) > 0 {
 			var podNames []string
 			for _, p := range pods.Items {
-				if strings.Contains(p.Name, chartName) {
-					podNames = append(podNames, p.Name)
-				}
+				podNames = append(podNames, p.Name)
 			}
-			if len(podNames) > 0 {
-				r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
-			}
+			r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
 		}
 	})
 }
