@@ -183,6 +183,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", common.Mesh)
 		return 1
 	}
+	if err = (&controller.PartitionExportsController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(common.PartitionExports),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.PartitionExports)
+		return 1
+	}
 	if err = (&controller.ServiceRouterController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
@@ -271,6 +280,15 @@ func (c *Command) Run(args []string) int {
 				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.Mesh),
 				EnableConsulNamespaces: c.flagEnableNamespaces,
 				EnableNSMirroring:      c.flagEnableNSMirroring,
+			}})
+		mgr.GetWebhookServer().Register("/mutate-v1alpha1-partitionexports",
+			&webhook.Admission{Handler: &v1alpha1.PartitionExportsWebhook{
+				Client:                 mgr.GetClient(),
+				ConsulClient:           consulClient,
+				Logger:                 ctrl.Log.WithName("webhooks").WithName(common.PartitionExports),
+				EnableConsulNamespaces: c.flagEnableNamespaces,
+				EnableNSMirroring:      c.flagEnableNSMirroring,
+				PartitionName:          c.httpFlags.Partition(),
 			}})
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
 			&webhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
