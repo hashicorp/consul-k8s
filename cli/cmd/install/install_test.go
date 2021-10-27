@@ -54,9 +54,14 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-consul-bootstrap-acl-token",
+			Labels: map[string]string: "managed-by":"consul-k8s",
 		},
 	}
-	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"managed-by": "consul-k8s"},
+		},
+	})
 	err := c.checkForPreviousSecrets()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "found consul-acl-bootstrap-token secret from previous installations: \"test-consul-bootstrap-acl-token\" in namespace \"default\". To delete, run kubectl delete secret test-consul-bootstrap-acl-token --namespace default")
@@ -70,6 +75,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	secret = &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "irrelevant-secret",
+			Labels: map[string]string{"managed-by": "consul-k8s"},
 		},
 	}
 	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})

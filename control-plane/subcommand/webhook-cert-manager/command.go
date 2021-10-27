@@ -258,6 +258,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		}
 
 		iterLog.Info("Creating Kubernetes secret with certificate")
+		secret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 		if _, err = clientset.CoreV1().Secrets(bundle.SecretNamespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 			iterLog.Error(fmt.Sprintf("Error writing secret to API server: %s", err))
 			return err

@@ -3,7 +3,6 @@ package uninstall
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -392,7 +391,7 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 		return nil
 	}
 	for _, secret := range secrets.Items {
-		if strings.HasPrefix(secret.Name, foundReleaseName) {
+		if secret.ObjectMeta.Labels["managed-by"] == "consul-k8s" {
 			err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)

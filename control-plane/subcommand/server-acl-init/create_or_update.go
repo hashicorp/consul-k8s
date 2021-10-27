@@ -86,7 +86,8 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 		func() error {
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: secretName,
+					Name:   secretName,
+					Labels: map[string]string{"managed-by": "consul-k8s"},
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(token),

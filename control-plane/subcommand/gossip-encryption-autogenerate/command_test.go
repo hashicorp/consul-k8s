@@ -61,6 +61,7 @@ func TestRun_EarlyTerminationWithSuccessCodeIfSecretExists(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: namespace,
+			Labels:    map[string]string{"managed-by": "consul-k8s"},
 		},
 		Data: map[string][]byte{
 			secretKey: []byte(secretKey),

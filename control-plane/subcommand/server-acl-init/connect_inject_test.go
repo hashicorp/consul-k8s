@@ -54,7 +54,8 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	// Create a secret of non service-account-token type (we're using the opaque type).
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+			Name:   secretName,
+			Labels: map[string]string{"managed-by": "consul-k8s"},
 		},
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeOpaque,

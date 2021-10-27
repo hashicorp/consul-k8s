@@ -31,7 +31,8 @@ func TestRun_TokenSinkFile(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{"managed-by": "consul-k8s"},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -72,7 +73,8 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{"managed-by": "consul-k8s"},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -118,7 +120,8 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: secretName,
+				Name:   secretName,
+				Labels: map[string]string{"managed-by": "consul-k8s"},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),

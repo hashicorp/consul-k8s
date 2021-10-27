@@ -58,6 +58,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 	logger.Logf(t, "retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
 	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 	federationSecret.ResourceVersion = ""
+	federationSecret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 	require.NoError(t, err)
 	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 	require.NoError(t, err)
@@ -190,6 +191,7 @@ func TestMeshGatewaySecure(t *testing.T) {
 			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 			require.NoError(t, err)
 			federationSecret.ResourceVersion = ""
+			federationSecret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
