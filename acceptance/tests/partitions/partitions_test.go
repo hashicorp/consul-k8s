@@ -28,6 +28,7 @@ const staticClientNamespace = "ns2"
 func TestPartitionsWithoutMesh(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
+	t.Skipf("skipping because it's not supported with consul 1.8")
 
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
