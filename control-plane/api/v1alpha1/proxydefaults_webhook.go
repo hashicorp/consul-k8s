@@ -17,11 +17,10 @@ import (
 
 type ProxyDefaultsWebhook struct {
 	client.Client
-	ConsulClient           *capi.Client
-	Logger                 logr.Logger
-	decoder                *admission.Decoder
-	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
+	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -61,7 +60,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 		}
 	}
 
-	if err := proxyDefaults.Validate(v.EnableConsulNamespaces); err != nil {
+	if err := proxyDefaults.Validate(v.ConsulMeta); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))

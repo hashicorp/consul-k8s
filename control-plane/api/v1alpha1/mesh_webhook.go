@@ -17,11 +17,9 @@ import (
 
 type MeshWebhook struct {
 	client.Client
-	ConsulClient           *capi.Client
-	Logger                 logr.Logger
-	decoder                *admission.Decoder
-	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

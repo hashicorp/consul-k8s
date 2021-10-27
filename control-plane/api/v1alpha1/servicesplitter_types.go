@@ -162,10 +162,10 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceSplitterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
+func (in *ServiceSplitter) Validate(consulMeta common.ConsulMeta) error {
 	errs := in.Spec.Splits.validate(field.NewPath("spec").Child("splits"))
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -177,7 +177,7 @@ func (in *ServiceSplitter) Validate(namespacesEnabled bool) error {
 
 // DefaultNamespaceFields has no behaviour here as service-splitter have namespace fields
 // that do not default.
-func (in *ServiceSplitter) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ServiceSplitter) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 func (in ServiceSplits) toConsul() []capi.ServiceSplit {

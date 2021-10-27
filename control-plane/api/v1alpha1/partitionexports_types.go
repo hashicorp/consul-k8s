@@ -1,13 +1,19 @@
 package v1alpha1
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const PartitionExportsKubeKind = "partitionexports"
@@ -178,9 +184,39 @@ func (in *PartitionExports) MatchesConsul(candidate api.ConfigEntry) bool {
 
 }
 
-func (in *PartitionExports) Validate(_ bool) error {
+func (in *PartitionExports) Validate(consulMeta common.ConsulMeta) error {
+	var errs field.ErrorList
+	if !consulMeta.PartitionsEnabled {
+		return apierrors.NewForbidden(
+			schema.GroupResource{Group: ConsulHashicorpGroup, Resource: common.PartitionExports},
+			in.KubernetesName(),
+			errors.New("Consul Enterprise Admin Partitions must be enabled to create PartitionExports"))
+	}
+	if in.Name != consulMeta.Partition {
+		errs = append(errs, field.Invalid(field.NewPath("name"), in.Name, fmt.Sprintf(`%s resource name must be the same name as the partition, "%s"`, in.KubeKind(), consulMeta.Partition)))
+	}
+	if len(in.Spec.Services) == 0 {
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("services"), in.Spec.Services, "at least one service must be exported"))
+	}
+	for i, service := range in.Spec.Services {
+		if err := service.validate(field.NewPath("spec").Child("services").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: PartitionExportsKubeKind},
+			in.KubernetesName(), errs)
+	}
 	return nil
 }
 
-func (in *PartitionExports) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
+func (in *ExportedService) validate(path *field.Path) *field.Error {
+	if len(in.Consumers) == 0 {
+		return field.Invalid(path, in.Consumers, "service must have at least 1 consumer.")
+	}
+	return nil
+}
+
+func (in *PartitionExports) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
