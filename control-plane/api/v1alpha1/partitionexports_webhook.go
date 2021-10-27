@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,12 +17,10 @@ import (
 
 type PartitionExportsWebhook struct {
 	client.Client
-	ConsulClient           *capi.Client
-	Logger                 logr.Logger
-	decoder                *admission.Decoder
-	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
-	PartitionName          string
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
+	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -44,12 +43,6 @@ func (v *PartitionExportsWebhook) Handle(ctx context.Context, req admission.Requ
 	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", exports.KubernetesName())
 
-		if exports.KubernetesName() != v.PartitionName {
-			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf(`%s resource name must be the same name as the partition, "%s"`,
-					exports.KubeKind(), v.PartitionName))
-		}
-
 		if err := v.Client.List(ctx, &exportsList); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
@@ -59,6 +52,10 @@ func (v *PartitionExportsWebhook) Handle(ctx context.Context, req admission.Requ
 				fmt.Errorf("%s resource already defined - only one partitionexports entry is supported per Kubernetes cluster",
 					exports.KubeKind()))
 		}
+	}
+
+	if err := exports.Validate(v.ConsulMeta); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	return admission.Allowed(fmt.Sprintf("valid %s request", exports.KubeKind()))

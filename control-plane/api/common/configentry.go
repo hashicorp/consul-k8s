@@ -58,13 +58,42 @@ type ConfigEntryResource interface {
 	// DeepCopyObject should be implemented by the generated code.
 	DeepCopyObject() runtime.Object
 	// Validate returns an error if the resource is invalid.
-	Validate(namespacesEnabled bool) error
+	Validate(consulMeta ConsulMeta) error
 	// DefaultNamespaceFields sets Consul namespace fields on the config entry
 	// spec to their default values if namespaces are enabled.
-	DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string)
+	DefaultNamespaceFields(consulMeta ConsulMeta)
 
 	// ConfigEntryResource has to implement metav1.Object so that structs
 	// that implement it effectively implement client.Object which is
 	// the interface supported by controller-runtime reconcile-able resources.
 	metav1.Object
+}
+
+// ConsulMeta contains metadata which represents installation specific
+// information about Consul.
+type ConsulMeta struct {
+	// PartitionsEnabled indicates that a user is running Consul Enterprise
+	// with version 1.11+ which supports Admin Partitions.
+	PartitionsEnabled bool
+	// Partition is the name of the Admin Partition in Consul that the config
+	// entry will be created in.
+	Partition string
+
+	// NamespacesEnabled indicates that a user is running Consul Enterprise
+	// with version 1.7+ which supports namespaces.
+	NamespacesEnabled bool
+	// DestinationNamespace is the namespace in Consul that the config entry created
+	// in k8s will get mapped into. If the Consul namespace does not already exist, it will
+	// be created.
+	DestinationNamespace string
+	// Mirroring causes Consul namespaces to be created to match the
+	// k8s namespace of any config entry custom resource. Config entries will
+	// be created in the matching Consul namespace.
+	Mirroring bool
+	// Prefix works in conjunction with Mirroring.
+	// It is the prefix added to the Consul namespace to map to a specific.
+	// k8s namespace. For example, if `mirroringK8SPrefix` is set to "k8s-", a
+	// service in the k8s `staging` namespace will be registered into the
+	// `k8s-staging` Consul namespace.
+	Prefix string
 }

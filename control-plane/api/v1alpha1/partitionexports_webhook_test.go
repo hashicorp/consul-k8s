@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,7 @@ func TestValidatePartitionExports(t *testing.T) {
 	cases := map[string]struct {
 		existingResources []runtime.Object
 		newResource       *PartitionExports
+		consulMeta        common.ConsulMeta
 		expAllow          bool
 		expErrMessage     string
 	}{
@@ -30,7 +32,19 @@ func TestValidatePartitionExports(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: otherPartition,
 				},
-				Spec: PartitionExportsSpec{},
+				Spec: PartitionExportsSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service",
+							Namespace: "service-ns",
+							Consumers: []ServiceConsumer{{Partition: "other"}},
+						},
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
 			},
 			expAllow: true,
 		},
@@ -54,18 +68,98 @@ func TestValidatePartitionExports(t *testing.T) {
 					},
 				},
 			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
+			},
 			expAllow:      false,
 			expErrMessage: "partitionexports resource already defined - only one partitionexports entry is supported per Kubernetes cluster",
 		},
-		"name not exports": {
+		"name not partition name": {
 			existingResources: []runtime.Object{},
 			newResource: &PartitionExports{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "local",
 				},
+				Spec: PartitionExportsSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service",
+							Namespace: "service-ns",
+							Consumers: []ServiceConsumer{{Partition: "other"}},
+						},
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
 			},
 			expAllow:      false,
-			expErrMessage: "partitionexports resource name must be the same name as the partition, \"other\"",
+			expErrMessage: "partitionexports.consul.hashicorp.com \"local\" is invalid: name: Invalid value: \"local\": partitionexports resource name must be the same name as the partition, \"other\"",
+		},
+		"partitions disabled": {
+			existingResources: []runtime.Object{},
+			newResource: &PartitionExports{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: otherPartition,
+				},
+				Spec: PartitionExportsSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service",
+							Namespace: "service-ns",
+							Consumers: []ServiceConsumer{{Partition: "other"}},
+						},
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: false,
+				Partition:         "",
+			},
+			expAllow:      false,
+			expErrMessage: "partitionexports.consul.hashicorp.com \"other\" is forbidden: Consul Enterprise Admin Partitions must be enabled to create PartitionExports",
+		},
+		"no services": {
+			existingResources: []runtime.Object{},
+			newResource: &PartitionExports{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: otherPartition,
+				},
+				Spec: PartitionExportsSpec{
+					Services: []ExportedService{},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
+			},
+			expAllow:      false,
+			expErrMessage: "partitionexports.consul.hashicorp.com \"other\" is invalid: spec.services: Invalid value: []v1alpha1.ExportedService(nil): at least one service must be exported",
+		},
+		"service with no consumers": {
+			existingResources: []runtime.Object{},
+			newResource: &PartitionExports{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: otherPartition,
+				},
+				Spec: PartitionExportsSpec{
+					Services: []ExportedService{
+						{
+							Name:      "service",
+							Namespace: "service-ns",
+							Consumers: []ServiceConsumer{},
+						},
+					},
+				},
+			},
+			consulMeta: common.ConsulMeta{
+				PartitionsEnabled: true,
+				Partition:         otherPartition,
+			},
+			expAllow:      false,
+			expErrMessage: "partitionexports.consul.hashicorp.com \"other\" is invalid: spec.services[0]: Invalid value: []v1alpha1.ServiceConsumer(nil): service must have at least 1 consumer.",
 		},
 	}
 	for name, c := range cases {
@@ -80,11 +174,11 @@ func TestValidatePartitionExports(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &PartitionExportsWebhook{
-				Client:        client,
-				ConsulClient:  nil,
-				Logger:        logrtest.TestLogger{T: t},
-				PartitionName: otherPartition,
-				decoder:       decoder,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				decoder:      decoder,
+				ConsulMeta:   c.consulMeta,
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
