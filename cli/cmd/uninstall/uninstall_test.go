@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,6 +173,96 @@ func TestDeleteRoleBindings(t *testing.T) {
 	rolebindings, err := c.kubernetes.RbacV1().RoleBindings("default").List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	require.Len(t, rolebindings.Items, 0)
+}
+
+func TestDeleteJobs(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-job1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	job2 := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-job2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.BatchV1().Jobs("default").Create(context.Background(), job, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.BatchV1().Jobs("default").Create(context.Background(), job2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteJobs("consul", "default")
+	require.NoError(t, err)
+	jobs, err := c.kubernetes.BatchV1().Jobs("default").List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, jobs.Items, 0)
+}
+
+func TestDeleteClusterRoles(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	clusterrole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-clusterrole1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	clusterrole2 := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-clusterrole2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.RbacV1().ClusterRoles().Create(context.Background(), clusterrole, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.RbacV1().ClusterRoles().Create(context.Background(), clusterrole2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteClusterRoles("consul")
+	require.NoError(t, err)
+	clusterroles, err := c.kubernetes.RbacV1().ClusterRoles().List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, clusterroles.Items, 0)
+}
+
+func TestDeleteClusterRoleBindings(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	clusterrolebinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-clusterrolebinding1",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	clusterrolebinding2 := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-test-clusterrolebinding2",
+			Labels: map[string]string{
+				"release": "consul",
+			},
+		},
+	}
+	_, err := c.kubernetes.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterrolebinding, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = c.kubernetes.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterrolebinding2, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = c.deleteClusterRoleBindings("consul")
+	require.NoError(t, err)
+	clusterrolebindings, err := c.kubernetes.RbacV1().ClusterRoleBindings().List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, clusterrolebindings.Items, 0)
 }
 
 // getInitializedCommand sets up a command struct for tests.
