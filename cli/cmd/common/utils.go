@@ -97,7 +97,7 @@ func InitActionConfig(actionConfig *action.Configuration, namespace string, sett
 	return actionConfig, nil
 }
 
-// CheckForPreviousInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
+// CheckForInstallations uses the helm Go SDK to find helm releases in all namespaces where the chart name is
 // "consul", and returns the release name and namespace if found, or an error if not found.
 func CheckForInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (string, string, error) {
 	// Need a specific action config to call helm list, where namespace is NOT specified.

@@ -213,7 +213,7 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Pre-Install Checks", terminal.WithHeaderStyle())
 
-	// Note the logic here, common's CheckForPreviousInstallations function returns an error if
+	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found, which in the install command is what we need for a successful install.
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
 		c.UI.Output(fmt.Sprintf("existing Consul installation found (name=%s, namespace=%s) - run "+
