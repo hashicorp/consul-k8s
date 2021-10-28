@@ -75,8 +75,11 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
     
 2. Ensure you have access to the consul chart: 
 
+    ``` bash
+    helm search repo hashicorp/consul
     ```
-    $ helm search repo hashicorp/consul
+
+    ``` text
     NAME                CHART VERSION   APP VERSION DESCRIPTION
     hashicorp/consul    0.35.0          1.10.3      Official HashiCorp Consul Chart
     ```
