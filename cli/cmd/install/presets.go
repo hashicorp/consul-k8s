@@ -35,8 +35,6 @@ ui:
     enabled: true
   metrics: 
     enabled: true
-    enableAgentMetrics: true
-    agentMetricsRetentionTiome: '1m'
     provider: "prometheus"
     baseURL: http://prometheus-server 
 prometheus:
