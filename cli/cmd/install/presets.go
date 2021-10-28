@@ -33,10 +33,6 @@ ui:
   enabled: true
   service:
     enabled: true
-  metrics: 
-    enabled: true
-    provider: "prometheus"
-    baseURL: http://prometheus-server 
 prometheus:
   enabled: true
 `
