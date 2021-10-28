@@ -13,6 +13,7 @@ import (
 // enable ACLs and TLS, which are set up via Helm hooks. This allows us to verify that core service mesh functionality
 // with non-trivial Helm settings are set up appropriately with the CLI.
 func TestCLIConnectInject(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool

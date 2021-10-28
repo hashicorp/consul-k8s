@@ -22,6 +22,7 @@ const testNamespace = "ns1"
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestTerminatingGatewaySingleNamespace(t *testing.T) {
+	t.SkipNow()
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")

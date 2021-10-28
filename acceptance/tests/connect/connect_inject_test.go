@@ -18,6 +18,7 @@ import (
 
 // Test that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool
@@ -41,6 +42,7 @@ func TestConnectInject(t *testing.T) {
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_CleanupKilledPods(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool
@@ -115,6 +117,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 // Test that when Consul clients are restarted and lose all their registrations,
 // the services get re-registered and can continue to talk to each other.
 func TestConnectInject_RestartConsulClients(t *testing.T) {
+	t.SkipNow()
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
