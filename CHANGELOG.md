@@ -10,6 +10,7 @@ IMPROVEMENTS:
 * CLI
   * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
   * Add `-verbose`, `-v` flag to the `consul-k8s install` command, which outputs all logs emitted from the installation. By default, verbose is set to `false` to hide logs that show resources are not ready. [[GH-810](https://github.com/hashicorp/consul-k8s/pull/810)]
+  * Add Prometheus deployment and Consul K8s metrics integration with demo preset when installing via `-preset=demo`. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
 
 ## 0.35.0 (October 19, 2021)
 
