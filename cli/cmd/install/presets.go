@@ -17,11 +17,30 @@ var presets = map[string]interface{}{
 var demo = `
 global:
   name: consul
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
 connectInject:
   enabled: true
+  metrics: 
+    defaultEnabled: true
+    defaultEnableMerging: true
+    enableGatewayMetrics: true
 server:
   replicas: 1
   bootstrapExpect: 1
+ui: 
+  enabled: true
+  service:
+    enabled: true
+  metrics: 
+    enabled: true
+    enableAgentMetrics: true
+    agentMetricsRetentionTiome: '1m'
+    provider: "prometheus"
+    baseURL: http://prometheus-server 
+prometheus:
+  enabled: true
 `
 
 var secure = `
