@@ -1,12 +1,9 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 	"time"
 
@@ -179,15 +176,8 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 
 	// Install Vault.
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
-	// Wait for the injector pod to become Ready, but not the server.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
-	// Wait for the server pod to be PodRunning, it will not be Ready because it has not been Init+Unseal'd yet.
-	// The vault server has health checks bound to unseal status, and Unseal is done as part of bootstrap (below).
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
-		pod, err := v.kubernetesClient.CoreV1().Pods(v.vaultHelmOptions.KubectlOptions.Namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.vaultReleaseName), metav1.GetOptions{})
-		require.NoError(r, err)
-		require.Equal(r, pod.Status.Phase, corev1.PodRunning)
-	})
+	// Wait for the injector and vault server pods to become Ready.
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("helm.sh/chart=%s", v.vaultChartName))
 	// Now call bootstrap()
 	v.bootstrap(t, ctx)
 }

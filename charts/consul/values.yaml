@@ -117,6 +117,24 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
+  # secretsBackend is used to enable and disable the use of Vault as the secrets backend for the Consul on Kubernetes installation.
+  # In order to utilize this configuration it is required to have an accessible vault cluster which has been pre-configured
+  # by a Vault operator to have the Vault Kube Auth Method, KV2 + PKI secrets engines enabled as well as pre-created
+  # vault secrets, policies and roles.
+  secretsBackend:
+    vault:
+      # Enabling the Vault secrets backend will cause K8S secrets to no longer be used for the following Consul secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
+      enabled: false
+
+      # The consulServerRole must be created and have read capabilties via a Policy for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`.
+      consulServerRole: ""  # e.g. "consul-server"
+
+      # The consulClientRole must be created and have read capabilties via a Policy for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
+      consulClientRole: ""  # e.g. "consul-client"
+
   # Configures Consul's gossip encryption key, set as a Kubernetes secret
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
@@ -129,6 +147,7 @@ global:
   # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
+
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false

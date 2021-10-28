@@ -76,7 +76,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	logger.Log(t, "Waiting for pods to be ready.")
+	logger.Logf(t, "Waiting for pods to be ready.")
 
 	// Wait up to 15m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
