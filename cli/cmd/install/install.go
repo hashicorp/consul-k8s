@@ -44,6 +44,9 @@ const (
 	flagNameTimeout = "timeout"
 	defaultTimeout  = "10m"
 
+	flagNameVerbose = "verbose"
+	defaultVerbose  = false
+
 	flagNameWait = "wait"
 	defaultWait  = true
 )
@@ -65,6 +68,7 @@ type Command struct {
 	flagFileValues      []string
 	flagTimeout         string
 	timeoutDuration     time.Duration
+	flagVerbose         bool
 	flagWait            bool
 
 	flagKubeConfig  string
@@ -136,6 +140,12 @@ func (c *Command) init() {
 		Usage:   "Timeout to wait for installation to be ready.",
 	})
 	f.BoolVar(&flag.BoolVar{
+		Name:    flagNameVerbose,
+		Target:  &c.flagVerbose,
+		Default: defaultVerbose,
+		Usage:   "Output verbose logs from the install command to understand status of resources being installed.",
+	})
+	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameWait,
 		Target:  &c.flagWait,
 		Default: defaultWait,
@@ -192,8 +202,15 @@ func (c *Command) Run(args []string) int {
 	// Setup logger to stream Helm library logs
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
-		if !strings.Contains(logMsg, "not ready") {
+
+		if c.flagVerbose {
+			// Only output all logs when verbose is enabled
 			c.UI.Output(logMsg, terminal.WithLibraryStyle())
+		} else {
+			// When verbose is not enabled, output all logs except not ready messages from logs
+			if !strings.Contains(logMsg, "not ready") {
+				c.UI.Output(logMsg, terminal.WithLibraryStyle())
+			}
 		}
 	}
 
