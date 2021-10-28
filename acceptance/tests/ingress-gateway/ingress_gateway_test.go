@@ -15,6 +15,7 @@ import (
 
 // Test that ingress gateways work in a default installation and a secure installation.
 func TestIngressGateway(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool

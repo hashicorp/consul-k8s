@@ -19,6 +19,7 @@ const staticClientName = "static-client"
 // Test that prometheus metrics, when enabled, are accessible from the
 // endpoints that have been exposed on the server, client and gateways.
 func TestComponentMetrics(t *testing.T) {
+	t.SkipNow()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -87,6 +88,7 @@ func TestComponentMetrics(t *testing.T) {
 // Test that merged service and envoy metrics are accessible from the
 // endpoints that have been exposed on the service.
 func TestAppMetrics(t *testing.T) {
+	t.SkipNow()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)

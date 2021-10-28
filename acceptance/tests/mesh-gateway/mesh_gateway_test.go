@@ -22,6 +22,7 @@ const staticClientName = "static-client"
 // Test that Connect and wan federation over mesh gateways work in a default installation
 // i.e. without ACLs because TLS is required for WAN federation over mesh gateways
 func TestMeshGatewayDefault(t *testing.T) {
+	t.SkipNow()
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -126,6 +127,7 @@ func TestMeshGatewayDefault(t *testing.T) {
 // Test that Connect and wan federation over mesh gateways work in a secure installation,
 // with ACLs and TLS with and without auto-encrypt enabled.
 func TestMeshGatewaySecure(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		name              string
 		enableAutoEncrypt string

@@ -20,6 +20,7 @@ const staticServerName = "static-server"
 
 // Test that terminating gateways work in a default and secure installations.
 func TestTerminatingGateway(t *testing.T) {
+	t.SkipNow()
 	cases := []struct {
 		secure      bool
 		autoEncrypt bool
