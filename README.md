@@ -66,22 +66,24 @@ use Consul with Kubernetes, please see the
 
 Detailed installation instructions for Consul on Kubernetes are found [here](https://www.consul.io/docs/k8s/installation/overview). 
 
-1. Add the HashiCorp Helm Repository:
+1. Add the HashiCorp Helm repository:
+   
+    ``` bash
+    helm repo add hashicorp https://helm.releases.hashicorp.com
+    ```
     
-        $ helm repo add hashicorp https://helm.releases.hashicorp.com
-        "hashicorp" has been added to your repositories
-    
-2. Ensure you have access to the consul chart: 
+2. Ensure you have access to the Consul Helm chart and you see the latest chart version listed. Otherwise run `helm repo update` if you have
+   previously added the HashiCorp Helm repository. 
 
-        $ helm search repo hashicorp/consul
-        NAME                CHART VERSION   APP VERSION DESCRIPTION
-        hashicorp/consul    0.35.0          1.10.3      Official HashiCorp Consul Chart
+    ``` bash
+    helm search repo hashicorp/consul
+    ```
 
 3. Now you're ready to install Consul! To install Consul with the default configuration using Helm 3.2 run the following command below.
    This will create a `consul` Kubernetes namespace if not already present, and install Consul on the dedicated namespace. 
-
-        $ helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul
-        NAME: consul
+ 
+   ``` bash
+   helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul
 
 Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
