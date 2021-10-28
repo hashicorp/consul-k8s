@@ -208,7 +208,7 @@ func (c *Command) Run(args []string) int {
 			// Only output all logs when verbose is enabled
 			c.UI.Output(logMsg, terminal.WithLibraryStyle())
 		} else {
-			// When verbose is not enabled, output all logs except not ready messages from logs
+			// When verbose is not enabled, output all logs except not ready messages for resources
 			if !strings.Contains(logMsg, "not ready") {
 				c.UI.Output(logMsg, terminal.WithLibraryStyle())
 			}
