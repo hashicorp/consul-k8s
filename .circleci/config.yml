@@ -922,9 +922,9 @@ workflows:
       # Unit test CLI
       - unit-cli
       # Unit tests for go modules in helm and bats tests for templates
-      - unit-acceptance-framework:
-          requires:
-            - go-fmt-and-vet-acceptance
+#      - unit-acceptance-framework:
+#          requires:
+#            - go-fmt-and-vet-acceptance
       - unit-helm-gen:
           requires:
             - go-fmt-and-vet-helm-gen
@@ -961,7 +961,7 @@ workflows:
           requires:
             - dev-upload-docker
             - unit-test-helm-templates
-            - unit-acceptance-framework
+#            - unit-acceptance-framework
             - unit-cli
 #      - acceptance-tproxy:
 #          requires:
