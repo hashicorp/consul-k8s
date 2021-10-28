@@ -2,8 +2,6 @@ package vault
 
 import (
 	"fmt"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"testing"
 	"time"
 
@@ -12,6 +10,8 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"

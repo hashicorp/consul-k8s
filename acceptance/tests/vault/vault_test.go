@@ -2,19 +2,20 @@ package vault
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 const (
 	gossipKey = "3R7oLrdpkk2V0Y7yHLizyxXeS2RtaVuy07DkU15Lhws="
 )
 
-// Installs Vault, bootstraps it with the kube auth method
+// Installs Vault, bootstraps it with the Kube Auth Method
 // and then validates that the KV2 secrets engine is online
 // and the Kube Auth Method is enabled.
 func TestVault_Create(t *testing.T) {
@@ -45,9 +46,9 @@ func TestVault_Create(t *testing.T) {
 	require.NotNil(t, authList["kubernetes/"])
 }
 
-// Installs Vault, bootstraps it with secrets, policies, and kube auth method
-// then creates a gossip encryption secret and uses this to bootstrap Consul
-func TestVaultConsulGossipEncryptionKeyIntegration(t *testing.T) {
+// Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
+// then creates a gossip encryption secret and uses this to bootstrap Consul.
+func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
