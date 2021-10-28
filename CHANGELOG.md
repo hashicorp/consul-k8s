@@ -9,6 +9,7 @@ IMPROVEMENTS:
   * `kube-system` and `local-path-storage` namespaces are now excluded from connect injection by default on Kubernetes versions >= 1.21. This prevents deadlock issues when `kube-system` components go down and allows Kind to work without changing the failure policy of the mutating webhook. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
 * CLI
   * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
+  * Add Prometheus deployment and Consul K8s metrics integration with demo preset when installing via `-preset=demo`. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
 
 ## 0.35.0 (October 19, 2021)
 
