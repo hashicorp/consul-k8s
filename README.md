@@ -87,10 +87,8 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
 3. Now you're ready to install Consul! To install Consul with the default configuration using Helm 3.2 run the following command below.
    This will create a `consul` Kubernetes namespace if not already present, and install Consul on the dedicated namespace. 
  
-   ```
-   $ helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul
-   NAME: consul
-   ```
+   ``` bash
+   helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul
 
 Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
