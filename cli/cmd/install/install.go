@@ -144,7 +144,7 @@ func (c *Command) init() {
 		Aliases: []string{"v"},
 		Target:  &c.flagVerbose,
 		Default: defaultVerbose,
-		Usage:   "Output verbose logs from the install command to understand status of resources being installed.",
+		Usage:   "Output verbose logs from the install command with the status of resources being installed.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameWait,
