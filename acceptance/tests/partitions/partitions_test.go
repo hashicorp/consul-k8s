@@ -41,6 +41,9 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 		t.Skipf("skipping this test because -enable-transparent-proxy is true")
 	}
 
+	const defaultPartition = "default"
+	const secondaryPartition = "secondary"
+	const defaultNamespace = "default"
 	cases := []struct {
 		name                 string
 		destinationNamespace string
@@ -49,13 +52,13 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 	}{
 		{
 			"default namespace",
-			"default",
+			defaultNamespace,
 			false,
 			false,
 		},
 		{
 			"default namespace; secure",
-			"default",
+			defaultNamespace,
 			false,
 			true,
 		},
@@ -159,9 +162,9 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 			var partitionSvcIP string
 			if !cfg.UseKind {
 				// Get the IP of the partition service to configure the external server address in the values file for the workload cluster.
-				partitionServiceName := fmt.Sprintf("%s-partition-secret", releaseName)
+				partitionSecretName := fmt.Sprintf("%s-partition-secret", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external IP for servers")
-				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
+				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionSecretName, metav1.GetOptions{})
 				require.NoError(t, err)
 				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
 			} else {
@@ -171,11 +174,14 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 				partitionSvcIP = nodeList.Items[0].Status.Addresses[0].Address
 			}
 
-			// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
-			// this can be identified by reading the cluster config.
-			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(ctx, "kubernetes", metav1.GetOptions{})
-			require.NoError(t, err)
-			k8sAuthMethodHost := fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			var k8sAuthMethodHost string
+			if cfg.UseKind {
+				// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
+				// this can be identified by reading the cluster config.
+				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
+				require.NoError(t, err)
+				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			}
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
@@ -198,16 +204,15 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 
 				"global.adminPartitions.enabled": "true",
-				"global.adminPartitions.name":    "secondary",
+				"global.adminPartitions.name":    secondaryPartition,
 				"global.enableConsulNamespaces":  "true",
 
 				"global.tls.caCert.secretName": tlsCert,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":           "true",
-				"externalServers.hosts[0]":          partitionSvcIP,
-				"externalServers.tlsServerName":     "server.dc1.consul",
-				"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+				"externalServers.enabled":       "true",
+				"externalServers.hosts[0]":      partitionSvcIP,
+				"externalServers.tlsServerName": "server.dc1.consul",
 
 				"client.enabled":           "true",
 				"client.exposeGossipPorts": "true",
@@ -218,6 +223,7 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 				// setup partition token if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
+				clientHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
 			} else {
 				// provide CA key when auto-encrypt is disabled.
 				clientHelmValues["global.tls.caKey.secretName"] = tlsKey
@@ -289,17 +295,17 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 
 			consulClient := serverConsulCluster.SetupConsulClient(t, c.secure)
 
-			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: "default"}
-			clientQueryServerOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: "default"}
+			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
+			clientQueryServerOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: defaultPartition}
 
-			serverQueryClientOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: "secondary"}
-			clientQueryClientOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: "secondary"}
+			serverQueryClientOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: secondaryPartition}
+			clientQueryClientOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: secondaryPartition}
 
 			if !c.mirrorK8S {
-				serverQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "default"}
-				clientQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "default"}
-				serverQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "secondary"}
-				clientQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: "secondary"}
+				serverQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: defaultPartition}
+				clientQueryServerOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: defaultPartition}
+				serverQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: secondaryPartition}
+				clientQueryClientOpts = &api.QueryOptions{Namespace: c.destinationNamespace, Partition: secondaryPartition}
 			}
 
 			// Check that the ACL token is deleted.
@@ -339,14 +345,14 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 
 			logger.Log(t, "creating static-server and static-client deployments in server cluster")
 			k8s.DeployKustomize(t, serverClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if c.destinationNamespace == "default" {
+			if c.destinationNamespace == defaultNamespace {
 				k8s.DeployKustomize(t, serverClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			} else {
 				k8s.DeployKustomize(t, serverClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 			}
 			logger.Log(t, "creating static-server and static-client deployments in client cluster")
 			k8s.DeployKustomize(t, clientClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if c.destinationNamespace == "default" {
+			if c.destinationNamespace == defaultNamespace {
 				k8s.DeployKustomize(t, clientClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			} else {
 				k8s.DeployKustomize(t, clientClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
@@ -416,9 +422,9 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 				}
 
 				logger.Log(t, "creating intention")
-				_, err := consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: "default"})
+				_, err := consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: defaultPartition})
 				require.NoError(t, err)
-				_, err = consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: "secondary"})
+				_, err = consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: secondaryPartition})
 				require.NoError(t, err)
 			}
 
@@ -590,9 +596,9 @@ func TestPartitionsWithMesh(t *testing.T) {
 			var partitionSvcIP string
 			if !cfg.UseKind {
 				// Get the IP of the partition service to configure the external server address in the values file for the workload cluster.
-				partitionServiceName := fmt.Sprintf("%s-partition-secret", releaseName)
+				partitionSecretName := fmt.Sprintf("%s-partition-secret", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external IP for servers")
-				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
+				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionSecretName, metav1.GetOptions{})
 				require.NoError(t, err)
 				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
 			} else {
@@ -602,11 +608,14 @@ func TestPartitionsWithMesh(t *testing.T) {
 				partitionSvcIP = nodeList.Items[0].Status.Addresses[0].Address
 			}
 
-			// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
-			// this can be identified by reading the cluster config.
-			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
-			require.NoError(t, err)
-			k8sAuthMethodHost := fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			var k8sAuthMethodHost string
+			if cfg.UseKind {
+				// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
+				// this can be identified by reading the cluster config.
+				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
+				require.NoError(t, err)
+				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			}
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
@@ -641,10 +650,9 @@ func TestPartitionsWithMesh(t *testing.T) {
 				"global.tls.caCert.secretName": tlsCert,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":           "true",
-				"externalServers.hosts[0]":          partitionSvcIP,
-				"externalServers.tlsServerName":     "server.dc1.consul",
-				"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+				"externalServers.enabled":       "true",
+				"externalServers.hosts[0]":      partitionSvcIP,
+				"externalServers.tlsServerName": "server.dc1.consul",
 
 				"client.enabled":           "true",
 				"client.exposeGossipPorts": "true",
@@ -655,6 +663,7 @@ func TestPartitionsWithMesh(t *testing.T) {
 				// setup partition token if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
+				clientHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
 			} else {
 				// provide CA key when auto-encrypt is disabled.
 				clientHelmValues["global.tls.caKey.secretName"] = tlsKey
@@ -821,6 +830,9 @@ func TestPartitionsWithMesh(t *testing.T) {
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
 			// Server cluster.
+			// We are going to test that static-clients deployed in each partition can
+			// access the static-servers running in another partition.
+			// ie default -> secondary and secondary -> default.
 			services, _, err := consulClient.Catalog().Service(staticServerName, "", serverQueryServerOpts)
 			require.NoError(t, err)
 			require.Len(t, services, 1)
@@ -843,7 +855,7 @@ func TestPartitionsWithMesh(t *testing.T) {
 				Services: []api.ExportedService{
 					{
 						Name:      "mesh-gateway",
-						Namespace: "default",
+						Namespace: defaultNamespace,
 						Consumers: []api.ServiceConsumer{
 							{Partition: secondaryPartition},
 						},
@@ -862,7 +874,7 @@ func TestPartitionsWithMesh(t *testing.T) {
 				Services: []api.ExportedService{
 					{
 						Name:      "mesh-gateway",
-						Namespace: "default",
+						Namespace: defaultNamespace,
 						Consumers: []api.ServiceConsumer{
 							{Partition: defaultPartition},
 						},
