@@ -38,7 +38,6 @@ prometheus:
 var secure = `
 global:
   name: consul
-  enabled: true
   gossipEncryption:
     autoGenerate: true 
   tls:
