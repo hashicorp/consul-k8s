@@ -862,7 +862,7 @@ function commit_dev_mode {
    pushd "$1" > /dev/null
 
    status "Staging CHANGELOG.md and version_*.go files"
-   git add CHANGELOG.md && git add control-plane/version/version*.go
+   git add CHANGELOG.md && git add */version/version*.go
    ret=$?
 
    if test ${ret} -eq 0
