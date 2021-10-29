@@ -27,7 +27,6 @@ connectInject:
     enableGatewayMetrics: true
 server:
   replicas: 1
-  bootstrapExpect: 1
 ui: 
   enabled: true
   service:
