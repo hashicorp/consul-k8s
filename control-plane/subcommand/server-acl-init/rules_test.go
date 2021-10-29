@@ -827,7 +827,6 @@ func TestControllerRules(t *testing.T) {
 			Expected: `
 partition "part-1" {
   mesh = "write"
-  acl = "write"
   namespace "consul" {
     policy = "write"
     service_prefix "" {
@@ -846,7 +845,6 @@ partition "part-1" {
 			Expected: `
 partition "part-1" {
   mesh = "write"
-  acl = "write"
   namespace_prefix "" {
     policy = "write"
     service_prefix "" {
@@ -866,7 +864,6 @@ partition "part-1" {
 			Expected: `
 partition "part-1" {
   mesh = "write"
-  acl = "write"
   namespace_prefix "prefix-" {
     policy = "write"
     service_prefix "" {
