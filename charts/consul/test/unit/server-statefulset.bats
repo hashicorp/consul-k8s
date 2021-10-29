@@ -838,7 +838,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
@@ -1414,4 +1414,74 @@ load _helpers
       yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
   [ "${object}" = 1 ]
+}
+
+#--------------------------------------------------------------------
+# vault integration
+
+@test "server/StatefulSet: vault annotations not attached by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    . | tee /dev/stderr |
+     yq '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault annotations added when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-init-first"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: vault gossip annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.gossipEncryption.secretName=path/to/secret/key' \
+    --set 'global.gossipEncryption.secretKey=.Data.gossip.gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret/key" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
+  [ "${actual}" = '{{- with secret "path/to/secret/key" -}} {{ .Data.gossip.gossip }} {{- end -}}' ]
+}
+
+@test "server/StatefulSet: vault no GOSSIP_KEY env variable and command defines GOSSIP_KEY" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.gossipEncryption.secretName=a/b/c/d' \
+    --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
+      | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
