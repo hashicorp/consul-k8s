@@ -15,6 +15,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -193,7 +194,9 @@ func (c *Command) Run(args []string) int {
 	// Setup Consul client
 	if c.consulClient == nil {
 		var err error
-		c.consulClient, err = c.http.APIClient()
+		cfg := api.DefaultConfig()
+		c.http.MergeOntoConfig(cfg)
+		c.consulClient, err = consul.NewClient(cfg)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 			return 1

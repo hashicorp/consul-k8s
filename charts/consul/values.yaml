@@ -85,7 +85,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.10.3"
+  image: "ashwinvenkatesh/consul@sha256:e321bd719da2c2284c358846163d2b48e8fc27822ae5caba4b22c397c6e09356"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -105,7 +105,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: "hashicorp/consul-k8s-control-plane:0.35.0"
+  imageK8S: "ashwinvenkatesh/consul-k8s@sha256:e777b8f2dab5ffc10e08febc16ccf4403c4feb62465c5bdc1ac6855a6b995acb"
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running

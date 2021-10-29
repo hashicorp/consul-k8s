@@ -246,6 +246,7 @@ namespace_prefix "{{ .SyncNSMirroringPrefix }}" {
 namespace "{{ .SyncConsulDestNS }}" {
 {{- end }}
 {{- end }}
+  policy = "write"
   node_prefix "" {
     policy = "read"
   }
