@@ -42,8 +42,6 @@ global:
   datacenter: dc1
   gossipEncryption:
     autoGenerate: true 
-    secretName: "consul-gossip-encryption-key"
-    secretKey: "key"
   tls:
     enabled: true
     enableAutoEncrypt: true
