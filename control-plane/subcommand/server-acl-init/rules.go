@@ -335,6 +335,7 @@ func (c *Command) controllerRules() (string, error) {
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
+  acl = "write"
 {{- else }}
   operator = "write"
 {{- end }}
