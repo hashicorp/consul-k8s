@@ -39,7 +39,6 @@ var secure = `
 global:
   name: consul
   enabled: true
-  datacenter: dc1
   gossipEncryption:
     autoGenerate: true 
   tls:
