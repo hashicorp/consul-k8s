@@ -41,7 +41,7 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
     automatically configure the Consul and Kubernetes integration to run within
     an existing Kubernetes cluster.
 
-  * A [Docker image `hashicorp/consul-k8s-control-plane`](https://hub.docker.com/r/hashicorp/consul-k8s-plane) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
+  * A [Docker image `hashicorp/consul-k8s-control-plane`](https://hub.docker.com/r/hashicorp/consul-k8s-control-plane) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
 
   * Consul K8s CLI distributed as `consul-k8s`, to install and uninstall Consul Kubernetes. See the [Consul K8s CLI Reference](https://www.consul.io/docs/k8s/k8s-cli) for more details on usage. 
 
