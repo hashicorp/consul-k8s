@@ -41,7 +41,9 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
     automatically configure the Consul and Kubernetes integration to run within
     an existing Kubernetes cluster.
 
-  * A [Docker image `hashicorp/consul-k8s`](https://hub.docker.com/r/hashicorp/consul-k8s) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
+  * A [Docker image `hashicorp/consul-k8s-control-plane`](https://hub.docker.com/r/hashicorp/consul-k8s-plane) is available. This can be used to manually run `consul-k8s` within a scheduled environment.
+
+  * Consul K8s CLI distributed as `consul-k8s`, to install and uninstall Consul Kubernetes. See the [Consul K8s CLI Reference](https://www.consul.io/docs/k8s/k8s-cli) for more details on usage. 
 
   * Raw binaries are available in the [HashiCorp releases directory](https://releases.hashicorp.com/consul-k8s/).
     These can be used to run `consul-k8s` directly or build custom packages.
@@ -72,8 +74,8 @@ Detailed installation instructions for Consul on Kubernetes are found [here](htt
     helm repo add hashicorp https://helm.releases.hashicorp.com
     ```
     
-2. Ensure you have access to the Consul Helm chart and you see the latest chart version listed. Otherwise run `helm repo update` if you have
-   previously added the HashiCorp Helm repository. 
+2. Ensure you have access to the Consul Helm chart and you see the latest chart version listed. If you have previously added the 
+   HashiCorp Helm repository, run `helm repo update`. 
 
     ``` bash
     helm search repo hashicorp/consul
