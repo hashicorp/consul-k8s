@@ -84,6 +84,7 @@ function main {
       esac
    done
 
+   # Set dev mode for both CLI and Control Plane modules
    set_dev_mode "${sdir}" || return 1
 
 
@@ -91,6 +92,7 @@ function main {
    then
       status_stage "==> Commiting Dev Mode Changes"
       # Currently ${sdir} is consul-k8s/control-plane, but for git functions we should be in top-level, so we pass in "${sdir}/..".
+      # This will commit `version.go` for both CLI and Control Plane modules as well as the CHANGELOG.md.
       commit_dev_mode "${sdir}/.." || return 1
 
       if is_set "${do_push}"
