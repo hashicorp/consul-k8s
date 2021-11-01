@@ -72,6 +72,7 @@ func NewVaultCluster(
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
 	_, _ = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+	_, _ = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "pull", "hashicorp/vault", "--version", vaultChartVersion)
 
 	return &VaultCluster{
 		ctx:                ctx,
