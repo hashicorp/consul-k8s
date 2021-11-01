@@ -74,7 +74,7 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image": "ashwinvenkatesh/consul@sha256:7426f47fa7065e38a2488042be66325aa37cda17a3bc15e58178104ff4619c1b",
+				"global.image": "ashwinvenkatesh/consul@sha256:70c8ba1c8c7c092e34473f4d45f08f148bf52f372bce830babfdd7dbfc1ce5d4",
 
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",

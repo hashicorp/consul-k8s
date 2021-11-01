@@ -97,7 +97,7 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 
 			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-beta1",
+				"global.image":      "ashwinvenkatesh/consul@sha256:70c8ba1c8c7c092e34473f4d45f08f148bf52f372bce830babfdd7dbfc1ce5d4",
 
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
@@ -186,7 +186,7 @@ func TestPartitionsWithoutMesh(t *testing.T) {
 			// Create client cluster.
 			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-beta1",
+				"global.image":      "ashwinvenkatesh/consul@sha256:70c8ba1c8c7c092e34473f4d45f08f148bf52f372bce830babfdd7dbfc1ce5d4",
 				"global.enabled":    "false",
 
 				"global.tls.enabled":           "true",
@@ -523,7 +523,7 @@ func TestPartitionsWithMesh(t *testing.T) {
 
 			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "ashwinvenkatesh/consul@sha256:e321bd719da2c2284c358846163d2b48e8fc27822ae5caba4b22c397c6e09356",
+				"global.image":      "ashwinvenkatesh/consul@sha256:70c8ba1c8c7c092e34473f4d45f08f148bf52f372bce830babfdd7dbfc1ce5d4",
 				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:e777b8f2dab5ffc10e08febc16ccf4403c4feb62465c5bdc1ac6855a6b995acb",
 
 				"global.adminPartitions.enabled": "true",
@@ -620,7 +620,7 @@ func TestPartitionsWithMesh(t *testing.T) {
 			// Create client cluster.
 			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "ashwinvenkatesh/consul@sha256:e321bd719da2c2284c358846163d2b48e8fc27822ae5caba4b22c397c6e09356",
+				"global.image":      "ashwinvenkatesh/consul@sha256:70c8ba1c8c7c092e34473f4d45f08f148bf52f372bce830babfdd7dbfc1ce5d4",
 				"global.imageK8S":   "ashwinvenkatesh/consul-k8s@sha256:e777b8f2dab5ffc10e08febc16ccf4403c4feb62465c5bdc1ac6855a6b995acb",
 				"global.enabled":    "false",
 
