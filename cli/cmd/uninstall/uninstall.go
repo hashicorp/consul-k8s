@@ -316,8 +316,7 @@ func (c *Command) findExistingInstallation(settings *helmCLI.EnvSettings, uiLogg
 	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
 		return false, "", "", err
-	} else if (c.flagNamespace != defaultAllNamespaces && c.flagNamespace == namespace) ||
-		(c.flagNamespace == defaultAllNamespaces) {
+	} else if c.flagNamespace == defaultAllNamespaces || c.flagNamespace == namespace {
 		return true, releaseName, namespace, nil
 	} else {
 		return false, "", "", fmt.Errorf("could not find consul installation in namespace %s", c.flagNamespace)
