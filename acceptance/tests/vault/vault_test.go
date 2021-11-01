@@ -128,6 +128,5 @@ path "consul/data/secret/gossip" {
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
 	// we use keys[0] because KeyringList returns a list of keyrings for each dc, in this case there is only 1 dc.
-	require.NotNil(t, keys[0].PrimaryKeys[gossipKey])
-
+	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
 }

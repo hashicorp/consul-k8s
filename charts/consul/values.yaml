@@ -123,7 +123,7 @@ global:
   # vault secrets, policies and roles.
   secretsBackend:
     vault:
-      # Enabling the Vault secrets backend will cause K8S secrets to no longer be used for the following Consul secrets:
+      # Enabling the Vault secrets backend will cause Kubernetes secrets to no longer be used for the following Consul secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
       enabled: false
 
