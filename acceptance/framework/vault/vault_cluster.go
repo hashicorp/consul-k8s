@@ -71,8 +71,14 @@ func NewVaultCluster(
 	helm.AddRepo(t, &helm.Options{}, "hashicorp/vault", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
-	_, _ = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
-	_, _ = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "pull", "hashicorp/vault", "--version", vaultChartVersion)
+	errStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+	if err != nil {
+		logger.Logf(t, "Unable to update helm repository: %s, %s", err, errStr)
+	}
+	errStr, err = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "pull", "hashicorp/vault", "--version", vaultChartVersion)
+	if err != nil {
+		logger.Logf(t, "Unable to pull helm repository: %s, %s", err, errStr)
+	}
 
 	return &VaultCluster{
 		ctx:                ctx,
