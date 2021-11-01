@@ -1,5 +1,5 @@
 resources:
-  - ../../bases/static-client
+  - ../../../bases/static-client
 
 patchesStrategicMerge:
   - patch.yaml
