@@ -863,25 +863,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretName is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretName is set but not global.gossipEncyption.secretKey" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretName=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretKey is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretKey is set but not global.gossipEncyption.secretName" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretKey=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
 @test "server/StatefulSet: gossip environment variable present in server StatefulSet when all config is provided" {
