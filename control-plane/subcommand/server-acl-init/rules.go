@@ -239,13 +239,13 @@ func (c *Command) syncRules() (string, error) {
   }
 {{- if .EnableNamespaces }}
 operator = "write"
+acl = "write"
 {{- if .SyncEnableNSMirroring }}
 namespace_prefix "{{ .SyncNSMirroringPrefix }}" {
 {{- else }}
 namespace "{{ .SyncConsulDestNS }}" {
 {{- end }}
 {{- end }}
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }

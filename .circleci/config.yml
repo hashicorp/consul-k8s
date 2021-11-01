@@ -70,7 +70,7 @@ commands:
         type: string
       consul-k8s-image:
         type: string
-        default: "ashwinvenkatesh/consul-k8s@sha256:7ed94b27317c0e6eab3b42a08acaf974efe243c4276e39df46586358dec94585"
+        default: "docker.mirror.hashicorp.services/hashicorpdev/consul-k8s-control-plane:latest"
       go-path:
         type: string
         default: "/home/circleci/.go_workspace"

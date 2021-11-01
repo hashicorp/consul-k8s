@@ -444,7 +444,6 @@ func TestSyncRules(t *testing.T) {
 			Expected: `node "k8s-sync" {
     policy = "write"
   }
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -461,7 +460,6 @@ func TestSyncRules(t *testing.T) {
 			Expected: `node "new-node-name" {
     policy = "write"
   }
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -479,8 +477,8 @@ func TestSyncRules(t *testing.T) {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace "sync-namespace" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -499,8 +497,8 @@ namespace "sync-namespace" {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace "sync-namespace" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -519,8 +517,8 @@ namespace "sync-namespace" {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace_prefix "" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -539,8 +537,8 @@ namespace_prefix "" {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace_prefix "" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -560,8 +558,8 @@ namespace_prefix "" {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace_prefix "prefix-" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
@@ -581,8 +579,8 @@ namespace_prefix "prefix-" {
     policy = "write"
   }
 operator = "write"
+acl = "write"
 namespace_prefix "prefix-" {
-  policy = "write"
   node_prefix "" {
     policy = "read"
   }
