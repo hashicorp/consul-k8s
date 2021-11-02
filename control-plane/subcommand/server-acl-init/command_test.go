@@ -15,10 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -31,6 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 var ns = "default"
@@ -1284,6 +1285,8 @@ func TestRun_NoLeader(t *testing.T) {
 			numACLBootCalls++
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1341,6 +1344,10 @@ func TestRun_NoLeader(t *testing.T) {
 		{
 			"PUT",
 			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/tokens",
 		},
 		{
 			"PUT",
@@ -1496,6 +1503,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			numPolicyCalls++
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			fmt.Fprintln(w, "{}")
 		}
@@ -1531,6 +1540,10 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 			"/v1/acl/policy",
 		},
 		{
+			"GET",
+			"/v1/acl/tokens",
+		},
+		{
 			"PUT",
 			"/v1/acl/token",
 		},
@@ -1558,8 +1571,8 @@ func TestRun_ClientTokensRetry(t *testing.T) {
 	}, consulAPICalls)
 }
 
-// Test if there is an old bootstrap Secret we assume the servers were
-// bootstrapped already and continue on to the next step.
+// Test if there is an old bootstrap Secret we still try to create and set
+// server tokens.
 func TestRun_AlreadyBootstrapped(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
@@ -1581,6 +1594,8 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/agent/self":
 			fmt.Fprintln(w, `{"Config": {"Datacenter": "dc1", "PrimaryDatacenter": "dc1"}}`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
 		default:
 			// Send an empty JSON response with code 200 to all calls.
 			fmt.Fprintln(w, "{}")
@@ -1629,8 +1644,24 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 
 	// Test that the expected API calls were made.
 	require.Equal([]APICall{
-		// We only expect the calls for creating client tokens
-		// and updating the server policy.
+		// We expect calls for updating the server policy, setting server tokens,
+		// and updating client policy.
+		{
+			"PUT",
+			"/v1/acl/policy",
+		},
+		{
+			"GET",
+			"/v1/acl/tokens",
+		},
+		{
+			"PUT",
+			"/v1/acl/token",
+		},
+		{
+			"PUT",
+			"/v1/agent/token/agent",
+		},
 		{
 			"GET",
 			"/v1/agent/self",
@@ -1641,13 +1672,84 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		},
 		{
 			"PUT",
-			"/v1/acl/policy",
-		},
-		{
-			"PUT",
 			"/v1/acl/token",
 		},
 	}, consulAPICalls)
+}
+
+// Test if there is an old bootstrap Secret and the server token exists
+// that we don't try and recreate the token.
+func TestRun_AlreadyBootstrapped_ServerTokenExists(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	// First set everything up with ACLs bootstrapped.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	setUpK8sServiceAccount(t, k8s, ns)
+	defer testAgent.Stop()
+	k8s.CoreV1().Secrets(ns).Create(context.Background(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourcePrefix + "-bootstrap-acl-token",
+		},
+		Data: map[string][]byte{
+			"token": []byte(bootToken),
+		},
+	}, metav1.CreateOptions{})
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testAgent.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+
+	// Create the server policy and token _before_ we run the command.
+	agentPolicyRules, err := cmd.agentRules()
+	require.NoError(err)
+	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "agent-token",
+		Description: "Agent Token Policy",
+		Rules:       agentPolicyRules,
+	}, nil)
+	require.NoError(err)
+	_, _, err = consulClient.ACL().TokenCreate(&api.ACLToken{
+		Description: fmt.Sprintf("Server Token for %s", strings.Split(testAgent.HTTPAddr, ":")[0]),
+		Policies: []*api.ACLTokenPolicyLink{
+			{
+				Name: policy.Name,
+			},
+		},
+	}, nil)
+	require.NoError(err)
+
+	// Run the command.
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace", ns,
+		"-server-address", strings.Split(testAgent.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testAgent.HTTPAddr, ":")[1],
+		"-resource-prefix", resourcePrefix,
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that only one server token exists, i.e. it didn't create an
+	// extra token.
+	tokens, _, err := consulClient.ACL().TokenList(nil)
+	require.NoError(err)
+	count := 0
+	for _, token := range tokens {
+		if len(token.Policies) == 1 && token.Policies[0].Name == policy.Name {
+			count++
+		}
+	}
+	require.Equal(1, count)
 }
 
 // Test if there is a provided bootstrap we skip bootstrapping of the servers
