@@ -10,7 +10,7 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: client
-{{- if (or .Values.global.acls.manageSystemACLs .Values.global.enablePodSecurityPolicies .Values.global.openshift.enabled) }}
+{{- if (or .Values.dns.enabled .Values.global.acls.manageSystemACLs .Values.global.enablePodSecurityPolicies .Values.global.openshift.enabled) }}
 rules:
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
@@ -37,6 +37,13 @@ rules:
     verbs:
       - use
 {{- end}}
+{{- if .Values.dns.enabled }}
+  - apiGroups: [""]
+    resources:
+      - services
+    verbs:
+      - get
+{{- end }}
 {{- else}}
 rules: []
 {{- end }}

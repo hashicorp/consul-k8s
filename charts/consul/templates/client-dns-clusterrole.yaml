@@ -1,0 +1,24 @@
+{{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if .Values.dns.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-client-dns
+#  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+rules:
+{{- if .Values.dns.enabled }}
+  - apiGroups: [""]
+    resources:
+      - services
+    resourceNames:
+      - "kube-dns"
+    verbs:
+      - get
+{{- end }}
+{{- end }}
+{{- end }}

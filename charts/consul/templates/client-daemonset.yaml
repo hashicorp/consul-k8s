@@ -201,6 +201,11 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
+              {{- if .Values.dns.enabled }}
+              export kube_dns_service_ip=$( curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/kube-system/services/kube-dns \
+                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" | jq -r .spec.clusterIP )
+              {{- end }}
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
               {{ template "consul.extraconfig" }}
@@ -275,6 +280,9 @@ spec:
                 {{- end }}
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
+                {{- end }}
+                {{- if .Values.dns.enabled }}
+                -recursor="$kube_dns_service_ip" \
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -domain={{ .Values.global.domain }}
