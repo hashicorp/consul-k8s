@@ -3,6 +3,7 @@
 BREAKING CHANGES:
 * Helm Chart
   * The `kube-system` and `local-path-storage` namespaces are now _excluded_ from connect injection by default on Kubernetes versions >= 1.21. If you wish to enable injection on those namespaces, set `connectInject.namespaceSelector` to `null`. [[GH-726](https://github.com/hashicorp/consul-k8s/pull/726)]
+
 IMPROVEMENTS:
 * Helm Chart
   * Automatic retry for `gossip-encryption-autogenerate-job` on failure [[GH-789](https://github.com/hashicorp/consul-k8s/pull/789)]
@@ -10,7 +11,9 @@ IMPROVEMENTS:
 * CLI
   * Add `status` command. [[GH-768](https://github.com/hashicorp/consul-k8s/pull/768)]
   * Add `-verbose`, `-v` flag to the `consul-k8s install` command, which outputs all logs emitted from the installation. By default, verbose is set to `false` to hide logs that show resources are not ready. [[GH-810](https://github.com/hashicorp/consul-k8s/pull/810)]
-  * Add Prometheus deployment and Consul K8s metrics integration with demo preset when installing via `-preset=demo`. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
+  * Set `prometheus.enabled` to true and enable all metrics for Consul K8s when installing via the `demo` preset. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
+  * Set `controller.enabled` to `true` when installing via the `demo` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
+  * Set `global.gossipEncryption.autoGenerate` to `true` and `global.tls.enableAutoEncrypt` to `true` when installing via the `secure` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
 
 ## 0.35.0 (October 19, 2021)
 
