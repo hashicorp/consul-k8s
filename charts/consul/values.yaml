@@ -135,14 +135,14 @@ global:
       # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
       consulClientRole: ""  # e.g. "consul-client"
 
-  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
-  # a Kubernetes secret referencing these values.
+  # a Kubernetes secret or Vault secret path and key, if `global.secretsBackend.vault.enabled=true`..
   #
   # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
@@ -151,10 +151,10 @@ global:
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false
-    # secretName is the name of the Kubernetes secret that holds the gossip
-    # encryption key. The secret must be in the same namespace that Consul is installed into.
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
+    # encryption key. The Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
-    # secretKey is the key within the Kubernetes secret that holds the gossip
+    # secretKey is the key within the Kubernetes secret or Vault secret that holds the gossip
     # encryption key.
     secretKey: ""
 
