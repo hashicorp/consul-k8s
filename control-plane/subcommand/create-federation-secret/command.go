@@ -128,6 +128,7 @@ func (c *Command) Run(args []string) int {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-federation", c.flagResourcePrefix),
 			Namespace: c.flagK8sNamespace,
+			Labels:    map[string]string{"managed-by": "consul-k8s"},
 		},
 		Type: "Opaque",
 		Data: make(map[string][]byte),
@@ -244,7 +245,6 @@ func (c *Command) Run(args []string) int {
 
 	// Now create the Kubernetes secret.
 	logger.Info("Creating/updating Kubernetes secret", "name", federationSecret.ObjectMeta.Name, "ns", c.flagK8sNamespace)
-	federationSecret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 	_, err = c.k8sClient.CoreV1().Secrets(c.flagK8sNamespace).Create(c.ctx, federationSecret, metav1.CreateOptions{})
 	if k8serrors.IsAlreadyExists(err) {
 		logger.Info("Secret already exists, updating instead")
