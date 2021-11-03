@@ -213,8 +213,7 @@ func TestRun_ReplicationTokenMissingExpectedKey(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
-				Labels: map[string]string{"managed-by": "consul-k8s"},
+				Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
 			},
 		},
 		metav1.CreateOptions{})
@@ -392,8 +391,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 					context.Background(),
 					&v1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:   c.resourcePrefix + "-acl-replication-acl-token",
-							Labels: map[string]string{"managed-by": "consul-k8s"},
+							Name: c.resourcePrefix + "-acl-replication-acl-token",
 						},
 						Data: map[string][]byte{
 							common.ACLTokenSecretKey: []byte(replicationToken),
@@ -788,8 +786,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 			context.Background(),
 			&v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
-					Labels: map[string]string{"managed-by": "consul-k8s"},
+					Name: "prefix-" + common.ACLReplicationTokenName + "-acl-token",
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(replicationToken),
