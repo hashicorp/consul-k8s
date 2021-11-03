@@ -66,6 +66,9 @@ type initContainerCommandData struct {
 	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
+
+	// ConsulDNSIP is the IP of the Consul DNS Service.
+	ConsulDNSIP string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -118,6 +121,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
+		ConsulDNSIP:                h.ConsulDNSIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
@@ -330,6 +334,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- if .ConsulDNSIP }}
+  -consul-dns-ip="{{ .ConsulDNSIP }}" \
   {{- end }}
   {{- range .TProxyExcludeInboundPorts }}
   -exclude-inbound-port="{{ . }}" \

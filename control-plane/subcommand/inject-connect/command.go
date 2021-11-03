@@ -91,6 +91,7 @@ type Command struct {
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
+	flagConsulDNSIP                            string
 
 	flagEnableOpenShift bool
 
@@ -161,6 +162,8 @@ func (c *Command) init() {
 		"Enable transparent proxy mode for all Consul service mesh applications by default.")
 	c.flagSet.BoolVar(&c.flagTransparentProxyDefaultOverwriteProbes, "transparent-proxy-default-overwrite-probes", true,
 		"Overwrite Kubernetes probes to point to Envoy by default when in Transparent Proxy mode.")
+	c.flagSet.StringVar(&c.flagConsulDNSIP, "consul-dns-ip", "",
+		"ClusterIP of the Consul DNS service.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
@@ -471,6 +474,7 @@ func (c *Command) Run(args []string) int {
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
 			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
 			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
+			ConsulDNSIP:                c.flagConsulDNSIP,
 			EnableOpenShift:            c.flagEnableOpenShift,
 			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                   c.flagLogLevel,

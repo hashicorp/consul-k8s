@@ -201,12 +201,15 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              {{- if .Values.dns.enabled }}
-              export kube_dns_service_ip=$( curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/kube-system/services/kube-dns \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )" | jq -r .spec.clusterIP )
-              {{- end }}
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
+
+              {{- if .Values.dns.enabled }}
+              export kube_dns_service_ip=$(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
+              echo $kube_dns_service_ip > /consul/kubednsip
+              if [[ -z $kube_dns_service_ip ]]; then
+                  echo "Unable to get kube-dns Service IP"
+              fi
+              {{- end }}
 
               {{ template "consul.extraconfig" }}
 
