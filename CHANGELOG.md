@@ -19,7 +19,6 @@ IMPROVEMENTS:
   * Set `prometheus.enabled` to true and enable all metrics for Consul K8s when installing via the `demo` preset. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
   * Set `controller.enabled` to `true` when installing via the `demo` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
   * Set `global.gossipEncryption.autoGenerate` to `true` and `global.tls.enableAutoEncrypt` to `true` when installing via the `secure` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
-  * Add Prometheus deployment and Consul K8s metrics integration with demo preset when installing via `-preset=demo`. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
 * Control Plane
   * Add support for partition-exports config entry as a Custom Resource Definition to help manage cross-partition networking. [[GH-802](https://github.com/hashicorp/consul-k8s/pull/802)]
 
