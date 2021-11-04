@@ -795,8 +795,13 @@ function set_dev_mode {
    local sdir="$1"
    local vers="$(parse_version "${sdir}" false false)"
 
-   status_stage "==> Setting VersionPreRelease back to 'dev'"
+   status_stage "==> Setting VersionPreRelease back to 'dev' for Control Plane"
    update_version "${sdir}/version/version.go" "${vers}" dev || return 1
+
+   # This function has been modified for Consul-K8s monorepo. It now sets dev mode
+   # for the CLI module as well.
+   status_stage "==> Setting VersionPreRelease back to 'dev' for CLI"
+   update_version "${sdir}/../cli/version/version.go" "${vers}" dev || return 1
 
    status_stage "==> Adding new UNRELEASED label in CHANGELOG.md"
    add_unreleased_to_changelog "${sdir}/.." || return 1
@@ -857,7 +862,7 @@ function commit_dev_mode {
    pushd "$1" > /dev/null
 
    status "Staging CHANGELOG.md and version_*.go files"
-   git add CHANGELOG.md && git add control-plane/version/version*.go
+   git add CHANGELOG.md && git add */version/version*.go
    ret=$?
 
    if test ${ret} -eq 0

@@ -229,6 +229,9 @@ partition "{{ .PartitionName }}" {
 	return c.renderGatewayRules(terminatingGatewayRulesTpl, name, namespace)
 }
 
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
   node "{{ .SyncConsulNodeName }}" {
@@ -236,6 +239,7 @@ func (c *Command) syncRules() (string, error) {
   }
 {{- if .EnableNamespaces }}
 operator = "write"
+acl = "write"
 {{- if .SyncEnableNSMirroring }}
 namespace_prefix "{{ .SyncNSMirroringPrefix }}" {
 {{- else }}
@@ -330,6 +334,9 @@ partition "default" {
 }
 
 // policy = "write" is required when creating namespaces within a partition.
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
 func (c *Command) controllerRules() (string, error) {
 	controllerRules := `
 {{- if .EnablePartitions }}
@@ -338,6 +345,7 @@ partition "{{ .PartitionName }}" {
   acl = "write"
 {{- else }}
   operator = "write"
+  acl = "write"
 {{- end }}
 {{- if .EnableNamespaces }}
 {{- if .InjectEnableNSMirroring }}

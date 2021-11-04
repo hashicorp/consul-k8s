@@ -74,7 +74,7 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image": "ashwinvenkatesh/consul@sha256:7426f47fa7065e38a2488042be66325aa37cda17a3bc15e58178104ff4619c1b",
+				"global.image": "hashicorp/consul-enterprise:1.11.0-ent-beta2",
 
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",
@@ -125,7 +125,7 @@ func TestControllerNamespaces(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-f", "../fixtures/crds")
+					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-k", "../fixtures/cases/crds-ent")
 					require.NoError(r, err, out)
 					// NOTE: No need to clean up because the namespace will be deleted.
 				})

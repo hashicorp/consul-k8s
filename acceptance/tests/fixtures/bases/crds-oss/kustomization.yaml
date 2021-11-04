@@ -1,0 +1,10 @@
+resources:
+  - ingressgateway.yaml
+  - mesh.yaml
+  - proxydefaults.yaml
+  - servicedefaults.yaml
+  - serviceintentions.yaml
+  - serviceresolver.yaml
+  - servicerouter.yaml
+  - servicesplitter.yaml
+  - terminatinggateway.yaml

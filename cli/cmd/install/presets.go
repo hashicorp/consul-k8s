@@ -13,29 +13,46 @@ var presets = map[string]interface{}{
 	PresetSecure: convert(secure),
 }
 
-// TODO: enable prometheus in demo installation
 var demo = `
 global:
   name: consul
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
 connectInject:
   enabled: true
+  metrics: 
+    defaultEnabled: true
+    defaultEnableMerging: true
+    enableGatewayMetrics: true
 server:
   replicas: 1
-  bootstrapExpect: 1
+controller:
+  enabled: true
+ui: 
+  enabled: true
+  service:
+    enabled: true
+prometheus:
+  enabled: true
 `
 
 var secure = `
 global:
   name: consul
-  acls:
-    manageSystemACLs: true
+  gossipEncryption:
+    autoGenerate: true 
   tls:
     enabled: true
-connectInject:
-  enabled: true
+    enableAutoEncrypt: true
+  acls:
+    manageSystemACLs: true
 server:
   replicas: 1
-  bootstrapExpect: 1
+connectInject:
+  enabled: true
+controller:
+  enabled: true
 `
 
 var globalNameConsul = `
