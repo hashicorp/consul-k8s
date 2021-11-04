@@ -11,11 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
@@ -24,6 +19,12 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -313,7 +314,6 @@ func (c *Command) Run(args []string) int {
 		scheme = "https"
 	}
 
-	var updateServerPolicy bool
 	var bootstrapToken string
 
 	if c.flagBootstrapTokenFile != "" {
@@ -340,19 +340,13 @@ func (c *Command) Run(args []string) int {
 
 		if bootstrapToken != "" {
 			c.log.Info(fmt.Sprintf("ACLs already bootstrapped - retrieved bootstrap token from Secret %q", bootTokenSecretName))
-
-			// Mark that we should update the server ACL policy in case
-			// there are namespace related config changes. Because of the
-			// organization of the server token creation code, the policy
-			// otherwise won't be updated.
-			updateServerPolicy = true
 		} else {
 			c.log.Info("No bootstrap token from previous installation found, continuing on to bootstrapping")
-			bootstrapToken, err = c.bootstrapServers(serverAddresses, bootTokenSecretName, scheme)
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		}
+		bootstrapToken, err = c.bootstrapServers(serverAddresses, bootstrapToken, bootTokenSecretName, scheme)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 	}
 
@@ -383,18 +377,6 @@ func (c *Command) Run(args []string) int {
 	}
 	c.log.Info("Current datacenter", "datacenter", consulDC, "primaryDC", primaryDC)
 	isPrimary := consulDC == primaryDC
-
-	// With the addition of namespaces, the ACL policies associated
-	// with the server tokens may need to be updated if Enterprise Consul
-	// users upgrade to 1.7+. This updates the policy if the bootstrap
-	// token had previously existed, which signals a potential config change.
-	if updateServerPolicy {
-		_, err = c.setServerPolicy(consulClient)
-		if err != nil {
-			c.log.Error("Error updating the server ACL policy", "err", err)
-			return 1
-		}
-	}
 
 	if c.flagEnablePartitions && c.flagPartitionName == consulDefaultPartition && isPrimary {
 		// Partition token is local because only the Primary datacenter can have Admin Partitions.
