@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+BUG FIXES:
+* Control Plane
+  * ACLs: Fix issue where if one or more servers fail to have their ACL tokens set on the initial run of server-acl-init
+    then on subsequent re-runs of server-acl-init the tokens are never set. [[GH-825](https://github.com/hashicorp/consul-k8s/issues/825)]
+  * ACLs: Fix issue where if the number of Consul servers is increased, the new servers are never provisioned
+    an ACL token. [[GH-677](https://github.com/hashicorp/consul-k8s/issues/677)]
+
 ## 0.36.0 (November 02, 2021)
 
 BREAKING CHANGES:
