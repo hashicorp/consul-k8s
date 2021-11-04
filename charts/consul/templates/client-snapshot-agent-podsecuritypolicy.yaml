@@ -10,6 +10,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client-snapshot-agent
 spec:
   privileged: false
   # Required to prevent escalations to root.

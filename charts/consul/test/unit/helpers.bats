@@ -120,6 +120,20 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# component label
+#
+# This test ensures that we set a "component: <blah>" in every file.
+#
+# If this test fails, you're likely missing setting that label somewhere.
+
+@test "helper/component-label: used everywhere" {
+  cd `chart_dir`
+  # Grep for files that don't have 'component: ' in them
+  local actual=$(grep -L 'component: ' templates/*.yaml | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}
+
+#--------------------------------------------------------------------
 # consul.getAutoEncryptClientCA
 # Similarly to consul.fullname tests, these tests use test-runner.yaml to test the
 # consul.getAutoEncryptClientCA helper since we need an existing template that calls

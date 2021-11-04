@@ -9,6 +9,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: sync-catalog
 spec:
   privileged: false
   # Required to prevent escalations to root.
