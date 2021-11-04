@@ -794,30 +794,30 @@ Here are some things to consider before adding a test:
 
 ## Helm Reference Docs
  
-The helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
+The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
 generated from our `values.yaml` file.
 
 ### Generating Helm Reference Docs
  
 To generate the docs and update the `helm.mdx` file:
 
-1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub
+1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
 1. Clone your fork:
    ```shell-session
-   git clone https://github.com/your-username/consul.git
+   git clone https://github.com/<your-username>/consul.git
    ```
-1. Change directory into your `consul-helm` repo: 
+1. Change directory into your `consul-k8s` repo: 
    ```shell-session
-   cd /path/to/consul-helm
+   cd /path/to/consul-k8s
    ```
-1. Run `make gen-docs` using the path to your consul (not consul-helm) repo:
+1. Run `make gen-docs` using the path to your consul (not consul-k8s) repo:
    ```shell-session
    make gen-docs consul=<path-to-consul-repo>
    # Examples:
    # make gen-docs consul=/Users/my-name/code/hashicorp/consul
    # make gen-docs consul=../consul
    ```
-1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-helm` pull request)
+1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
 
 ### values.yaml Annotations
 
