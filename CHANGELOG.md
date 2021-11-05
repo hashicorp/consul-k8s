@@ -1,7 +1,19 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Control Plane
+  * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
+
+BUG FIXES:
+* Control Plane
+  * ACLs: Fix issue where if one or more servers fail to have their ACL tokens set on the initial run of server-acl-init
+    then on subsequent re-runs of server-acl-init the tokens are never set. [[GH-825](https://github.com/hashicorp/consul-k8s/issues/825)]
+  * ACLs: Fix issue where if the number of Consul servers is increased, the new servers are never provisioned
+    an ACL token. [[GH-677](https://github.com/hashicorp/consul-k8s/issues/677)]
+  * Fix issue where after a `helm upgrade`, users would see `x509: certificate signed by unknown authority.`
+    errors when modifying config entry resources. [[GH-837](https://github.com/hashicorp/consul-k8s/pull/837)]
 
 ## 0.36.0 (November 02, 2021)
 
@@ -22,7 +34,6 @@ IMPROVEMENTS:
   * Set `prometheus.enabled` to true and enable all metrics for Consul K8s when installing via the `demo` preset. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
   * Set `controller.enabled` to `true` when installing via the `demo` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
   * Set `global.gossipEncryption.autoGenerate` to `true` and `global.tls.enableAutoEncrypt` to `true` when installing via the `secure` preset. [[GH818](https://github.com/hashicorp/consul-k8s/pull/818)]
-  * Add Prometheus deployment and Consul K8s metrics integration with demo preset when installing via `-preset=demo`. [[GH-809](https://github.com/hashicorp/consul-k8s/pull/809)]
 * Control Plane
   * Add support for partition-exports config entry as a Custom Resource Definition to help manage cross-partition networking. [[GH-802](https://github.com/hashicorp/consul-k8s/pull/802)]
 

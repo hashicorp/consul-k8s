@@ -157,8 +157,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	certCh := make(chan cert.MetaBundle)
-
 	// Create the certificate notifier so we can update certificates,
 	// then start all the background routines for updating certificates.
 	var notifiers []*cert.Notify
@@ -179,12 +177,13 @@ func (c *Command) Run(args []string) int {
 				Expiry: expiry,
 			}
 		}
+
+		certCh := make(chan cert.MetaBundle)
 		certNotify := &cert.Notify{Source: certSource, Ch: certCh, WebhookConfigName: config.Name, SecretName: config.SecretName, SecretNamespace: config.SecretNamespace}
 		notifiers = append(notifiers, certNotify)
 		go certNotify.Start(ctx)
+		go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 	}
-
-	go c.certWatcher(ctx, certCh, c.clientset, c.logger)
 
 	// We define a signal handler for OS interrupts, and when an SIGINT or SIGTERM is received,
 	// we gracefully shut down, by first stopping our cert notifiers and then cancelling
