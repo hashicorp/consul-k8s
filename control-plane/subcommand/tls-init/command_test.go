@@ -65,8 +65,8 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 		algorithm string
 	}{
 		{
-			caCert:    caCert,
-			caKey:     caKey,
+			caCert:    caCertEC,
+			caKey:     caKeyEC,
 			algorithm: "ec",
 		},
 		{
@@ -75,6 +75,7 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 			algorithm: "rsa",
 		},
 		{
+			// caCertRSA is used because the key is just caKeyRSA encrypted.
 			caCert:    caCertRSA,
 			caKey:     caKeyPKCS8,
 			algorithm: "pkcs8",
@@ -154,13 +155,13 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	ca, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(ca.Name())
-	err = ioutil.WriteFile(ca.Name(), []byte(caCert), 0644)
+	err = ioutil.WriteFile(ca.Name(), []byte(caCertEC), 0644)
 	require.NoError(t, err)
 
 	key, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
 	defer os.RemoveAll(key.Name())
-	err = ioutil.WriteFile(key.Name(), []byte(caKey), 0644)
+	err = ioutil.WriteFile(key.Name(), []byte(caKeyEC), 0644)
 	require.NoError(t, err)
 
 	flags := []string{"-name-prefix", "consul", "-ca", ca.Name(), "-key", key.Name(), "-additional-dnsname", "test.dns.name"}
@@ -168,7 +169,7 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsFiles(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
-	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertBlock, _ := pem.Decode([]byte(caCertEC))
 	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
 	require.NoError(t, err)
 
@@ -204,7 +205,7 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -216,7 +217,7 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -229,7 +230,7 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
-	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertBlock, _ := pem.Decode([]byte(caCertEC))
 	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
 	require.NoError(t, err)
 
@@ -293,7 +294,7 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -305,7 +306,7 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -328,7 +329,7 @@ func TestRun_UpdatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	exitCode := cmd.Run(flags)
 	require.Equal(t, 0, exitCode)
 
-	caCertBlock, _ := pem.Decode([]byte(caCert))
+	caCertBlock, _ := pem.Decode([]byte(caCertEC))
 	caCertificate, err := x509.ParseCertificate(caCertBlock.Bytes)
 	require.NoError(t, err)
 
@@ -365,7 +366,7 @@ func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -377,7 +378,7 @@ func TestRun_CreatesServerCertificatesWithExpiryWithinSpecifiedDays(t *testing.T
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -410,7 +411,7 @@ func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -422,7 +423,7 @@ func TestRun_CreatesServerCertificatesWithProvidedHosts(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -456,7 +457,7 @@ func TestRun_CreatesServerCertificatesWithSpecifiedDomainAndDC(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -468,7 +469,7 @@ func TestRun_CreatesServerCertificatesWithSpecifiedDomainAndDC(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -509,7 +510,7 @@ func TestRun_CreatesServerCertificatesInSpecifiedNamespace(t *testing.T) {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			corev1.TLSCertKey: []byte(caCert),
+			corev1.TLSCertKey: []byte(caCertEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -521,7 +522,7 @@ func TestRun_CreatesServerCertificatesInSpecifiedNamespace(t *testing.T) {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			corev1.TLSPrivateKeyKey: []byte(caKey),
+			corev1.TLSPrivateKeyKey: []byte(caKeyEC),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
@@ -536,7 +537,7 @@ func TestRun_CreatesServerCertificatesInSpecifiedNamespace(t *testing.T) {
 }
 
 const (
-	caCert string = `-----BEGIN CERTIFICATE-----
+	caCertEC string = `-----BEGIN CERTIFICATE-----
 MIIDPjCCAuWgAwIBAgIRAOjdIMIYBXgeoXBDydhFImcwCgYIKoZIzj0EAwIwgZEx
 CzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj
 bzEaMBgGA1UECRMRMTAxIFNlY29uZCBTdHJlZXQxDjAMBgNVBBETBTk0MTA1MRcw
@@ -557,7 +558,7 @@ WBJ2jlEV/kttcHlcHpvyO3GHCp3AE+G4f27NWqYdYeACIDJkx6OjZBU7i4K3HSrO
 qlxZIl+NFZSHr8XS6BFNB8vc
 -----END CERTIFICATE-----`
 
-	caKey string = `-----BEGIN EC PRIVATE KEY-----
+	caKeyEC string = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIO+ASjxFB5gYZju94Ujx81ykp54K53b1TvQNQW/zgbFqoAoGCCqGSM49
 AwEHoUQDQgAEvETlXGiuMdIH3nOTf/1RGYmBoZA9RaaDp1T9kcABGuzoxEA+P7VO
 rd4cnIiTnYqkslAdqcXWmoFEubPFTuKghw==

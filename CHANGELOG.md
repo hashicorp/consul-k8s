@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+IMPROVEMENTS:
+* Control Plane
+  * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
+
 BUG FIXES:
 * Control Plane
   * ACLs: Fix issue where if one or more servers fail to have their ACL tokens set on the initial run of server-acl-init
