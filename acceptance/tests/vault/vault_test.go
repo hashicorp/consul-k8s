@@ -15,37 +15,6 @@ const (
 	gossipKey = "3R7oLrdpkk2V0Y7yHLizyxXeS2RtaVuy07DkU15Lhws="
 )
 
-// Installs Vault, bootstraps it with the Kube Auth Method
-// and then validates that the KV2 secrets engine is online
-// and the Kube Auth Method is enabled.
-func TestVault_Create(t *testing.T) {
-	cfg := suite.Config()
-	ctx := suite.Environment().DefaultContext(t)
-
-	vaultReleaseName := helpers.RandomName()
-	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
-	vaultCluster.Create(t, ctx)
-	logger.Log(t, "Finished Installing and Bootstrapping")
-
-	vaultClient := vaultCluster.VaultClient(t)
-
-	// Write to the KV2 engine succeeds.
-	logger.Log(t, "Creating a KV2 Secret")
-	params := map[string]interface{}{
-		"data": map[string]interface{}{
-			"foo": "bar",
-		},
-	}
-	_, err := vaultClient.Logical().Write("consul/data/secret/test", params)
-	require.NoError(t, err)
-
-	// Validate that the Auth Method exists.
-	authList, err := vaultClient.Sys().ListAuth()
-	require.NoError(t, err)
-	logger.Log(t, "Auth List: ", authList)
-	require.NotNil(t, authList["kubernetes/"])
-}
-
 // Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
 // then creates a gossip encryption secret and uses this to bootstrap Consul.
 func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {

@@ -121,6 +121,9 @@ global:
   # In order to utilize this configuration it is required to have an accessible vault cluster which has been pre-configured
   # by a Vault operator to have the Vault Kube Auth Method, KV2 + PKI secrets engines enabled as well as pre-created
   # vault secrets, policies and roles.
+  # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
+  # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
+  # secretKey should be in the form of "key".
   secretsBackend:
     vault:
       # Enabling the Vault secrets backend will cause Kubernetes secrets to no longer be used for the following Consul secrets:
@@ -142,11 +145,20 @@ global:
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
-  # a Kubernetes secret or Vault secret path and key, if `global.secretsBackend.vault.enabled=true`..
+  # a key, saving this as a Kubernetes secret or Vault secret path and key.
+  # If `global.secretsBackend.vault.enabled=true` be sure to add the "data" field to the secretName as required by
+  # the Vault KV-2 secrets engine [see example].
   #
   # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
+  #
+  # Vault CLI Example:
+  # ```
+  # $ vault kv put consul/secrets/gossip key=$(consul keygen)
+  # ```
+  # `gossipEncryption.secretName="consul/data/secrets/gossip"`
+  # `gossipEncryption.secretKey="key"`
 
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.

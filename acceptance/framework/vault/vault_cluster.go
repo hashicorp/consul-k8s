@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	vaultNS           = "default"
-	vaultChartVersion = "0.17.0"
-	vaultRootToken    = "abcd1234"
+	vaultNS        = "default"
+	vaultPodLabel  = "app.kubernetes.io/instance="
+	vaultRootToken = "abcd1234"
 )
 
 // VaultCluster
@@ -32,7 +32,6 @@ type VaultCluster struct {
 
 	vaultHelmOptions *helm.Options
 	vaultReleaseName string
-	vaultChartName   string
 	vaultClient      *vapi.Client
 
 	kubectlOptions *terratestk8s.KubectlOptions
@@ -65,19 +64,13 @@ func NewVaultCluster(
 		SetValues:      defaultVaultValues(),
 		KubectlOptions: kopts,
 		Logger:         logger,
-		Version:        vaultChartVersion,
 	}
-	// Add the vault helm repo in case it is missing, and do an update so we can utilise `vaultChartVersion` to install.
 	helm.AddRepo(t, &helm.Options{}, "hashicorp/vault", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
 	errStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
 	if err != nil {
 		logger.Logf(t, "Unable to update helm repository: %s, %s", err, errStr)
-	}
-	errStr, err = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "pull", "hashicorp/vault", "--version", vaultChartVersion)
-	if err != nil {
-		logger.Logf(t, "Unable to pull helm repository: %s, %s", err, errStr)
 	}
 
 	return &VaultCluster{
@@ -93,7 +86,6 @@ func NewVaultCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		vaultReleaseName:   releaseName,
-		vaultChartName:     fmt.Sprintf("vault-%s", vaultChartVersion),
 	}
 }
 
@@ -179,12 +171,12 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, v.vaultChartName)
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, "", fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
 
 	// Install Vault.
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
 	// Wait for the injector and vault server pods to become Ready.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("helm.sh/chart=%s", v.vaultChartName))
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
 	// Now call bootstrap()
 	v.bootstrap(t, ctx)
 }
