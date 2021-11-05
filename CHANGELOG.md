@@ -8,6 +8,9 @@ BUG FIXES:
     an ACL token. [[GH-677](https://github.com/hashicorp/consul-k8s/issues/677)]
   * Fix issue where after a `helm upgrade`, users would see `x509: certificate signed by unknown authority.`
     errors when modifying config entry resources. [[GH-837](https://github.com/hashicorp/consul-k8s/pull/837)]
+* Helm Chart
+  * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
+    Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
 
 ## 0.36.0 (November 02, 2021)
 
