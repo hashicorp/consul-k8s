@@ -1,5 +1,6 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (and .Values.global.adminPartitions.enabled (not $serverEnabled)) }}
+{{- template "consul.reservedNamesFailer" (list .Values.global.adminPartitions.name "global.adminPartitions.name") }}
 apiVersion: batch/v1
 kind: Job
 metadata:
