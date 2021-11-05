@@ -126,17 +126,16 @@ global:
   # secretKey should be in the form of "key".
   secretsBackend:
     vault:
-      # Enabling the Vault secrets backend will cause Kubernetes secrets to no longer be used for the following Consul secrets:
-      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
+      # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
       # The consulServerRole must be created and have read capabilties via a Policy for the following secrets:
-      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`.
-      consulServerRole: ""  # e.g. "consul-server"
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      consulServerRole: ""
 
       # The consulClientRole must be created and have read capabilties via a Policy for the following secrets:
-      # - gossip encryption key defined by `global.gossipEncryption.secretName/Key`
-      consulClientRole: ""  # e.g. "consul-client"
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`
+      consulClientRole: ""
 
   # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
@@ -164,7 +163,7 @@ global:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false
     # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
-    # encryption key. The Kubernetes secret must be in the same namespace that Consul is installed into.
+    # encryption key. A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
     # secretKey is the key within the Kubernetes secret or Vault secret that holds the gossip
     # encryption key.

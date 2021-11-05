@@ -1,8 +1,11 @@
 package vault
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -11,9 +14,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	gossipKey = "3R7oLrdpkk2V0Y7yHLizyxXeS2RtaVuy07DkU15Lhws="
-)
+// generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
+func generateGossipSecret() (string, error) {
+	// This code was copied from Consul's Keygen command:
+	// https://github.com/hashicorp/consul/blob/d652cc86e3d0322102c2b5e9026c6a60f36c17a5/command/keygen/keygen.go
+
+	key := make([]byte, 32)
+	n, err := rand.Reader.Read(key)
+	if err != nil {
+		return "", fmt.Errorf("error reading random data: %s", err)
+	}
+	if n != 32 {
+		return "", fmt.Errorf("couldn't read enough entropy")
+	}
+
+	return base64.StdEncoding.EncodeToString(key), nil
+}
 
 // Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
 // then creates a gossip encryption secret and uses this to bootstrap Consul.
@@ -30,6 +46,9 @@ func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
 	vaultCluster.Create(t, ctx)
 	// Vault is now installed in the cluster.
 
+	// FIXME: There is a *slight* delay between when the vault pods are Ready and when the vaultClient connect attempt
+	// will work, on occassion the client connection will time out before it's ready. Fix later.
+	time.Sleep(1 * time.Second)
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
@@ -62,7 +81,10 @@ path "consul/data/secret/gossip" {
 	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-server", params)
 	require.NoError(t, err)
 
-	// Create the gossip key.
+	gossipKey, err := generateGossipSecret()
+	require.NoError(t, err)
+
+	// Create the gossip secret.
 	logger.Log(t, "Creating the gossip secret")
 	params = map[string]interface{}{
 		"data": map[string]interface{}{
