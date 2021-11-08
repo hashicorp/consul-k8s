@@ -1428,6 +1428,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -1435,11 +1436,8 @@ load _helpers
       yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-init-first"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-  local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  [ "${actual}" = "test" ]
 }
 
 @test "server/StatefulSet: vault gossip annotations are correct when enabled" {
@@ -1447,6 +1445,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.gossipEncryption.secretName=path/to/secret/key' \
     --set 'global.gossipEncryption.secretKey=.Data.gossip.gossip' \
     . | tee /dev/stderr |

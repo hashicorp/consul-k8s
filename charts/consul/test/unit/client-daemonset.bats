@@ -1520,12 +1520,29 @@ rollingUpdate:
 #--------------------------------------------------------------------
 # vault integration
 
+@test "client/DaemonSet: fail when vault is enabled but the consulClientRole is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "secretsBackend.vault.consulClientRole must be provided if secretsBackend.vault.enabled=true." ]]
+}
+
 @test "client/DaemonSet: vault annotations not set by default" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     . | tee /dev/stderr |
-     yq '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"] | length > 0 ' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1534,18 +1551,17 @@ rollingUpdate:
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-  local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-init-first"] | length > 0' | tee /dev/stderr)
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  [ "${actual}" = "foo" ]
 }
 
 @test "client/DaemonSet: vault gossip annotations are set when gossip encryption enabled" {
@@ -1553,17 +1569,24 @@ rollingUpdate:
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
-    --set 'global.gossipEncryption.secretName=path/to/secret/key' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.gossipEncryption.secretName=path/to/secret' \
     --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
-  [ "${actual}" = "path/to/secret/key" ]
+  [ "${actual}" = "path/to/secret" ]
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
-  [ "${actual}" = '{{- with secret "path/to/secret/key" -}} {{ .Data.gossip.gossip }} {{- end -}}' ]
+  echo "Actual:"
+  echo $actual
+  local expected='{{- with secret "path/to/secret" -}} {{- .Data.data.gossip -}} {{- end -}}'
+  echo "Expected:"
+  echo $expected
+  [ '${actual}' = '${expected}' ]
 }
 
 @test "client/DaemonSet: GOSSIP_KEY env variable is not set and command defines GOSSIP_KEY when vault is enabled" {
@@ -1571,6 +1594,8 @@ rollingUpdate:
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
     --set 'global.gossipEncryption.secretName=a/b/c/d' \
     --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
     . | tee /dev/stderr |
