@@ -1520,7 +1520,7 @@ rollingUpdate:
 #--------------------------------------------------------------------
 # vault integration
 
-@test "client/DaemonSet: vault annotations not attached by default" {
+@test "client/DaemonSet: vault annotations not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
     -s templates/client-daemonset.yaml  \
@@ -1548,13 +1548,13 @@ rollingUpdate:
   [ "${actual}" = "" ]
 }
 
-@test "client/DaemonSet: vault gossip annotations are correct when enabled" {
+@test "client/DaemonSet: vault gossip annotations are set when gossip encryption enabled" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.gossipEncryption.secretName=path/to/secret/key' \
-    --set 'global.gossipEncryption.secretKey=.Data.gossip.gossip' \
+    --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -1566,7 +1566,7 @@ rollingUpdate:
   [ "${actual}" = '{{- with secret "path/to/secret/key" -}} {{ .Data.gossip.gossip }} {{- end -}}' ]
 }
 
-@test "client/DaemonSet: vault no GOSSIP_KEY env variable and command defines GOSSIP_KEY" {
+@test "client/DaemonSet: GOSSIP_KEY env variable is not set and command defines GOSSIP_KEY when vault is enabled" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \

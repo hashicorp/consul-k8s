@@ -117,10 +117,11 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # secretsBackend is used to enable and disable the use of Vault as the secrets backend for the Consul on Kubernetes installation.
-  # In order to utilize this configuration it is required to have an accessible vault cluster which has been pre-configured
-  # by a Vault operator to have the Vault Kube Auth Method, KV2 + PKI secrets engines enabled as well as pre-created
-  # vault secrets, policies and roles.
+  # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
+  # The Vault cluster needs to have the Kubernetes Auth Method, 
+  # KV2 and PKI secrets engines enabled and have necessary secrets, 
+  # policies and roles created prior to installing Consul.
+  # The Vault cluster should not have Consul as its storage backend.
   # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
   # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
   # secretKey should be in the form of "key".
@@ -165,7 +166,7 @@ global:
     # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
     # encryption key. A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
-    # secretKey is the key within the Kubernetes secret or Vault secret that holds the gossip
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
 
