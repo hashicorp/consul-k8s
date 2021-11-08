@@ -139,6 +139,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# volumeClaim name
+
+@test "server/StatefulSet: no truncation for namespace <= 58 chars" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.volumeClaimTemplates[0].metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "data-default" ]
+}
+
+@test "server/StatefulSet: truncation for namespace > 58 chars" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -n really-really-really-really-really-really-really-long-namespace \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.volumeClaimTemplates[0].metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "data-really-really-really-really-really-really-really-long-name" ]
+}
+
+#--------------------------------------------------------------------
 # storageClass
 
 @test "server/StatefulSet: no storageClass on claim by default" {
