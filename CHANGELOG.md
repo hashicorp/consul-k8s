@@ -17,6 +17,7 @@ BUG FIXES:
 * Helm Chart
   * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
+  * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
 
 ## 0.36.0 (November 02, 2021)
 
