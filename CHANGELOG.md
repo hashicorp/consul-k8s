@@ -3,6 +3,7 @@
 IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
+  * Connect: Add pod name as tag to service instances and proxies. [[GH-848](https://github.com/hashicorp/consul-k8s/pull/848)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
 

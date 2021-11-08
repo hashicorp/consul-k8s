@@ -613,7 +613,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceTags:    []string{"pod1"},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -629,7 +629,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags: []string{},
+					ServiceTags: []string{"pod1"},
 				},
 			},
 			expectedAgentHealthChecks: []*api.AgentCheck{
@@ -691,7 +691,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceTags:    []string{"pod1"},
 				},
 				{
 					ServiceID:      "pod2-service-created",
@@ -699,7 +699,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceTags:    []string{"pod2"},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -715,7 +715,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags: []string{},
+					ServiceTags: []string{"pod1"},
 				},
 				{
 					ServiceID:      "pod2-service-created-sidecar-proxy",
@@ -729,7 +729,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags: []string{},
+					ServiceTags: []string{"pod2"},
 				},
 			},
 			expectedAgentHealthChecks: []*api.AgentCheck{
@@ -814,7 +814,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceTags:    []string{"pod1"},
 				},
 				{
 					ServiceID:      "pod2-service-created",
@@ -822,7 +822,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
 					ServiceMeta:    map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags:    []string{},
+					ServiceTags:    []string{"pod2"},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -838,7 +838,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod1", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags: []string{},
+					ServiceTags: []string{"pod1"},
 				},
 				{
 					ServiceID:      "pod2-service-created-sidecar-proxy",
@@ -852,7 +852,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 					},
 					ServiceMeta: map[string]string{MetaKeyPodName: "pod2", MetaKeyKubeServiceName: "service-created", MetaKeyKubeNS: "default", MetaKeyManagedBy: managedByValue},
-					ServiceTags: []string{},
+					ServiceTags: []string{"pod2"},
 				},
 			},
 			expectedAgentHealthChecks: []*api.AgentCheck{
@@ -930,7 +930,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						MetaKeyKubeNS:          "default",
 						MetaKeyManagedBy:       managedByValue,
 					},
-					ServiceTags: []string{"abc", "123", "def", "456"},
+					ServiceTags: []string{"pod1", "abc", "123", "def", "456"},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -963,7 +963,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						MetaKeyKubeNS:          "default",
 						MetaKeyManagedBy:       managedByValue,
 					},
-					ServiceTags: []string{"abc", "123", "def", "456"},
+					ServiceTags: []string{"pod1", "abc", "123", "def", "456"},
 				},
 			},
 			expectedAgentHealthChecks: []*api.AgentCheck{

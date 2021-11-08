@@ -416,9 +416,9 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		}
 	}
 
-	var tags []string
+	tags := []string{pod.Name}
 	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags = strings.Split(raw, ",")
+		tags = append(tags, strings.Split(raw, ",")...)
 	}
 	// Get the tags from the deprecated tags annotation and combine.
 	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
@@ -432,9 +432,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
 		Namespace: r.consulNamespace(pod.Namespace),
-	}
-	if len(tags) > 0 {
-		service.Tags = tags
+		Tags:      tags,
 	}
 
 	proxyServiceName := getProxyServiceName(pod, serviceEndpoints)
@@ -495,9 +493,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				AliasService: serviceID,
 			},
 		},
-	}
-	if len(tags) > 0 {
-		proxyService.Tags = tags
+		Tags: tags,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
