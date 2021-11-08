@@ -257,7 +257,7 @@ spec:
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -server
           volumeMounts:
-            - name: data-{{ .Release.Namespace }}
+            - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
@@ -365,7 +365,7 @@ spec:
       {{- end }}
   volumeClaimTemplates:
     - metadata:
-        name: data-{{ .Release.Namespace }}
+        name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
       spec:
         accessModes:
           - ReadWriteOnce
