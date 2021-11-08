@@ -569,7 +569,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 1b0252854bdef3197902ee928716ebd691ef39b173a19ad0d4e883ddb0443b88 ]
+  [ "${actual}" = b0be8c9b3ae8692a4e393b93976c55988e95cb9d9dae96fbd8626f3f5b6c404b ]
 }
 
 #--------------------------------------------------------------------
