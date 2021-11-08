@@ -978,3 +978,39 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# consulDestinationNamespace reserved name
+
+@test "syncCatalog/Deployment: fails when consulDestinationNamespace=system" {
+  reservedNameTest "system"
+}
+
+@test "syncCatalog/Deployment: fails when consulDestinationNamespace=universal" {
+  reservedNameTest "universal"
+}
+
+@test "syncCatalog/Deployment: fails when consulDestinationNamespace=consul" {
+  reservedNameTest "consul"
+}
+
+@test "syncCatalog/Deployment: fails when consulDestinationNamespace=operator" {
+  reservedNameTest "operator"
+}
+
+@test "syncCatalog/Deployment: fails when consulDestinationNamespace=root" {
+  reservedNameTest "root"
+}
+
+# reservedNameTest is a helper function that tests if certain Consul destination
+# namespace names fail because the name is reserved.
+reservedNameTest() {
+  cd `chart_dir`
+  local -r name="$1"
+		run helm template \
+				-s templates/sync-catalog-deployment.yaml  \
+				--set 'syncCatalog.enabled=true' \
+				--set "syncCatalog.consulNamespaces.consulDestinationNamespace=$name" .
+
+		[ "$status" -eq 1 ]
+		[[ "$output" =~ "The name $name set for key syncCatalog.consulNamespaces.consulDestinationNamespace is reserved by Consul for future use" ]]
+}

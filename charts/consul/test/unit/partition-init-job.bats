@@ -110,3 +110,41 @@ load _helpers
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# partition reserved name
+
+@test "partitionInit/Job: fails when adminPartitions.name=system" {
+  reservedNameTest "system"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=universal" {
+  reservedNameTest "universal"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=consul" {
+  reservedNameTest "consul"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=operator" {
+  reservedNameTest "operator"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=root" {
+  reservedNameTest "root"
+}
+
+# reservedNameTest is a helper function that tests if certain partition names
+# fail because the name is reserved.
+reservedNameTest() {
+  cd `chart_dir`
+  local -r name="$1"
+		run helm template \
+				-s templates/partition-init-job.yaml  \
+				--set 'global.enabled=false' \
+				--set 'global.adminPartitions.enabled=true' \
+				--set "global.adminPartitions.name=$name" .
+
+		[ "$status" -eq 1 ]
+		[[ "$output" =~ "The name $name set for key global.adminPartitions.name is reserved by Consul for future use" ]]
+}
