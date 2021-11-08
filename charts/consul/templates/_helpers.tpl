@@ -119,3 +119,21 @@ This template is for an init container.
       memory: "50Mi"
       cpu: "50m"
 {{- end -}}
+
+{{/*
+Fails when a reserved name is passed in. This should be used to test against
+Consul namespaces and partition names.
+This template accepts an array that contains two elements. The first element
+is the name that's being checked and the second is the name of the values.yaml
+key that's setting the name.
+
+Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
+
+*/}}
+{{- define "consul.reservedNamesFailer" -}}
+{{- $name := index . 0 -}}
+{{- $key := index . 1 -}}
+{{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
+{{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
+{{- end }}
+{{- end -}}
