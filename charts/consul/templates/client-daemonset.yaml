@@ -203,9 +203,8 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              {{- if .Values.dns.enabled }}
+              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection)}}
               export kube_dns_service_ip=$(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
-              echo $kube_dns_service_ip > /consul/kubednsip
               if [[ -z $kube_dns_service_ip ]]; then
                   echo "Unable to get kube-dns Service IP"
               fi
@@ -284,7 +283,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
-                {{- if .Values.dns.enabled }}
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection)}}
                 -recursor="$kube_dns_service_ip" \
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \

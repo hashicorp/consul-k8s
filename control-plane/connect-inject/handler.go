@@ -134,10 +134,9 @@ type Handler struct {
 	// to point them to the Envoy proxy.
 	TProxyOverwriteProbes bool
 
-	// ConsulDNSIP is the IP of the Consul DNS service on Kubernetes. When this values is not empty,
-	// it should be passed to the redirect traffic command so DNS requests are directed to Consul from
-	// mesh services.
-	ConsulDNSIP string
+	// EnableConsulDNS enables traffic redirection so that DNS requests are directed to Consul
+	// from mesh services.
+	EnableConsulDNS bool
 
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow

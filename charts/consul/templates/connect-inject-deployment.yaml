@@ -85,13 +85,6 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              {{- if .Values.dns.enabled }}
-              consul_fullname_with_underscore=$(echo $CONSUL_FULLNAME | tr '-' '_')
-              dns_var_name=${consul_fullname_with_underscore}_dns_service_host
-              dns_var_name_in_caps=$(echo $dns_var_name | tr 'a-z' 'A-Z')
-              export dns_ip=$(eval echo \$${dns_var_name_in_caps})
-              {{- end }}
-
               consul-k8s-control-plane inject-connect \
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
@@ -115,8 +108,8 @@ spec:
                 {{- else }}
                 -transparent-proxy-default-overwrite-probes=false \
                 {{- end }}
-                {{- if .Values.dns.enabled }}
-                -consul-dns-ip=$dns_ip \
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection)}}
+                -enable-consul-dns=true \
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \

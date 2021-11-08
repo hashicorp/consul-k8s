@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -306,6 +307,88 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				require.Nil(t, container.SecurityContext)
 				require.NotContains(t, actualCmd, c.expectedNotContainsCmd)
 			}
+		})
+	}
+}
+
+func TestHandlerContainerInit_consulDNS(t *testing.T) {
+	cases := map[string]struct {
+		globalEnabled       bool
+		annotations         map[string]string
+		expectedContainsCmd string
+		namespaceLabel      map[string]string
+	}{
+		"enabled globally, ns not set, annotation not provided": {
+			globalEnabled: true,
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -consul-dns-ip="10.0.34.16" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"enabled globally, ns not set, annotation is false": {
+			globalEnabled: true,
+			annotations:   map[string]string{keyConsulDNS: "false"},
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"enabled globally, ns not set, annotation is true": {
+			globalEnabled: true,
+			annotations:   map[string]string{keyConsulDNS: "true"},
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -consul-dns-ip="10.0.34.16" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"disabled globally, ns not set, annotation not provided": {
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"disabled globally, ns not set, annotation is false": {
+			annotations: map[string]string{keyConsulDNS: "false"},
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"disabled globally, ns not set, annotation is true": {
+			annotations: map[string]string{keyConsulDNS: "true"},
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -consul-dns-ip="10.0.34.16" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+		},
+		"disabled globally, ns enabled, annotation not set": {
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -consul-dns-ip="10.0.34.16" \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			namespaceLabel: map[string]string{keyConsulDNS: "true"},
+		},
+		"enabled globally, ns disabled, annotation not set": {
+			globalEnabled: true,
+			expectedContainsCmd: `/consul/connect-inject/consul connect redirect-traffic \
+  -proxy-id="$(cat /consul/connect-inject/proxyid)" \
+  -proxy-uid=5995`,
+			namespaceLabel: map[string]string{keyConsulDNS: "false"},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := Handler{EnableConsulDNS: c.globalEnabled, EnableTransparentProxy: true}
+			os.Setenv(dnsServiceHostEnvSuffix, "10.0.34.16")
+			defer os.Unsetenv(dnsServiceHostEnvSuffix)
+
+			pod := minimal()
+			pod.Annotations = c.annotations
+
+			ns := testNS
+			ns.Labels = c.namespaceLabel
+			container, err := h.containerInit(ns, *pod)
+			require.NoError(t, err)
+			actualCmd := strings.Join(container.Command, " ")
+
+			require.Contains(t, actualCmd, c.expectedContainsCmd)
 		})
 	}
 }

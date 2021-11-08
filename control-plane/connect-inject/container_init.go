@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -16,6 +17,7 @@ const (
 	envoyUserAndGroupID         = 5995
 	copyContainerUserAndGroupID = 5996
 	netAdminCapability          = "NET_ADMIN"
+	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
@@ -110,6 +112,21 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		return corev1.Container{}, err
 	}
 
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, h.EnableConsulDNS)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	var consulDNSIP string
+	if dnsEnabled {
+		for _, e := range os.Environ() {
+			if strings.Contains(e, dnsServiceHostEnvSuffix) {
+				dnsServiceHostEnv := strings.SplitN(e, "=", 2)
+				consulDNSIP = dnsServiceHostEnv[1]
+			}
+		}
+	}
+
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,
 		ConsulPartition:            h.ConsulPartition,
@@ -121,7 +138,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
-		ConsulDNSIP:                h.ConsulDNSIP,
+		ConsulDNSIP:                consulDNSIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
@@ -237,6 +254,22 @@ func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalE
 	}
 	// Next see if the namespace has been defaulted.
 	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Else fall back to the global default.
+	return globalEnabled, nil
+}
+
+// consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
+// to read the pod's namespace label when it exists.
+func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+	// First check to see if the pod annotation exists to override the namespace or global settings.
+	if raw, ok := pod.Annotations[keyConsulDNS]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Next see if the namespace has been defaulted.
+	if raw, ok := namespace.Labels[keyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.
