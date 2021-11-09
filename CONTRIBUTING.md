@@ -3,22 +3,22 @@
 1. [Contributing 101](#contributing-101)
     1. [Running Linters Locally](#running-linters-locally)
     2. [Rebasing Contributions against main](#rebasing-contributions-against-main)
-3. [Creating a new CRD](#creating-a-new-crd)
+1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
-    2. [Spec Methods](#spec-methods)
-    3. [Spec Tests](#spec-tests)
-    4. [Controller](#controller)
-    5. [Webhook](#webhook)
-    6. [Update command.go](#update-commandgo)
-    7. [Generating YAML](#generating-yaml)
-    8. [Updating consul-helm](#updating-consul-helm)
-    9. [Testing a new CRD](#testing-a-new-crd)
-    10. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
+    1. [Spec Methods](#spec-methods)
+    1. [Spec Tests](#spec-tests)
+    1. [Controller](#controller)
+    1. [Webhook](#webhook)
+    1. [Update command.go](#update-commandgo)
+    1. [Generating YAML](#generating-yaml)
+    1. [Updating consul-helm](#updating-consul-helm)
+    1. [Testing a new CRD](#testing-a-new-crd)
+    1. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
 5. [Testing the Helm chart](#testing-the-helm-chart)
-6. [Running the tests](#running-the-tests)
-     1. [Writing Unit tests](#writing-unit-tests)
-     2. [Writing Acceptance tests](#writing-acceptance-tests)
-8. [Helm Reference Docs](#helm-reference-docs)
+    1. [Running the tests](#running-the-tests)
+    1. [Writing Unit tests](#writing-unit-tests)
+    1. [Writing Acceptance tests](#writing-acceptance-tests)
+1. [Helm Reference Docs](#helm-reference-docs)
 
 
 ## Contributing 101
@@ -48,14 +48,8 @@ To compile the `consul-k8s` binary for your local machine:
 $ make dev
 ```
 
-This will compile the `consul-k8s` binary into `bin/consul-k8s` as
+This will compile the `consul-k8s-control-plane` binary into `bin/consul-k8s-control-plane` as
 well as your `$GOPATH` and run the test suite.
-
-Or run the following to generate all binaries:
-
-```shell
-$ make dist
-```
 
 If you just want to run the tests:
 
@@ -445,8 +439,6 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install golang
   ```
-  
----
 
 ### Running The Tests
 
