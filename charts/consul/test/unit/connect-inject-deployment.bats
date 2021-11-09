@@ -532,7 +532,7 @@ EOF
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: -enable-consul-dns is false if dns.enabled=false is disabled" {
+@test "connectInject/Deployment: -enable-consul-dns is true if dns.enabled=true and dns.enableRedirection=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
