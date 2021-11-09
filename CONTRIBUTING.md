@@ -91,7 +91,7 @@ controller:
 Run a `helm install` from the project root directory to target your dev version of the Helm chart. 
 
 ```shell
-helm install consul --create-namespace -n consul -f ./values-dev.yaml ./charts/consul
+helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/consul
 ```
 
 ### Running linters locally
