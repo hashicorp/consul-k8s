@@ -1,6 +1,7 @@
 # Contributing to Consul on Kubernetes
 
 1. [Contributing 101](#contributing-101)
+    1. [Building and running `consul-k8s-control-plane`](#building-and-running-consul-k8s-control-plane)
     1. [Running Linters Locally](#running-linters-locally)
     1. [Rebasing Contributions against main](#rebasing-contributions-against-main)
 1. [Creating a new CRD](#creating-a-new-crd)
@@ -22,6 +23,8 @@
 
 
 ## Contributing 101
+
+### Building and running `consul-k8s-control-plane`
 
 To build and install the control plane binary `consul-k8s` locally, Go version 1.11.4+ is required because this repository uses go modules and go 1.11.4 introduced changes to checksumming of modules to correct a symlink problem.
 You will also need to install the Docker engine:
@@ -69,13 +72,28 @@ To create a docker image with your local changes:
 $ make dev-docker
 ```
 
-Create a `values.dev.yaml` file that includes the `global.imageK8s` flag:
+If you'd like to use your docker images in a dev deployment of Consul K8s, you would need to push those images to Docker Hub since 
+deploying off of local images is not supported unless you host your own local Docker registry:
+
+```
+$ docker tag consul-k8s-control-plane-dev <insert-docker-hub-username>/consul-k8s-control-plane-dev
+$ docker push <insert-docker-hub-username>/consul-k8s-control-plane-dev
+Using default tag: latest
+The push refers to repository [docker.io/<hub-username>/consul-k8s-control-plane-dev]
+4c5225fbac5e: Pushed
+737cd00c4260: Pushed
+7a9c7d9855c2: Pushed
+e2eb06d8af82: Pushed
+latest: digest: sha256:0b3e90e0b32da8aba1b11cda6a6a768a5eb4d83664a408d53f1502db8703ef8a size: 1160
+```
+
+Create a `values.dev.yaml` file that includes the `global.imageK8s` flag to point to dev images you just pushed:
 
 ```yaml
 global:
   tls:
     enabled: true
-  imageK8S: consul-k8s-control-plane-dev
+  imageK8S: <insert-docker-hub-username>/consul-k8s-control-plane-dev
 server:
   replicas: 1
 connectInject:
