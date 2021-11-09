@@ -2,8 +2,9 @@
 
 1. [Contributing 101](#contributing-101)
     1. [Building and running `consul-k8s-control-plane`](#building-and-running-consul-k8s-control-plane)
-    1. [Running Linters Locally](#running-linters-locally)
-    1. [Rebasing Contributions against main](#rebasing-contributions-against-main)
+    1. [Building and running the `consul-k8s` CLI](#building-and-running-the-consul-k8s-cli)
+    3. [Running Linters Locally](#running-linters-locally)
+    4. [Rebasing Contributions against main](#rebasing-contributions-against-main)
 1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
@@ -110,6 +111,27 @@ Run a `helm install` from the project root directory to target your dev version 
 
 ```shell
 helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/consul
+```
+
+### Building and running the `consul-k8s` CLI
+
+Change directory into the `cli` folder where the golang code resides.
+
+```shell
+cd cli
+```
+
+Build the CLI binary using the following command
+
+```shell
+go build -o bin/consul-k8s
+```
+
+Run the CLI as follows
+
+```shell
+./bin/consul-k8s version
+consul-k8s 0.36.0-dev
 ```
 
 ### Running linters locally
