@@ -48,7 +48,7 @@ func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
 
 	// FIXME: There is a *slight* delay between when the vault pods are Ready and when the vaultClient connect attempt
 	// will work, on occassion the client connection will time out before it's ready. Fix later.
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 
@@ -102,7 +102,7 @@ path "consul/data/secret/gossip" {
 
 		"global.secretsBackend.vault.enabled":          "true",
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
-		"global.secretsBackend.vault.consulclientRole": "consul-client",
+		"global.secretsBackend.vault.consulClientRole": "consul-client",
 
 		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",

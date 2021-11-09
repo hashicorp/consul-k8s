@@ -65,7 +65,7 @@ func NewVaultCluster(
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
-	helm.AddRepo(t, &helm.Options{}, "hashicorp/vault", "https://helm.releases.hashicorp.com")
+	helm.AddRepo(t, &helm.Options{}, "hashicorp", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
 	errStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
