@@ -107,7 +107,7 @@ path "consul/data/secret/gossip" {
 		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
-		"global.gossipEncryption.secretKey":  ".Data.data.gossip",
+		"global.gossipEncryption.secretKey":  "gossip",
 	}
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)

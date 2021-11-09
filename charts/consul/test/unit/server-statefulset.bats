@@ -1465,7 +1465,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.gossipEncryption.secretName=path/to/secret' \
-    --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -1488,7 +1488,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.gossipEncryption.secretName=a/b/c/d' \
-    --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
     . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
