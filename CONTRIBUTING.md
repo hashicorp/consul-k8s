@@ -69,6 +69,31 @@ To create a docker image with your local changes:
 $ make dev-docker
 ```
 
+Create a `values.dev.yaml` file that includes the `global.imageK8s` flag
+
+```yaml
+global:
+  tls:
+    enabled: true
+  image: hashicorp/consul-k8s-control-plane-dev
+server:
+  replicas: 1
+connectInject:
+  enabled: true
+ui:
+  enabled: true
+  service:
+    enabled: true
+controller:
+  enabled: true
+```
+
+Run a `helm install` from the project root directory to target your dev version of the Helm chart. 
+
+```shell
+helm install consul --create-namespace -n consul -f ./values-dev.yaml ./charts/consul
+```
+
 ### Running linters locally
 [`golangci-lint`](https://golangci-lint.run/) is used in CI to enforce coding and style standards and help catch bugs ahead of time.
 The configuration that CI runs is stored in `.golangci.yml` at the top level of the repository.
