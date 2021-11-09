@@ -69,13 +69,13 @@ To create a docker image with your local changes:
 $ make dev-docker
 ```
 
-Create a `values.dev.yaml` file that includes the `global.imageK8s` flag
+Create a `values.dev.yaml` file that includes the `global.imageK8s` flag:
 
 ```yaml
 global:
   tls:
     enabled: true
-  image: hashicorp/consul-k8s-control-plane-dev
+  image: consul-k8s-control-plane-dev
 server:
   replicas: 1
 connectInject:
