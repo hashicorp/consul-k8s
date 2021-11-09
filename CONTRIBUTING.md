@@ -75,7 +75,7 @@ Create a `values.dev.yaml` file that includes the `global.imageK8s` flag:
 global:
   tls:
     enabled: true
-  image: consul-k8s-control-plane-dev
+  imageK8S: consul-k8s-control-plane-dev
 server:
   replicas: 1
 connectInject:
