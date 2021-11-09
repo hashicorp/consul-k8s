@@ -7,7 +7,7 @@
 {{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
 {{- if (and .Values.global.gossipEncryption.secretName (not .Values.global.gossipEncryption.secretKey)) }}{{fail "gossipEncryption.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.gossipEncryption.secretName) .Values.global.gossipEncryption.secretKey) }}{{fail "gossipEncryption.secretKey and secretName must both be specified." }}{{ end -}}
-{{- if (and (not .Values.global.secretsBackend.vault.consulServerRole) .Values.global.secretsBackend.vault.enabled) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.consulServerRole)) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet

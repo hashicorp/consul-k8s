@@ -1528,7 +1528,7 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "secretsBackend.vault.consulClientRole must be provided if secretsBackend.vault.enabled=true." ]]
+  [[ "$output" =~ "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true" ]]
 }
 
 @test "client/DaemonSet: vault annotations not set by default" {
@@ -1579,14 +1579,10 @@ rollingUpdate:
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
   [ "${actual}" = "path/to/secret" ]
-  local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
-  echo "Actual:"
-  echo $actual
-  local expected='{{- with secret "path/to/secret" -}} {{- .Data.data.gossip -}} {{- end -}}'
-  echo "Expected:"
-  echo $expected
-  [ '${actual}' = '${expected}' ]
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.gossip -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
 }
 
 @test "client/DaemonSet: GOSSIP_KEY env variable is not set and command defines GOSSIP_KEY when vault is enabled" {

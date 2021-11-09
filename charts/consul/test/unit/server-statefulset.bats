@@ -1414,12 +1414,28 @@ load _helpers
 #--------------------------------------------------------------------
 # vault integration
 
-@test "server/StatefulSet: vault annotations not attached by default" {
+@test "server/StatefulSet: fail when vault is enabled but the consulServerRole is not provided" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true" ]]
+}
+
+@test "server/StatefulSet: vault annotations not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     . | tee /dev/stderr |
-     yq '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"] | length > 0 ' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1428,6 +1444,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
@@ -1445,18 +1462,22 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.gossipEncryption.secretName=path/to/secret/key' \
-    --set 'global.gossipEncryption.secretKey=.Data.gossip.gossip' \
+    --set 'global.gossipEncryption.secretName=path/to/secret' \
+    --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
-  [ "${actual}" = "path/to/secret/key" ]
+  [ "${actual}" = "path/to/secret" ]
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
-  [ "${actual}" = '{{- with secret "path/to/secret/key" -}} {{ .Data.gossip.gossip }} {{- end -}}' ]
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.gossip -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
 }
 
 @test "server/StatefulSet: vault no GOSSIP_KEY env variable and command defines GOSSIP_KEY" {
@@ -1464,6 +1485,8 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.gossipEncryption.secretName=a/b/c/d' \
     --set 'global.gossipEncryption.secretKey=.Data.data.gossip' \
     . | tee /dev/stderr |
