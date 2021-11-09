@@ -2,7 +2,7 @@
 
 1. [Contributing 101](#contributing-101)
     1. [Running Linters Locally](#running-linters-locally)
-    2. [Rebasing Contributions against main](#rebasing-contributions-against-main)
+    1. [Rebasing Contributions against main](#rebasing-contributions-against-main)
 1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
