@@ -15,6 +15,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: server
 spec:
   maxUnavailable: {{ template "consul.pdb.maxUnavailable" . }}
   selector:

@@ -10,6 +10,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: license
 {{- if or .Values.global.acls.manageSystemACLs .Values.global.enablePodSecurityPolicies }}
 rules:
 {{- if .Values.global.acls.manageSystemACLs }}
