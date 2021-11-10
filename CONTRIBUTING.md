@@ -134,6 +134,22 @@ Run the CLI as follows
 consul-k8s 0.36.0-dev
 ```
 
+### Making Changes to consul-k8s
+
+The first step to making changes is to fork Consul K8s. Afterwards, the easiest way 
+to work on the fork is to set it as a remote of the Consul K8s project:
+
+1. Rename the existing remote's name: `git remote rename origin upstream`.
+1. Add your fork as a remote by running
+   `git remote add origin <github url of fork>`. For example:
+   `git remote add origin https://github.com/myusername/consul-k8s`.
+1. Checkout a feature branch: `git checkout -t -b new-feature`
+1. Make changes (i.e. `git commit -am 'message'`)
+1. Push changes to the fork when ready to submit PR:
+   `git push -u origin new-feature`
+
+>Note: If you make any changes to the code, run `gofmt -s -w` to automatically format the code according to Go standards.
+
 ### Running linters locally
 [`golangci-lint`](https://golangci-lint.run/) is used in CI to enforce coding and style standards and help catch bugs ahead of time.
 The configuration that CI runs is stored in `.golangci.yml` at the top level of the repository.
