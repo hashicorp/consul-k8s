@@ -28,7 +28,7 @@ data:
       }
     }
   {{- end }}
-  {{- if (and .Values.ui.enabled (or .Values.ui.metrics.enabled (and .Values.global.metrics.enabled (eq (.Values.ui.metrics.enabled | toString) "-")))) }}
+  {{- if (and .Values.ui.enabled (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString))))) }}
   ui-config.json: |-
     {
       "ui_config": {
