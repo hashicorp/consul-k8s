@@ -4,14 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 // generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
@@ -46,9 +44,6 @@ func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
 	vaultCluster.Create(t, ctx)
 	// Vault is now installed in the cluster.
 
-	// FIXME: There is a *slight* delay between when the vault pods are Ready and when the vaultClient connect attempt
-	// will work, on occassion the client connection will time out before it's ready. Fix later.
-	time.Sleep(5 * time.Second)
 	// Now fetch the Vault client so we can create the policies and secrets.
 	vaultClient := vaultCluster.VaultClient(t)
 

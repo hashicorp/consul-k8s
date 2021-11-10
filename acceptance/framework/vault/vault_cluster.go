@@ -111,7 +111,7 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 		v.logger)
 
 	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 10}, t, func(r *retry.R) {
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
 		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
 		// get used to fail the test, just for logging.
@@ -154,7 +154,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	}
 	// We need to kubectl exec this one on the vault server:
 	// This is taken from https://learn.hashicorp.com/tutorials/vault/kubernetes-google-cloud-gke?in=vault/kubernetes#configure-kubernetes-authentication
-	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
+	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config issuer=\"https://kubernetes.default.svc.cluster.local\" token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)
