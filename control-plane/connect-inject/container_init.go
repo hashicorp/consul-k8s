@@ -2,7 +2,7 @@ package connectinject
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -125,7 +125,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
 		consulDNSClusterIP = os.Getenv(h.constructDNSServiceHostName())
 		if consulDNSClusterIP == "" {
-			return corev1.Container{}, errors.New("failed to find ClusterIP for Consul DNS Service Host")
+			return corev1.Container{}, fmt.Errorf("environment variable %s is not found", h.constructDNSServiceHostName())
 		}
 	}
 
