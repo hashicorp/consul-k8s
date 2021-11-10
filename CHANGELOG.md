@@ -1,10 +1,17 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
+  `global.metrics=false` and `ui.metrics.enabled=-`. If you are no longer seeing UI metrics,
+  set `global.metrics=true` or `ui.metrics.enabled=true`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
+
 IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
+* Helm Chart
+  * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
 
 BUG FIXES:
 * Control Plane
@@ -18,10 +25,7 @@ BUG FIXES:
   * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
   * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
-
-IMPROVEMENTS:
-* Helm Chart
-  * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
+  * Fix issue where UI metrics would be enabled when `global.metrics=false` and `ui.metrics.enabled=-`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
 
 ## 0.36.0 (November 02, 2021)
 
