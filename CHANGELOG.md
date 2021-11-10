@@ -8,6 +8,7 @@ BREAKING CHANGES:
 IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
+  * Connect: Log a warning when ACLs are enabled and the default service account is used. [[GH-842](https://github.com/hashicorp/consul-k8s/pull/842)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
 * Helm Chart
