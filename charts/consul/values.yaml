@@ -1122,7 +1122,7 @@ dns:
   # @type: boolean
   enabled: "-"
 
-  # Used to determine if services using Consul Connect use Consul DNS
+  # If true, services using Consul Connect will use Consul DNS
   # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
   # listed in /etc/resolv.conf if not found in Consul.
   # @type: boolean

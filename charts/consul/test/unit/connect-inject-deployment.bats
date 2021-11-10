@@ -522,7 +522,7 @@ EOF
 #--------------------------------------------------------------------
 # DNS
 
-@test "connectInject/Deployment: -enable-consul-dns unset default" {
+@test "connectInject/Deployment: -enable-consul-dns unset by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
@@ -540,6 +540,16 @@ EOF
       --set 'dns.enableRedirection=true' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -resource-prefix always set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-resource-prefix=RELEASE-NAME-consul")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

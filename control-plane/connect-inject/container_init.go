@@ -2,6 +2,7 @@ package connectinject
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -69,8 +70,8 @@ type initContainerCommandData struct {
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
 
-	// ConsulDNSIP is the IP of the Consul DNS Service.
-	ConsulDNSIP string
+	// ConsulDNSClusterIP is the IP of the Consul DNS Service.
+	ConsulDNSClusterIP string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -117,13 +118,14 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		return corev1.Container{}, err
 	}
 
-	var consulDNSIP string
+	var consulDNSClusterIP string
 	if dnsEnabled {
-		for _, e := range os.Environ() {
-			if strings.Contains(e, dnsServiceHostEnvSuffix) {
-				dnsServiceHostEnv := strings.SplitN(e, "=", 2)
-				consulDNSIP = dnsServiceHostEnv[1]
-			}
+		// If Consul DNS is enabled, we find the environment variable that has the value
+		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
+		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
+		consulDNSClusterIP = os.Getenv(h.constructDNSServiceHostName())
+		if consulDNSClusterIP == "" {
+			return corev1.Container{}, errors.New("failed to find ClusterIP for Consul DNS Service Host")
 		}
 	}
 
@@ -138,7 +140,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
-		ConsulDNSIP:                consulDNSIP,
+		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
@@ -242,6 +244,15 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 	}
 
 	return container, nil
+}
+
+// constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
+// key of the env variable whose value is the cluster IP of the Consul DNS Service.
+// It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
+func (h *Handler) constructDNSServiceHostName() string {
+	upcaseResourcePrefix := strings.ToUpper(h.ResourcePrefix)
+	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
+	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
 }
 
 // transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
@@ -368,8 +379,8 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
   {{- end }}
-  {{- if .ConsulDNSIP }}
-  -consul-dns-ip="{{ .ConsulDNSIP }}" \
+  {{- if .ConsulDNSClusterIP }}
+  -consul-dns-ip="{{ .ConsulDNSClusterIP }}" \
   {{- end }}
   {{- range .TProxyExcludeInboundPorts }}
   -exclude-inbound-port="{{ . }}" \

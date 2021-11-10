@@ -375,9 +375,9 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := Handler{EnableConsulDNS: c.globalEnabled, EnableTransparentProxy: true}
-			os.Setenv(dnsServiceHostEnvSuffix, "10.0.34.16")
-			defer os.Unsetenv(dnsServiceHostEnvSuffix)
+			h := Handler{EnableConsulDNS: c.globalEnabled, EnableTransparentProxy: true, ResourcePrefix: "consul-consul"}
+			os.Setenv("CONSUL_CONSUL_DNS_SERVICE_HOST", "10.0.34.16")
+			defer os.Unsetenv("CONSUL_CONSUL_DNS_SERVICE_HOST")
 
 			pod := minimal()
 			pod.Annotations = c.annotations
@@ -389,6 +389,33 @@ func TestHandlerContainerInit_consulDNS(t *testing.T) {
 			actualCmd := strings.Join(container.Command, " ")
 
 			require.Contains(t, actualCmd, c.expectedContainsCmd)
+		})
+	}
+}
+
+func TestHandler_constructDNSServiceHostName(t *testing.T) {
+	cases := []struct {
+		prefix string
+		result string
+	}{
+		{
+			prefix: "consul-consul",
+			result: "CONSUL_CONSUL_DNS_SERVICE_HOST",
+		},
+		{
+			prefix: "release",
+			result: "RELEASE_DNS_SERVICE_HOST",
+		},
+		{
+			prefix: "consul-dc1",
+			result: "CONSUL_DC1_DNS_SERVICE_HOST",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.prefix, func(t *testing.T) {
+			h := Handler{ResourcePrefix: c.prefix}
+			require.Equal(t, c.result, h.constructDNSServiceHostName())
 		})
 	}
 }

@@ -138,6 +138,10 @@ type Handler struct {
 	// from mesh services.
 	EnableConsulDNS bool
 
+	// ResourcePrefix is the prefix used for the installation which is used to determine the Service
+	// name of the Consul DNS service.
+	ResourcePrefix string
+
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
 	// those containers to be created otherwise.

@@ -37,7 +37,7 @@ to the consul agent command.
               recursor_flags=""
               for ip in $(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
               do
-                 recursor_flags=$recursor_flags" -recursor=$ip"
+                 recursor_flags="$recursor_flags -recursor=$ip"
               done
 {{- end -}}
 

@@ -203,7 +203,7 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection)}}
+              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
               {{ template "consul.recursors" }}
               {{- end }}
 
@@ -280,7 +280,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
-                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection)}}
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
                 $recursor_flags \
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
