@@ -11,6 +11,9 @@ BREAKING CHANGES:
 * Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
   `global.metrics=false` and `ui.metrics.enabled=-`. If you are no longer seeing UI metrics,
   set `global.metrics=true` or `ui.metrics.enabled=true`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
+* The `enterpriseLicense` section of the values file has been migrated from being under the `server` stanza to being
+  under the `global` stanza. Migrating the contents of `server.enterpriseLicense` to `global.enterpriseLicense` will
+  ensure the license job works. [[GH-856](https://github.com/hashicorp/consul-k8s/pull/856)]
 
 IMPROVEMENTS:
 * Control Plane
