@@ -3,8 +3,9 @@
 1. [Contributing 101](#contributing-101)
     1. [Building and running `consul-k8s-control-plane`](#building-and-running-consul-k8s-control-plane)
     1. [Building and running the `consul-k8s` CLI](#building-and-running-the-consul-k8s-cli)
-    3. [Running Linters Locally](#running-linters-locally)
-    4. [Rebasing Contributions against main](#rebasing-contributions-against-main)
+    1. [Making changes to consul-k8s](#making-changes-to-consul-k8s)
+    1. [Running linters locally](#running-linters-locally)
+    1. [Rebasing contributions against main](#rebasing-contributions-against-main)
 1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
@@ -134,7 +135,7 @@ Run the CLI as follows
 consul-k8s 0.36.0-dev
 ```
 
-### Making Changes to consul-k8s
+### Making changes to consul-k8s
 
 The first step to making changes is to fork Consul K8s. Afterwards, the easiest way 
 to work on the fork is to set it as a remote of the Consul K8s project:
