@@ -88,7 +88,7 @@ e2eb06d8af82: Pushed
 latest: digest: sha256:0b3e90e0b32da8aba1b11cda6a6a768a5eb4d83664a408d53f1502db8703ef8a size: 1160
 ```
 
-Create a `values.dev.yaml` file that includes the `global.imageK8s` flag to point to dev images you just pushed:
+Create a `values.dev.yaml` file that includes the `global.imageK8S` flag to point to dev images you just pushed:
 
 ```yaml
 global:
