@@ -19,6 +19,10 @@ BUG FIXES:
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
   * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
 
+IMPROVEMENTS:
+* Helm Chart
+  * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
+
 ## 0.36.0 (November 02, 2021)
 
 BREAKING CHANGES:

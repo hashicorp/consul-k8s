@@ -10,6 +10,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: connect-injector
 webhooks:
   - name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
     # The webhook will fail scheduling all pods that are not part of consul if all replicas of the webhook are unhealthy.
