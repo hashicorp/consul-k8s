@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+FEATURES:
+* Helm Chart
+  * Add support for Consul services to utilize Consul DNS for service discovery. Set `dns.enableRedirection` to allow services to
+    use Consul DNS via the Consul DNS Service. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+* Control Plane
+  * Connect: Allow services using Connect to utilize Consul DNS to perform service discovery. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+  
 BREAKING CHANGES:
 * Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
   `global.metrics=false` and `ui.metrics.enabled=-`. If you are no longer seeing UI metrics,

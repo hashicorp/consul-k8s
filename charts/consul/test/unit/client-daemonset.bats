@@ -1171,6 +1171,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# DNS
+
+@test "client/DaemonSet: recursor flags is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: add recursor flags if dns.enableRedirection is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml \
+      --set 'dns.enableRedirection=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # hostNetwork
 
 @test "client/DaemonSet: hostNetwork not set by default" {
