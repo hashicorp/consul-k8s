@@ -1345,8 +1345,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","secret":{"secretName":"foo"}}' ]
@@ -1356,8 +1356,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","mountPath":"/consul/license","readOnly":true}' ]
@@ -1367,8 +1367,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
