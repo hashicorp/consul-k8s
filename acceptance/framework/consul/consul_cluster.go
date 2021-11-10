@@ -508,7 +508,8 @@ func defaultValues() map[string]string {
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).
-		"dns.enabled": "false",
+		"dns.enabled":        "false",
+		"ui.metrics.enabled": "false",
 
 		// Enable trace logs for servers and clients.
 		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
