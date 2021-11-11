@@ -142,10 +142,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		if err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
@@ -154,8 +151,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// If the endpoints object has the label "connect-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if value, ok := serviceEndpoints.Labels[connectIgnoreLabel]; ok && value == "true" {
-		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
-		return ctrl.Result{}, err
+		return r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 	}
 
 	r.Log.Info("retrieved", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
@@ -190,7 +186,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap, endpointPods); err != nil {
+	if _, err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap, endpointPods); err != nil {
 		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
 	}
@@ -673,7 +669,7 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool, endpointPods mapset.Set) error {
+func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool, endpointPods mapset.Set) (ctrl.Result, error) {
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	agents := corev1.PodList{}
 	listOptions := client.ListOptions{
@@ -686,7 +682,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	}
 	if err := r.Client.List(ctx, &agents, &listOptions); err != nil {
 		r.Log.Error(err, "failed to get Consul client agent pods")
-		return err
+		return ctrl.Result{}, err
 	}
 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
@@ -694,14 +690,14 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 		client, err := r.remoteConsulClient(agent.Status.PodIP, r.consulNamespace(k8sSvcNamespace))
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", agent.Status.PodIP)
-			return err
+			return ctrl.Result{}, err
 		}
 
 		// Get services matching metadata.
 		svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace, client)
 		if err != nil {
 			r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
-			return err
+			return ctrl.Result{}, err
 		}
 
 		// Deregister each service instance that matches the metadata.
@@ -715,7 +711,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 					r.Log.Info("deregistering service from consul", "svc", svcID)
 					if err = client.Agent().ServiceDeregister(svcID); err != nil {
 						r.Log.Error(err, "failed to deregister service instance", "id", svcID)
-						return err
+						return ctrl.Result{}, err
 					}
 					serviceDeregistered = true
 				}
@@ -723,7 +719,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 				r.Log.Info("deregistering service from consul", "svc", svcID)
 				if err = client.Agent().ServiceDeregister(svcID); err != nil {
 					r.Log.Error(err, "failed to deregister service instance", "id", svcID)
-					return err
+					return ctrl.Result{}, err
 				}
 				serviceDeregistered = true
 			}
@@ -733,12 +729,12 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
-					return err
+					return ctrl.Result{}, err
 				}
 			}
 		}
 	}
-	return nil
+	return ctrl.Result{}, nil
 }
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
