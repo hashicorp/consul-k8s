@@ -1011,10 +1011,8 @@ func (r *EndpointsController) consulNamespace(namespace string) string {
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
 func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[keyInjectStatus]; ok {
-		if anno == injected {
-			return true
-		}
+	if anno, ok := pod.Annotations[keyInjectStatus]; ok && anno == injected {
+		return true
 	}
 	return false
 }
