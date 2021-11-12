@@ -1,12 +1,7 @@
 package vault
 
 import (
-	"context"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 	"time"
 
@@ -15,6 +10,8 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
@@ -23,9 +20,9 @@ import (
 )
 
 const (
-	vaultNS           = "default"
-	vaultChartVersion = "0.17.0"
-	vaultRootToken    = "abcd1234"
+	vaultNS        = "default"
+	vaultPodLabel  = "app.kubernetes.io/instance="
+	vaultRootToken = "abcd1234"
 )
 
 // VaultCluster
@@ -35,7 +32,6 @@ type VaultCluster struct {
 
 	vaultHelmOptions *helm.Options
 	vaultReleaseName string
-	vaultChartName   string
 	vaultClient      *vapi.Client
 
 	kubectlOptions *terratestk8s.KubectlOptions
@@ -68,13 +64,14 @@ func NewVaultCluster(
 		SetValues:      defaultVaultValues(),
 		KubectlOptions: kopts,
 		Logger:         logger,
-		Version:        vaultChartVersion,
 	}
-	// Add the vault helm repo in case it is missing, and do an update so we can utilise `vaultChartVersion` to install.
-	helm.AddRepo(t, &helm.Options{}, "hashicorp/vault", "https://helm.releases.hashicorp.com")
+	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
-	_, _ = helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+	_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+	if err != nil {
+		logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
+	}
 
 	return &VaultCluster{
 		ctx:                ctx,
@@ -89,7 +86,6 @@ func NewVaultCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		vaultReleaseName:   releaseName,
-		vaultChartName:     fmt.Sprintf("vault-%s", vaultChartVersion),
 	}
 }
 
@@ -115,7 +111,7 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 		v.logger)
 
 	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
 		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
 		// get used to fail the test, just for logging.
@@ -158,7 +154,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	}
 	// We need to kubectl exec this one on the vault server:
 	// This is taken from https://learn.hashicorp.com/tutorials/vault/kubernetes-google-cloud-gke?in=vault/kubernetes#configure-kubernetes-authentication
-	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
+	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config disable_iss_validation=\"true\" token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)
@@ -175,19 +171,12 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, v.vaultChartName)
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, "", fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
 
 	// Install Vault.
 	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
-	// Wait for the injector pod to become Ready, but not the server.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
-	// Wait for the server pod to be PodRunning, it will not be Ready because it has not been Init+Unseal'd yet.
-	// The vault server has health checks bound to unseal status, and Unseal is done as part of bootstrap (below).
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 30}, t, func(r *retry.R) {
-		pod, err := v.kubernetesClient.CoreV1().Pods(v.vaultHelmOptions.KubectlOptions.Namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.vaultReleaseName), metav1.GetOptions{})
-		require.NoError(r, err)
-		require.Equal(r, pod.Status.Phase, corev1.PodRunning)
-	})
+	// Wait for the injector and vault server pods to become Ready.
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
 	// Now call bootstrap()
 	v.bootstrap(t, ctx)
 }

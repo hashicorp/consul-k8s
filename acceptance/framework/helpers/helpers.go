@@ -29,7 +29,7 @@ func RandomName() string {
 
 // CheckForPriorInstallations checks if there is an existing Helm release
 // for this Helm chart already installed. If there is, it fails the tests.
-func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, options *helm.Options, chartName string) {
+func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, options *helm.Options, chartName, labelSelector string) {
 	t.Helper()
 
 	var helmListOutput string
@@ -57,7 +57,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 	// Wait for all pods in the "default" namespace to exit. A previous
 	// release may not be listed by Helm but its pods may still be terminating.
 	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
-		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("chart=%s", chartName)})
+		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		require.NoError(r, err)
 		if len(pods.Items) > 0 {
 			var podNames []string

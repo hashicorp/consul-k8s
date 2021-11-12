@@ -117,25 +117,70 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
+  # The Vault cluster needs to have the Kubernetes Auth Method, 
+  # KV2 and PKI secrets engines enabled and have necessary secrets, 
+  # policies and roles created prior to installing Consul.
+  # The Vault cluster should not have Consul as its storage backend.
+  # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
+  # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
+  # secretKey should be in the form of "key".
+  secretsBackend:
+    vault:
+      # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
+      enabled: false
+
+      # The Vault role for the Consul server.
+      # The role must be connected to the Consul server's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/server-serviceaccount.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulServerRole: ""
+
+      # The Vault role for the Consul client.
+      # The role must be connected to the Consul client's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/client-daemonset.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulClientRole: ""
+
+  # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
-  # a Kubernetes secret referencing these values.
+  # a key, saving this as a Kubernetes secret or Vault secret path and key.
+  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" field to the secretName as required by
+  # the Vault KV-2 secrets engine [see example].
   #
   # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
+  #
+  # Vault CLI Example:
+  # ```
+  # $ vault kv put consul/secrets/gossip key=$(consul keygen)
+  # ```
+  # `gossipEncryption.secretName="consul/data/secrets/gossip"`
+  # `gossipEncryption.secretKey="key"`
+
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false
-    # secretName is the name of the Kubernetes secret that holds the gossip
-    # encryption key. The secret must be in the same namespace that Consul is installed into.
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
+    # encryption key. A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
-    # secretKey is the key within the Kubernetes secret that holds the gossip
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
 

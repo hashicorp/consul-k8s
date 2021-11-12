@@ -602,7 +602,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
@@ -1515,4 +1515,95 @@ rollingUpdate:
       yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
   [ "${object}" = 1 ]
+}
+
+#--------------------------------------------------------------------
+# vault integration
+
+@test "client/DaemonSet: fail when vault is enabled but the consulClientRole is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true" ]]
+}
+
+@test "client/DaemonSet: vault annotations not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"] | length > 0 ' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "client/DaemonSet: vault annotations added when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+}
+
+@test "client/DaemonSet: vault gossip annotations are set when gossip encryption enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.gossipEncryption.secretName=path/to/secret' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.gossip -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "client/DaemonSet: GOSSIP_KEY env variable is not set and command defines GOSSIP_KEY when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.gossipEncryption.secretName=a/b/c/d' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
+      | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
