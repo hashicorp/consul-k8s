@@ -4761,6 +4761,29 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 	}
 }
 
+func TestMapAddresses(t *testing.T) {
+	addresses := corev1.EndpointSubset{
+		Addresses: []corev1.EndpointAddress{
+			{Hostname: "host1"},
+			{Hostname: "host2"},
+		},
+		NotReadyAddresses: []corev1.EndpointAddress{
+			{Hostname: "host3"},
+			{Hostname: "host4"},
+		},
+	}
+
+	expected := map[corev1.EndpointAddress]string{
+		{Hostname: "host1"}: api.HealthPassing,
+		{Hostname: "host2"}: api.HealthPassing,
+		{Hostname: "host3"}: api.HealthCritical,
+		{Hostname: "host4"}: api.HealthCritical,
+	}
+
+	actual := mapAddresses(addresses)
+	require.Equal(t, expected, actual)
+}
+
 func createPod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
