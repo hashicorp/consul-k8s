@@ -122,9 +122,9 @@ const (
 	// webhook/handler.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
 
-	// labelConnectIgnore is a label that can be added to a service to prevent it from being
+	// labelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
-	labelConnectIgnore = "consul.hashicorp.com/connect-ignore"
+	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"
