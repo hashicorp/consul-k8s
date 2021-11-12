@@ -360,7 +360,7 @@ func TestPartitions(t *testing.T) {
 				k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 			// This section of the tests run the in-partition networking tests.
-			t.Cleanup(func() {
+			t.Run("in-partition", func(t *testing.T) {
 				logger.Log(t, "test in-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
 				k8s.DeployKustomize(t, serverClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
@@ -467,7 +467,7 @@ func TestPartitions(t *testing.T) {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
 			})
 			// This section of the tests run the cross-partition networking tests.
-			t.Cleanup(func() {
+			t.Run("cross-partition", func(t *testing.T) {
 				logger.Log(t, "test cross-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
 				k8s.DeployKustomize(t, serverClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
