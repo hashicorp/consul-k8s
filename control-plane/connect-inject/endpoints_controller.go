@@ -118,8 +118,7 @@ type EndpointsController struct {
 }
 
 // Reconcile reads the state of the cluster's service endpoints when a request is received and makes changes
-// to the endpoints based on the state read. Requests are created when the endpoints are created, updated,
-// or deleted.
+// to the endpoints based on the state read. Reconcile is called when services are created, updated, or deleted.
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
