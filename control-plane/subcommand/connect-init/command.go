@@ -178,7 +178,7 @@ func (c *Command) Run(args []string) int {
 			if registrationRetryCount%10 == 0 {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
 					" If your pod is not starting also check the connect-inject deployment logs." +
-					" Note that only one service may be used to route requests to each pod." +
+					"\nNote that only one service may be used to route requests to each pod." +
 					" If you need multiple services to point to the same pod, add the label" +
 					" `consul.hashicorp.com/connect-ignore: \"true\"` to services which should" +
 					" not be used by Consul for handling requests.")
