@@ -130,8 +130,15 @@ global:
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
-      # The consulServerRole must be created and have read capabilties via a Policy for the following secrets:
+      # The Vault role for the Consul server.
+      # The role must be connected to the Consul server's service account and
+      # have have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/server-serviceaccount.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
       consulServerRole: ""
 
       # The consulClientRole must be created and have read capabilties via a Policy for the following secrets:
@@ -146,7 +153,7 @@ global:
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
   # a key, saving this as a Kubernetes secret or Vault secret path and key.
-  # If `global.secretsBackend.vault.enabled=true` be sure to add the "data" field to the secretName as required by
+  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" field to the secretName as required by
   # the Vault KV-2 secrets engine [see example].
   #
   # ```

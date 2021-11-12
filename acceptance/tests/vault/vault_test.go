@@ -57,7 +57,7 @@ path "consul/data/secret/gossip" {
 	require.NoError(t, err)
 
 	// Create the Auth Roles for consul-server + consul-client.
-	logger.Log(t, "Creating the gossip auth roles")
+	logger.Log(t, "Creating the consul-server and consul-client-roles")
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
 		"bound_service_account_namespaces": "default",
@@ -113,6 +113,6 @@ path "consul/data/secret/gossip" {
 	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
-	// we use keys[0] because KeyringList returns a list of keyrings for each dc, in this case there is only 1 dc.
+	// We use keys[0] because KeyringList returns a list of keyrings for each dc, in this case there is only 1 dc.
 	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
 }
