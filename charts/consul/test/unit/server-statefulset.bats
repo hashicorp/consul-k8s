@@ -838,7 +838,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
@@ -863,25 +863,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretName is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretName is set but not global.gossipEncyption.secretKey" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretName=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretKey is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretKey is set but not global.gossipEncyption.secretName" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretKey=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
 @test "server/StatefulSet: gossip environment variable present in server StatefulSet when all config is provided" {
@@ -1414,4 +1409,96 @@ load _helpers
       yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
   [ "${object}" = 1 ]
+}
+
+#--------------------------------------------------------------------
+# vault integration
+
+@test "server/StatefulSet: fail when vault is enabled but the consulServerRole is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true" ]]
+}
+
+@test "server/StatefulSet: vault annotations not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"] | length > 0 ' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault annotations added when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "test" ]
+}
+
+@test "server/StatefulSet: vault gossip annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.gossipEncryption.secretName=path/to/secret' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.gossip -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault no GOSSIP_KEY env variable and command defines GOSSIP_KEY" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.gossipEncryption.secretName=a/b/c/d' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
+      | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
