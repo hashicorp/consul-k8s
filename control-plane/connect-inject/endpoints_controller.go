@@ -161,17 +161,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
-		// Combine all addresses to a map, with a value indicating whether an address is ready or not.
-		allAddresses := make(map[corev1.EndpointAddress]string)
-		for _, readyAddress := range subset.Addresses {
-			allAddresses[readyAddress] = api.HealthPassing
-		}
-
-		for _, notReadyAddress := range subset.NotReadyAddresses {
-			allAddresses[notReadyAddress] = api.HealthCritical
-		}
-
-		for address, healthStatus := range allAddresses {
+		for address, healthStatus := range mapAddresses(subset) {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				endpointPods.Add(address.TargetRef.Name)
 				if err := r.registerServicesAndHealthCheck(ctx, serviceEndpoints, address, healthStatus, endpointAddressMap); err != nil {
@@ -1015,4 +1005,18 @@ func hasBeenInjected(pod corev1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// mapAddresses combines all addresses to a mapping of address to its health status.
+func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]string {
+	m := make(map[corev1.EndpointAddress]string)
+	for _, readyAddress := range addresses.Addresses {
+		m[readyAddress] = api.HealthPassing
+	}
+
+	for _, notReadyAddress := range addresses.NotReadyAddresses {
+		m[notReadyAddress] = api.HealthCritical
+	}
+
+	return m
 }
