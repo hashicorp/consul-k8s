@@ -65,12 +65,12 @@ func NewVaultCluster(
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
-	helm.AddRepo(t, &helm.Options{}, "hashicorp", "https://helm.releases.hashicorp.com")
+	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
-	errStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+	_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
 	if err != nil {
-		logger.Logf(t, "Unable to update helm repository: %s, %s", err, errStr)
+		logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 	}
 
 	return &VaultCluster{
@@ -154,7 +154,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	}
 	// We need to kubectl exec this one on the vault server:
 	// This is taken from https://learn.hashicorp.com/tutorials/vault/kubernetes-google-cloud-gke?in=vault/kubernetes#configure-kubernetes-authentication
-	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config issuer=\"https://kubernetes.default.svc.cluster.local\" token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
+	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config disable_iss_validation=\"true\" token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)

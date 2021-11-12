@@ -132,7 +132,7 @@ global:
 
       # The Vault role for the Consul server.
       # The role must be connected to the Consul server's service account and
-      # have have a policy with read capabilities for the following secrets:
+      # have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul server, run
       #     ```
@@ -141,8 +141,15 @@ global:
       # and check the name of `metadata.name`.
       consulServerRole: ""
 
-      # The consulClientRole must be created and have read capabilties via a Policy for the following secrets:
-      # - gossip encryption key defined by `global.gossipEncryption.secretName`
+      # The Vault role for the Consul client.
+      # The role must be connected to the Consul client's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/client-daemonset.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
       consulClientRole: ""
 
   # Configures Consul's gossip encryption key.
