@@ -46,9 +46,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-	// action/upgrade
-	// --install, --reset-values vs --reuse-values,
-	// atomic
 )
 
 type Command struct {
@@ -59,6 +56,7 @@ type Command struct {
 	set *flag.Sets
 
 	flagPreset          string
+	flagNamespace       string
 	flagDryRun          bool
 	flagAutoApprove     bool
 	flagValueFiles      []string
@@ -103,6 +101,12 @@ func (c *Command) init() {
 		Aliases: []string{"f"},
 		Target:  &c.flagValueFiles,
 		Usage:   "Path to a file to customize the upgrade, such as Consul Helm chart values file. Can be specified multiple times.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameNamespace,
+		Target:  &c.flagNamespace,
+		Default: common.DefaultReleaseNamespace,
+		Usage:   "Namespace for the Consul installation.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamePreset,
@@ -234,8 +238,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
-
-		foundNamespace = ns
 	}
 
 	// Handle preset, value files, and set values logic.
@@ -254,7 +256,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
+		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
 
 		if len(vals) == 0 {
 			c.UI.Output("Overrides: "+string(valuesYaml), terminal.WithInfoStyle())
@@ -293,7 +295,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, foundNamespace, settings, uiLogger)
+	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -301,7 +303,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup the upgrade action.
 	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = foundNamespace
+	upgrade.Namespace = c.flagNamespace
 	upgrade.DryRun = c.flagDryRun
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
@@ -330,6 +332,8 @@ func (c *Command) Run(args []string) int {
 
 	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
+		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
+
 		configYaml, err := yaml.Marshal(re.Config)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -341,11 +345,11 @@ func (c *Command) Run(args []string) int {
 		} else {
 			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
 		}
-		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithSuccessStyle())
+
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", foundNamespace, terminal.WithSuccessStyle())
+	c.UI.Output("Upgraded Consul into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
 
 	return 0
 }
@@ -363,6 +367,10 @@ func (c *Command) validateFlags(args []string) error {
 	}
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
+	}
+	if !validLabel(c.flagNamespace) {
+		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
