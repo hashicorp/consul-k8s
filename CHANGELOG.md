@@ -1,10 +1,28 @@
 ## UNRELEASED
 
+FEATURES:
+* Helm Chart
+  * Add support for Consul services to utilize Consul DNS for service discovery. Set `dns.enableRedirection` to allow services to
+    use Consul DNS via the Consul DNS Service. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+* Control Plane
+  * Connect: Allow services using Connect to utilize Consul DNS to perform service discovery. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+  
+BREAKING CHANGES:
+* Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
+  `global.metrics=false` and `ui.metrics.enabled=-`. If you are no longer seeing UI metrics,
+  set `global.metrics=true` or `ui.metrics.enabled=true`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
+* The `enterpriseLicense` section of the values file has been migrated from being under the `server` stanza to being
+  under the `global` stanza. Migrating the contents of `server.enterpriseLicense` to `global.enterpriseLicense` will
+  ensure the license job works. [[GH-856](https://github.com/hashicorp/consul-k8s/pull/856)]
+
 IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
+  * Connect: Log a warning when ACLs are enabled and the default service account is used. [[GH-842](https://github.com/hashicorp/consul-k8s/pull/842)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
+* Helm Chart
+  * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
 
 BUG FIXES:
 * Control Plane
@@ -18,6 +36,7 @@ BUG FIXES:
   * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
   * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
+  * Fix issue where UI metrics would be enabled when `global.metrics=false` and `ui.metrics.enabled=-`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
   * Populate the federation secret with the generated Gossip key when `global.gossipEncryption.autoGenerate` is set to true. [[GH-854](https://github.com/hashicorp/consul-k8s/pull/854)]
 
 ## 0.36.0 (November 02, 2021)

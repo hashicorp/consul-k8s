@@ -1,27 +1,32 @@
 # Contributing to Consul on Kubernetes
 
 1. [Contributing 101](#contributing-101)
-    1. [Running Linters Locally](#running-linters-locally)
-    2. [Rebasing Contributions against main](#rebasing-contributions-against-main)
-3. [Creating a new CRD](#creating-a-new-crd)
+    1. [Building and running `consul-k8s-control-plane`](#building-and-running-consul-k8s-control-plane)
+    1. [Building and running the `consul-k8s` CLI](#building-and-running-the-consul-k8s-cli)
+    1. [Making changes to consul-k8s](#making-changes-to-consul-k8s)
+    1. [Running linters locally](#running-linters-locally)
+    1. [Rebasing contributions against main](#rebasing-contributions-against-main)
+1. [Creating a new CRD](#creating-a-new-crd)
     1. [The Structs](#the-structs) 
-    2. [Spec Methods](#spec-methods)
-    3. [Spec Tests](#spec-tests)
-    4. [Controller](#controller)
-    5. [Webhook](#webhook)
-    6. [Update command.go](#update-commandgo)
-    7. [Generating YAML](#generating-yaml)
-    8. [Updating consul-helm](#updating-consul-helm)
-    9. [Testing a new CRD](#testing-a-new-crd)
-    10. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
+    1. [Spec Methods](#spec-methods)
+    1. [Spec Tests](#spec-tests)
+    1. [Controller](#controller)
+    1. [Webhook](#webhook)
+    1. [Update command.go](#update-commandgo)
+    1. [Generating YAML](#generating-yaml)
+    1. [Updating consul-helm](#updating-consul-helm)
+    1. [Testing a new CRD](#testing-a-new-crd)
+    1. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
 5. [Testing the Helm chart](#testing-the-helm-chart)
-6. [Running the tests](#running-the-tests)
-     1. [Writing Unit tests](#writing-unit-tests)
-     2. [Writing Acceptance tests](#writing-acceptance-tests)
-8. [Helm Reference Docs](#helm-reference-docs)
+    1. [Running the tests](#running-the-tests)
+    1. [Writing Unit tests](#writing-unit-tests)
+    1. [Writing Acceptance tests](#writing-acceptance-tests)
+1. [Helm Reference Docs](#helm-reference-docs)
 
 
 ## Contributing 101
+
+### Building and running `consul-k8s-control-plane`
 
 To build and install the control plane binary `consul-k8s` locally, Go version 1.11.4+ is required because this repository uses go modules and go 1.11.4 introduced changes to checksumming of modules to correct a symlink problem.
 You will also need to install the Docker engine:
@@ -48,14 +53,8 @@ To compile the `consul-k8s` binary for your local machine:
 $ make dev
 ```
 
-This will compile the `consul-k8s` binary into `bin/consul-k8s` as
+This will compile the `consul-k8s-control-plane` binary into `bin/consul-k8s-control-plane` as
 well as your `$GOPATH` and run the test suite.
-
-Or run the following to generate all binaries:
-
-```shell
-$ make dist
-```
 
 If you just want to run the tests:
 
@@ -74,6 +73,83 @@ To create a docker image with your local changes:
 ```shell
 $ make dev-docker
 ```
+
+If you'd like to use your docker images in a dev deployment of Consul K8s, you would need to push those images to Docker Hub since 
+deploying off of local images is not supported unless you host your own local Docker registry:
+
+```
+$ docker tag consul-k8s-control-plane-dev <insert-docker-hub-username>/consul-k8s-control-plane-dev
+$ docker push <insert-docker-hub-username>/consul-k8s-control-plane-dev
+Using default tag: latest
+The push refers to repository [docker.io/<hub-username>/consul-k8s-control-plane-dev]
+4c5225fbac5e: Pushed
+737cd00c4260: Pushed
+7a9c7d9855c2: Pushed
+e2eb06d8af82: Pushed
+latest: digest: sha256:0b3e90e0b32da8aba1b11cda6a6a768a5eb4d83664a408d53f1502db8703ef8a size: 1160
+```
+
+Create a `values.dev.yaml` file that includes the `global.imageK8S` flag to point to dev images you just pushed:
+
+```yaml
+global:
+  tls:
+    enabled: true
+  imageK8S: <insert-docker-hub-username>/consul-k8s-control-plane-dev
+server:
+  replicas: 1
+connectInject:
+  enabled: true
+ui:
+  enabled: true
+  service:
+    enabled: true
+controller:
+  enabled: true
+```
+
+Run a `helm install` from the project root directory to target your dev version of the Helm chart. 
+
+```shell
+helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/consul
+```
+
+### Building and running the `consul-k8s` CLI
+
+Change directory into the `cli` folder where the golang code resides.
+
+```shell
+cd cli
+```
+
+Build the CLI binary using the following command
+
+```shell
+go build -o bin/consul-k8s
+```
+
+Run the CLI as follows
+
+```shell
+./bin/consul-k8s version
+consul-k8s 0.36.0-dev
+```
+
+### Making changes to consul-k8s
+
+The first step to making changes is to fork Consul K8s. Afterwards, the easiest way 
+to work on the fork is to set it as a remote of the Consul K8s project:
+
+1. Rename the existing remote's name: `git remote rename origin upstream`.
+1. Add your fork as a remote by running
+   `git remote add origin <github url of fork>`. For example:
+   `git remote add origin https://github.com/myusername/consul-k8s`.
+1. Checkout a feature branch: `git checkout -t -b new-feature`
+1. Make changes (i.e. `git commit -am 'message'`)
+1. Push changes to the fork when ready to submit PR:
+   `git push -u origin new-feature`
+
+>Note: If you make any changes to the code, run `gofmt -s -w` to automatically format the code according to Go standards.
 
 ### Running linters locally
 [`golangci-lint`](https://golangci-lint.run/) is used in CI to enforce coding and style standards and help catch bugs ahead of time.
@@ -445,8 +521,6 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install golang
   ```
-  
----
 
 ### Running The Tests
 

@@ -22,6 +22,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: server-acl-init
 spec:
   template:
     metadata:
@@ -191,7 +192,7 @@ spec:
                 -acl-binding-rule-selector={{ .Values.connectInject.aclBindingRuleSelector }} \
                 {{- end }}
 
-                {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey) }}
+                {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey) }}
                 -create-enterprise-license-token=true \
                 {{- end }}
 

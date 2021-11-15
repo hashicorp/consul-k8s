@@ -10,6 +10,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client-snapshot-agent
 spec:
   replicas: {{ .Values.client.snapshotAgent.replicas }}
   selector:
@@ -37,7 +38,7 @@ spec:
       {{- if .Values.client.priorityClassName }}
       priorityClassName: {{ .Values.client.priorityClassName | quote }}
       {{- end }}
-      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
+      {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
       volumes:
         {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
         - name: snapshot-config
@@ -51,10 +52,10 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- else }}
-        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
         - name: consul-license
           secret:
-            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+            secretName: {{ .Values.global.enterpriseLicense.secretName }}
         {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}
@@ -101,9 +102,9 @@ spec:
                   name: "{{ template "consul.fullname" . }}-client-snapshot-agent-acl-token"
                   key: "token"
             {{- else }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH
-              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
             {{- end}}
           command:
@@ -122,7 +123,7 @@ spec:
                 {{- if .Values.global.acls.manageSystemACLs }}
                 -config-dir=/consul/aclconfig \
                 {{- end }}
-          {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
+          {{- if (or .Values.global.acls.manageSystemACLs .Values.global.tls.enabled (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
           volumeMounts:
             {{- if (and .Values.client.snapshotAgent.configSecret.secretName .Values.client.snapshotAgent.configSecret.secretKey) }}
             - name: snapshot-config
@@ -133,7 +134,7 @@ spec:
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- else }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true

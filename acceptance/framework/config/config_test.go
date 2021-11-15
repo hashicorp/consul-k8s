@@ -61,8 +61,8 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				EnterpriseLicense: "ent-license",
 			},
 			map[string]string{
-				"server.enterpriseLicense.secretName":           "license",
-				"server.enterpriseLicense.secretKey":            "key",
+				"global.enterpriseLicense.secretName":           "license",
+				"global.enterpriseLicense.secretKey":            "key",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},

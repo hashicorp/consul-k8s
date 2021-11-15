@@ -28,6 +28,18 @@ is passed to consul as a -config-file param on command line.
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
 {{- end -}}
 
+{{/*
+Sets up a list of recusor flags for Consul agents by iterating over the IPs of every nameserver
+in /etc/resolv.conf and concatenating them into a string of arguments that can be passed directly
+to the consul agent command.
+*/}}
+{{- define "consul.recursors" -}}
+              recursor_flags=""
+              for ip in $(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
+              do
+                 recursor_flags="$recursor_flags -recursor=$ip"
+              done
+{{- end -}}
 
 {{/*
 Create chart name and version as used by the chart label.
