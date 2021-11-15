@@ -7,35 +7,46 @@ const (
 	PresetSecure = "secure"
 )
 
-// presets is a map of pre-configured helm values.
-var presets = map[string]interface{}{
-	PresetDemo:   convert(demo),
-	PresetSecure: convert(secure),
+// Presets is a map of pre-configured helm values.
+var Presets = map[string]interface{}{
+	PresetDemo:   Convert(demo),
+	PresetSecure: Convert(secure),
 }
 
 var demo = `
 global:
   name: consul
-  metrics:
-    enabled: true
-    enableAgentMetrics: true
 connectInject:
   enabled: true
-  metrics: 
-    defaultEnabled: true
-    defaultEnableMerging: true
-    enableGatewayMetrics: true
 server:
   replicas: 1
-controller:
-  enabled: true
-ui: 
-  enabled: true
-  service:
-    enabled: true
-prometheus:
-  enabled: true
+  bootstrapExpect: 1
 `
+
+// TODO: I don't know why the following hangs for me.
+//var demo = `
+//global:
+//  name: consul
+//  metrics:
+//    enabled: true
+//    enableAgentMetrics: true
+//connectInject:
+//  enabled: true
+//  metrics:
+//    defaultEnabled: true
+//    defaultEnableMerging: true
+//    enableGatewayMetrics: true
+//server:
+//  replicas: 1
+//controller:
+//  enabled: true
+//ui:
+//  enabled: true
+//  service:
+//    enabled: true
+//prometheus:
+//  enabled: true
+//`
 
 var secure = `
 global:
@@ -55,13 +66,13 @@ controller:
   enabled: true
 `
 
-var globalNameConsul = `
+var GlobalNameConsul = `
 global:
   name: consul
 `
 
 // convert is a helper function that converts a YAML string to a map.
-func convert(s string) map[string]interface{} {
+func Convert(s string) map[string]interface{} {
 	var m map[string]interface{}
 	_ = yaml.Unmarshal([]byte(s), &m)
 	return m
