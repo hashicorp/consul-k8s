@@ -1,4 +1,4 @@
-package install
+package upgrade
 
 import (
 	"errors"
@@ -8,20 +8,21 @@ import (
 	"sync"
 	"time"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-
 	consulChart "github.com/hashicorp/consul-k8s/charts"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+
+	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	helmCLI "helm.sh/helm/v3/pkg/cli"
+
+	"github.com/hashicorp/consul-k8s/cli/cmd/install"
+
+	"github.com/hashicorp/consul-k8s/cli/cmd/common"
+	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"k8s.io/client-go/kubernetes"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/yaml"
 )
 
@@ -82,7 +83,7 @@ type Command struct {
 func (c *Command) init() {
 	// Store all the possible preset values in 'presetList'. Printed in the help message.
 	var presetList []string
-	for name := range Presets {
+	for name := range install.Presets {
 		presetList = append(presetList, name)
 	}
 
@@ -175,24 +176,11 @@ func (c *Command) init() {
 	c.Init()
 }
 
-type helmValues struct {
-	Global globalValues `yaml:"global"`
-}
-
-type globalValues struct {
-	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
-}
-
-type enterpriseLicense struct {
-	SecretName string `yaml:"secretName"`
-	SecretKey  string `yaml:"secretKey"`
-}
-
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
 	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
-	c.Log.ResetNamed("install")
+	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
 
@@ -245,28 +233,17 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	c.UI.Output("Pre-Install Checks", terminal.WithHeaderStyle())
+	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
 
 	// Note the logic here, common's CheckForInstallations function returns an error if
-	// the release is not found, which in the install command is what we need for a successful install.
-	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
-		c.UI.Output(fmt.Sprintf("existing Consul installation found (name=%s, namespace=%s) - run "+
-			"consul-k8s uninstall if you wish to re-install", name, ns), terminal.WithErrorStyle())
+	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
+	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
+		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
 		return 1
 	} else {
-		c.UI.Output("No existing installations found.")
-	}
-
-	// Ensure there's no previous PVCs lying around.
-	if err := c.checkForPreviousPVCs(); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Ensure there's no previous bootstrap secret lying around.
-	if err := c.checkForPreviousSecrets(); err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
+		c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
+		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
+		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
 	}
 
 	// Handle preset, value files, and set values logic.
@@ -281,25 +258,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var v helmValues
-	err = yaml.Unmarshal(valuesYaml, &v)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// If an enterprise license secret was provided check that the secret exists
-	// and that the enterprise Consul image is set.
-	if v.Global.EnterpriseLicense.SecretName != "" {
-		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName); err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
-		}
-	}
-
-	// Print out the installation summary.
+	// Print out the upgrade summary.
+	// TODO: Fix this, it's just incorrect.
 	if !c.flagAutoApprove {
-		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
+		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
 
@@ -313,17 +275,11 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = MergeMaps(Convert(GlobalNameConsul), vals)
+	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
 
-	// Dry Run should exit here, no need to actual locate/download the charts.
-	if c.flagDryRun {
-		c.UI.Output("Dry run complete - installation can proceed.", terminal.WithInfoStyle())
-		return 0
-	}
-
-	if !c.flagAutoApprove {
+	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: "Proceed with installation? (y/N)",
+			Prompt: "Proceed with upgrade? (y/N)",
 			Style:  terminal.InfoStyle,
 			Secret: false,
 		})
@@ -333,12 +289,16 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		if common.Abort(confirmation) {
-			c.UI.Output("Install aborted. To learn how to customize your installation, run:\nconsul-k8s install --help", terminal.WithInfoStyle())
+			c.UI.Output("Upgrade aborted. To learn how to customize your upgrade, run:\nconsul-k8s upgrade --help", terminal.WithInfoStyle())
 			return 1
 		}
 	}
 
-	c.UI.Output("Running Installation", terminal.WithHeaderStyle())
+	if !c.flagDryRun {
+		c.UI.Output("Running Upgrade", terminal.WithHeaderStyle())
+	} else {
+		c.UI.Output("Performing Dry Upgrade", terminal.WithHeaderStyle())
+	}
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
@@ -348,13 +308,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Setup the installation action.
-	install := action.NewInstall(actionConfig)
-	install.ReleaseName = common.DefaultReleaseName
-	install.Namespace = c.flagNamespace
-	install.CreateNamespace = true
-	install.Wait = c.flagWait
-	install.Timeout = c.timeoutDuration
+	// Setup the upgrade action.
+	// TODO: So many things to add here.
+	upgrade := action.NewUpgrade(actionConfig)
+	upgrade.Namespace = c.flagNamespace
+	upgrade.DryRun = c.flagDryRun
+	upgrade.Wait = c.flagWait
+	upgrade.Timeout = c.timeoutDuration
 
 	// Read the embedded chart files into []*loader.BufferedFile.
 	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
@@ -372,115 +332,38 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
 
 	// Run the install.
-	_, err = install.Run(chart, vals)
+	re, err := upgrade.Run(common.DefaultReleaseName, chart, vals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	c.UI.Output("Consul installed into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
+
+	// Dry Run should exit here, printing the release's config.
+	if c.flagDryRun {
+		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
+
+		configYaml, err := yaml.Marshal(re.Config)
+		if err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
+
+		if len(re.Config) == 0 {
+			c.UI.Output("Config: "+string(configYaml), terminal.WithInfoStyle())
+		} else {
+			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
+		}
+
+		return 0
+	}
+
+	c.UI.Output("Upgraded Consul into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
 
 	return 0
 }
-func (c *Command) Help() string {
-	c.once.Do(c.init)
-	s := "Usage: consul-k8s install [flags]" + "\n" + "Install Consul onto a Kubernetes cluster." + "\n"
-	return s + "\n" + c.help
-}
 
-func (c *Command) Synopsis() string {
-	return "Install Consul on Kubernetes."
-}
-
-// checkForPreviousPVCs checks for existing PVCs with a name containing "consul-server" and returns an error and lists
-// the PVCs it finds matches.
-func (c *Command) checkForPreviousPVCs() error {
-	pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims("").List(c.Ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("error listing PVCs: %s", err)
-	}
-	var previousPVCs []string
-	for _, pvc := range pvcs.Items {
-		if strings.Contains(pvc.Name, "consul-server") {
-			previousPVCs = append(previousPVCs, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
-		}
-	}
-
-	if len(previousPVCs) > 0 {
-		return fmt.Errorf("found PVCs from previous installations (%s), delete before re-installing",
-			strings.Join(previousPVCs, ","))
-	}
-	c.UI.Output("No previous persistent volume claims found", terminal.WithSuccessStyle())
-	return nil
-}
-
-// checkForPreviousSecrets checks for the bootstrap token and returns an error if found.
-func (c *Command) checkForPreviousSecrets() error {
-	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue})
-	if err != nil {
-		return fmt.Errorf("error listing secrets: %s", err)
-	}
-	for _, secret := range secrets.Items {
-		// future TODO: also check for federation secret
-		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
-			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
-				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
-		}
-	}
-
-	c.UI.Output("No previous secrets found", terminal.WithSuccessStyle())
-	return nil
-}
-
-// mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
-// installation based on the following precedence order from lowest to highest:
-// 1. -preset
-// 2. -f values-file
-// 3. -set
-// 4. -set-string
-// 5. -set-file
-// For example, -set-file will override a value provided via -set.
-// Within each of these groups the rightmost flag value has the highest precedence.
-func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) (map[string]interface{}, error) {
-	p := getter.All(settings)
-	v := &values.Options{
-		ValueFiles:   c.flagValueFiles,
-		StringValues: c.flagSetStringValues,
-		Values:       c.flagSetValues,
-		FileValues:   c.flagFileValues,
-	}
-	vals, err := v.MergeValues(p)
-	if err != nil {
-		return nil, fmt.Errorf("error merging values: %s", err)
-	}
-	if c.flagPreset != defaultPreset {
-		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := Presets[c.flagPreset].(map[string]interface{})
-		vals = MergeMaps(presetMap, vals)
-	}
-	return vals, err
-}
-
-// MergeMaps is a helper function used in Run. Merges two maps giving b precedent.
-// @source: https://github.com/helm/helm/blob/main/pkg/cli/values/options.go
-func MergeMaps(a, b map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(a))
-	for k, v := range a {
-		out[k] = v
-	}
-	for k, v := range b {
-		if v, ok := v.(map[string]interface{}); ok {
-			if bv, ok := out[k]; ok {
-				if bv, ok := bv.(map[string]interface{}); ok {
-					out[k] = MergeMaps(bv, v)
-					continue
-				}
-			}
-		}
-		out[k] = v
-	}
-	return out
-}
-
+// TODO: Make sure the following function is consistent.
+// TODO: Move these functions to common?
 // validateFlags is a helper function that performs sanity checks on the user's provided flags.
 func (c *Command) validateFlags(args []string) error {
 	if err := c.set.Parse(args); err != nil {
@@ -492,7 +375,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if _, ok := install.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !validLabel(c.flagNamespace) {
@@ -518,6 +401,8 @@ func (c *Command) validateFlags(args []string) error {
 	return nil
 }
 
+// TODO: Make sure the following function is consistent.
+// TODO: Move these functions to common?
 // validLabel is a helper function that checks if a string follows RFC 1123 labels.
 func validLabel(s string) bool {
 	for i, c := range s {
@@ -533,17 +418,32 @@ func validLabel(s string) bool {
 	return true
 }
 
-// checkValidEnterprise checks and validates an enterprise installation.
-// When an enterprise license secret is provided, check that the secret exists
-// in the "consul" namespace.
-func (c *Command) checkValidEnterprise(secretName string) error {
-
-	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
-	if k8serrors.IsNotFound(err) {
-		return fmt.Errorf("enterprise license secret %q is not found in the %q namespace; please make sure that the secret exists in the %q namespace", secretName, c.flagNamespace, c.flagNamespace)
-	} else if err != nil {
-		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
+// TODO: Move these functions to common?
+// mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
+// installation based on the following precedence order from lowest to highest:
+// 1. -preset
+// 2. -f values-file
+// 3. -set
+// 4. -set-string
+// 5. -set-file
+// For example, -set-file will override a value provided via -set.
+// Within each of these groups the rightmost flag value has the highest precedence.
+func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) (map[string]interface{}, error) {
+	p := getter.All(settings)
+	v := &values.Options{
+		ValueFiles:   c.flagValueFiles,
+		StringValues: c.flagSetStringValues,
+		Values:       c.flagSetValues,
+		FileValues:   c.flagFileValues,
 	}
-	c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
-	return nil
+	vals, err := v.MergeValues(p)
+	if err != nil {
+		return nil, fmt.Errorf("error merging values: %s", err)
+	}
+	if c.flagPreset != defaultPreset {
+		// Note the ordering of the function call, presets have lower precedence than set vals.
+		presetMap := install.Presets[c.flagPreset].(map[string]interface{})
+		vals = install.MergeMaps(presetMap, vals)
+	}
+	return vals, err
 }
