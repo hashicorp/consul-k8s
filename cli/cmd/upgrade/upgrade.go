@@ -56,9 +56,9 @@ type Command struct {
 	set *flag.Sets
 
 	flagPreset          string
+	flagNamespace       string
 	flagDryRun          bool
 	flagAutoApprove     bool
-	flagNamespace       string
 	flagValueFiles      []string
 	flagSetStringValues []string
 	flagSetValues       []string
@@ -91,7 +91,7 @@ func (c *Command) init() {
 		Usage:   "Skip confirmation prompt.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    flagNamespace,
+		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Default: defaultNamespace,
 		Usage:   "Namespace where Consul is installed. Defaults to 'consul'.",
@@ -173,6 +173,8 @@ func (c *Command) init() {
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+
+	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
@@ -230,16 +232,13 @@ func (c *Command) Run(args []string) int {
 
 	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
-	var foundNamespace string
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
-		c.UI.Output("could not find existing Consul installation - run `consul-k8s install`")
+		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
 		return 1
 	} else {
 		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
-
-		foundNamespace = ns
 	}
 
 	// Handle preset, value files, and set values logic.
@@ -297,7 +296,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, foundNamespace, settings, uiLogger)
+	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -305,7 +304,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup the upgrade action.
 	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = foundNamespace
+	upgrade.Namespace = c.flagNamespace
 	upgrade.DryRun = c.flagDryRun
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
@@ -334,6 +333,8 @@ func (c *Command) Run(args []string) int {
 
 	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
+		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
+
 		configYaml, err := yaml.Marshal(re.Config)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -345,11 +346,11 @@ func (c *Command) Run(args []string) int {
 		} else {
 			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
 		}
-		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithSuccessStyle())
+
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", foundNamespace, terminal.WithSuccessStyle())
+	c.UI.Output("Upgraded Consul into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
 
 	return 0
 }
@@ -380,7 +381,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return fmt.Errorf("file '%s' does not exist", filename)
+				return fmt.Errorf("File '%s' does not exist.", filename)
 			}
 		}
 	}
@@ -433,14 +434,4 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 		vals = install.MergeMaps(presetMap, vals)
 	}
 	return vals, err
-}
-
-func (c *Command) Help() string {
-	c.once.Do(c.init)
-	s := "Usage: consul-k8s upgrade [flags]" + "\n" + "Upgrade Consul from an existing installation." + "\n"
-	return s + "\n" + c.help
-}
-
-func (c *Command) Synopsis() string {
-	return "Upgrade Consul on Kubernetes."
 }
