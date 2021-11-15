@@ -18,6 +18,7 @@ BUG FIXES:
   * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
   * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
+  * Populate the federation secret with the generated Gossip key when `global.gossipEncryption.autoGenerate` is set to true. [[GH-854](https://github.com/hashicorp/consul-k8s/pull/854)]
 
 ## 0.36.0 (November 02, 2021)
 
