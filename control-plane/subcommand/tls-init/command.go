@@ -136,7 +136,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-cert", c.flagNamePrefix),
 				Namespace: c.flagK8sNamespace,
-				Labels:    map[string]string{"managed-by": "consul-k8s"},
+				Labels:    map[string]string{common.CliLabelKey: common.CliLabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey: []byte(ca),
@@ -153,7 +153,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-ca-key", c.flagNamePrefix),
 				Namespace: c.flagK8sNamespace,
-				Labels:    map[string]string{"managed-by": "consul-k8s"},
+				Labels:    map[string]string{common.CliLabelKey: common.CliLabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSPrivateKeyKey: []byte(pk),
@@ -239,7 +239,7 @@ func (c *Command) Run(args []string) int {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: c.flagK8sNamespace,
 				Name:      fmt.Sprintf("%s-server-cert", c.flagNamePrefix),
-				Labels:    map[string]string{"managed-by": "consul-k8s"},
+				Labels:    map[string]string{common.CliLabelKey: common.CliLabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       []byte(serverCert),

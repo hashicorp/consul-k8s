@@ -391,7 +391,7 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 		return nil
 	}
 	for _, secret := range secrets.Items {
-		if secret.ObjectMeta.Labels["managed-by"] == "consul-k8s" {
+		if secret.ObjectMeta.Labels[common.CliLabelKey] == common.CliLabelValue {
 			err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)

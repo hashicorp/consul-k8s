@@ -249,7 +249,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 						UID:        deployment.UID,
 					},
 				},
-				Labels: map[string]string{"managed-by": "consul-k8s"},
+				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       bundle.Cert,

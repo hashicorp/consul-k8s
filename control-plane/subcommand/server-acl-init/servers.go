@@ -103,7 +103,7 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   bootTokenSecretName,
-					Labels: map[string]string{"managed-by": "consul-k8s"},
+					Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(bootstrapToken),

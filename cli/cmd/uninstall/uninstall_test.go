@@ -63,8 +63,8 @@ func TestDeleteSecrets(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "consul-test-secret1",
 			Labels: map[string]string{
-				"release":    "consul",
-				"managed-by": "consul-k8s",
+				"release":          "consul",
+				common.CliLabelKey: common.CliLabelValue,
 			},
 		},
 	}

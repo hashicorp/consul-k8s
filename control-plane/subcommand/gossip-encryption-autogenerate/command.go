@@ -111,7 +111,7 @@ func (c *Command) Run(args []string) int {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.flagSecretName,
 			Namespace: c.flagNamespace,
-			Labels:    map[string]string{"managed-by": "consul-k8s"},
+			Labels:    map[string]string{common.CliLabelKey: common.CliLabelValue},
 		},
 		Data: map[string][]byte{
 			c.flagSecretKey: []byte(gossipSecret),

@@ -128,7 +128,7 @@ func (c *Command) Run(args []string) int {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-federation", c.flagResourcePrefix),
 			Namespace: c.flagK8sNamespace,
-			Labels:    map[string]string{"managed-by": "consul-k8s"},
+			Labels:    map[string]string{common.CliLabelKey: common.CliLabelValue},
 		},
 		Type: "Opaque",
 		Data: make(map[string][]byte),
