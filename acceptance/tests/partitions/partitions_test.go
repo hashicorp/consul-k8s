@@ -530,55 +530,22 @@ func TestPartitions(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, services, 1)
 
-				defaultPartitionExports := &api.PartitionExportsConfigEntry{
-					Name: defaultPartition,
-					Services: []api.ExportedService{
-						{
-							Name:      "mesh-gateway",
-							Namespace: defaultNamespace,
-							Consumers: []api.ServiceConsumer{
-								{Partition: secondaryPartition},
-							},
-						},
-						{
-							Name:      staticServerName,
-							Namespace: staticServerNamespace,
-							Consumers: []api.ServiceConsumer{
-								{Partition: secondaryPartition},
-							},
-						},
-					},
-				}
-				secondaryPartitionExports := &api.PartitionExportsConfigEntry{
-					Name: secondaryPartition,
-					Services: []api.ExportedService{
-						{
-							Name:      "mesh-gateway",
-							Namespace: defaultNamespace,
-							Consumers: []api.ServiceConsumer{
-								{Partition: defaultPartition},
-							},
-						},
-						{
-							Name:      staticServerName,
-							Namespace: staticServerNamespace,
-							Consumers: []api.ServiceConsumer{
-								{Partition: defaultPartition},
-							},
-						},
-					},
-				}
-
-				if !c.mirrorK8S {
-					defaultPartitionExports.Services[1].Namespace = c.destinationNamespace
-					secondaryPartitionExports.Services[1].Namespace = c.destinationNamespace
-				}
-
 				logger.Log(t, "creating partition exports")
-				_, _, err = consulClient.ConfigEntries().Set(defaultPartitionExports, &api.WriteOptions{Partition: defaultPartition})
-				require.NoError(t, err)
-				_, _, err = consulClient.ConfigEntries().Set(secondaryPartitionExports, &api.WriteOptions{Partition: secondaryPartition})
-				require.NoError(t, err)
+				if c.destinationNamespace == defaultNamespace {
+					k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+					k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+						k8s.KubectlDeleteK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+						k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+					})
+				} else {
+					k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
+					k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-ns1")
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+						k8s.KubectlDeleteK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
+						k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-ns1")
+					})
+				}
 
 				if c.secure {
 					logger.Log(t, "checking that the connection is not successful because there's no intention")
