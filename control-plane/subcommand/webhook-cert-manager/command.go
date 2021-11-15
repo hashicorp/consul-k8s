@@ -280,6 +280,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		return nil
 	}
 
+	certSecret.ObjectMeta.Labels[common.CliLabelKey] = common.CliLabelValue
 	certSecret.Data[corev1.TLSCertKey] = bundle.Cert
 	certSecret.Data[corev1.TLSPrivateKeyKey] = bundle.Key
 	// Update the Owner Reference on an existing secret in case the secret
