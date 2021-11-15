@@ -60,7 +60,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
 	err := c.checkForPreviousSecrets()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "found consul secret from previous installations: \"test-consul-bootstrap-acl-token\" in namespace \"default\". To delete, run kubectl delete secret test-consul-bootstrap-acl-token --namespace default")
+	require.Contains(t, err.Error(), "found Consul secret from previous installation")
 
 	// Clear out the client and make sure the check now passes.
 	c.kubernetes = fake.NewSimpleClientset()
