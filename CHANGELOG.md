@@ -23,6 +23,7 @@ IMPROVEMENTS:
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
 * Helm Chart
   * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
+  * Update Consul version to 1.10.4. [[GH-861](https://github.com/hashicorp/consul-k8s/pull/861)]
 
 BUG FIXES:
 * Control Plane
