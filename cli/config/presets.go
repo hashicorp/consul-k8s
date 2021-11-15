@@ -17,9 +17,6 @@ var Presets = map[string]interface{}{
 const demo = `
 global:
   name: consul
-  metrics:
-    enabled: true
-    enableAgentMetrics: true
 connectInject:
   enabled: true
   metrics:
