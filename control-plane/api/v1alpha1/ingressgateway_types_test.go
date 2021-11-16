@@ -56,6 +56,43 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
+									Partition: "default",
+									TLS: &GatewayServiceTLSConfig{
+										SDS: &GatewayTLSSDSConfig{
+											ClusterName:  "cluster1",
+											CertResource: "cert1",
+										},
+									},
+									RequestHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"foo":    "bar",
+											"source": "dest",
+										},
+										Set: map[string]string{
+											"bar": "baz",
+											"key": "car",
+										},
+										Remove: []string{
+											"foo",
+											"bar",
+											"baz",
+										},
+									},
+									ResponseHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"doo":    "var",
+											"aource": "sest",
+										},
+										Set: map[string]string{
+											"var": "vaz",
+											"jey": "xar",
+										},
+										Remove: []string{
+											"doo",
+											"var",
+											"vaz",
+										},
+									},
 								},
 								{
 									Name:      "name2",
@@ -92,6 +129,43 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 								Name:      "name1",
 								Hosts:     []string{"host1_1", "host1_2"},
 								Namespace: "ns1",
+								Partition: "default",
+								TLS: &capi.GatewayServiceTLSConfig{
+									SDS: &capi.GatewayTLSSDSConfig{
+										ClusterName:  "cluster1",
+										CertResource: "cert1",
+									},
+								},
+								RequestHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 							{
 								Name:      "name2",
@@ -183,6 +257,43 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
+									Partition: "default",
+									TLS: &GatewayServiceTLSConfig{
+										SDS: &GatewayTLSSDSConfig{
+											ClusterName:  "cluster1",
+											CertResource: "cert1",
+										},
+									},
+									RequestHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"foo":    "bar",
+											"source": "dest",
+										},
+										Set: map[string]string{
+											"bar": "baz",
+											"key": "car",
+										},
+										Remove: []string{
+											"foo",
+											"bar",
+											"baz",
+										},
+									},
+									ResponseHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"doo":    "var",
+											"aource": "sest",
+										},
+										Set: map[string]string{
+											"var": "vaz",
+											"jey": "xar",
+										},
+										Remove: []string{
+											"doo",
+											"var",
+											"vaz",
+										},
+									},
 								},
 								{
 									Name:      "name2",
@@ -218,6 +329,43 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 								Name:      "name1",
 								Hosts:     []string{"host1_1", "host1_2"},
 								Namespace: "ns1",
+								Partition: "default",
+								TLS: &capi.GatewayServiceTLSConfig{
+									SDS: &capi.GatewayTLSSDSConfig{
+										ClusterName:  "cluster1",
+										CertResource: "cert1",
+									},
+								},
+								RequestHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 							{
 								Name:      "name2",
@@ -258,6 +406,7 @@ func TestIngressGateway_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *IngressGateway
 		namespacesEnabled bool
+		partitionEnabled  bool
 		expectedErrMsgs   []string
 	}{
 		"listener.protocol invalid": {
@@ -420,6 +569,51 @@ func TestIngressGateway_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 		},
+		"service.partition set when partitions disabled": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Partition: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			partitionEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.listeners[0].services[0].partition: Invalid value: "foo": Consul Enterprise admin-partitions must be enabled to set service.partition`,
+			},
+		},
+		"service.partition set when partitions enabled": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Partition: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			partitionEnabled: true,
+		},
 		"multiple errors": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -448,7 +642,7 @@ func TestIngressGateway_Validate(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled})
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

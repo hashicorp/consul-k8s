@@ -109,26 +109,6 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
-  - serviceexports
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - consul.hashicorp.com
-  resources:
-  - serviceexports/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - consul.hashicorp.com
-  resources:
   - serviceintentions
   verbs:
   - create

@@ -61,6 +61,19 @@ type IngressGatewaySpec struct {
 type GatewayTLSConfig struct {
 	// Indicates that TLS should be enabled for this gateway service.
 	Enabled bool `json:"enabled"`
+
+	// SDS allows configuring TLS certificate from an SDS service.
+	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+}
+
+type GatewayServiceTLSConfig struct {
+	// SDS allows configuring TLS certificate from an SDS service.
+	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+}
+
+type GatewayTLSSDSConfig struct {
+	ClusterName  string `json:"clusterName,omitempty"`
+	CertResource string `json:"certResource,omitempty"`
 }
 
 // IngressListener manages the configuration for a listener on a specific port.
@@ -111,6 +124,35 @@ type IngressService struct {
 	// Namespace is the namespace where the service is located.
 	// Namespacing is a Consul Enterprise feature.
 	Namespace string `json:"namespace,omitempty"`
+
+	// Partition is the admin-partition where the service is located.
+	// Partitioning is a Consul Enterprise feature.
+	Partition string `json:"partition,omitempty"`
+
+	// TLS allows specifying some TLS configuration per listener.
+	TLS *GatewayServiceTLSConfig `json:"gatewayServiceTLSConfig,omitempty"`
+
+	// Allow HTTP header manipulation to be configured.
+	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
+	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
+}
+
+// HTTPHeaderModifiers is a set of rules for HTTP header modification that
+// should be performed by proxies as the request passes through them. It can
+// operate on either request or response headers depending on the context in
+// which it is used.
+type HTTPHeaderModifiers struct {
+	// Add is a set of name -> value pairs that should be appended to the request
+	// or response (i.e. allowing duplicates if the same header already exists).
+	Add map[string]string `json:"add,omitempty"`
+
+	// Set is a set of name -> value pairs that should be added to the request or
+	// response, overwriting any existing header values of the same name.
+	Set map[string]string `json:"set,omitempty"`
+
+	// Remove is the set of header names that should be stripped from the request
+	// or response.
+	Remove []string `json:"remove,omitempty"`
 }
 
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -219,10 +261,8 @@ func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
 	path := field.NewPath("spec")
 
 	for i, v := range in.Spec.Listeners {
-		errs = append(errs, v.validate(path.Child("listeners").Index(i))...)
+		errs = append(errs, v.validate(path.Child("listeners").Index(i), consulMeta)...)
 	}
-
-	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -254,6 +294,7 @@ func (in *IngressGateway) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 func (in GatewayTLSConfig) toConsul() capi.GatewayTLSConfig {
 	return capi.GatewayTLSConfig{
 		Enabled: in.Enabled,
+		SDS:     in.SDS.toConsul(),
 	}
 }
 
@@ -271,13 +312,47 @@ func (in IngressListener) toConsul() capi.IngressListener {
 
 func (in IngressService) toConsul() capi.IngressService {
 	return capi.IngressService{
-		Name:      in.Name,
-		Hosts:     in.Hosts,
-		Namespace: in.Namespace,
+		Name:            in.Name,
+		Hosts:           in.Hosts,
+		Namespace:       in.Namespace,
+		Partition:       in.Partition,
+		TLS:             in.TLS.toConsul(),
+		RequestHeaders:  in.RequestHeaders.toConsul(),
+		ResponseHeaders: in.ResponseHeaders.toConsul(),
 	}
 }
 
-func (in IngressListener) validate(path *field.Path) field.ErrorList {
+func (in *GatewayTLSSDSConfig) toConsul() *capi.GatewayTLSSDSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayTLSSDSConfig{
+		ClusterName:  in.ClusterName,
+		CertResource: in.CertResource,
+	}
+}
+
+func (in *GatewayServiceTLSConfig) toConsul() *capi.GatewayServiceTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayServiceTLSConfig{
+		SDS: in.SDS.toConsul(),
+	}
+}
+
+func (in *HTTPHeaderModifiers) toConsul() *capi.HTTPHeaderModifiers {
+	if in == nil {
+		return nil
+	}
+	return &capi.HTTPHeaderModifiers{
+		Add:    in.Add,
+		Set:    in.Set,
+		Remove: in.Remove,
+	}
+}
+
+func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	validProtocols := []string{"tcp", "http", "http2", "grpc"}
 	if !sliceContains(validProtocols, in.Protocol) {
@@ -307,27 +382,21 @@ func (in IngressListener) validate(path *field.Path) field.ErrorList {
 				fmt.Sprintf("hosts must be empty if name is %q", wildcardServiceName)))
 		}
 
+		if svc.Partition != "" && !consulMeta.PartitionsEnabled {
+			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("partition"),
+				svc.Partition, `Consul Enterprise admin-partitions must be enabled to set service.partition`))
+		}
+
+		if svc.Namespace != "" && !consulMeta.NamespacesEnabled {
+			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("namespace"),
+				svc.Namespace, `Consul Enterprise namespaces must be enabled to set service.namespace`))
+		}
+
 		if len(svc.Hosts) > 0 && in.Protocol == "tcp" {
 			asJSON, _ := json.Marshal(svc.Hosts)
 			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("hosts"),
 				string(asJSON),
 				"hosts must be empty if protocol is \"tcp\""))
-		}
-	}
-	return errs
-}
-
-func (in *IngressGateway) validateNamespaces(namespacesEnabled bool) field.ErrorList {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	if !namespacesEnabled {
-		for i, listener := range in.Spec.Listeners {
-			for j, service := range listener.Services {
-				if service.Namespace != "" {
-					errs = append(errs, field.Invalid(path.Child("listeners").Index(i).Child("services").Index(j).Child("namespace"),
-						service.Namespace, `Consul Enterprise namespaces must be enabled to set service.namespace`))
-				}
-			}
 		}
 	}
 	return errs
