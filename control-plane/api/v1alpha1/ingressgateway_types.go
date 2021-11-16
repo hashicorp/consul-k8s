@@ -137,24 +137,6 @@ type IngressService struct {
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 }
 
-// HTTPHeaderModifiers is a set of rules for HTTP header modification that
-// should be performed by proxies as the request passes through them. It can
-// operate on either request or response headers depending on the context in
-// which it is used.
-type HTTPHeaderModifiers struct {
-	// Add is a set of name -> value pairs that should be appended to the request
-	// or response (i.e. allowing duplicates if the same header already exists).
-	Add map[string]string `json:"add,omitempty"`
-
-	// Set is a set of name -> value pairs that should be added to the request or
-	// response, overwriting any existing header values of the same name.
-	Set map[string]string `json:"set,omitempty"`
-
-	// Remove is the set of header names that should be stripped from the request
-	// or response.
-	Remove []string `json:"remove,omitempty"`
-}
-
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
 	return in.ObjectMeta
 }
@@ -338,17 +320,6 @@ func (in *GatewayServiceTLSConfig) toConsul() *capi.GatewayServiceTLSConfig {
 	}
 	return &capi.GatewayServiceTLSConfig{
 		SDS: in.SDS.toConsul(),
-	}
-}
-
-func (in *HTTPHeaderModifiers) toConsul() *capi.HTTPHeaderModifiers {
-	if in == nil {
-		return nil
-	}
-	return &capi.HTTPHeaderModifiers{
-		Add:    in.Add,
-		Set:    in.Set,
-		Remove: in.Remove,
 	}
 }
 
