@@ -50,6 +50,36 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 							Service:       "foo",
 							ServiceSubset: "bar",
 							Namespace:     "baz",
+							RequestHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -63,6 +93,36 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 						Service:       "foo",
 						ServiceSubset: "bar",
 						Namespace:     "baz",
+						RequestHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"foo":    "bar",
+								"source": "dest",
+							},
+							Set: map[string]string{
+								"bar": "baz",
+								"key": "car",
+							},
+							Remove: []string{
+								"foo",
+								"bar",
+								"baz",
+							},
+						},
+						ResponseHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"doo":    "var",
+								"aource": "sest",
+							},
+							Set: map[string]string{
+								"var": "vaz",
+								"jey": "xar",
+							},
+							Remove: []string{
+								"doo",
+								"var",
+								"vaz",
+							},
+						},
 					},
 				},
 			},
@@ -125,6 +185,36 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 							Service:       "foo",
 							ServiceSubset: "bar",
 							Namespace:     "baz",
+							RequestHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -138,6 +228,36 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 						Service:       "foo",
 						ServiceSubset: "bar",
 						Namespace:     "baz",
+						RequestHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"foo":    "bar",
+								"source": "dest",
+							},
+							Set: map[string]string{
+								"bar": "baz",
+								"key": "car",
+							},
+							Remove: []string{
+								"foo",
+								"bar",
+								"baz",
+							},
+						},
+						ResponseHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"doo":    "var",
+								"aource": "sest",
+							},
+							Set: map[string]string{
+								"var": "vaz",
+								"jey": "xar",
+							},
+							Remove: []string{
+								"doo",
+								"var",
+								"vaz",
+							},
+						},
 					},
 				},
 				Meta: map[string]string{
