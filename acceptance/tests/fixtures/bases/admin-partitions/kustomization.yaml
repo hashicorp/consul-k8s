@@ -1,0 +1,3 @@
+resources:
+  - partitionexports-default.yaml
+  - partitionexports-secondary.yaml
