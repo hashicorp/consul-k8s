@@ -249,10 +249,15 @@ func TestMeshGatewaySecure(t *testing.T) {
 			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 			logger.Log(t, "creating intention")
-			_, err = primaryClient.Connect().IntentionUpsert(&api.Intention{
-				SourceName:      staticClientName,
-				DestinationName: "static-server",
-				Action:          api.IntentionActionAllow,
+			_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+				Kind: api.ServiceIntentions,
+				Name: "static-server",
+				Sources: []*api.SourceIntention{
+					{
+						Name:   staticClientName,
+						Action: api.IntentionActionAllow,
+					},
+				},
 			}, nil)
 			require.NoError(t, err)
 

@@ -182,23 +182,28 @@ func TestConnectInjectNamespaces(t *testing.T) {
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, "http://localhost:1234")
 				}
 
-				intention := &api.Intention{
-					SourceName:      staticClientName,
-					SourceNS:        staticClientNamespace,
-					DestinationName: staticServerName,
-					DestinationNS:   staticServerNamespace,
-					Action:          api.IntentionActionAllow,
+				intention := &api.ServiceIntentionsConfigEntry{
+					Kind:      api.ServiceIntentions,
+					Name:      staticServerName,
+					Namespace: staticServerNamespace,
+					Sources: []*api.SourceIntention{
+						{
+							Name:      staticClientName,
+							Namespace: staticClientNamespace,
+							Action:    api.IntentionActionAllow,
+						},
+					},
 				}
 
 				// Set the destination namespace to be the same
 				// unless mirrorK8S is true.
 				if !c.mirrorK8S {
-					intention.SourceNS = c.destinationNamespace
-					intention.DestinationNS = c.destinationNamespace
+					intention.Namespace = c.destinationNamespace
+					intention.Sources[0].Namespace = c.destinationNamespace
 				}
 
 				logger.Log(t, "creating intention")
-				_, err := consulClient.Connect().IntentionUpsert(intention, nil)
+				_, _, err := consulClient.ConfigEntries().Set(intention, nil)
 				require.NoError(t, err)
 			}
 
