@@ -142,6 +142,9 @@ type ServiceRouteDestination struct {
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
+	// Allow HTTP header manipulation to be configured.
+	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
+	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 }
 
 func (in *ServiceRouter) ConsulMirroringNS() string {
@@ -330,6 +333,8 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
+		RequestHeaders:        in.RequestHeaders.toConsul(),
+		ResponseHeaders:       in.ResponseHeaders.toConsul(),
 	}
 }
 
