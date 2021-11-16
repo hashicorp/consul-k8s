@@ -46,11 +46,22 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 				Spec: IngressGatewaySpec{
 					TLS: GatewayTLSConfig{
 						Enabled: true,
+						SDS: &GatewayTLSSDSConfig{
+							ClusterName:  "cluster1",
+							CertResource: "cert1",
+						},
 					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
 							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								Enabled: true,
+								SDS: &GatewayTLSSDSConfig{
+									ClusterName:  "cluster1",
+									CertResource: "cert1",
+								},
+							},
 							Services: []IngressService{
 								{
 									Name:      "name1",
@@ -119,11 +130,22 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 				Namespace: "foobar",
 				TLS: capi.GatewayTLSConfig{
 					Enabled: true,
+					SDS: &capi.GatewayTLSSDSConfig{
+						ClusterName:  "cluster1",
+						CertResource: "cert1",
+					},
 				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
 						Protocol: "tcp",
+						TLS: &capi.GatewayTLSConfig{
+							Enabled: true,
+							SDS: &capi.GatewayTLSSDSConfig{
+								ClusterName:  "cluster1",
+								CertResource: "cert1",
+							},
+						},
 						Services: []capi.IngressService{
 							{
 								Name:      "name1",
@@ -247,11 +269,22 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 				Spec: IngressGatewaySpec{
 					TLS: GatewayTLSConfig{
 						Enabled: true,
+						SDS: &GatewayTLSSDSConfig{
+							ClusterName:  "cluster1",
+							CertResource: "cert1",
+						},
 					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
 							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								Enabled: true,
+								SDS: &GatewayTLSSDSConfig{
+									ClusterName:  "cluster1",
+									CertResource: "cert1",
+								},
+							},
 							Services: []IngressService{
 								{
 									Name:      "name1",
@@ -319,11 +352,22 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 				Name: "name",
 				TLS: capi.GatewayTLSConfig{
 					Enabled: true,
+					SDS: &capi.GatewayTLSSDSConfig{
+						ClusterName:  "cluster1",
+						CertResource: "cert1",
+					},
 				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
 						Protocol: "tcp",
+						TLS: &capi.GatewayTLSConfig{
+							Enabled: true,
+							SDS: &capi.GatewayTLSSDSConfig{
+								ClusterName:  "cluster1",
+								CertResource: "cert1",
+							},
+						},
 						Services: []capi.IngressService{
 							{
 								Name:      "name1",
