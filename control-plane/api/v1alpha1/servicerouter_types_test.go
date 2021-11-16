@@ -83,6 +83,36 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -129,6 +159,36 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -224,6 +284,36 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -270,6 +360,36 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
