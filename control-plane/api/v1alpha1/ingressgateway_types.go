@@ -87,6 +87,9 @@ type IngressListener struct {
 	// current supported values are: (tcp | http | http2 | grpc).
 	Protocol string `json:"protocol,omitempty"`
 
+	// TLS config for this listener.
+	TLS *GatewayTLSConfig `json:"gatewayTLSConfig,omitempty"`
+
 	// Services declares the set of services to which the listener forwards
 	// traffic.
 	//
@@ -223,7 +226,7 @@ func (in *IngressGateway) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.IngressGatewayConfigEntry{
 		Kind:      in.ConsulKind(),
 		Name:      in.ConsulName(),
-		TLS:       in.Spec.TLS.toConsul(),
+		TLS:       *in.Spec.TLS.toConsul(),
 		Listeners: listeners,
 		Meta:      meta(datacenter),
 	}
@@ -273,8 +276,11 @@ func (in *IngressGateway) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	}
 }
 
-func (in GatewayTLSConfig) toConsul() capi.GatewayTLSConfig {
-	return capi.GatewayTLSConfig{
+func (in *GatewayTLSConfig) toConsul() *capi.GatewayTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayTLSConfig{
 		Enabled: in.Enabled,
 		SDS:     in.SDS.toConsul(),
 	}
@@ -285,9 +291,11 @@ func (in IngressListener) toConsul() capi.IngressListener {
 	for _, s := range in.Services {
 		services = append(services, s.toConsul())
 	}
+
 	return capi.IngressListener{
 		Port:     in.Port,
 		Protocol: in.Protocol,
+		TLS:      in.TLS.toConsul(),
 		Services: services,
 	}
 }
