@@ -425,25 +425,30 @@ func TestPartitions(t *testing.T) {
 					k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, "http://localhost:1234")
 					k8s.CheckStaticServerConnectionFailing(t, clientClusterStaticClientOpts, "http://localhost:1234")
 
-					intention := &api.Intention{
-						SourceName:      staticClientName,
-						SourceNS:        staticClientNamespace,
-						DestinationName: staticServerName,
-						DestinationNS:   staticServerNamespace,
-						Action:          api.IntentionActionAllow,
+					intention := &api.ServiceIntentionsConfigEntry{
+						Kind:      api.ServiceIntentions,
+						Name:      staticServerName,
+						Namespace: staticServerNamespace,
+						Sources: []*api.SourceIntention{
+							{
+								Name:      staticClientName,
+								Namespace: staticClientNamespace,
+								Action:    api.IntentionActionAllow,
+							},
+						},
 					}
 
 					// Set the destination namespace to be the same
 					// unless mirrorK8S is true.
 					if !c.mirrorK8S {
-						intention.SourceNS = c.destinationNamespace
-						intention.DestinationNS = c.destinationNamespace
+						intention.Namespace = c.destinationNamespace
+						intention.Sources[0].Namespace = c.destinationNamespace
 					}
 
 					logger.Log(t, "creating intention")
-					_, err := consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: defaultPartition})
+					_, _, err := consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: defaultPartition})
 					require.NoError(t, err)
-					_, err = consulClient.Connect().IntentionUpsert(intention, &api.WriteOptions{Partition: secondaryPartition})
+					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 					require.NoError(t, err)
 				}
 
