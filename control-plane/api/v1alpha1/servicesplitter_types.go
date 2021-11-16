@@ -64,6 +64,9 @@ type ServiceSplit struct {
 	// The namespace to resolve the service from instead of the current namespace.
 	// If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Allow HTTP header manipulation to be configured.
+	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
+	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 }
 
 func (in *ServiceSplitter) GetObjectMeta() metav1.ObjectMeta {
@@ -191,10 +194,12 @@ func (in ServiceSplits) toConsul() []capi.ServiceSplit {
 
 func (in ServiceSplit) toConsul() capi.ServiceSplit {
 	return capi.ServiceSplit{
-		Weight:        in.Weight,
-		Service:       in.Service,
-		ServiceSubset: in.ServiceSubset,
-		Namespace:     in.Namespace,
+		Weight:          in.Weight,
+		Service:         in.Service,
+		ServiceSubset:   in.ServiceSubset,
+		Namespace:       in.Namespace,
+		RequestHeaders:  in.RequestHeaders.toConsul(),
+		ResponseHeaders: in.ResponseHeaders.toConsul(),
 	}
 }
 
