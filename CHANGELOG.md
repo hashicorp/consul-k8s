@@ -19,11 +19,15 @@ IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
   * Connect: Log a warning when ACLs are enabled and the default service account is used. [[GH-842](https://github.com/hashicorp/consul-k8s/pull/842)]
+  * Update Service Router, Service Splitter and Ingress Gateway CRD with support for RequestHeaders and ResponseHeaders. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
+  * Update Ingress Gateway CRD with partition support for the IngressService and TLS Config. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
 * Helm Chart
   * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
   * Update Consul version to 1.10.4. [[GH-861](https://github.com/hashicorp/consul-k8s/pull/861)]
+  * Update Service Router, Service Splitter and Ingress Gateway CRD with support for RequestHeaders and ResponseHeaders. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
+  * Update Ingress Gateway CRD with partition support for the IngressService and TLS Config. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
 
 BUG FIXES:
 * Control Plane
