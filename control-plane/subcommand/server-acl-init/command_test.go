@@ -1611,8 +1611,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		context.Background(),
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   resourcePrefix + "-bootstrap-acl-token",
-				Labels: map[string]string{"managed-by": "consul-k8s"},
+				Name: resourcePrefix + "-bootstrap-acl-token",
 			},
 			Data: map[string][]byte{
 				"token": []byte("old-token"),
@@ -2300,8 +2299,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	secretName := resourcePrefix + "-connect-injector-authmethod-svc-account"
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   secretName,
-			Labels: map[string]string{"managed-by": "consul-k8s"},
+			Name: secretName,
 		},
 		Data: map[string][]byte{
 			"ca.crt": caCertBytes,
@@ -2314,8 +2312,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	// Create the second secret of a different type
 	otherSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   resourcePrefix + "-some-other-secret",
-			Labels: map[string]string{"managed-by": "consul-k8s"},
+			Name: resourcePrefix + "-some-other-secret",
 		},
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeDockercfg,

@@ -379,7 +379,7 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 	return nil
 }
 
-// deleteSecrets deletes any secrets that have foundReleaseName in their name.
+// deleteSecrets deletes any secrets that have the label "managed-by" set to "consul-k8s".
 func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) error {
 	var secretNames []string
 	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{})

@@ -141,7 +141,6 @@ func TestPartitions(t *testing.T) {
 			caCertSecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsCert, metav1.GetOptions{})
 			caCertSecret.ResourceVersion = ""
 			require.NoError(t, err)
-			caCertSecret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 			_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caCertSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
@@ -152,7 +151,6 @@ func TestPartitions(t *testing.T) {
 				caKeySecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsKey, metav1.GetOptions{})
 				caKeySecret.ResourceVersion = ""
 				require.NoError(t, err)
-				caKeySecret.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caKeySecret, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
@@ -163,7 +161,6 @@ func TestPartitions(t *testing.T) {
 				token, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionToken, metav1.GetOptions{})
 				token.ResourceVersion = ""
 				require.NoError(t, err)
-				token.ObjectMeta.Labels["managed-by"] = "consul-k8s"
 				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, token, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}

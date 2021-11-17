@@ -72,8 +72,7 @@ func TestDeleteSecrets(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "consul-test-secret2",
 			Labels: map[string]string{
-				"release":    "consul",
-				"managed-by": "consul-k8s",
+				"release": "consul",
 			},
 		},
 	}
@@ -95,8 +94,9 @@ func TestDeleteSecrets(t *testing.T) {
 	require.NoError(t, err)
 	secrets, err := c.kubernetes.CoreV1().Secrets("default").List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
+
+	// Only secret1 should have been deleted, secret2 persists since it doesn't have the label.
 	require.Len(t, secrets.Items, 1)
-	require.Equal(t, secrets.Items[0].Name, secret3.Name)
 }
 
 func TestDeleteServiceAccounts(t *testing.T) {
