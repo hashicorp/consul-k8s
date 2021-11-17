@@ -238,6 +238,7 @@ func (c *Command) Run(args []string) int {
 	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
+		// TODO: Don't just error, install.
 		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
 		return 1
 	} else {
