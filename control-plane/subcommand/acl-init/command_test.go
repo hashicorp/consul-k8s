@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
