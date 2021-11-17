@@ -140,7 +140,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		return r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
+		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
+		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
@@ -660,7 +661,7 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool, endpointPods mapset.Set) (ctrl.Result, error) {
+func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool, endpointPods mapset.Set) error {
 	// Get all agents by getting pods with label component=client, app=consul and release=<ReleaseName>
 	agents := corev1.PodList{}
 	listOptions := client.ListOptions{
@@ -673,7 +674,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 	}
 	if err := r.Client.List(ctx, &agents, &listOptions); err != nil {
 		r.Log.Error(err, "failed to get Consul client agent pods")
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// On each agent, we need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
@@ -681,14 +682,14 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 		client, err := r.remoteConsulClient(agent.Status.PodIP, r.consulNamespace(k8sSvcNamespace))
 		if err != nil {
 			r.Log.Error(err, "failed to create a new Consul client", "address", agent.Status.PodIP)
-			return ctrl.Result{}, err
+			return err
 		}
 
 		// Get services matching metadata.
 		svcs, err := serviceInstancesForK8SServiceNameAndNamespace(k8sSvcName, k8sSvcNamespace, client)
 		if err != nil {
 			r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
-			return ctrl.Result{}, err
+			return err
 		}
 
 		// Deregister each service instance that matches the metadata.
@@ -702,7 +703,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 					r.Log.Info("deregistering service from consul", "svc", svcID)
 					if err = client.Agent().ServiceDeregister(svcID); err != nil {
 						r.Log.Error(err, "failed to deregister service instance", "id", svcID)
-						return ctrl.Result{}, err
+						return err
 					}
 					serviceDeregistered = true
 				}
@@ -710,7 +711,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 				r.Log.Info("deregistering service from consul", "svc", svcID)
 				if err = client.Agent().ServiceDeregister(svcID); err != nil {
 					r.Log.Error(err, "failed to deregister service instance", "id", svcID)
-					return ctrl.Result{}, err
+					return err
 				}
 				serviceDeregistered = true
 			}
@@ -720,12 +721,13 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
-					return ctrl.Result{}, err
+					return err
 				}
 			}
 		}
 	}
-	return ctrl.Result{}, nil
+
+	return nil
 }
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
