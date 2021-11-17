@@ -256,7 +256,13 @@ func (c *Command) Run(args []string) int {
 			corev1.TLSCertKey:       []byte(serverCert),
 			corev1.TLSPrivateKeyKey: []byte(serverKey),
 		}
-		serverCertSecret.ObjectMeta.Labels[common.CliLabelKey] = common.CliLabelValue
+
+		if serverCertSecret.ObjectMeta.Labels == nil {
+			serverCertSecret.ObjectMeta.Labels = map[string]string{common.CliLabelKey: common.CliLabelValue}
+		} else {
+			serverCertSecret.ObjectMeta.Labels[common.CliLabelKey] = common.CliLabelValue
+		}
+
 		c.log.Info("updating server certificate and private key secret")
 		_, err := c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Update(c.ctx, serverCertSecret, metav1.UpdateOptions{})
 		if err != nil {
