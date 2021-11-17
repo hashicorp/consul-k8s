@@ -4843,26 +4843,71 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 }
 
 func TestMapAddresses(t *testing.T) {
-	addresses := corev1.EndpointSubset{
-		Addresses: []corev1.EndpointAddress{
-			{Hostname: "host1"},
-			{Hostname: "host2"},
+	t.Parallel()
+	cases := map[string]struct {
+		addresses corev1.EndpointSubset
+		expected  map[corev1.EndpointAddress]string
+	}{
+		"ready and not ready addresses": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+				},
+				NotReadyAddresses: []corev1.EndpointAddress{
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthPassing,
+				{Hostname: "host2"}: api.HealthPassing,
+				{Hostname: "host3"}: api.HealthCritical,
+				{Hostname: "host4"}: api.HealthCritical,
+			},
 		},
-		NotReadyAddresses: []corev1.EndpointAddress{
-			{Hostname: "host3"},
-			{Hostname: "host4"},
+		"ready addresses only": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+				NotReadyAddresses: []corev1.EndpointAddress{},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthPassing,
+				{Hostname: "host2"}: api.HealthPassing,
+				{Hostname: "host3"}: api.HealthPassing,
+				{Hostname: "host4"}: api.HealthPassing,
+			},
+		},
+		"not ready addresses only": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{},
+				NotReadyAddresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthCritical,
+				{Hostname: "host2"}: api.HealthCritical,
+				{Hostname: "host3"}: api.HealthCritical,
+				{Hostname: "host4"}: api.HealthCritical,
+			},
 		},
 	}
 
-	expected := map[corev1.EndpointAddress]string{
-		{Hostname: "host1"}: api.HealthPassing,
-		{Hostname: "host2"}: api.HealthPassing,
-		{Hostname: "host3"}: api.HealthCritical,
-		{Hostname: "host4"}: api.HealthCritical,
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := mapAddresses(c.addresses)
+			require.Equal(t, c.expected, actual)
+		})
 	}
-
-	actual := mapAddresses(addresses)
-	require.Equal(t, expected, actual)
 }
 
 func createPod(name, ip string, inject bool, managedByEndpointsController bool) *corev1.Pod {
