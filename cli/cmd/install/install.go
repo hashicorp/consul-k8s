@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	subCommandCommon "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -422,11 +423,12 @@ func (c *Command) checkForPreviousSecrets() error {
 	}
 	for _, secret := range secrets.Items {
 		// future TODO: also check for federation secret
-		if secret.ObjectMeta.Labels["managed-by"] == "consul-k8s" {
+		if secret.ObjectMeta.Labels[subCommandCommon.CliLabelKey] == subCommandCommon.CliLabelValue {
 			return fmt.Errorf("found consul secret from previous installations: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
 				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
 		}
 	}
+
 	c.UI.Output("No previous secrets found", terminal.WithSuccessStyle())
 	return nil
 }

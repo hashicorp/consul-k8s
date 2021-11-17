@@ -436,8 +436,7 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	if errors.IsNotFound(err) {
 		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   config.LicenseSecretName,
-				Labels: map[string]string{"managed-by": "consul-k8s"},
+				Name: config.LicenseSecretName,
 			},
 			StringData: map[string]string{
 				config.LicenseSecretKey: cfg.EnterpriseLicense,
