@@ -95,8 +95,8 @@ func TestDeleteSecrets(t *testing.T) {
 	secrets, err := c.kubernetes.CoreV1().Secrets("default").List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 
-	// Only secret1 should have been deleted, secret2 persists since it doesn't have the label.
-	require.Len(t, secrets.Items, 1)
+	// Only secret1 should have been deleted, secret2 and secret 3 persist since it doesn't have the label.
+	require.Len(t, secrets.Items, 2)
 }
 
 func TestDeleteServiceAccounts(t *testing.T) {
