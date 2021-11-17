@@ -535,87 +535,6 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 }
 
-// TestReconcileWithServiceIgnore tests the reconcile function with a service that should be ignored.
-func TestReconcileWithServiceIgnore(t *testing.T) {
-	t.Parallel()
-	nodeName := "test-node"
-
-	cases := []struct {
-		name                       string
-		consulSvcName              string
-		k8sObjects                 func() []runtime.Object
-		initialConsulSvcs          []*api.AgentServiceRegistration
-		expectedNumSvcInstances    int
-		expectedConsulSvcInstances []*api.CatalogService
-		expectedProxySvcInstances  []*api.CatalogService
-		expectedAgentHealthChecks  []*api.AgentCheck
-		expErr                     string
-	}{
-		// TODO: Test case where service is registered and should be deregistered.
-		// TODO: Test case where service is not registered and just gets ignored.
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
-			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
-			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
-
-			// Add the default namespace.
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-			// Create fake k8s client
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
-
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
-
-			// Create test consul server
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
-			require.NoError(t, err)
-			defer consul.Stop()
-			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
-			consulClient, err := api.NewClient(cfg)
-			require.NoError(t, err)
-			addr := strings.Split(consul.HTTPAddr, ":")
-			consulPort := addr[1]
-
-			// Register service and proxy in consul.
-			for _, svc := range tt.initialConsulSvcs {
-				err = consulClient.Agent().ServiceRegister(svc)
-				require.NoError(t, err)
-			}
-
-			// Create the endpoints controller
-			ep := &EndpointsController{
-				Client:                fakeClient,
-				Log:                   logrtest.TestLogger{T: t},
-				ConsulClient:          consulClient,
-				ConsulPort:            consulPort,
-				ConsulScheme:          "http",
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSetWith(),
-				ReleaseName:           "consul",
-				ReleaseNamespace:      "default",
-				ConsulClientCfg:       cfg,
-			}
-			namespacedName := types.NamespacedName{
-				Namespace: "default",
-				Name:      "service-created",
-			}
-
-			_, _ = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
-		})
-	}
-}
-
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
 // object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
 // with two addresses, and an endpoints object with every possible customization.
@@ -2794,6 +2713,87 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
 				require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 			}
+		})
+	}
+}
+
+// TestReconcileWithServiceIgnore tests the reconcile function with a service that should be ignored.
+func TestReconcileWithServiceIgnore(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+
+	cases := []struct {
+		name                       string
+		consulSvcName              string
+		k8sObjects                 func() []runtime.Object
+		initialConsulSvcs          []*api.AgentServiceRegistration
+		expectedNumSvcInstances    int
+		expectedConsulSvcInstances []*api.CatalogService
+		expectedProxySvcInstances  []*api.CatalogService
+		expectedAgentHealthChecks  []*api.AgentCheck
+		expErr                     string
+	}{
+		// TODO: Test case where service is registered and should be deregistered.
+		// TODO: Test case where service is not registered and just gets ignored.
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// The agent pod needs to have the address 127.0.0.1 so when the
+			// code gets the agent pods via the label component=client, and
+			// makes requests against the agent API, it will actually hit the
+			// test server we have on localhost.
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			// Register service and proxy in consul.
+			for _, svc := range tt.initialConsulSvcs {
+				err = consulClient.Agent().ServiceRegister(svc)
+				require.NoError(t, err)
+			}
+
+			// Create the endpoints controller
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				ConsulClientCfg:       cfg,
+			}
+			namespacedName := types.NamespacedName{
+				Namespace: "default",
+				Name:      "service-created",
+			}
+
+			_, _ = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 		})
 	}
 }
