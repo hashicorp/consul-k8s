@@ -150,10 +150,8 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// If the endpoints object has the label "connect-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if value, ok := serviceEndpoints.Labels[labelServiceIgnore]; ok && value == "true" {
-		if isRegistered() {
-			return r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
-		}
-		return ctrl.Result{}, nil
+		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
+		return ctrl.Result{}, err
 	}
 
 	r.Log.Info("retrieved", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
@@ -178,7 +176,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
 	// the registration codepath.
-	if _, err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap, endpointPods); err != nil {
+	if err = r.deregisterServiceOnAllAgents(ctx, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap, endpointPods); err != nil {
 		r.Log.Error(err, "failed to deregister endpoints on all agents", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
 	}
@@ -651,6 +649,11 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
 }
 
+// fetchServices returns a list of services from the given k8s client.
+func (r *EndpointsController) fetchServices(ctx context.Context, k8sSvcName, k8sSvcNamespace string) ([]*api.AgentService, error) {
+	return nil, nil
+}
+
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata
 // "k8s-service-name"=k8sSvcName and "k8s-namespace"=k8sSvcNamespace. The k8s service name may or may not match the
 // consul service name, but the k8s service name will always match the metadata on the Consul service
@@ -1027,8 +1030,6 @@ func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]st
 
 // isRegistered checks if the endpoint is registered in Consul.
 func isRegistered() bool {
-	// TODO: Implement this.
-	// _, err := r.consul.Catalog().Service(endpoint.ServiceName, "", nil)
-	// return err == nil
+
 	return true
 }
