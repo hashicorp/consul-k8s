@@ -233,6 +233,7 @@ func (c *Command) Run(args []string) int {
 	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
+		// TODO: Don't just error, install.
 		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
 		return 1
 	} else {
@@ -434,4 +435,14 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 		vals = install.MergeMaps(presetMap, vals)
 	}
 	return vals, err
+}
+
+func (c *Command) Help() string {
+	c.once.Do(c.init)
+	s := "Usage: consul-k8s upgrade [flags]" + "\n" + "Upgrade Consul from an existing installation." + "\n"
+	return s + "\n" + c.help
+}
+
+func (c *Command) Synopsis() string {
+	return "Upgrade Consul on Kubernetes."
 }
