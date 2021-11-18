@@ -29,10 +29,7 @@ import (
 // test pattern of the enterprise tests already covers a config-entry similar to partition-exports
 // ie a "global" configentry. Hence a separate file has been created to test this controller.
 
-// TODO: remove skips once 1.11-beta2 image is released.
-
 func TestPartitionExportsController_createsPartitionExports(tt *testing.T) {
-	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -152,7 +149,6 @@ func TestPartitionExportsController_createsPartitionExports(tt *testing.T) {
 }
 
 func TestPartitionExportsController_updatesPartitionExports(tt *testing.T) {
-	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
@@ -295,7 +291,6 @@ func TestPartitionExportsController_updatesPartitionExports(tt *testing.T) {
 }
 
 func TestPartitionExportsController_deletesPartitionExports(tt *testing.T) {
-	tt.Skip()
 	tt.Parallel()
 
 	cases := map[string]struct {
