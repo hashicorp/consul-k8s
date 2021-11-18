@@ -14,7 +14,7 @@ BREAKING CHANGES:
   ```yaml
   client:
     extraConfig: |
-      {use_streaming_backend": false}
+      {"use_streaming_backend": false}
   ```
   
   [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
