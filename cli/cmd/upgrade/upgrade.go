@@ -61,7 +61,6 @@ type Command struct {
 	set *flag.Sets
 
 	flagPreset          string
-	flagNamespace       string
 	flagDryRun          bool
 	flagAutoApprove     bool
 	flagValueFiles      []string
@@ -106,12 +105,6 @@ func (c *Command) init() {
 		Aliases: []string{"f"},
 		Target:  &c.flagValueFiles,
 		Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
-	})
-	f.StringVar(&flag.StringVar{
-		Name:    flagNameNamespace,
-		Target:  &c.flagNamespace,
-		Default: common.DefaultReleaseNamespace,
-		Usage:   "Namespace for the Consul installation.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamePreset,
@@ -237,6 +230,7 @@ func (c *Command) Run(args []string) int {
 
 	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
+	foundNamespace := ""
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
 		// TODO: Don't just error, install.
 		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
@@ -245,6 +239,8 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
 		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
+
+		foundNamespace = ns
 	}
 
 	// Handle preset, value files, and set values logic.
@@ -264,7 +260,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
+		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
 
 		if len(vals) == 0 {
 			c.UI.Output("Overrides: "+string(valuesYaml), terminal.WithInfoStyle())
@@ -273,10 +269,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
-	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
-	// aren't double prefixed with "consul-consul-...".
-	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
+	// TODO: Fix this!
+	//// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
+	//// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
+	//// aren't double prefixed with "consul-consul-...".
+	//vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
 
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
@@ -303,7 +300,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = common.InitActionConfig(actionConfig, foundNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -312,7 +309,7 @@ func (c *Command) Run(args []string) int {
 	// Setup the upgrade action.
 	// TODO: So many things to add here.
 	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = c.flagNamespace
+	upgrade.Namespace = foundNamespace
 	upgrade.DryRun = c.flagDryRun
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
@@ -341,8 +338,6 @@ func (c *Command) Run(args []string) int {
 
 	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
-		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
-
 		configYaml, err := yaml.Marshal(re.Config)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -354,11 +349,11 @@ func (c *Command) Run(args []string) int {
 		} else {
 			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
 		}
-
+		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithSuccessStyle())
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
+	c.UI.Output("Upgraded Consul into namespace %q", foundNamespace, terminal.WithSuccessStyle())
 
 	return 0
 }
@@ -378,10 +373,6 @@ func (c *Command) validateFlags(args []string) error {
 	}
 	if _, ok := install.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
-	}
-	if !validLabel(c.flagNamespace) {
-		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
