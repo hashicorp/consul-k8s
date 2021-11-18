@@ -11,7 +11,7 @@ import (
 /* Just using this to play around with the Go debugger. */
 func TestDebugger(t *testing.T) {
 	c := getInitializedCommand(t)
-	c.Run([]string{"-dry-run"})
+	c.Run([]string{"-set=\"connectInject.enabled=false\"", "-auto-approve"})
 }
 
 // getInitializedCommand sets up a command struct for tests.
