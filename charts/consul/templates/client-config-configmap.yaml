@@ -25,8 +25,7 @@ data:
        in the UI. */}}
   config.json: |-
     {
-      "check_update_interval": "0s",
-      "use_streaming_backend": false
+      "check_update_interval": "0s"
     }
   {{- end }}
 {{- end }}
