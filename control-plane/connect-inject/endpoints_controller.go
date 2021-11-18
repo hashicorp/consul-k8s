@@ -150,6 +150,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	// If the endpoints object has the label "connect-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if value, ok := serviceEndpoints.Labels[labelServiceIgnore]; ok && value == "true" {
+		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 		return ctrl.Result{}, err
 	}
@@ -647,11 +648,6 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 	}
 
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
-}
-
-// fetchServices returns a list of services from the given k8s client.
-func (r *EndpointsController) fetchServices(ctx context.Context, k8sSvcName, k8sSvcNamespace string) ([]*api.AgentService, error) {
-	return nil, nil
 }
 
 // deregisterServiceOnAllAgents queries all agents for service instances that have the metadata
