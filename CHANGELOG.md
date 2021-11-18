@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.37.0 (November 18, 2021)
 
 BREAKING CHANGES:
 * Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
