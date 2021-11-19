@@ -96,6 +96,10 @@ func TestMeshGatewayDefault(t *testing.T) {
 	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
+	// workaround
+	k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("sts/%s-consul-server", releaseName))
+	k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
+
 	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
 	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
 
