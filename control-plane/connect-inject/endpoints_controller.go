@@ -147,7 +147,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// If the endpoints object has the label "connect-ignore" set to true, deregister all instances in Consul for this service.
+	// If the endpoints object has the label "service-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if value, ok := serviceEndpoints.Labels[labelServiceIgnore]; ok && value == "true" {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
