@@ -162,6 +162,12 @@ global:
         # The address of the Vault server.
         address: ""
 
+        # A path to the CA certificate to be used for Vault communication.
+        caFile: ""
+
+        # A path to a folder containing CA certificates to be used for Vault communication.
+        caPath: ""
+
         # The path to a PKI secrets engine for the root certificate.
         # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
         rootPKIPath: ""

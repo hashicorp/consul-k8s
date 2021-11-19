@@ -56,7 +56,7 @@ func TestVault(t *testing.T) {
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
 	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
 
-	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName)
 	vaultCluster.Create(t, ctx)
 	// Vault is now installed in the cluster.
 
@@ -108,11 +108,16 @@ func TestVault(t *testing.T) {
 	}
 	_, err = vaultClient.Logical().Write("consul/data/secret/gossip", params)
 	require.NoError(t, err)
+
+	vaultCASecret := vault.CASecretName(vaultReleaseName)
 	consulHelmValues := map[string]string{
 		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
 
-		"server.enabled":  "true",
-		"server.replicas": "1",
+		"server.enabled":              "true",
+		"server.replicas":             "1",
+		"server.extraVolumes[0].type": "secret",
+		"server.extraVolumes[0].name": vaultCASecret,
+		"server.extraVolumes[0].load": "false",
 
 		"connectInject.enabled": "true",
 		"controller.enabled":    "true",
@@ -122,6 +127,7 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
 
 		"global.secretsBackend.vault.connectCA.address":             fmt.Sprintf("http://%s-vault:8200", vaultReleaseName),
+		"global.secretsBackend.vault.connectCA.caFile":              fmt.Sprintf("/consul/userconfig/%s/tls.crt", vaultCASecret),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
 

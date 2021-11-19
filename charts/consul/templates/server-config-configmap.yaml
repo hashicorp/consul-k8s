@@ -21,6 +21,8 @@ data:
           "ca_config": [
             {
               "address": "{{ .connectCA.address }}",
+              "ca_file": "{{ .connectCA.caFile }}",
+              "ca_path": "{{ .connectCA.caPath }}",
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {

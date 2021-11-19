@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -13,33 +14,30 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 const (
-	vaultNS        = "default"
-	vaultPodLabel  = "app.kubernetes.io/instance="
-	vaultRootToken = "abcd1234"
+	vaultPodLabel = "app.kubernetes.io/instance="
 )
 
-// VaultCluster
+// VaultCluster represents a vault installation.
 type VaultCluster struct {
-	ctx       environment.TestContext
-	namespace string
+	ctx environment.TestContext
 
-	vaultHelmOptions *helm.Options
-	vaultReleaseName string
-	vaultClient      *vapi.Client
+	helmOptions *helm.Options
+	releaseName string
+	vaultClient *vapi.Client
 
 	kubectlOptions *terratestk8s.KubectlOptions
-	values         map[string]string
 
 	kubernetesClient kubernetes.Interface
-	kubeConfig       string
-	kubeContext      string
 
 	noCleanupOnFailure bool
 	debugDirectory     string
@@ -47,21 +45,14 @@ type VaultCluster struct {
 }
 
 // NewVaultCluster creates a VaultCluster which will be used to install Vault using Helm.
-func NewVaultCluster(
-	t *testing.T,
-	helmValues map[string]string,
-	ctx environment.TestContext,
-	cfg *config.TestConfig,
-	releaseName string,
-) *VaultCluster {
+func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, releaseName string) *VaultCluster {
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
-	kopts.Namespace = vaultNS
 
 	vaultHelmOpts := &helm.Options{
-		SetValues:      defaultVaultValues(),
+		SetValues:      defaultVaultValues(releaseName),
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
@@ -75,35 +66,34 @@ func NewVaultCluster(
 
 	return &VaultCluster{
 		ctx:                ctx,
-		vaultHelmOptions:   vaultHelmOpts,
+		helmOptions:        vaultHelmOpts,
 		kubectlOptions:     kopts,
-		namespace:          cfg.KubeNamespace,
-		values:             helmValues,
 		kubernetesClient:   ctx.KubernetesClient(t),
-		kubeConfig:         cfg.Kubeconfig,
-		kubeContext:        cfg.KubeContext,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
-		vaultReleaseName:   releaseName,
+		releaseName:        releaseName,
 	}
 }
 
 // VaultClient returns the vault client.
 func (v *VaultCluster) VaultClient(t *testing.T) *vapi.Client { return v.vaultClient }
 
-// Setup Vault Client returns a Vault Client.
-// TODO: We need to support Vault with TLS enabled.
+// SetupVaultClient sets up and returns a Vault Client.
 func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 	t.Helper()
+
+	if v.vaultClient != nil {
+		return v.vaultClient
+	}
 
 	config := vapi.DefaultConfig()
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8200 // use non-secure by default
 
-	serverPod := fmt.Sprintf("%s-vault-0", v.vaultReleaseName)
+	serverPod := fmt.Sprintf("%s-vault-0", v.releaseName)
 	tunnel := terratestk8s.NewTunnelWithLogger(
-		v.vaultHelmOptions.KubectlOptions,
+		v.helmOptions.KubectlOptions,
 		terratestk8s.ResourceTypePod,
 		serverPod,
 		localPort,
@@ -122,7 +112,9 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 		tunnel.Close()
 	})
 
-	config.Address = fmt.Sprintf("http://127.0.0.1:%d", localPort)
+	config.Address = fmt.Sprintf("https://127.0.0.1:%d", localPort)
+	err := config.ConfigureTLS(&vapi.TLSConfig{Insecure: true})
+	require.NoError(t, err)
 	vaultClient, err := vapi.NewClient(config)
 	require.NoError(t, err)
 	return vaultClient
@@ -132,7 +124,6 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 
 	v.vaultClient = v.SetupVaultClient(t)
-	v.vaultClient.SetToken(vaultRootToken)
 
 	// Enable the KV-V2 Secrets engine.
 	err := v.vaultClient.Sys().Mount("consul", &vapi.MountInput{
@@ -146,18 +137,24 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 
 	// Enable Kube Auth.
 	err = v.vaultClient.Sys().EnableAuthWithOptions("kubernetes", &vapi.EnableAuthOptions{
-		Type:   "kubernetes",
-		Config: vapi.MountConfigInput{},
+		Type: "kubernetes",
 	})
 	if err != nil {
 		t.Fatal("unable to enable kube auth", "err", err)
 	}
-	// We need to kubectl exec this one on the vault server:
-	// This is taken from https://learn.hashicorp.com/tutorials/vault/kubernetes-google-cloud-gke?in=vault/kubernetes#configure-kubernetes-authentication
-	cmdString := fmt.Sprintf("VAULT_TOKEN=%s vault write auth/kubernetes/config disable_iss_validation=\"true\" token_reviewer_jwt=\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" kubernetes_host=\"https://${KUBERNETES_PORT_443_TCP_ADDR}:443\" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", vaultRootToken)
 
 	v.logger.Logf(t, "updating vault kube auth config")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "-i", fmt.Sprintf("%s-vault-0", v.vaultReleaseName), "--", "sh", "-c", cmdString)
+	namespace := v.helmOptions.KubectlOptions.Namespace
+	sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), fmt.Sprintf("%s-vault", v.releaseName), metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, sa.Secrets, 1)
+	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	v.vaultClient.Logical().Write("auth/kubernetes/config", map[string]interface{}{
+		"token_reviewer_jwt": tokenSecret.StringData["token"],
+		"kubernetes_ca_cert": tokenSecret.StringData["ca.crt"],
+		"kubernetes_host":    "https://kubernetes.default.svc",
+	})
 }
 
 // Create installs Vault via Helm and then calls bootstrap to initialize it.
@@ -171,13 +168,19 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.vaultHelmOptions, "", fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "", fmt.Sprintf("%s=%s", vaultPodLabel, v.releaseName))
+
+	v.createTLSCerts(t)
 
 	// Install Vault.
-	helm.Install(t, v.vaultHelmOptions, "hashicorp/vault", v.vaultReleaseName)
+	helm.Install(t, v.helmOptions, "hashicorp/vault", v.releaseName)
+
 	// Wait for the injector and vault server pods to become Ready.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.vaultHelmOptions.KubectlOptions.Namespace, fmt.Sprintf("%s=%s", vaultPodLabel, v.vaultReleaseName))
-	// Now call bootstrap()
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
+
+	v.initAndUnseal(t)
+
+	// Now call bootstrap().
 	v.bootstrap(t, ctx)
 }
 
@@ -185,20 +188,112 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 func (v *VaultCluster) Destroy(t *testing.T) {
 	t.Helper()
 
-	k8s.WritePodsDebugInfoIfFailed(t, v.kubectlOptions, v.debugDirectory, "release="+v.vaultReleaseName)
+	k8s.WritePodsDebugInfoIfFailed(t, v.kubectlOptions, v.debugDirectory, "release="+v.releaseName)
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
-	_ = helm.DeleteE(t, v.vaultHelmOptions, v.vaultReleaseName, true)
-	// We do not need to do any PVC deletion in vault dev mode.
+	_ = helm.DeleteE(t, v.helmOptions, v.releaseName, true)
+	// We do not need to do any PVC deletion in vault dev mode. todo
 }
 
-func defaultVaultValues() map[string]string {
+func defaultVaultValues(releaseName string) map[string]string {
+	certSecret := certSecretName(releaseName)
+	caSecret := CASecretName(releaseName)
+
+	serverConfig := fmt.Sprintf(`
+      listener "tcp" {
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+        tls_cert_file = "/vault/userconfig/%s/tls.crt"
+        tls_key_file  = "/vault/userconfig/%s/tls.key"
+        tls_client_ca_file = "/vault/userconfig/%s/tls.crt"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }`, certSecret, certSecret, caSecret)
+
 	return map[string]string{
-		"server.replicas":         "1",
-		"server.dev.enabled":      "true",
-		"server.dev.devRootToken": vaultRootToken,
-		"server.bootstrapExpect":  "1",
-		"injector.enabled":        "true",
-		"global.enabled":          "true",
+		"global.tlsDisable":                        "false",
+		"server.extraEnvironmentVars.VAULT_CACERT": fmt.Sprintf("/vault/userconfig/%s/tls.crt", caSecret),
+		"server.extraVolumes[0].name":              caSecret,
+		"server.extraVolumes[0].type":              "secret",
+		"server.extraVolumes[1].name":              certSecret,
+		"server.extraVolumes[1].type":              "secret",
+		"server.standalone.enabled":                "true",
+		"server.standalone.config":                 serverConfig,
+		"injector.enabled":                         "true",
 	}
+}
+
+func certSecretName(releaseName string) string {
+	return fmt.Sprintf("%s-vault-server-tls", releaseName)
+}
+
+func CASecretName(releaseName string) string {
+	return fmt.Sprintf("%s-vault-ca", releaseName)
+}
+
+func (v *VaultCluster) createTLSCerts(t *testing.T) {
+	namespace := v.helmOptions.KubectlOptions.Namespace
+
+	// Generate CA and cert and create secrets for them.
+	signer, _, caPem, caCertTmpl, err := cert.GenerateCA("Vault CA")
+	require.NoError(t, err)
+	vaultService := fmt.Sprintf("%s-vault", v.releaseName)
+	certSANs := []string{
+		vaultService,
+		fmt.Sprintf("%s.default", vaultService),
+		fmt.Sprintf("%s.default.svc", vaultService),
+	}
+	certPem, keyPem, err := cert.GenerateCert("Vault server", 24*time.Hour, caCertTmpl, signer, certSANs)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if !v.noCleanupOnFailure {
+			// We're ignoring error here because secret deletion is best effort.
+			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
+			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
+		}
+	})
+
+	_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      certSecretName(v.releaseName),
+		},
+		Data: map[string][]byte{
+			corev1.TLSCertKey:       []byte(certPem),
+			corev1.TLSPrivateKeyKey: []byte(keyPem),
+		},
+		Type: corev1.SecretTypeTLS,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CASecretName(v.releaseName),
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			corev1.TLSCertKey: []byte(caPem),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
+
+func (v *VaultCluster) initAndUnseal(t *testing.T) {
+	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		v.vaultClient = v.SetupVaultClient(t)
+		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
+			SecretShares:    1,
+			SecretThreshold: 1,
+		})
+		require.NoError(r, err)
+		v.vaultClient.SetToken(initResp.RootToken)
+
+		_, err = v.vaultClient.Sys().Unseal(initResp.KeysB64[0])
+		require.NoError(r, err)
+	})
 }
