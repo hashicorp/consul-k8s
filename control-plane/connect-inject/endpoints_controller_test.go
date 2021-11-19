@@ -2717,63 +2717,83 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	}
 }
 
-// TestReconcileWithServiceIgnore tests the reconcile function with a service that should be ignored.
-func TestReconcileWithServiceIgnore(t *testing.T) {
+// TestReconcileIgnoresServiceIgnoreLabel tests that the endpoints controller correctly ignores services
+// with the service-ignore label and deregisters services previously registered if the service-ignore
+// label is added. This is done by running Reconcile twice, once on an initial set of labels, then again
+// on a new set of labels with the service-ignore label. The number of services registered in Consul is
+// checked before updating the labels against the `svcsExpectedBeforeUpdate` and after updating the labels
+// where the expected number of services should be zero.
+func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
+	serviceName := "service-ignored"
+	namespace := "default"
 
-	cases := []struct {
-		name                       string
-		consulSvcName              string
-		k8sObjects                 func() []runtime.Object
-		initialConsulSvcs          []*api.AgentServiceRegistration
-		expectedNumSvcInstances    int
-		expectedConsulSvcInstances []*api.CatalogService
-		expectedProxySvcInstances  []*api.CatalogService
-		expectedAgentHealthChecks  []*api.AgentCheck
-		expErr                     string
+	cases := map[string]struct {
+		initialLabels            map[string]string
+		updatedLabels            map[string]string
+		svcsExpectedBeforeUpdate int
 	}{
-		// TODO: Test case where service is registered and should be deregistered.
-		// TODO: Test case where service is not registered and just gets ignored.
+		"Endpoint with service-ignore is never registered": {
+			initialLabels: map[string]string{
+				labelServiceIgnore: "true",
+			},
+			updatedLabels: map[string]string{
+				labelServiceIgnore: "true",
+			},
+			svcsExpectedBeforeUpdate: 0,
+		},
+		"Endpoint without labels is registered, then deregisterd when service-ignore is added": {
+			initialLabels: map[string]string{},
+			updatedLabels: map[string]string{
+				labelServiceIgnore: "true",
+			},
+			svcsExpectedBeforeUpdate: 1,
+		},
 	}
 
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			// The agent pod needs to have the address 127.0.0.1 so when the
-			// code gets the agent pods via the label component=client, and
-			// makes requests against the agent API, it will actually hit the
-			// test server we have on localhost.
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
+			endpoint := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: namespace,
+					Labels:    tt.initialLabels,
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP:       "1.2.3.4",
+								NodeName: &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: namespace,
+								},
+							},
+						},
+					},
+				},
+			}
+			pod1 := createPod("pod1", "1.2.3.4", true, true)
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
-
-			// Add the default namespace.
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-			// Create fake k8s client
-			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
-
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test consul server
-			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
-				c.NodeName = nodeName
-			})
+			// Create test Consul server
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
 			require.NoError(t, err)
 			defer consul.Stop()
 			consul.WaitForServiceIntentions(t)
-
-			cfg := &api.Config{
-				Address: consul.HTTPAddr,
-			}
+			cfg := &api.Config{Address: consul.HTTPAddr}
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
-
-			// Register service and proxy in consul.
-			for _, svc := range tt.initialConsulSvcs {
-				err = consulClient.Agent().ServiceRegister(svc)
-				require.NoError(t, err)
-			}
 
 			// Create the endpoints controller
 			ep := &EndpointsController{
@@ -2785,15 +2805,36 @@ func TestReconcileWithServiceIgnore(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				ReleaseName:           "consul",
-				ReleaseNamespace:      "default",
+				ReleaseNamespace:      namespace,
 				ConsulClientCfg:       cfg,
 			}
-			namespacedName := types.NamespacedName{
-				Namespace: "default",
-				Name:      "service-created",
-			}
 
-			_, _ = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
+
+			// Run the reconcile process the first time
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// Check that the correct number of instances of the service were registered at the midpoint
+			serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+			require.NoError(t, err)
+			require.Len(t, serviceInstances, tt.svcsExpectedBeforeUpdate)
+
+			// Update labels on the endpoint
+			endpoint.Labels = tt.updatedLabels
+			err = fakeClient.Update(context.Background(), endpoint)
+			require.NoError(t, err)
+
+			// Run the reconcile process the second time
+			resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// Check that no services are registered with Consul
+			serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
+			require.NoError(t, err)
+			require.Empty(t, serviceInstances)
 		})
 	}
 }
