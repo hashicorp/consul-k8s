@@ -96,9 +96,12 @@ func TestMeshGatewayDefault(t *testing.T) {
 	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
-	// workaround
-	k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("sts/%s-consul-server", releaseName))
-	k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
+	if cfg.UseKind {
+		// This is a temporary workaround that seems to fix mesh gateway tests on kind 1.22.x.
+		// TODO (ishustava): we need to investigate this further and remove once we've found the issue.
+		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("sts/%s-consul-server", releaseName))
+		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
+	}
 
 	primaryClient := primaryConsulCluster.SetupConsulClient(t, false)
 	secondaryClient := secondaryConsulCluster.SetupConsulClient(t, false)
@@ -228,6 +231,13 @@ func TestMeshGatewaySecure(t *testing.T) {
 			// Install the secondary consul cluster in the secondary kubernetes context
 			secondaryConsulCluster := consul.NewHelmCluster(t, secondaryHelmValues, secondaryContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)
+
+			if cfg.UseKind {
+				// This is a temporary workaround that seems to fix mesh gateway tests on kind 1.22.x.
+				// TODO (ishustava): we need to investigate this further and remove once we've found the issue.
+				k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("sts/%s-consul-server", releaseName))
+				k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "rollout", "status", fmt.Sprintf("sts/%s-consul-server", releaseName))
+			}
 
 			primaryClient := primaryConsulCluster.SetupConsulClient(t, true)
 			secondaryClient := secondaryConsulCluster.SetupConsulClient(t, true)
