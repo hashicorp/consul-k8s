@@ -11,6 +11,31 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 data:
+  {{- with .Values.global.secretsBackend.vault }}
+  {{- if .connectCA }}
+  connect-ca-config.json: |
+    {
+      "connect": [
+        {
+          "ca_config": [
+            {
+              "address": "{{ .connectCA.address }}",
+              "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              "root_pki_path": "{{ .connectCA.rootPKIPath }}",
+              "auth_method": {
+                "type": "kubernetes",
+                "params": {
+                  "role": "{{.consulServerRole}}"
+                }
+              }
+            }
+          ],
+          "ca_provider": "vault"
+        }
+      ]
+    }
+    {{- end }}
+  {{- end }}
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}

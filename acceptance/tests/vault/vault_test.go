@@ -4,34 +4,49 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"testing"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
-// generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
-func generateGossipSecret() (string, error) {
-	// This code was copied from Consul's Keygen command:
-	// https://github.com/hashicorp/consul/blob/d652cc86e3d0322102c2b5e9026c6a60f36c17a5/command/keygen/keygen.go
+const (
+	gossipRules = `
+path "consul/data/secret/gossip" {
+  capabilities = ["read"]
+}`
 
-	key := make([]byte, 32)
-	n, err := rand.Reader.Read(key)
-	if err != nil {
-		return "", fmt.Errorf("error reading random data: %s", err)
-	}
-	if n != 32 {
-		return "", fmt.Errorf("couldn't read enough entropy")
-	}
-
-	return base64.StdEncoding.EncodeToString(key), nil
+	connectCARules = `
+path "/sys/mounts" {
+  capabilities = [ "read" ]
 }
 
+path "/sys/mounts/connect_root" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/sys/mounts/connect_inter" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/connect_root/*" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+
+path "/connect_inter/*" {
+  capabilities = [ "create", "read", "update", "delete", "list" ]
+}
+`
+)
+
+// todo: update
 // Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
 // then creates a gossip encryption secret and uses this to bootstrap Consul.
-func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
+func TestVault(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
@@ -48,16 +63,15 @@ func TestVault_BootstrapConsulGossipEncryptionKey(t *testing.T) {
 	vaultClient := vaultCluster.VaultClient(t)
 
 	// Create the Vault Policy for the gossip key.
-	logger.Log(t, "Creating the gossip policy")
-	rules := `
-path "consul/data/secret/gossip" {
-  capabilities = ["read"]
-}`
-	err := vaultClient.Sys().PutPolicy("consul-gossip", rules)
+	logger.Log(t, "Creating policies")
+	err := vaultClient.Sys().PutPolicy("consul-gossip", gossipRules)
 	require.NoError(t, err)
 
-	// Create the Auth Roles for consul-server + consul-client.
-	logger.Log(t, "Creating the consul-server and consul-client-roles")
+	err = vaultClient.Sys().PutPolicy("connect-ca", connectCARules)
+	require.NoError(t, err)
+
+	// Create the Auth Roles for consul-server and consul-client.
+	logger.Log(t, "Creating the consul-server and consul-client roles")
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
 		"bound_service_account_namespaces": "default",
@@ -70,7 +84,7 @@ path "consul/data/secret/gossip" {
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
 		"bound_service_account_namespaces": "default",
-		"policies":                         "consul-gossip",
+		"policies":                         "consul-gossip,connect-ca",
 		"ttl":                              "24h",
 	}
 	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-server", params)
@@ -90,14 +104,21 @@ path "consul/data/secret/gossip" {
 	require.NoError(t, err)
 
 	consulHelmValues := map[string]string{
+		"global.image": "ishustava/consul-dev@sha256:a873b4aa28f7511628281e852daab4c04918872bb86023cefb6197acabb43426",
+
 		"server.enabled":  "true",
 		"server.replicas": "1",
 
 		"connectInject.enabled": "true",
+		"controller.enabled":    "true",
 
 		"global.secretsBackend.vault.enabled":          "true",
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
+
+		"global.secretsBackend.vault.connectCA.address":             fmt.Sprintf("http://%s-vault:8200", vaultReleaseName),
+		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
+		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
 
 		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
@@ -113,6 +134,48 @@ path "consul/data/secret/gossip" {
 	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
-	// We use keys[0] because KeyringList returns a list of keyrings for each dc, in this case there is only 1 dc.
+	// There should only be one key since there is only 1 dc.
+	require.Len(t, keys, 1)
 	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
+
+	// Confirm that the Vault Connect CA has been bootstrapped correctly.
+	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
+	require.Equal(t, caConfig.Provider, "vault")
+
+	// Deploy two services and check that they can talk to each other.
+	logger.Log(t, "creating static-server and static-client deployments")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	if cfg.EnableTransparentProxy {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+	} else {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	}
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")
+	})
+	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")
+
+	logger.Log(t, "checking that connection is successful")
+	if cfg.EnableTransparentProxy {
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://static-server")
+	} else {
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
+	}
+}
+
+// generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
+func generateGossipSecret() (string, error) {
+	// This code was copied from Consul's Keygen command:
+	// https://github.com/hashicorp/consul/blob/d652cc86e3d0322102c2b5e9026c6a60f36c17a5/command/keygen/keygen.go
+
+	key := make([]byte, 32)
+	n, err := rand.Reader.Read(key)
+	if err != nil {
+		return "", fmt.Errorf("error reading random data: %s", err)
+	}
+	if n != 32 {
+		return "", fmt.Errorf("couldn't read enough entropy")
+	}
+
+	return base64.StdEncoding.EncodeToString(key), nil
 }
