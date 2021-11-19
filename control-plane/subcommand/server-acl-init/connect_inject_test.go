@@ -56,7 +56,7 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   secretName,
-			Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeOpaque,

@@ -33,7 +33,7 @@ func TestRun_TokenSinkFile(t *testing.T) {
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   secretName,
-				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -75,7 +75,7 @@ func TestRun_TokenSinkFileErr(t *testing.T) {
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   secretName,
-				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),
@@ -122,7 +122,7 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   secretName,
-				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte(token),

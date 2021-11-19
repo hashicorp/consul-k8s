@@ -64,7 +64,7 @@ func TestDeleteSecrets(t *testing.T) {
 			Name: "consul-test-secret1",
 			Labels: map[string]string{
 				"release":          "consul",
-				common.CliLabelKey: common.CliLabelValue,
+				common.CLILabelKey: common.CLILabelValue,
 			},
 		},
 	}

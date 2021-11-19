@@ -249,7 +249,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 						UID:        deployment.UID,
 					},
 				},
-				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       bundle.Cert,
@@ -281,9 +281,9 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	}
 
 	if certSecret.ObjectMeta.Labels == nil {
-		certSecret.ObjectMeta.Labels = map[string]string{common.CliLabelKey: common.CliLabelValue}
+		certSecret.ObjectMeta.Labels = map[string]string{common.CLILabelKey: common.CLILabelValue}
 	} else {
-		certSecret.ObjectMeta.Labels[common.CliLabelKey] = common.CliLabelValue
+		certSecret.ObjectMeta.Labels[common.CLILabelKey] = common.CLILabelValue
 	}
 
 	certSecret.Data[corev1.TLSCertKey] = bundle.Cert

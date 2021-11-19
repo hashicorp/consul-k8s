@@ -1612,7 +1612,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 		&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   resourcePrefix + "-bootstrap-acl-token",
-				Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				"token": []byte("old-token"),
@@ -2301,7 +2301,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   secretName,
-			Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{
 			"ca.crt": caCertBytes,
@@ -2315,7 +2315,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	otherSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   resourcePrefix + "-some-other-secret",
-			Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{},
 		Type: v1.SecretTypeDockercfg,

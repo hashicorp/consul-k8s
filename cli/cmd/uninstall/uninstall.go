@@ -382,7 +382,9 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 // deleteSecrets deletes any secrets that have the label "managed-by" set to "consul-k8s".
 func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) error {
 	var secretNames []string
-	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{})
+	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue,
+	})
 	if err != nil {
 		return fmt.Errorf("deleteSecrets: %s", err)
 	}
@@ -391,13 +393,11 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 		return nil
 	}
 	for _, secret := range secrets.Items {
-		if secret.ObjectMeta.Labels[common.CliLabelKey] == common.CliLabelValue {
-			err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)
-			}
-			secretNames = append(secretNames, secret.Name)
+		err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)
 		}
+		secretNames = append(secretNames, secret.Name)
 	}
 	if len(secretNames) > 0 {
 		for _, secret := range secretNames {

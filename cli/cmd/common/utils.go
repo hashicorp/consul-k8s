@@ -22,10 +22,10 @@ const (
 	templatesDirName        = "templates"
 	TopLevelChartDirName    = "consul"
 
-	// CliLabelKey and CliLabelValue are added to each secret on creation so the CLI knows
+	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
 	// which key to delete on an uninstall.
-	CliLabelKey   = "managed-by"
-	CliLabelValue = "consul-k8s"
+	CLILabelKey   = "managed-by"
+	CLILabelValue = "consul-k8s"
 )
 
 // ReadChartFiles reads the chart files from the embedded file system, and loads their contents into

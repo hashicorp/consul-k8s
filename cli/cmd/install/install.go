@@ -421,7 +421,7 @@ func (c *Command) checkForPreviousSecrets() error {
 	}
 	for _, secret := range secrets.Items {
 		// future TODO: also check for federation secret
-		if secret.ObjectMeta.Labels[common.CliLabelKey] == common.CliLabelValue {
+		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
 			return fmt.Errorf("found Consul secret from previous installations: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
 				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
 		}

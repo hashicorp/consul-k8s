@@ -87,7 +87,7 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   secretName,
-					Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(token),

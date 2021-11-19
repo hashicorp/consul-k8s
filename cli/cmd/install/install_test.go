@@ -54,7 +54,7 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "test-consul-bootstrap-acl-token",
-			Labels: map[string]string{common.CliLabelKey: common.CliLabelValue},
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 	}
 	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
