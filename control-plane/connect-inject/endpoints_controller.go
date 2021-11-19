@@ -1023,9 +1023,3 @@ func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]st
 
 	return m
 }
-
-// isRegistered checks if the endpoint is registered in Consul.
-func isRegistered() bool {
-
-	return true
-}
