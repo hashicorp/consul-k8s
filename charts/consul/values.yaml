@@ -173,6 +173,19 @@ global:
         # Additional Connect CA configuration in JSON format.
         # Please see https://www.consul.io/docs/connect/ca/vault#common-ca-config-options
         # for additional configuration options.
+        #
+        # Example:
+        #
+        # ```yaml
+        # additionalConfig: |
+        #   {
+        #     "connect": [{
+        #       "ca_config": [{
+        #            "leaf_cert_ttl": "36h"
+        #         }]
+        #     }]
+        #   }
+        # ```
         additionalConfig: |
           {}
 
