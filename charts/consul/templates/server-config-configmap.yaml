@@ -11,8 +11,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 data:
+  {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
+  {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
   {{- with .Values.global.secretsBackend.vault }}
-  {{- if .connectCA }}
   connect-ca-config.json: |
     {
       "connect": [
@@ -34,7 +35,11 @@ data:
         }
       ]
     }
-    {{- end }}
+  {{- if .connectCA.additionalConfig }}
+  additional-connect-ca-config.json: |
+{{ tpl .connectCA.additionalConfig $ | trimAll "\"" | indent 4 }}
+  {{- end }}
+  {{- end }}
   {{- end }}
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
