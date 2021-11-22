@@ -138,6 +138,7 @@ func TestVault(t *testing.T) {
 
 	// Confirm that the Vault Connect CA has been bootstrapped correctly.
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
+	require.NoError(t, err)
 	require.Equal(t, caConfig.Provider, "vault")
 
 	// Deploy two services and check that they can talk to each other.
