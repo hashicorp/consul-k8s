@@ -152,6 +152,14 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # Configuration for Vault CA certificate.
+      ca:
+        # secretName is the name of the Kubernetes secret that holds the Vault CA certificate.
+        # A Kubernetes secret must be in the same namespace that Consul is installed into.
+        secretName: ""
+        # secretKey is the key within the Kubernetes secret that holds the Vault CA certificate.
+        secretKey: ""
+
       # Configuration for the Vault Connect CA provider.
       # The provider will be configured to use the Vault Kubernetes auth method
       # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
@@ -161,12 +169,6 @@ global:
       connectCA:
         # The address of the Vault server.
         address: ""
-
-        # A path to the CA certificate to be used for Vault communication.
-        caFile: ""
-
-        # A path to a folder containing CA certificates to be used for Vault communication.
-        caPath: ""
 
         # The path to a PKI secrets engine for the root certificate.
         # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
