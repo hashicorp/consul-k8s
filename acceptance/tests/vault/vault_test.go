@@ -20,6 +20,8 @@ path "consul/data/secret/gossip" {
   capabilities = ["read"]
 }`
 
+	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
+	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
 	connectCARules = `
 path "/sys/mounts" {
   capabilities = [ "read" ]
