@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	gossipRules = `
+	gossipPolicy = `
 path "consul/data/secret/gossip" {
   capabilities = ["read"]
 }`
 
 	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
 	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
-	connectCARules = `
+	connectCAPolicy = `
 path "/sys/mounts" {
   capabilities = [ "read" ]
 }
@@ -65,10 +65,10 @@ func TestVault(t *testing.T) {
 
 	// Create the Vault Policy for the gossip key.
 	logger.Log(t, "Creating policies")
-	err := vaultClient.Sys().PutPolicy("consul-gossip", gossipRules)
+	err := vaultClient.Sys().PutPolicy("consul-gossip", gossipPolicy)
 	require.NoError(t, err)
 
-	err = vaultClient.Sys().PutPolicy("connect-ca", connectCARules)
+	err = vaultClient.Sys().PutPolicy("connect-ca", connectCAPolicy)
 	require.NoError(t, err)
 
 	// Create the Auth Roles for consul-server and consul-client.

@@ -86,7 +86,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
-		require.NotEmpty(t, pods.Items)
+		require.NotEmpty(r, pods.Items)
 
 		var notReadyPods []string
 		for _, pod := range pods.Items {
