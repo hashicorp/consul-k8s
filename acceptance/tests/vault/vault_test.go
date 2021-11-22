@@ -43,9 +43,8 @@ path "/connect_inter/*" {
 `
 )
 
-// todo: update
-// Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
-// then creates a gossip encryption secret and uses this to bootstrap Consul.
+// TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
+// It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -102,9 +101,8 @@ func TestVault(t *testing.T) {
 	}
 	_, err = vaultClient.Logical().Write("consul/data/secret/gossip", params)
 	require.NoError(t, err)
-
 	consulHelmValues := map[string]string{
-		"global.image": "ishustava/consul-dev@sha256:a873b4aa28f7511628281e852daab4c04918872bb86023cefb6197acabb43426",
+		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
 
 		"server.enabled":  "true",
 		"server.replicas": "1",
@@ -134,8 +132,8 @@ func TestVault(t *testing.T) {
 	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
-	// There should only be one key since there is only 1 dc.
-	require.Len(t, keys, 1)
+	// There are two identical keys for LAN and WAN since there is only 1 dc.
+	require.Len(t, keys, 2)
 	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
 
 	// Confirm that the Vault Connect CA has been bootstrapped correctly.
