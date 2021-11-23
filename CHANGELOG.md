@@ -48,7 +48,6 @@ IMPROVEMENTS:
   * Update Ingress Gateway CRD with partition support for the IngressService and TLS Config. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
   * Re-enable streaming for Consul clients. [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
 
-
 BUG FIXES:
 * Control Plane
   * ACLs: Fix issue where if one or more servers fail to have their ACL tokens set on the initial run of server-acl-init
