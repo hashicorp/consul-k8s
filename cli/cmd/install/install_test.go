@@ -222,5 +222,4 @@ func TestCheckValidEnterprise(t *testing.T) {
 	err =  c.checkValidEnterprise(secret2.Name, "consul-enterprise:-ent")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error getting the enterprise secret")
-
 }
