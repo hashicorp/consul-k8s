@@ -5,6 +5,7 @@ IMPROVEMENTS:
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
+  * Pre-check in the `install` command to verify the correct license secret exists when using an ent image.[GH-820](https://github.com/hashicorp/consul-k8s/pull/875)
 
 BUG FIXES:
 * Control Plane
