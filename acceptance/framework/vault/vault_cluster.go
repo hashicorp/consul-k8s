@@ -144,6 +144,9 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	}
 
 	v.logger.Logf(t, "updating vault kube auth config")
+
+	// To configure the auth method, we need to read the token and the ca cert from the Vault's server
+	// service account token.
 	namespace := v.helmOptions.KubectlOptions.Namespace
 	sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), fmt.Sprintf("%s-vault", v.releaseName), metav1.GetOptions{})
 	require.NoError(t, err)
@@ -302,12 +305,13 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	namespace := v.helmOptions.KubectlOptions.Namespace
 	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
-		// First wait for vault server pod to be running.
+		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, serverPod.Status.Phase, corev1.PodRunning)
 
 		v.vaultClient = v.SetupVaultClient(t)
+
 		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
 			SecretShares:    1,
 			SecretThreshold: 1,
