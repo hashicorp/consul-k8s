@@ -72,6 +72,11 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the Auth Roles for consul-server and consul-client.
+	// Auth roles bind policies to Kubernetes service accounts, which
+	// then enables the Vault agent init container to call 'vault login'
+	// with the Kubernetes auth method to obtain a Vault token.
+	// Please see https://www.vaultproject.io/docs/auth/kubernetes#configuration
+	// for more details.
 	logger.Log(t, "Creating the consul-server and consul-client roles")
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
