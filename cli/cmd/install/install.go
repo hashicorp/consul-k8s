@@ -289,9 +289,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// If an enterprise license secret was provided check that the enterprise image is set.
-	c.UI.Output("Nicoleta global Image: %s", v.Global.Image, terminal.WithInfoStyle())
-	c.UI.Output("Nicoleta SecretName: %s", v.Global.EnterpriseLicense.SecretName, terminal.WithInfoStyle())
-
 	if v.Global.EnterpriseLicense.SecretName != "" {
 		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName,v.Global.Image); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
