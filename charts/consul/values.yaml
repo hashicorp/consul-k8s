@@ -155,7 +155,7 @@ global:
       # Configuration for the Vault Connect CA provider.
       # The provider will be configured to use the Vault Kubernetes auth method
       # and therefore requires the role provided by `consulServerRole`
-      # needs to have permissions to the root and intermediate PKI paths.
+      # to have permissions to the root and intermediate PKI paths.
       # Please see https://www.consul.io/docs/connect/ca/vault#vault-acl-policies
       # for information on how to configure the Vault policies.
       connectCA:
