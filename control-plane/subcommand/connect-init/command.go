@@ -180,7 +180,7 @@ func (c *Command) Run(args []string) int {
 					" If your pod is not starting also check the connect-inject deployment logs." +
 					"\nNote that only one service may be used to route requests to each pod." +
 					" If you need multiple services to point to the same pod, add the label" +
-					" `consul.hashicorp.com/connect-ignore: \"true\"` to services which should" +
+					" `consul.hashicorp.com/service-ignore: \"true\"` to services which should" +
 					" not be used by Consul for handling requests.")
 
 			}
