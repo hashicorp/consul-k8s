@@ -117,8 +117,8 @@ type EndpointsController struct {
 	context.Context
 }
 
-// Reconcile reads the state of the cluster's service endpoints when a request is received and makes changes
-// to the endpoints based on the state read. Reconcile is called when services are created, updated, or deleted.
+// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
+// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
