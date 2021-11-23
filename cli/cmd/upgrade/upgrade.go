@@ -51,6 +51,9 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
+	// action/upgrade
+	// --install, --reset-values vs --reuse-values,
+	// atomic
 )
 
 type Command struct {
@@ -256,6 +259,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Print out the upgrade summary.
+	// TODO: Fix this to show the diff between existing and proposed install rather than overrides.
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
@@ -268,7 +272,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// TODO: Fix this!
+	// TODO: Fix this! We are just going to comment this in, because we do want to set global.name to consul if not set already.
 	//// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	//// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	//// aren't double prefixed with "consul-consul-...".
@@ -306,7 +310,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Setup the upgrade action.
-	// TODO: So many things to add here.
+	// TODO: So many things to add here. (Could add upgrade.<> features)
 	upgrade := action.NewUpgrade(actionConfig)
 	upgrade.Namespace = foundNamespace
 	upgrade.DryRun = c.flagDryRun
