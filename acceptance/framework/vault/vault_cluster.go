@@ -150,11 +150,12 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	require.Len(t, sa.Secrets, 1)
 	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
 	require.NoError(t, err)
-	v.vaultClient.Logical().Write("auth/kubernetes/config", map[string]interface{}{
+	_, err = v.vaultClient.Logical().Write("auth/kubernetes/config", map[string]interface{}{
 		"token_reviewer_jwt": tokenSecret.StringData["token"],
 		"kubernetes_ca_cert": tokenSecret.StringData["ca.crt"],
 		"kubernetes_host":    "https://kubernetes.default.svc",
 	})
+	require.NoError(t, err)
 }
 
 // Create installs Vault via Helm and then calls bootstrap to initialize it.
