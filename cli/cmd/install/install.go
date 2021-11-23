@@ -174,6 +174,20 @@ func (c *Command) init() {
 	c.Init()
 }
 
+type helmValues struct {
+	Global globalValues `yaml:"global"`
+}
+
+type globalValues struct {
+	Image string `yaml:"image"`
+	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
+}
+
+type enterpriseLicense struct {
+	SecretName string `yaml:"secretName"`
+	SecretKey string `yaml:"secretKey"`
+}
+
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
@@ -265,6 +279,24 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
+	}
+
+	var v helmValues
+	err = yaml.Unmarshal(valuesYaml, &v)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	// If an enterprise license secret was provided check that the enterprise image is set.
+	c.UI.Output("Nicoleta global Image: %s", v.Global.Image, terminal.WithInfoStyle())
+	c.UI.Output("Nicoleta SecretName: %s", v.Global.EnterpriseLicense.SecretName, terminal.WithInfoStyle())
+
+	if v.Global.EnterpriseLicense.SecretName != "" {
+		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName,v.Global.Image); err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
 	}
 
 	// Print out the installation summary.
@@ -500,4 +532,18 @@ func validLabel(s string) bool {
 		}
 	}
 	return true
+}
+
+// checkValidEnterprise checks and validates an enterprise installation.
+func (c *Command) checkValidEnterprise(secretName string, image string) error {
+
+	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error getting the enterprise secret for namespace: %s %s", c.flagNamespace, err)
+	}
+	if !strings.Contains(image,"-ent") {
+		return fmt.Errorf("enterprise image not provided: %s", image)
+	}
+	c.UI.Output("Valid enterprise image and secret found.", terminal.WithSuccessStyle())
+	return nil
 }

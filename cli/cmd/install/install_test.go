@@ -187,3 +187,40 @@ func getInitializedCommand(t *testing.T) *Command {
 	c.init()
 	return c
 }
+
+func TestCheckValidEnterprise(t *testing.T) {
+	c := getInitializedCommand(t)
+
+	// Enterprise secret and image are valid.
+	c.kubernetes = fake.NewSimpleClientset()
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-secret",
+		},
+	}
+	secret2 := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-secret2",
+		},
+	}
+	c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), secret, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret, metav1.CreateOptions{})
+	err :=  c.checkValidEnterprise(secret.Name, "consul-enterprise:-ent")
+	require.NoError(t, err)
+
+	// Enterprise secret provided but not an enterprise image.
+	err =  c.checkValidEnterprise(secret.Name, "consul:")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "enterprise image not provided")
+
+	// Enterprise secret does not exist.
+	err =  c.checkValidEnterprise("consul-unrelated-secret", "consul-enterprise:-ent")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error getting the enterprise secret")
+
+	// Enterprise secret exists in a different namespace.
+	err =  c.checkValidEnterprise(secret2.Name, "consul-enterprise:-ent")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error getting the enterprise secret")
+
+}
