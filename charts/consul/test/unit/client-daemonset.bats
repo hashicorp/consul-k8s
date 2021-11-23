@@ -1608,10 +1608,10 @@ rollingUpdate:
   [ "${actual}" = "true" ]
 }
 
-@test "server/StatefulSet: vault CA is not configured by default" {
+@test "client/DaemonSet: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
+    -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -1624,10 +1624,10 @@ rollingUpdate:
   [ "${actual}" = "false" ]
 }
 
-@test "server/StatefulSet: vault CA is not configured when secretName is set but secretKey is not" {
+@test "client/DaemonSet: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
+    -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -1641,10 +1641,10 @@ rollingUpdate:
   [ "${actual}" = "false" ]
 }
 
-@test "server/StatefulSet: vault CA is not configured when secretKey is set but secretName is not" {
+@test "client/DaemonSet: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
+    -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -1658,10 +1658,10 @@ rollingUpdate:
   [ "${actual}" = "false" ]
 }
 
-@test "server/StatefulSet: vault CA is configured when both secretName and secretKey are set" {
+@test "client/DaemonSet: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
+    -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
