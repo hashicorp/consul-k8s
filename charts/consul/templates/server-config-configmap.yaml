@@ -21,14 +21,15 @@ data:
           "ca_config": [
             {
               "address": "{{ .connectCA.address }}",
-              "ca_file": "{{ .connectCA.caFile }}",
-              "ca_path": "{{ .connectCA.caPath }}",
+              {{- if and .ca.secretName .ca.secretKey }}
+              "ca_file": "/consul/vault-ca/tls.crt",
+              {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
                 "type": "kubernetes",
                 "params": {
-                  "role": "{{.consulServerRole}}"
+                  "role": "{{ .consulServerRole }}"
                 }
               }
             }

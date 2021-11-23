@@ -126,8 +126,10 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
 
-		"global.secretsBackend.vault.connectCA.address":             fmt.Sprintf("http://%s-vault:8200", vaultReleaseName),
-		"global.secretsBackend.vault.connectCA.caFile":              fmt.Sprintf("/consul/userconfig/%s/tls.crt", vaultCASecret),
+		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
+		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
+
+		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
 

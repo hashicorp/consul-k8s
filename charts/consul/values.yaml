@@ -152,7 +152,8 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
-      # Configuration for Vault CA certificate.
+      # Configuration for Vault server CA certificate. This certificate will be mounted
+      # to any pod where Vault agent needs to run.
       ca:
         # secretName is the name of the Kubernetes secret that holds the Vault CA certificate.
         # A Kubernetes secret must be in the same namespace that Consul is installed into.

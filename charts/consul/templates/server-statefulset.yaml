@@ -52,8 +52,10 @@ spec:
         {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-inject": "true"
         "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulServerRole }}"
-        "vault.hashicorp.com/ca-cert": {{ .Values.global.secretsBackend.vault.connectCA.caFile }}
-        "vault.hashicorp.com/agent-copy-volume-mounts": "consul"
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
         {{- if .Values.global.gossipEncryption.secretName }}
         {{- with .Values.global.gossipEncryption }}
         "vault.hashicorp.com/agent-inject-secret-gossip.txt": "{{ .secretName }}"
@@ -121,6 +123,14 @@ spec:
         - name: consul-license
           secret:
             secretName: {{ .Values.server.enterpriseLicense.secretName }}
+        {{- end }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        - name: vault-ca
+          secret:
+            secretName: {{ .Values.global.secretsBackend.vault.ca.secretName }}
+            items:
+              - key: {{ .Values.global.secretsBackend.vault.ca.secretKey }}
+                path: tls.crt
         {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
@@ -299,6 +309,11 @@ spec:
             - name: userconfig-{{ .name }}
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+            - name: vault-ca
+              mountPath: /consul/vault-ca/
+              readOnly: true
             {{- end }}
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}

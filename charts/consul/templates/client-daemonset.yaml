@@ -41,8 +41,8 @@ spec:
         {{- if .Values.global.secretsBackend.vault.enabled }}
         "vault.hashicorp.com/agent-inject": "true"
         "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulClientRole }}"
-        "vault.hashicorp.com/ca-cert": {{ .Values.global.secretsBackend.vault.connectCA.caFile }}
-        "vault.hashicorp.com/agent-copy-volume-mounts": "consul"
+        "vault.hashicorp.com/agent-extra-secret": {{ .Values.global.secretsBackend.vault.ca.secretName }}
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
         {{- if .Values.global.gossipEncryption.secretName }}
         {{- with .Values.global.gossipEncryption }}
         "vault.hashicorp.com/agent-inject-secret-gossip.txt": "{{ .secretName }}"

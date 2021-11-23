@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	vaultPodLabel = "app.kubernetes.io/instance="
+	releaseLabel = "app.kubernetes.io/instance="
 )
 
 // VaultCluster represents a vault installation.
@@ -168,17 +168,17 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "", fmt.Sprintf("%s=%s", vaultPodLabel, v.releaseName))
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "", v.releaseLabelSelector())
 
 	v.createTLSCerts(t)
 
 	// Install Vault.
 	helm.Install(t, v.helmOptions, "hashicorp/vault", v.releaseName)
 
-	// Wait for the injector and vault server pods to become Ready.
-	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, "app.kubernetes.io/name=vault-agent-injector")
-
 	v.initAndUnseal(t)
+
+	// Wait for the injector and vault server pods to become Ready.
+	helpers.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
 
 	// Now call bootstrap().
 	v.bootstrap(t, ctx)
@@ -188,11 +188,14 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext) {
 func (v *VaultCluster) Destroy(t *testing.T) {
 	t.Helper()
 
-	k8s.WritePodsDebugInfoIfFailed(t, v.kubectlOptions, v.debugDirectory, "release="+v.releaseName)
+	k8s.WritePodsDebugInfoIfFailed(t, v.kubectlOptions, v.debugDirectory, v.releaseLabelSelector())
 	// Ignore the error returned by the helm delete here so that we can
 	// always idempotently clean up resources in the cluster.
 	_ = helm.DeleteE(t, v.helmOptions, v.releaseName, true)
-	// We do not need to do any PVC deletion in vault dev mode. todo
+
+	err := v.kubernetesClient.CoreV1().PersistentVolumeClaims(v.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(),
+		metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: v.releaseLabelSelector()})
+	require.NoError(t, err)
 }
 
 func defaultVaultValues(releaseName string) map[string]string {
@@ -233,7 +236,17 @@ func CASecretName(releaseName string) string {
 	return fmt.Sprintf("%s-vault-ca", releaseName)
 }
 
+func (v *VaultCluster) Address() string {
+	return fmt.Sprintf("https://%s-vault:8200", v.releaseName)
+}
+
+func (v *VaultCluster) releaseLabelSelector() string {
+	return fmt.Sprintf("%s=%s", releaseLabel, v.releaseName)
+}
+
 func (v *VaultCluster) createTLSCerts(t *testing.T) {
+	v.logger.Logf(t, "generating Vault TLS certificates")
+
 	namespace := v.helmOptions.KubectlOptions.Namespace
 
 	// Generate CA and cert and create secrets for them.
@@ -250,7 +263,7 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 
 	t.Cleanup(func() {
 		if !v.noCleanupOnFailure {
-			// We're ignoring error here because secret deletion is best effort.
+			// We're ignoring error here because secret deletion is best-effort.
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
 		}
@@ -283,8 +296,16 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 }
 
 func (v *VaultCluster) initAndUnseal(t *testing.T) {
+	v.logger.Logf(t, "initializing and unsealing Vault")
+
+	namespace := v.helmOptions.KubectlOptions.Namespace
 	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
+		// First wait for vault server pod to be running.
+		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
+		require.NoError(r, err)
+		require.Equal(r, serverPod.Status.Phase, corev1.PodRunning)
+
 		v.vaultClient = v.SetupVaultClient(t)
 		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
 			SecretShares:    1,
@@ -296,4 +317,24 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		_, err = v.vaultClient.Sys().Unseal(initResp.KeysB64[0])
 		require.NoError(r, err)
 	})
+
+	v.logger.Logf(t, "successfully initialized and unsealed Vault")
+
+	rootTokenSecret := fmt.Sprintf("%s-vault-root-token", v.releaseName)
+	v.logger.Logf(t, "saving Vault root token to %q Kubernetes secret", rootTokenSecret)
+
+	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
+		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
+	})
+	_, err := v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rootTokenSecret,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"token": []byte(v.vaultClient.Token()),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
 }
