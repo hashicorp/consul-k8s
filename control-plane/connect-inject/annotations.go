@@ -90,6 +90,12 @@ const (
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 
+	// keyConsulDNS enables or disables Consul DNS for a given pod. It can also be set as a label
+	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
+	// with their own annotation.
+	// This annotation/label takes a boolean value (true/false).
+	keyConsulDNS = "consul.hashicorp.com/consul-dns"
+
 	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
 	// with their own annotation.

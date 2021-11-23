@@ -13,8 +13,8 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/enterprise-license-rolebinding.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       .
 }
 
@@ -23,9 +23,9 @@ load _helpers
   assert_empty helm template \
       -s templates/enterprise-license-rolebinding.yaml  \
       --set 'server.enabled=false' \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -33,8 +33,8 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/enterprise-license-rolebinding.yaml  \
-      --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -42,8 +42,8 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/enterprise-license-rolebinding.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
       .
 }
 
@@ -51,9 +51,9 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/enterprise-license-rolebinding.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
-      --set 'server.enterpriseLicense.enableLicenseAutoload=false' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.enableLicenseAutoload=false' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

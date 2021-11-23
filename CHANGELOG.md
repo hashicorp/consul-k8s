@@ -1,11 +1,53 @@
 ## UNRELEASED
 
 IMPROVEMENTS:
+* CLI
+   * Pre-check in the `install` command to verify the correct license secret exists when using an ent image.[GH-875](https://github.com/hashicorp/consul-k8s/pull/875)
+
+
+## 0.37.0 (November 18, 2021)
+
+BREAKING CHANGES:
+* Previously [UI metrics](https://www.consul.io/docs/connect/observability/ui-visualization) would be enabled when
+  `global.metrics=false` and `ui.metrics.enabled=-`. If you are no longer seeing UI metrics,
+  set `global.metrics=true` or `ui.metrics.enabled=true`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
+* The `enterpriseLicense` section of the values file has been migrated from being under the `server` stanza to being
+  under the `global` stanza. Migrating the contents of `server.enterpriseLicense` to `global.enterpriseLicense` will
+  ensure the license job works. [[GH-856](https://github.com/hashicorp/consul-k8s/pull/856)]
+* Consul [streaming](https://www.consul.io/docs/agent/options#use_streaming_backend) is re-enabled by default.
+  Streaming is broken when using multi-DC federation and Consul versions 1.10.0, 1.10.1, 1.10.2.
+  If you are using those versions and multi-DC federation, you must upgrade to Consul >= 1.10.3 or set:
+
+  ```yaml
+  client:
+    extraConfig: |
+      {"use_streaming_backend": false}
+  ```
+  
+  [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
+
+FEATURES:
+* Helm Chart
+  * Add support for Consul services to utilize Consul DNS for service discovery. Set `dns.enableRedirection` to allow services to
+    use Consul DNS via the Consul DNS Service. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+* Control Plane
+  * Connect: Allow services using Connect to utilize Consul DNS to perform service discovery. [[GH-833](https://github.com/hashicorp/consul-k8s/pull/833)]
+
+IMPROVEMENTS:
 * Control Plane
   * TLS: Support PKCS1 and PKCS8 private keys for Consul certificate authority. [[GH-843](https://github.com/hashicorp/consul-k8s/pull/843)]
+  * Connect: Log a warning when ACLs are enabled and the default service account is used. [[GH-842](https://github.com/hashicorp/consul-k8s/pull/842)]
+  * Update Service Router, Service Splitter and Ingress Gateway CRD with support for RequestHeaders and ResponseHeaders. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
+  * Update Ingress Gateway CRD with partition support for the IngressService and TLS Config. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
 * CLI
   * Delete jobs, cluster roles, and cluster role bindings on `uninstall`. [[GH-820](https://github.com/hashicorp/consul-k8s/pull/820)]
-  * Pre-check in the `install` command to verify the correct license secret exists when using an ent image.[GH-820](https://github.com/hashicorp/consul-k8s/pull/875)
+* Helm Chart
+  * Add `component` labels to all resources. [[GH-840](https://github.com/hashicorp/consul-k8s/pull/840)]
+  * Update Consul version to 1.10.4. [[GH-861](https://github.com/hashicorp/consul-k8s/pull/861)]
+  * Update Service Router, Service Splitter and Ingress Gateway CRD with support for RequestHeaders and ResponseHeaders. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
+  * Update Ingress Gateway CRD with partition support for the IngressService and TLS Config. [[GH-863](https://github.com/hashicorp/consul-k8s/pull/863)]
+  * Re-enable streaming for Consul clients. [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
+
 
 BUG FIXES:
 * Control Plane
@@ -19,6 +61,8 @@ BUG FIXES:
   * **(Consul Enterprise only)** Error on Helm install if a reserved name is used for the admin partition name or a
     Consul destination namespace for connect or catalog sync. [[GH-846](https://github.com/hashicorp/consul-k8s/pull/846)]
   * Truncate Persistent Volume Claim names when namespace names are too long. [[GH-799](https://github.com/hashicorp/consul-k8s/pull/799)]
+  * Fix issue where UI metrics would be enabled when `global.metrics=false` and `ui.metrics.enabled=-`. [[GH-841](https://github.com/hashicorp/consul-k8s/pull/841)]
+  * Populate the federation secret with the generated Gossip key when `global.gossipEncryption.autoGenerate` is set to true. [[GH-854](https://github.com/hashicorp/consul-k8s/pull/854)]
 
 ## 0.36.0 (November 02, 2021)
 

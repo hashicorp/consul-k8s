@@ -204,35 +204,35 @@ load _helpers
 #--------------------------------------------------------------------
 # enterpriseLicense
 
-@test "serverACLInit/Job: ent license acl option enabled with server.enterpriseLicense.secretName and server.enterpriseLicense.secretKey set" {
+@test "serverACLInit/Job: ent license acl option enabled with global.enterpriseLicense.secretName and global.enterpriseLicense.secretKey set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: ent license acl option disabled missing server.enterpriseLicense.secretName" {
+@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretName" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: ent license acl option disabled missing server.enterpriseLicense.secretKey" {
+@test "serverACLInit/Job: ent license acl option disabled missing global.enterpriseLicense.secretKey" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretName=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]

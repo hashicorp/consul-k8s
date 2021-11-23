@@ -138,6 +138,12 @@ func (c *Command) Run(args []string) int {
 			return err
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 		if err != nil {
+			if c.flagServiceAccountName == "default" {
+				c.logger.Warn("The service account name for this Pod is \"default\"." +
+					" In default installations this is not a supported service account name." +
+					" The service account name must match the name of the Kubernetes Service" +
+					" or the consul.hashicorp.com/connect-service annotation.")
+			}
 			c.logger.Error("Hit maximum retries for consul login", "error", err)
 			return 1
 		}
