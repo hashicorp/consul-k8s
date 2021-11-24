@@ -536,8 +536,10 @@ func validLabel(s string) bool {
 func (c *Command) checkValidEnterprise(secretName string, image string) error {
 
 	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("error getting the enterprise secret for namespace: %s %s", c.flagNamespace, err)
+	if k8serrors.IsNotFound(err) {
+		return fmt.Errorf("enterprise license secret %q is not found in the %q namespace; please make sure that the secret exists in the %q namespace", c.flagNamespace, secretName, c.flagNamespace)
+	} else if err != nil {
+	       return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
 	if !strings.Contains(image, "-ent") {
 		return fmt.Errorf("enterprise image not provided: %s", image)
