@@ -542,7 +542,7 @@ func (c *Command) checkValidEnterprise(secretName string, image string) error {
 	       return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
 	if !strings.Contains(image, "-ent") {
-		return fmt.Errorf("enterprise image not provided: %s", image)
+		return fmt.Errorf("enterprise Consul image is not provided when enterprise license secret is set: %s", image)
 	}
 	c.UI.Output("Valid enterprise image and secret found.", terminal.WithSuccessStyle())
 	return nil
