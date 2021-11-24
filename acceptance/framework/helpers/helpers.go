@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gruntwork-io/terratest/modules/helm"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/gruntwork-io/terratest/modules/helm"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/random"
@@ -85,6 +86,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items)
 
 		var notReadyPods []string
 		for _, pod := range pods.Items {

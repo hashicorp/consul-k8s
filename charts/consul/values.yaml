@@ -152,6 +152,43 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # Configuration for the Vault Connect CA provider.
+      # The provider will be configured to use the Vault Kubernetes auth method
+      # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
+      # to have permissions to the root and intermediate PKI paths.
+      # Please see https://www.consul.io/docs/connect/ca/vault#vault-acl-policies
+      # for information on how to configure the Vault policies.
+      connectCA:
+        # The address of the Vault server.
+        address: ""
+
+        # The path to a PKI secrets engine for the root certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
+        rootPKIPath: ""
+
+        # The path to a PKI secrets engine for the generated intermediate certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#intermediatepkipath.
+        intermediatePKIPath: ""
+
+        # Additional Connect CA configuration in JSON format.
+        # Please see https://www.consul.io/docs/connect/ca/vault#common-ca-config-options
+        # for additional configuration options.
+        #
+        # Example:
+        #
+        # ```yaml
+        # additionalConfig: |
+        #   {
+        #     "connect": [{
+        #       "ca_config": [{
+        #            "leaf_cert_ttl": "36h"
+        #         }]
+        #     }]
+        #   }
+        # ```
+        additionalConfig: |
+          {}
+
   # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
