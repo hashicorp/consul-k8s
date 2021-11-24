@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -84,7 +85,8 @@ func (c *Command) init() {
 	for name := range config.Presets {
 		presetList = append(presetList, name)
 	}
-
+	// TODO: I removed the releaseName flag, I think we might need to put it back
+	// TODO: and give it as argument to the run of status.
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -245,17 +247,53 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
 	}
 
+	// Read the embedded chart files into []*loader.BufferedFile.
+	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	// Create a *chart.Chart object from the files to run the installation from.
+	chart, err := loader.LoadFiles(chartFiles)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
+
+	// Run a status to get the current chart values.
+	statusConfig := new(action.Configuration)
+	statusConfig, err = common.InitActionConfig(statusConfig, foundNamespace, settings, uiLogger)
+	if err != nil {
+		return 1
+	}
+
+	statuser := action.NewStatus(statusConfig)
+	rel, err := statuser.Run(common.DefaultReleaseNamespace)
+	if err != nil {
+		return 1
+	}
+	c.UI.Output("Ran a `helm status` to gather current Chart values.", terminal.WithSuccessStyle())
+
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	valuesYaml, err := yaml.Marshal(vals)
+	// TODO: We don't need this anymore.
+	_, err = yaml.Marshal(vals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
+	c.UI.Output("Succeeded in parsing CLI set values.")
+
+	//// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
+	//// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
+	//// aren't double prefixed with "consul-consul-...".
+	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
 
 	// Print out the upgrade summary.
 	if !c.flagAutoApprove {
@@ -263,12 +301,8 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
 
-		if len(vals) == 0 {
-			c.UI.Output("Overrides: "+string(valuesYaml), terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("Overrides:"+"\n"+string(valuesYaml), terminal.WithInfoStyle())
-		}
-	}
+		// Co-alesce the user provided over-rides with the chart. This is basically what `upgrade` does anyways.
+		newChart := install.MergeMaps(chart.Values, vals)
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
@@ -448,4 +482,58 @@ func (c *Command) Help() string {
 
 func (c *Command) Synopsis() string {
 	return "Upgrade Consul on Kubernetes."
+}
+
+// MapDiff takes in two map to string interfaces and returns a list of differences.
+func MapDiff(a, b map[string]interface{}) (map[string]interface{}, map[string]interface{}) {
+	from, to := map[string]interface{}{}, map[string]interface{}{}
+
+	for aKey, aVal := range a {
+		//if aKey == "global" {
+		//	fmt.Println("Break here!")
+		//} else if aKey == "name" {
+		//	fmt.Println("ok like really break here lmao")
+		//}
+		bVal, matchingKeys := b[aKey]
+		if matchingKeys {
+			// Spotted a difference!
+			if !reflect.DeepEqual(aVal, bVal) {
+				// Determine types of the interface{}
+				aIsMap := false
+
+				switch aVal.(type) {
+				case map[string]interface{}:
+					aIsMap = true
+				}
+
+				bIsMap := false
+
+				switch bVal.(type) {
+				case map[string]interface{}:
+					bIsMap = true
+				}
+
+				if !aIsMap && !bIsMap {
+					from[aKey] = aVal
+					to[aKey] = bVal
+				} else {
+					from[aKey], to[aKey] = MapDiff(aVal.(map[string]interface{}), bVal.(map[string]interface{}))
+				}
+			}
+		} else {
+			from[aKey] = aVal
+			to[aKey] = nil
+		}
+	}
+
+	// We also need to iterate through b, in case it has keys not present in a.
+	for bKey, bVal := range b {
+		_, matchingKeys := a[bKey]
+		if !matchingKeys {
+			from[bKey] = nil
+			to[bKey] = bVal
+		}
+	}
+
+	return from, to
 }
