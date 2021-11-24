@@ -288,7 +288,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// If an enterprise license secret was provided check that the enterprise image is set.
+	// If an enterprise license secret was provided check that the secret exists
+	// and that the enterprise Consul image is set.
 	if v.Global.EnterpriseLicense.SecretName != "" {
 		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName, v.Global.Image); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
