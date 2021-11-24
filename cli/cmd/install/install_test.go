@@ -204,7 +204,7 @@ func TestCheckValidEnterprise(t *testing.T) {
 
 	// Enterprise secret and image are valid.
 	c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), secret, metav1.CreateOptions{})
-	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret, metav1.CreateOptions{})
+	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret2, metav1.CreateOptions{})
 	err := c.checkValidEnterprise(secret.Name, "consul-enterprise:-ent")
 	require.NoError(t, err)
 
