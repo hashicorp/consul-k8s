@@ -204,22 +204,22 @@ func TestCheckValidEnterprise(t *testing.T) {
 
 	// Enterprise secret and image are valid.
 	c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), secret, metav1.CreateOptions{})
-	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret2, metav1.CreateOptions{})
 	err := c.checkValidEnterprise(secret.Name, "consul-enterprise:-ent")
 	require.NoError(t, err)
 
 	// Enterprise secret provided but not an enterprise image.
 	err = c.checkValidEnterprise(secret.Name, "consul:")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "enterprise image not provided")
+	require.Contains(t, err.Error(), "enterprise Consul image is not provided")
 
 	// Enterprise secret does not exist.
 	err = c.checkValidEnterprise("consul-unrelated-secret", "consul-enterprise:-ent")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "error getting the enterprise secret")
+	require.Contains(t, err.Error(), "please make sure that the secret exists")
 
 	// Enterprise secret exists in a different namespace.
+	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret2, metav1.CreateOptions{})
 	err = c.checkValidEnterprise(secret2.Name, "consul-enterprise:-ent")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "error getting the enterprise secret")
+	require.Contains(t, err.Error(), "please make sure that the secret exists")
 }

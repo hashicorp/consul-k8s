@@ -3,6 +3,7 @@ package install
 import (
 	"errors"
 	"fmt"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
@@ -533,17 +534,19 @@ func validLabel(s string) bool {
 }
 
 // checkValidEnterprise checks and validates an enterprise installation.
+// When an enterprise license secret is provided, check that the secret exists
+// in the "consul" namespace, and that the enterprise Consul image is provided.
 func (c *Command) checkValidEnterprise(secretName string, image string) error {
 
 	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
-		return fmt.Errorf("enterprise license secret %q is not found in the %q namespace; please make sure that the secret exists in the %q namespace", c.flagNamespace, secretName, c.flagNamespace)
+		return fmt.Errorf("enterprise license secret %q is not found in the %q namespace; please make sure that the secret exists in the %q namespace", secretName, c.flagNamespace, c.flagNamespace)
 	} else if err != nil {
-	       return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
+		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
 	if !strings.Contains(image, "-ent") {
 		return fmt.Errorf("enterprise Consul image is not provided when enterprise license secret is set: %s", image)
 	}
-	c.UI.Output("Valid enterprise image and secret found.", terminal.WithSuccessStyle())
+	c.UI.Output("Valid enterprise Consul image and secret found.", terminal.WithSuccessStyle())
 	return nil
 }
