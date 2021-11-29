@@ -177,13 +177,14 @@ func (c *Command) Run(args []string) int {
 			// it is not "lost" to the user at the end of the retries when the pod enters a CrashLoop.
 			if registrationRetryCount%10 == 0 {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
-					" If your pod is not starting also check the connect-inject deployment logs." +
-					"\nNote that only one service may be used to route requests to each pod." +
-					" If you need multiple services to point to the same pod, add the label" +
-					" `consul.hashicorp.com/service-ignore: \"true\"` to services which should" +
-					" not be used by Consul for handling requests.")
-
+					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
+			if len(serviceList) > 2 {
+				c.logger.Error("There are multiple Consul services registered for this pod when there should only be one." +
+					" Check if there are multiple Kubernetes services pointing at this pod and add the label" +
+					" `consul.hashicorp.com/service-ignore: \"true\"` to services which should not be used by Consul for handling requests.")
+			}
+
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
