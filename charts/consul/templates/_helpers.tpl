@@ -24,14 +24,14 @@ as well as the global.name setting.
 
 {{- define "consul.serverTLSCATemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "common_name=server.dc1.consul" "ttl=1h" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}" "ttl=1h" -{{ "}}" }}
             {{ "{{" }}- .Data.issuing_ca -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
 {{- define "consul.serverTLSTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "common_name=server.dc1.consul"
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
             "ttl=1h" "alt_names=localhost" "allowed_other_sans={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data | toJSON -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}

@@ -1617,3 +1617,73 @@ load _helpers
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
+
+@test "server/StatefulSet: vault tls annotations are set when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca"]' | tee /dev/stderr)
+  [ "${actual}" = "pki_int/issue/test" ]
+
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\" \"ttl=1h\" -}}\n{{- .Data.issuing_ca -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-servercert"]' | tee /dev/stderr)
+  [ "${actual}" = "pki_int/issue/test" ]
+
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-servercert"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc1.consul\"\n\"ttl=1h\" \"alt_names=localhost\" \"allowed_other_sans=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.${NAMESPACE},*.RELEASE-NAME-consul-server.${NAMESPACE}.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data | toJSON -}}\n{{- end -}}\n'
+  [ "${actual}" = "${expected}" ]
+
+}
+
+@test "server/StatefulSet: tls related volumes not attached and command is modified correctly when tls is enabled on vault" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+
+  local actual=$(echo $object |
+    yq -r '.volumes[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.volumes[] | select(.name == "consul-ca-key") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-client-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+      yq -r '.containers[0].command | any(contains("cat /vault/secrets/servercert | jq -r \".certificate\" > /vault/secrets/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.containers[0].command | any(contains("cat /vault/secrets/servercert | jq -r \".private_key\" > /vault/secrets/tls.key"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

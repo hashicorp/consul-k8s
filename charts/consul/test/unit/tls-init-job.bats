@@ -115,3 +115,15 @@ load _helpers
   actual=$(echo $spec | jq -r '.containers[0].command | join(" ") | contains("consul tls ca create")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+@test "tlsInit/Job: disabled with global.secretsBackend.vault.enabled=true and server.serverCert.secretName!=null" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'server.serverCert.secretName=test' \
+      .
+}

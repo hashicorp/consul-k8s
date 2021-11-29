@@ -230,8 +230,8 @@ spec:
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
               {{- if .Values.server.serverCert.secretName }}
-              cat /vault/secrets/servercert | jq -r '.certificate' > /vault/secrets/tls.crt
-              cat /vault/secrets/servercert | jq -r '.private_key' > /vault/secrets/tls.key
+              cat /vault/secrets/servercert | jq -r ".certificate" > /vault/secrets/tls.crt
+              cat /vault/secrets/servercert | jq -r ".private_key" > /vault/secrets/tls.key
               {{- end }}
               {{- end }}
 

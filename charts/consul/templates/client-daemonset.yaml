@@ -138,7 +138,7 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
-    {{- range .Values.client.extraVolumes }}
+        {{- range .Values.client.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
             {{- if (eq .type "configMap") }}

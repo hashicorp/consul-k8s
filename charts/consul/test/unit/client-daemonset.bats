@@ -1675,3 +1675,58 @@ rollingUpdate:
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
+
+@test "client/DaemonSet: vault tls annotations are set when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca"]' | tee /dev/stderr)
+  [ "${actual}" = "pki_int/issue/test" ]
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc1.consul\" \"ttl=1h\" -}}\n{{- .Data.issuing_ca -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "client/DaemonSet: tls related volumes not attached and command is modified correctly when tls is enabled on vault" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+
+  local actual=$(echo $object |
+    yq -r '.volumes[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.volumes[] | select(.name == "consul-ca-key") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-client-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
