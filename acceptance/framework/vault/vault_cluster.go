@@ -52,7 +52,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	kopts := ctx.KubectlOptions(t)
 
 	vaultHelmOpts := &helm.Options{
-		SetValues:      defaultVaultValues(releaseName),
+		SetValues:      defaultHelmValues(releaseName),
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
@@ -113,6 +113,7 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 	})
 
 	config.Address = fmt.Sprintf("https://127.0.0.1:%d", localPort)
+	// We don't need to verify TLS for localhost traffic.
 	err := config.ConfigureTLS(&vapi.TLSConfig{Insecure: true})
 	require.NoError(t, err)
 	vaultClient, err := vapi.NewClient(config)
@@ -202,7 +203,7 @@ func (v *VaultCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func defaultVaultValues(releaseName string) map[string]string {
+func defaultHelmValues(releaseName string) map[string]string {
 	certSecret := certSecretName(releaseName)
 	caSecret := CASecretName(releaseName)
 
@@ -232,22 +233,31 @@ func defaultVaultValues(releaseName string) map[string]string {
 	}
 }
 
+// certSecretName returns the Kubernetes secret name of the certificate and key
+// for the Vault server.
 func certSecretName(releaseName string) string {
 	return fmt.Sprintf("%s-vault-server-tls", releaseName)
 }
 
+// CASecretName returns the Kubernetes secret name of the CA for the Vault server.
 func CASecretName(releaseName string) string {
 	return fmt.Sprintf("%s-vault-ca", releaseName)
 }
 
+// Address is the in-cluster API address of the Vault server.
 func (v *VaultCluster) Address() string {
 	return fmt.Sprintf("https://%s-vault:8200", v.releaseName)
 }
 
+// releaseLabelSelector returns label selector that selects all pods
+// from a Vault installation.
 func (v *VaultCluster) releaseLabelSelector() string {
 	return fmt.Sprintf("%s=%s", releaseLabel, v.releaseName)
 }
 
+// createTLSCerts generates a self-signed CA and uses it to generate
+// certificate and key  for the Vault server. It then saves those as
+// Kubernetes secrets.
 func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	v.logger.Logf(t, "generating Vault TLS certificates")
 
@@ -299,6 +309,8 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// initAndUnseal initializes and unseals Vault.
+// Once initialized, it saves the Vault root token into a Kubernetes secret.
 func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	v.logger.Logf(t, "initializing and unsealing Vault")
 
@@ -310,8 +322,11 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		require.NoError(r, err)
 		require.Equal(r, serverPod.Status.Phase, corev1.PodRunning)
 
+		// Set up the client so that we can make API calls to initialize and unseal.
 		v.vaultClient = v.SetupVaultClient(t)
 
+		// Initialize Vault with 1 secret share. We don't need to
+		// more key shares for this test installation.
 		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
 			SecretShares:    1,
 			SecretThreshold: 1,
@@ -319,6 +334,8 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		require.NoError(r, err)
 		v.vaultClient.SetToken(initResp.RootToken)
 
+		// Unseal Vault with the unseal key we got when initialized it.
+		// There should be one unseal key since we're only using one secret share.
 		_, err = v.vaultClient.Sys().Unseal(initResp.KeysB64[0])
 		require.NoError(r, err)
 	})
