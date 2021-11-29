@@ -2784,7 +2784,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
-			// Create test Consul server
+			// Create test Consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
 			require.NoError(t, err)
 			defer consul.Stop()
