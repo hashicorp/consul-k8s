@@ -140,6 +140,7 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
+        {{- end }}
         {{- range .Values.client.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
