@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
@@ -149,7 +150,15 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
-	if value, ok := serviceEndpoints.Labels[labelServiceIgnore]; ok && value == "true" {
+	value, labelExists := serviceEndpoints.Labels[labelServiceIgnore]
+	shouldIgnore, err := strconv.ParseBool(value)
+
+	if err != nil {
+		r.Log.Error(err, "failed to parse label", "label", labelServiceIgnore, "value", value)
+		return ctrl.Result{}, err
+	}
+
+	if labelExists && shouldIgnore {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 		return ctrl.Result{}, err
