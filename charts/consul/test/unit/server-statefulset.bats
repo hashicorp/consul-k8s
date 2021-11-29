@@ -1646,7 +1646,7 @@ load _helpers
 
   local actual="$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-servercert"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc1.consul\"\n\"ttl=1h\" \"alt_names=localhost\" \"allowed_other_sans=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.${NAMESPACE},*.RELEASE-NAME-consul-server.${NAMESPACE}.svc,*.server.dc1.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data | toJSON -}}\n{{- end -}}\n'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost\" \"allowed_other_sans=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.${NAMESPACE},*.RELEASE-NAME-consul-server.${NAMESPACE}.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data | toJSON -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
 }
