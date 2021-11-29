@@ -21,6 +21,27 @@ as well as the global.name setting.
             {{ "{{" }}- {{ printf ".Data.data.%s" .secretKey }} -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
+
+{{- define "consul.serverTLSCATemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "common_name=server.dc1.consul" "ttl=1h" -{{ "}}" }}
+            {{ "{{" }}- .Data.issuing_ca -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "common_name=server.dc1.consul"
+            "ttl=1h" "alt_names=localhost" "allowed_other_sans={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data | toJSON -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSaltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.${NAMESPACE},*.%s-server.${NAMESPACE}.svc,*.server.%s.%s" $name $name $name $name (.Values.global.datacenter ) (.Values.global.domain) }}
+{{- end -}}
+
 {{/*
 Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
 substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file

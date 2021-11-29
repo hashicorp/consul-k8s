@@ -177,6 +177,118 @@ func TestVault(t *testing.T) {
 	}
 }
 
+// Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
+// then sets up a root CA, intermediate CA and bootstraps vault with the PKI engine
+// for ServerTLS certs.
+func TestVault_BootstrapConsulServerTLS(t *testing.T) {
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+
+	consulReleaseName := helpers.RandomName()
+	vaultReleaseName := helpers.RandomName()
+	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
+	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
+
+	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
+	vaultCluster.Create(t, ctx)
+	// Vault is now installed in the cluster.
+
+	// Now fetch the Vault client so we can create the policies and secrets.
+	vaultClient := vaultCluster.VaultClient(t)
+
+	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+	// Generate the root CA.
+	params := map[string]interface{}{
+		"common_name": "dc1.consul",
+		"ttl":         "24h",
+	}
+	_, err := vaultClient.Logical().Write("pki/root/generate/internal", params)
+	require.NoError(t, err)
+
+	// Configure the CA and CRL URLs.
+	params = map[string]interface{}{
+		"issuing_certificates":    "http://127.0.0.1:8200/v1/pki/ca",
+		"crl_distribution_points": "http://127.0.0.1:8200/v1/pki/crl",
+	}
+	_, err = vaultClient.Logical().Write("pki/config/urls", params)
+	require.NoError(t, err)
+
+	// Generate an intermediate CA.
+	params = map[string]interface{}{
+		"common_name": "dc1.consul Intermediate Authority",
+	}
+	resp, err := vaultClient.Logical().Write("pki_int/intermediate/generate/internal", params)
+	require.NoError(t, err)
+	csr := resp.Data["csr"].(string)
+
+	// Sign the CSR and import the certificate into Vault.
+	params = map[string]interface{}{
+		"csr":         csr,
+		"common_name": "dc1.consul",
+		"ttl":         "24h",
+	}
+	resp, err = vaultClient.Logical().Write("pki/root/sign-intermediate", params)
+	require.NoError(t, err)
+	intermediateCert := resp.Data["certificate"]
+
+	params = map[string]interface{}{
+		"certificate": intermediateCert,
+	}
+	_, err = vaultClient.Logical().Write("pki_int/intermediate/set-signed", params)
+	require.NoError(t, err)
+
+	// Create a Vault PKI Role
+	params = map[string]interface{}{
+		"allowed_domains":  "dc1.consul",
+		"allow_subdomains": "true",
+		"generate_lease":   "true",
+		"max_ttl":          "1h",
+	}
+
+	_, err = vaultClient.Logical().Write("pki_int/roles/consul-server", params)
+	require.NoError(t, err)
+
+	rules := `
+path "pki_int/issue/consul-server" {
+  capabilities = ["create", "update"]
+}`
+	err = vaultClient.Sys().PutPolicy("consul-server", rules)
+	require.NoError(t, err)
+
+	logger.Log(t, "Creating the consul-server role.")
+	params = map[string]interface{}{
+		"bound_service_account_names":      consulServerServiceAccountName,
+		"bound_service_account_namespaces": "default",
+		"policies":                         "consul-server",
+		"ttl":                              "24h",
+	}
+	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-server", params)
+	require.NoError(t, err)
+
+	logger.Log(t, "Creating the consul-client role.")
+	params["bound_service_account_names"] = consulClientServiceAccountName
+	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-client", params)
+	require.NoError(t, err)
+
+	consulHelmValues := map[string]string{
+		"server.enabled":  "true",
+		"server.replicas": "1",
+
+		"global.secretsBackend.vault.consulServerRole": "consul-server",
+		"global.secretsBackend.vault.consulClientRole": "consul-client",
+		"server.serverCert.secretName":                 "pki_int/issue/consul-server",
+
+		"global.secretsBackend.vault.enabled": "true",
+		"global.tls.enabled":                  "true",
+		"global.tls.httpsOnly":                "false",
+		"global.tls.enableAutoEncrypt":        "true",
+	}
+
+	logger.Log(t, "Installing Consul")
+	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
+	consulCluster.Create(t)
+}
+
 // generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
 func generateGossipSecret() (string, error) {
 	// This code was copied from Consul's Keygen command:

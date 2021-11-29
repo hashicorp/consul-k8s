@@ -134,7 +134,24 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 	if err != nil {
 		t.Fatal("unable to mount kv-v2 secrets engine", "err", err)
 	}
-	// TODO: add the PKI Secrets Engine when we have a need for it.
+
+	// Enable the PKI Secrets engine.
+	err = v.vaultClient.Sys().Mount("pki", &vapi.MountInput{
+		Type:   "pki",
+		Config: vapi.MountConfigInput{},
+	})
+	if err != nil {
+		t.Fatal("unable to mount pki secrets engine to pki", "err", err)
+	}
+
+	// Enable the PKI Secrets engine for intermediate CA.
+	err = v.vaultClient.Sys().Mount("pki_int", &vapi.MountInput{
+		Type:   "pki",
+		Config: vapi.MountConfigInput{},
+	})
+	if err != nil {
+		t.Fatal("unable to mount pki secrets engine to pki_int", "err", err)
+	}
 
 	// Enable Kube Auth.
 	err = v.vaultClient.Sys().EnableAuthWithOptions("kubernetes", &vapi.EnableAuthOptions{
