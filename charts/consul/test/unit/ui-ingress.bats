@@ -69,6 +69,7 @@ load _helpers
 #      --kube-version "1.18" \
 #      . | tee /dev/stderr |
 #      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
      -s templates/ui-ingress.yaml  \
      --set 'ui.ingress.enabled=true' \
@@ -89,6 +90,7 @@ load _helpers
 #      --kube-version "1.18" \
 #      . | tee /dev/stderr |
 #      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -110,6 +112,7 @@ load _helpers
 #      --kube-version "1.18" \
 #      . | tee /dev/stderr |
 #      yq -r '.spec.rules[0].http.paths[0].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -132,6 +135,7 @@ load _helpers
 #      --kube-version "1.18" \
 #      . | tee /dev/stderr |
 #      yq -r '.spec.rules[0].http.paths[1].backend.servicePort' | tee /dev/stderr)
+  cd `chart_dir`
   local actual=$(helm template \
       -s templates/ui-ingress.yaml  \
       --set 'ui.ingress.enabled=true' \
@@ -207,6 +211,7 @@ load _helpers
 # pathtype
 
 @test "ui/Ingress: default PathType Prefix" {
+  cd `chart_dir`
   local actual=$(helm template \
     -s templates/ui-ingress.yaml  \
     --set 'ui.ingress.enabled=true' \
@@ -218,6 +223,7 @@ load _helpers
 }
 
 @test "ui/Ingress: set PathType ImplementationSpecific" {
+  cd `chart_dir`
   local actual=$(helm template \
     -s templates/ui-ingress.yaml  \
     --set 'ui.ingress.enabled=true' \
