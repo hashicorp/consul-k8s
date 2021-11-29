@@ -818,7 +818,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.openshift.enabled & client.containerSecurityContext
 
-@test "client/DaemonSet: container level securityContexts are not set when global.openshift.enabled=true" {
+@test "server/StatefulSet: container level securityContexts are not set when global.openshift.enabled=true" {
   cd `chart_dir`
   local manifest=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -1033,16 +1033,6 @@ load _helpers
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("https://127.0.0.1:8501")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: CA certificate is specified when TLS is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("--cacert /consul/tls/ca/tls.crt")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
