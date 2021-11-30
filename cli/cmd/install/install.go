@@ -415,7 +415,7 @@ func (c *Command) checkForPreviousPVCs() error {
 
 // checkForPreviousSecrets checks for the bootstrap token and returns an error if found.
 func (c *Command) checkForPreviousSecrets() error {
-	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{})
+	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue})
 	if err != nil {
 		return fmt.Errorf("error listing secrets: %s", err)
 	}

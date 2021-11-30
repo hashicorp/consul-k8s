@@ -28,7 +28,7 @@ const (
 	ACLTokenSecretKey = "token"
 
 	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
-	// which key to delete on an uninstall.
+	// which secrets to delete on an uninstall.
 	CLILabelKey   = "managed-by"
 	CLILabelValue = "consul-k8s"
 )
