@@ -1,5 +1,8 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
+
 IMPROVEMENTS:
 * CLI
    * Pre-check in the `install` command to verify the correct license secret exists when using an enterprise Consul image. [[GH-875](https://github.com/hashicorp/consul-k8s/pull/875)]
@@ -24,7 +27,6 @@ BREAKING CHANGES:
   ```
   
   [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
-* Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
 
 FEATURES:
 * Helm Chart
