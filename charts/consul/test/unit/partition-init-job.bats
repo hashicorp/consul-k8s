@@ -71,6 +71,24 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "partitionInit/Job: does not set consul ca cert or server-port when .externalServers.useSystemRoots is true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'externalServers.useSystemRoots=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual
+  actual=$(echo $command | jq -r '. | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "partitionInit/Job: can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \

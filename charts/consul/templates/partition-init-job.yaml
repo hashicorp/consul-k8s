@@ -31,6 +31,7 @@ spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-partition-init
       {{- if .Values.global.tls.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
       volumes:
         - name: consul-ca-cert
           secret:
@@ -42,6 +43,7 @@ spec:
             items:
               - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
                 path: tls.crt
+      {{- end }}
       {{- end }}
       containers:
         - name: partition-init-job
@@ -59,10 +61,12 @@ spec:
                   key: {{ .Values.global.acls.bootstrapToken.secretKey }}
             {{- end }}
           {{- if .Values.global.tls.enabled  }}
+          {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
           volumeMounts:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+          {{- end }}
           {{- end }}
           command:
             - "/bin/sh"
@@ -82,9 +86,8 @@ spec:
 
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
+                {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
                 -consul-ca-cert=/consul/tls/ca/tls.crt \
-                {{- if not .Values.externalServers.enabled }}
-                -server-port=8501 \
                 {{- end }}
                 {{- if .Values.externalServers.tlsServerName }}
                 -consul-tls-server-name={{ .Values.externalServers.tlsServerName }} \
