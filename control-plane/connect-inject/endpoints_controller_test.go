@@ -2730,25 +2730,33 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	namespace := "default"
 
 	cases := map[string]struct {
-		initialLabels            map[string]string
-		updatedLabels            map[string]string
-		svcsExpectedBeforeUpdate int
+		svcInitiallyRegistered  bool
+		serviceLabels           map[string]string
+		expectedNumSvcInstances int
 	}{
-		"Endpoint with service-ignore is never registered": {
-			initialLabels: map[string]string{
+		"Registered endpoint with label is deregistered.": {
+			svcInitiallyRegistered: true,
+			serviceLabels: map[string]string{
 				labelServiceIgnore: "true",
 			},
-			updatedLabels: map[string]string{
-				labelServiceIgnore: "true",
-			},
-			svcsExpectedBeforeUpdate: 0,
+			expectedNumSvcInstances: 0,
 		},
-		"Endpoint without labels is registered, then deregisterd when service-ignore is added": {
-			initialLabels: map[string]string{},
-			updatedLabels: map[string]string{
+		"Not registered endpoint with label is never registered": {
+			svcInitiallyRegistered: false,
+			serviceLabels: map[string]string{
 				labelServiceIgnore: "true",
 			},
-			svcsExpectedBeforeUpdate: 1,
+			expectedNumSvcInstances: 0,
+		},
+		"Registered endpoint without label is unaffected": {
+			svcInitiallyRegistered:  true,
+			serviceLabels:           map[string]string{},
+			expectedNumSvcInstances: 1,
+		},
+		"Not registered endpoint without label is registered": {
+			svcInitiallyRegistered:  false,
+			serviceLabels:           map[string]string{},
+			expectedNumSvcInstances: 1,
 		},
 	}
 
@@ -2759,7 +2767,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: namespace,
-					Labels:    tt.initialLabels,
+					Labels:    tt.serviceLabels,
 				},
 				Subsets: []corev1.EndpointSubset{
 					{
@@ -2795,6 +2803,23 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
 
+			// Set up the initial Consul services.
+			if tt.svcInitiallyRegistered {
+				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					ID:      "pod1-" + serviceName,
+					Name:    serviceName,
+					Port:    0,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						"k8s-namespace":    namespace,
+						"k8s-service-name": serviceName,
+						"managed-by":       "consul-k8s-endpoints-controller",
+						"pod-name":         "pod1",
+					},
+				})
+				require.NoError(t, err)
+			}
+
 			// Create the endpoints controller
 			ep := &EndpointsController{
 				Client:                fakeClient,
@@ -2809,32 +2834,16 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				ConsulClientCfg:       cfg,
 			}
 
+			// Run the reconcile process to deregister the service if it was registered before
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
-
-			// Run the reconcile process the first time
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
-			// Check that the correct number of instances of the service were registered at the midpoint
+			// Check that no services are registered with Consul
 			serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
 			require.NoError(t, err)
-			require.Len(t, serviceInstances, tt.svcsExpectedBeforeUpdate)
-
-			// Update labels on the endpoint
-			endpoint.Labels = tt.updatedLabels
-			err = fakeClient.Update(context.Background(), endpoint)
-			require.NoError(t, err)
-
-			// Run the reconcile process the second time
-			resp, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
-			require.NoError(t, err)
-			require.False(t, resp.Requeue)
-
-			// Check that no services are registered with Consul
-			serviceInstances, _, err = consulClient.Catalog().Service(serviceName, "", nil)
-			require.NoError(t, err)
-			require.Empty(t, serviceInstances)
+			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
 		})
 	}
 }
