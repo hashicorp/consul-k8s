@@ -26,6 +26,11 @@ const (
 	// ACLTokenSecretKey is the key that we store the ACL tokens in when we
 	// create Kubernetes secrets.
 	ACLTokenSecretKey = "token"
+
+	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
+	// which secrets to delete on an uninstall.
+	CLILabelKey   = "managed-by"
+	CLILabelValue = "consul-k8s"
 )
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.

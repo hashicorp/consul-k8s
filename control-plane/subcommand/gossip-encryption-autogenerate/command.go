@@ -111,6 +111,7 @@ func (c *Command) Run(args []string) int {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.flagSecretName,
 			Namespace: c.flagNamespace,
+			Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Data: map[string][]byte{
 			c.flagSecretKey: []byte(gossipSecret),

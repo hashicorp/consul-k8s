@@ -249,6 +249,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 						UID:        deployment.UID,
 					},
 				},
+				Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 			},
 			Data: map[string][]byte{
 				corev1.TLSCertKey:       bundle.Cert,
@@ -277,6 +278,12 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	// Don't update secret if the certificate and key are unchanged.
 	if bytes.Equal(certSecret.Data[corev1.TLSCertKey], bundle.Cert) && bytes.Equal(certSecret.Data[corev1.TLSPrivateKeyKey], bundle.Key) && c.webhookUpdated(ctx, bundle, clientset) {
 		return nil
+	}
+
+	if certSecret.ObjectMeta.Labels == nil {
+		certSecret.ObjectMeta.Labels = map[string]string{common.CLILabelKey: common.CLILabelValue}
+	} else {
+		certSecret.ObjectMeta.Labels[common.CLILabelKey] = common.CLILabelValue
 	}
 
 	certSecret.Data[corev1.TLSCertKey] = bundle.Cert
