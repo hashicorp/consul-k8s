@@ -20,6 +20,7 @@ BREAKING CHANGES:
   ```
   
   [[GH-851](https://github.com/hashicorp/consul-k8s/pull/851)]
+* Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
 
 FEATURES:
 * Helm Chart

@@ -28,7 +28,7 @@
 
 ### Building and running `consul-k8s-control-plane`
 
-To build and install the control plane binary `consul-k8s` locally, Go version 1.11.4+ is required because this repository uses go modules and go 1.11.4 introduced changes to checksumming of modules to correct a symlink problem.
+To build and install the control plane binary `consul-k8s` locally, Go version 1.17.0+ is required. 
 You will also need to install the Docker engine:
 
 - [Docker for Mac](https://docs.docker.com/engine/installation/mac/)
