@@ -66,7 +66,7 @@ spec:
         {{- if .Values.server.serverCert.secretName }}
         "vault.hashicorp.com/agent-inject-secret-servercert": {{ .Values.server.serverCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-servercert": {{ include "consul.serverTLSTemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca": {{ include "consul.serverTLSCATemplate" . }}
         {{- end }}
         {{- end }}
@@ -243,7 +243,7 @@ spec:
                 -bind=0.0.0.0 \
                 -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
                 {{- if .Values.global.tls.enabled }}
-                {{- if .Values.global.secretsBackend.vault.enabled }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.server.serverCert.secretName }}
                 -hcl='ca_file = "/vault/secrets/serverca"' \
                 -hcl='cert_file = "/vault/secrets/tls.crt"' \
                 -hcl='key_file = "/vault/secrets/tls.key"' \

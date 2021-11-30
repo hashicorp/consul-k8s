@@ -4,14 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"testing"
-
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 const (
@@ -277,6 +276,7 @@ path "pki_int/issue/consul-server" {
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
 		"server.serverCert.secretName":                 "pki_int/issue/consul-server",
+		"global.tls.caCert.secretName":                 "pki_int/cert/ca",
 
 		"global.secretsBackend.vault.enabled": "true",
 		"global.tls.enabled":                  "true",

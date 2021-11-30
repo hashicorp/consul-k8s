@@ -24,8 +24,8 @@ as well as the global.name setting.
 
 {{- define "consul.serverTLSCATemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}" "ttl=1h" -{{ "}}" }}
-            {{ "{{" }}- .Data.issuing_ca -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
