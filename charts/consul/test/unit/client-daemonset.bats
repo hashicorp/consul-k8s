@@ -1685,15 +1685,13 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
     --set 'global.tls.enabled=true' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual=$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca"]' | tee /dev/stderr)
-  [ "${actual}" = "pki_int/issue/test" ]
   local actual="$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc1.consul\" \"ttl=1h\" -}}\n{{- .Data.issuing_ca -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/ca/pem\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -1705,6 +1703,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
     --set 'global.tls.enabled=true' \
+    --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
     . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
@@ -1730,3 +1729,17 @@ rollingUpdate:
       yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "client/DaemonSet: fail when vault, tls are enabled but no caCert provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.tls.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
+}
+

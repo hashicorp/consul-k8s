@@ -3,6 +3,7 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (and .Values.global.adminPartitions.enabled $serverEnabled (ne .Values.global.adminPartitions.name "default"))}}{{ fail "global.adminPartitions.name has to be \"default\" in the server cluster" }}{{ end -}}
 {{- if (and (not .Values.global.secretsBackend.vault.consulClientRole) .Values.global.secretsBackend.vault.enabled) }}{{ fail "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -47,11 +48,11 @@ spec:
         {{- end }}
         {{- if .Values.global.gossipEncryption.secretName }}
         {{- with .Values.global.gossipEncryption }}
-        "vault.hashicorp.com/agent-inject-secret-gossip.txt": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-secret-gossip.txt": {{ .secretName }}
         "vault.hashicorp.com/agent-inject-template-gossip.txt": {{ template "consul.vaultGossipTemplate" . }}
         {{- end }}
         {{- end }}
-        {{- if .Values.server.serverCert.secretName }}
+        {{- if .Values.global.tls.enabled }}
         "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.server.serverCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca": {{ template "consul.serverTLSCATemplate" . }}
         {{- end }}

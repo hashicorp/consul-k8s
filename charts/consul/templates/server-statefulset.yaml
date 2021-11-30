@@ -9,6 +9,7 @@
 {{- if (and (not .Values.global.gossipEncryption.secretName) .Values.global.gossipEncryption.secretKey) }}{{fail "gossipEncryption.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.consulServerRole)) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName) (not .Values.global.secretsBackend.vault.enabled)) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert must also be provided" }}{{ end }}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -243,7 +244,7 @@ spec:
                 -bind=0.0.0.0 \
                 -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
                 {{- if .Values.global.tls.enabled }}
-                {{- if and .Values.global.secretsBackend.vault.enabled .Values.server.serverCert.secretName }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
                 -hcl='ca_file = "/vault/secrets/serverca"' \
                 -hcl='cert_file = "/vault/secrets/tls.crt"' \
                 -hcl='key_file = "/vault/secrets/tls.key"' \
