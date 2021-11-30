@@ -150,15 +150,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
-	value, labelExists := serviceEndpoints.Labels[labelServiceIgnore]
-	shouldIgnore, err := strconv.ParseBool(value)
-
-	if err != nil {
-		r.Log.Error(err, "failed to parse label", "label", labelServiceIgnore, "value", value)
-		return ctrl.Result{}, err
-	}
-
-	if labelExists && shouldIgnore {
+	if isLabeledIgnore(serviceEndpoints.Labels) {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 		return ctrl.Result{}, err
@@ -1031,4 +1023,13 @@ func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]st
 	}
 
 	return m
+}
+
+// isLabeledIgnore checks the value of the label `consul.hashicorp.com/service-ignore` and returns true if the
+// label exists and is "truthy". Otherwise, it returns false.
+func isLabeledIgnore(labels map[string]string) bool {
+	value, labelExists := labels[labelServiceIgnore]
+	shouldIgnore, err := strconv.ParseBool(value)
+
+	return shouldIgnore && labelExists && err == nil
 }
