@@ -128,6 +128,7 @@ func (c *Command) Run(args []string) int {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-federation", c.flagResourcePrefix),
 			Namespace: c.flagK8sNamespace,
+			Labels:    map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 		Type: "Opaque",
 		Data: make(map[string][]byte),

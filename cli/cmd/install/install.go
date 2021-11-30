@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
-
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -416,17 +415,18 @@ func (c *Command) checkForPreviousPVCs() error {
 
 // checkForPreviousSecrets checks for the bootstrap token and returns an error if found.
 func (c *Command) checkForPreviousSecrets() error {
-	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{})
+	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue})
 	if err != nil {
 		return fmt.Errorf("error listing secrets: %s", err)
 	}
 	for _, secret := range secrets.Items {
 		// future TODO: also check for federation secret
-		if strings.Contains(secret.Name, "consul-bootstrap-acl-token") {
-			return fmt.Errorf("found consul-acl-bootstrap-token secret from previous installations: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
+		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
+			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
 				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
 		}
 	}
+
 	c.UI.Output("No previous secrets found", terminal.WithSuccessStyle())
 	return nil
 }

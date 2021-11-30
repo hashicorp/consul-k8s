@@ -102,7 +102,8 @@ func (c *Command) bootstrapACLs(firstServerAddr string, scheme string, bootToken
 		func() error {
 			secret := &apiv1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: bootTokenSecretName,
+					Name:   bootTokenSecretName,
+					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 				},
 				Data: map[string][]byte{
 					common.ACLTokenSecretKey: []byte(bootstrapToken),
