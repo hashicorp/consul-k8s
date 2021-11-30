@@ -116,7 +116,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "tlsInit/Job: disabled with global.secretsBackend.vault.enabled=true and server.serverCert.secretName!=null" {
+@test "tlsInit/Job: disabled with global.secretsBackend.vault.enabled=true and global.tls.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/tls-init-job.yaml  \
@@ -124,6 +124,6 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'server.serverCert.secretName=test' \
+      --set 'global.tls.caCert.secretName=test' \
       .
 }
