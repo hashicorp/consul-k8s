@@ -1414,6 +1414,20 @@ load _helpers
   [[ "$output" =~ "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true" ]]
 }
 
+@test "server/StatefulSet: fail when vault is enabled with tls but autoencrypt is disabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.server.serverCert.secretName=test' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
 @test "server/StatefulSet: vault annotations not set by default" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1613,6 +1627,7 @@ load _helpers
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
     --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.datacenter=dc2' \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -1646,6 +1661,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
     --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
     --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
     . | tee /dev/stderr |
