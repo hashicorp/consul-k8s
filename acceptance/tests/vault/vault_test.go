@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 	"testing"
-	"time"
 )
 
-/*
 const (
 	gossipPolicy = `
 path "consul/data/secret/gossip" {
@@ -43,6 +43,14 @@ path "/connect_inter/*" {
   capabilities = [ "create", "read", "update", "delete", "list" ]
 }
 `
+	serverTLSPolicy = `
+path "pki_int/issue/consul-server" {
+  capabilities = ["create", "update"]
+}`
+	caPolicy = `
+path "pki_int/cert/ca" {
+  capabilities = ["read"]
+}`
 )
 
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
@@ -68,6 +76,7 @@ func TestVault(t *testing.T) {
 	err := vaultClient.Sys().PutPolicy("consul-gossip", gossipPolicy)
 	require.NoError(t, err)
 
+	// Create the Vault Policy for the connect-ca.
 	err = vaultClient.Sys().PutPolicy("connect-ca", connectCAPolicy)
 	require.NoError(t, err)
 
@@ -90,12 +99,23 @@ func TestVault(t *testing.T) {
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
 		"bound_service_account_namespaces": "default",
-		"policies":                         "consul-gossip,connect-ca",
+		"policies":                         "consul-gossip,connect-ca,consul-server",
 		"ttl":                              "24h",
 	}
 	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-server", params)
 	require.NoError(t, err)
 
+	// Create the CA role that all components will use to fetch the Server CA certs.
+	params = map[string]interface{}{
+		"bound_service_account_names":      "*",
+		"bound_service_account_namespaces": "default",
+		"policies":                         "consul-ca",
+		"ttl":                              "24h",
+	}
+	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-ca", params)
+	require.NoError(t, err)
+
+	// Generate the gossip secret.
 	gossipKey, err := generateGossipSecret()
 	require.NoError(t, err)
 
@@ -108,6 +128,10 @@ func TestVault(t *testing.T) {
 	}
 	_, err = vaultClient.Logical().Write("consul/data/secret/gossip", params)
 	require.NoError(t, err)
+
+	// Bootstrap TLS with policies and secrets
+	bootstrapTLS(t, vaultClient, consulReleaseName)
+
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 	consulHelmValues := map[string]string{
@@ -125,6 +149,7 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.enabled":          "true",
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
+		"global.secretsBackend.vault.consulCARole":     "consul-ca",
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -133,10 +158,15 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
 
-		"global.acls.manageSystemACLs":       "true",
+		//"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
+
+		"server.serverCert.secretName": "pki_int/issue/consul-server",
+		"global.tls.caCert.secretName": "pki_int/cert/ca",
+		"global.tls.httpsOnly":         "false",
+		"global.tls.enableAutoEncrypt": "true",
 	}
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
@@ -144,7 +174,7 @@ func TestVault(t *testing.T) {
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
-	consulClient := consulCluster.SetupConsulClient(t, true)
+	consulClient := consulCluster.SetupConsulClient(t, false)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
 	// There are two identical keys for LAN and WAN since there is only 1 dc.
@@ -176,8 +206,72 @@ func TestVault(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
 	}
 }
-*/
 
+func bootstrapTLS(t *testing.T, vaultClient *vapi.Client, consulReleaseName string) {
+	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+
+	// Generate the root CA.
+	params := map[string]interface{}{
+		"common_name": "dc1.consul",
+		"ttl":         "24h",
+	}
+	_, err := vaultClient.Logical().Write("pki/root/generate/internal", params)
+	require.NoError(t, err)
+
+	// Configure the CA and CRL URLs.
+	params = map[string]interface{}{
+		"issuing_certificates":    "http://127.0.0.1:8200/v1/pki/ca",
+		"crl_distribution_points": "http://127.0.0.1:8200/v1/pki/crl",
+	}
+	_, err = vaultClient.Logical().Write("pki/config/urls", params)
+	require.NoError(t, err)
+
+	// Generate an intermediate CA.
+	params = map[string]interface{}{
+		"common_name": "dc1.consul Intermediate Authority",
+	}
+	resp, err := vaultClient.Logical().Write("pki_int/intermediate/generate/internal", params)
+	require.NoError(t, err)
+	csr := resp.Data["csr"].(string)
+
+	// Sign the CSR and import the certificate into Vault.
+	params = map[string]interface{}{
+		"csr":         csr,
+		"common_name": "dc1.consul",
+		"ttl":         "24h",
+	}
+	resp, err = vaultClient.Logical().Write("pki/root/sign-intermediate", params)
+	require.NoError(t, err)
+	intermediateCert := resp.Data["certificate"]
+
+	params = map[string]interface{}{
+		"certificate": intermediateCert,
+	}
+	_, err = vaultClient.Logical().Write("pki_int/intermediate/set-signed", params)
+	require.NoError(t, err)
+
+	// Create a Vault PKI Role
+	name := consulReleaseName + "-consul"
+	allowed_domains := fmt.Sprintf("dc1.consul,%s-server,%s-server.default,%s-server.default.svc", name, name, name)
+	params = map[string]interface{}{
+		"allowed_domains":    allowed_domains,
+		"allow_bare_domains": "true",
+		"allow_localhost":    "true",
+		"allow_subdomains":   "true",
+		"generate_lease":     "true",
+		"max_ttl":            "1h",
+	}
+
+	_, err = vaultClient.Logical().Write("pki_int/roles/consul-server", params)
+	require.NoError(t, err)
+	// Create the server and ca policies
+	err = vaultClient.Sys().PutPolicy("consul-server", serverTLSPolicy)
+	require.NoError(t, err)
+	err = vaultClient.Sys().PutPolicy("consul-ca", caPolicy)
+	require.NoError(t, err)
+}
+
+/*
 // Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
 // then sets up a root CA, intermediate CA and bootstraps vault with the PKI engine
 // for ServerTLS certs.
@@ -301,6 +395,8 @@ path "pki_int/cert/ca" {
 	consulCluster.Create(t)
 	time.Sleep(time.Second * 120)
 }
+
+*/
 
 // generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
 func generateGossipSecret() (string, error) {
