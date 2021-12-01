@@ -129,7 +129,7 @@ func TestVault(t *testing.T) {
 	_, err = vaultClient.Logical().Write("consul/data/secret/gossip", params)
 	require.NoError(t, err)
 
-	// Bootstrap TLS with policies and secrets
+	// Bootstrap TLS creates the CA infrastructure required for ServerTLS and also creates the `consul-server` roles.
 	bootstrapTLS(t, vaultClient, consulReleaseName)
 
 
@@ -207,6 +207,7 @@ func TestVault(t *testing.T) {
 	}
 }
 
+// bootstrapTLS creates a root CA, intermediate CA and setups up the required roles and policies for the server.
 func bootstrapTLS(t *testing.T, vaultClient *vapi.Client, consulReleaseName string) {
 	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
 
