@@ -15,6 +15,9 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -26,6 +29,15 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.adminPartitions.enabled=true' \
       --set 'server.enabled=true' \
+      .
+}
+
+@test "partitionInit/Job: disabled with global.adminPartitions.enabled=true and adminPartition.name = default" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'server.enabled=false' \
       .
 }
 
@@ -47,6 +59,18 @@ load _helpers
       .
 }
 
+@test "partitionInit/Job: fails if externalServers.enabled = false with non-default adminPartition" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "externalServers.enabled needs to be true and configured to create a non-default partition." ]]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 
@@ -57,6 +81,9 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.tls.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -77,6 +104,7 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
@@ -95,6 +123,9 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \
@@ -122,6 +153,9 @@ load _helpers
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'global.acls.bootstrapToken.secretName=partition-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
@@ -160,6 +194,8 @@ reservedNameTest() {
 		run helm template \
 				-s templates/partition-init-job.yaml  \
 				--set 'global.enabled=false' \
+				--set 'externalServers.enabled=true' \
+                --set 'externalServers.hosts[0]=foo' \
 				--set 'global.adminPartitions.enabled=true' \
 				--set "global.adminPartitions.name=$name" .
 
