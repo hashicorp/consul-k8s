@@ -77,7 +77,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	logger.Log(t, "Waiting for pods to be ready.")
+	logger.Logf(t, "Waiting for pods with label %q to be ready.", podLabelSelector)
 
 	// Wait up to 15m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
@@ -101,7 +101,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	logger.Log(t, "Finished waiting for pods to be ready.")
 }
 
-// Sets up a goroutine that will wait for interrupt signals
+// SetupInterruptHandler sets up a goroutine that will wait for interrupt signals
 // and call cleanup function when it catches it.
 func SetupInterruptHandler(cleanup func()) {
 	c := make(chan os.Signal, 1)
