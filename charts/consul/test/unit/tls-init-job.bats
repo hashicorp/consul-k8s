@@ -125,5 +125,6 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enableAutoEncrypt=true' \
       .
 }
