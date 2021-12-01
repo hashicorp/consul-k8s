@@ -2719,10 +2719,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 // TestReconcileIgnoresServiceIgnoreLabel tests that the endpoints controller correctly ignores services
 // with the service-ignore label and deregisters services previously registered if the service-ignore
-// label is added. This is done by running Reconcile twice, once on an initial set of labels, then again
-// on a new set of labels with the service-ignore label. The number of services registered in Consul is
-// checked before updating the labels against the `svcsExpectedBeforeUpdate` and after updating the labels
-// where the expected number of services should be zero.
+// label is added.
 func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
