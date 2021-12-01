@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 /*
@@ -187,7 +188,6 @@ func TestVault_BootstrapConsulServerTLS(t *testing.T) {
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
 	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
 
 	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
 	vaultCluster.Create(t, ctx)
@@ -238,11 +238,15 @@ func TestVault_BootstrapConsulServerTLS(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a Vault PKI Role
+	name := consulReleaseName + "-consul"
+	allowed_domains := fmt.Sprintf("dc1.consul,%s-server,%s-server.default,%s-server.default.svc", name, name, name)
 	params = map[string]interface{}{
-		"allowed_domains":  "dc1.consul",
-		"allow_subdomains": "true",
-		"generate_lease":   "true",
-		"max_ttl":          "1h",
+		"allowed_domains":    allowed_domains,
+		"allow_bare_domains": "true",
+		"allow_localhost":    "true",
+		"allow_subdomains":   "true",
+		"generate_lease":     "true",
+		"max_ttl":            "1h",
 	}
 
 	_, err = vaultClient.Logical().Write("pki_int/roles/consul-server", params)
@@ -252,7 +256,13 @@ func TestVault_BootstrapConsulServerTLS(t *testing.T) {
 path "pki_int/issue/consul-server" {
   capabilities = ["create", "update"]
 }`
+	clientRules := `
+path "pki_int/cert/ca" {
+  capabilities = ["read"]
+}`
 	err = vaultClient.Sys().PutPolicy("consul-server", rules)
+	require.NoError(t, err)
+	err = vaultClient.Sys().PutPolicy("consul-client", clientRules)
 	require.NoError(t, err)
 
 	logger.Log(t, "Creating the consul-server role.")
@@ -266,13 +276,14 @@ path "pki_int/issue/consul-server" {
 	require.NoError(t, err)
 
 	logger.Log(t, "Creating the consul-client role.")
-	params["bound_service_account_names"] = consulClientServiceAccountName
+	params["bound_service_account_names"] = "*"
+	params["policies"] = "consul-client"
 	_, err = vaultClient.Logical().Write("auth/kubernetes/role/consul-client", params)
 	require.NoError(t, err)
-
 	consulHelmValues := map[string]string{
-		"server.enabled":  "true",
-		"server.replicas": "1",
+		"server.enabled":        "true",
+		"server.replicas":       "1",
+		"connectInject.enabled": "true",
 
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
 		"global.secretsBackend.vault.consulClientRole": "consul-client",
@@ -288,6 +299,7 @@ path "pki_int/issue/consul-server" {
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)
+	time.Sleep(time.Second * 120)
 }
 
 // generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.

@@ -32,14 +32,14 @@ as well as the global.name setting.
 {{- define "consul.serverTLSTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
-            "ttl=1h" "alt_names=localhost" "allowed_other_sans={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data | toJSON -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
 {{- define "consul.serverTLSaltNames" -}}
 {{- $name := include "consul.fullname" . -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.${NAMESPACE},*.%s-server.${NAMESPACE}.svc,*.server.%s.%s" $name $name $name $name (.Values.global.datacenter ) (.Values.global.domain) }}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.default,*.%s-server.default.svc,*.server.%s.%s" $name $name $name $name (.Values.global.datacenter ) (.Values.global.domain) }}
 {{- end -}}
 
 {{/*
@@ -129,12 +129,18 @@ This template is for an init container.
         {{- else }}
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        -ca-file=/vault/secrets/serverca
+        {{- else }}
         -ca-file=/consul/tls/ca/tls.crt
+        {{- end }}
         {{- end }}
   volumeMounts:
     {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+    {{- if not .Values.global.secretsBackend.vault.enabled }}
     - name: consul-ca-cert
       mountPath: /consul/tls/ca
+    {{- end }}
     {{- end }}
     - name: consul-auto-encrypt-ca-cert
       mountPath: /consul/tls/client/ca
