@@ -180,9 +180,9 @@ func (c *Command) Run(args []string) int {
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
 			if len(serviceList) > 2 {
-				c.logger.Error("There are multiple Consul services registered for this pod when there should only be one." +
-					" Check if there are multiple Kubernetes services pointing at this pod and add the label" +
-					" `consul.hashicorp.com/service-ignore: \"true\"` to services which should not be used by Consul for handling requests.")
+				c.logger.Error("There are multiple Consul services registered for this pod when there must only be one." +
+					" Check if there are multiple Kubernetes services selecting this pod and add the label" +
+					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
 			}
 
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
