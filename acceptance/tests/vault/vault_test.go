@@ -129,6 +129,8 @@ func TestVault(t *testing.T) {
 	_, err = vaultClient.Logical().Write("consul/data/secret/gossip", params)
 	require.NoError(t, err)
 
+	vaultCASecret := vault.CASecretName(vaultReleaseName)
+
 	// Bootstrap TLS creates the CA infrastructure required for ServerTLS and also creates the `consul-server` roles.
 	bootstrapTLS(t, vaultClient, consulReleaseName)
 
