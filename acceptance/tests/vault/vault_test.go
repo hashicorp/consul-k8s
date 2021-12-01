@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/stretchr/testify/require"
@@ -44,6 +43,7 @@ path "/connect_inter/*" {
 `
 )
 
+/*
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
@@ -175,6 +175,7 @@ func TestVault(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
 	}
 }
+*/
 
 // Installs Vault, bootstraps it with secrets, policies, and Kube Auth Method
 // then sets up a root CA, intermediate CA and bootstraps vault with the PKI engine
