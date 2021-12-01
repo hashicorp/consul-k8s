@@ -11,9 +11,8 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 const (
@@ -288,7 +287,7 @@ func TestVault_BootstrapConsulServerTLS(t *testing.T) {
 	consulServerServiceAccountName := fmt.Sprintf("%s-consul-server", consulReleaseName)
 	consulClientServiceAccountName := fmt.Sprintf("%s-consul-client", consulReleaseName)
 
-	vaultCluster := vault.NewVaultCluster(t, nil, ctx, cfg, vaultReleaseName)
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName)
 	vaultCluster.Create(t, ctx)
 	// Vault is now installed in the cluster.
 
