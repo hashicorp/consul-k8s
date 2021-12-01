@@ -8,12 +8,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-/* Just using this to play around with the Go debugger. */
-func TestDebugger(t *testing.T) {
-	c := getInitializedCommand(t)
-	c.Run([]string{"-set=\"connectInject.enabled=false\"", "-auto-approve"})
-}
-
 // getInitializedCommand sets up a command struct for tests.
 func getInitializedCommand(t *testing.T) *Command {
 	t.Helper()
