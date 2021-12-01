@@ -2717,6 +2717,149 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	}
 }
 
+// TestReconcileIgnoresServiceIgnoreLabel tests that the endpoints controller correctly ignores services
+// with the service-ignore label and deregisters services previously registered if the service-ignore
+// label is added.
+func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	serviceName := "service-ignored"
+	namespace := "default"
+
+	cases := map[string]struct {
+		svcInitiallyRegistered  bool
+		serviceLabels           map[string]string
+		expectedNumSvcInstances int
+	}{
+		"Registered endpoint with label is deregistered.": {
+			svcInitiallyRegistered: true,
+			serviceLabels: map[string]string{
+				labelServiceIgnore: "true",
+			},
+			expectedNumSvcInstances: 0,
+		},
+		"Not registered endpoint with label is never registered": {
+			svcInitiallyRegistered: false,
+			serviceLabels: map[string]string{
+				labelServiceIgnore: "true",
+			},
+			expectedNumSvcInstances: 0,
+		},
+		"Registered endpoint without label is unaffected": {
+			svcInitiallyRegistered:  true,
+			serviceLabels:           map[string]string{},
+			expectedNumSvcInstances: 1,
+		},
+		"Not registered endpoint without label is registered": {
+			svcInitiallyRegistered:  false,
+			serviceLabels:           map[string]string{},
+			expectedNumSvcInstances: 1,
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
+			endpoint := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: namespace,
+					Labels:    tt.serviceLabels,
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP:       "1.2.3.4",
+								NodeName: &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: namespace,
+								},
+							},
+						},
+					},
+				},
+			}
+			pod1 := createPod("pod1", "1.2.3.4", true, true)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test Consul server.
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+			cfg := &api.Config{Address: consul.HTTPAddr}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			// Set up the initial Consul services.
+			if tt.svcInitiallyRegistered {
+				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					ID:      "pod1-" + serviceName,
+					Name:    serviceName,
+					Port:    0,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						"k8s-namespace":    namespace,
+						"k8s-service-name": serviceName,
+						"managed-by":       "consul-k8s-endpoints-controller",
+						"pod-name":         "pod1",
+					},
+				})
+				require.NoError(t, err)
+				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					ID:   "pod1-sidecar-proxy-" + serviceName,
+					Name: serviceName + "-sidecar-proxy",
+					Port: 0,
+					Meta: map[string]string{
+						"k8s-namespace":    namespace,
+						"k8s-service-name": serviceName,
+						"managed-by":       "consul-k8s-endpoints-controller",
+						"pod-name":         "pod1",
+					},
+				})
+				require.NoError(t, err)
+			}
+
+			// Create the endpoints controller.
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      namespace,
+				ConsulClientCfg:       cfg,
+			}
+
+			// Run the reconcile process to deregister the service if it was registered before.
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// Check that the correct number of services are registered with Consul.
+			serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+			require.NoError(t, err)
+			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+			require.NoError(t, err)
+			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
+		})
+	}
+}
+
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
@@ -4757,6 +4900,74 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 			tokenMeta, err := getTokenMetaFromDescription(c.description)
 			require.NoError(t, err)
 			require.Equal(t, c.expectedTokenMeta, tokenMeta)
+		})
+	}
+}
+
+func TestMapAddresses(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		addresses corev1.EndpointSubset
+		expected  map[corev1.EndpointAddress]string
+	}{
+		"ready and not ready addresses": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+				},
+				NotReadyAddresses: []corev1.EndpointAddress{
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthPassing,
+				{Hostname: "host2"}: api.HealthPassing,
+				{Hostname: "host3"}: api.HealthCritical,
+				{Hostname: "host4"}: api.HealthCritical,
+			},
+		},
+		"ready addresses only": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+				NotReadyAddresses: []corev1.EndpointAddress{},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthPassing,
+				{Hostname: "host2"}: api.HealthPassing,
+				{Hostname: "host3"}: api.HealthPassing,
+				{Hostname: "host4"}: api.HealthPassing,
+			},
+		},
+		"not ready addresses only": {
+			addresses: corev1.EndpointSubset{
+				Addresses: []corev1.EndpointAddress{},
+				NotReadyAddresses: []corev1.EndpointAddress{
+					{Hostname: "host1"},
+					{Hostname: "host2"},
+					{Hostname: "host3"},
+					{Hostname: "host4"},
+				},
+			},
+			expected: map[corev1.EndpointAddress]string{
+				{Hostname: "host1"}: api.HealthCritical,
+				{Hostname: "host2"}: api.HealthCritical,
+				{Hostname: "host3"}: api.HealthCritical,
+				{Hostname: "host4"}: api.HealthCritical,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := mapAddresses(c.addresses)
+			require.Equal(t, c.expected, actual)
 		})
 	}
 }

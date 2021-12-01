@@ -225,6 +225,12 @@ func (c *Command) Run(args []string) int {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
+			if len(serviceList) > 2 {
+				c.logger.Error("There are multiple Consul services registered for this pod when there must only be one." +
+					" Check if there are multiple Kubernetes services selecting this pod and add the label" +
+					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
+			}
+
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {
