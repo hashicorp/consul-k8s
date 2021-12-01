@@ -174,8 +174,6 @@ func (c *Command) init() {
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-
-	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
@@ -259,7 +257,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Print out the upgrade summary.
-	// TODO: Fix this to show the diff between existing and proposed install rather than overrides.
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
@@ -272,11 +269,10 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// TODO: Fix this! We are just going to comment this in, because we do want to set global.name to consul if not set already.
-	//// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
-	//// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
-	//// aren't double prefixed with "consul-consul-...".
-	//vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
+	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
+	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
+	// aren't double prefixed with "consul-consul-...".
+	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
 
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
@@ -310,7 +306,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Setup the upgrade action.
-	// TODO: So many things to add here. (Could add upgrade.<> features)
 	upgrade := action.NewUpgrade(actionConfig)
 	upgrade.Namespace = foundNamespace
 	upgrade.DryRun = c.flagDryRun
@@ -362,8 +357,7 @@ func (c *Command) Run(args []string) int {
 }
 
 // TODO: Make sure the following function is consistent.
-// TODO: Move these functions to common?
-// validateFlags is a helper function that performs sanity checks on the user's provided flags.
+// validateFlags checks that the user's provided flags are valid.
 func (c *Command) validateFlags(args []string) error {
 	if err := c.set.Parse(args); err != nil {
 		return err
@@ -372,7 +366,7 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
-		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
+		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if _, ok := install.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
@@ -385,7 +379,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return fmt.Errorf("File '%s' does not exist.", filename)
+				return fmt.Errorf("file '%s' does not exist", filename)
 			}
 		}
 	}
@@ -397,8 +391,7 @@ func (c *Command) validateFlags(args []string) error {
 }
 
 // TODO: Make sure the following function is consistent.
-// TODO: Move these functions to common?
-// validLabel is a helper function that checks if a string follows RFC 1123 labels.
+// validLabel checks if a string follows RFC 1123 labels.
 func validLabel(s string) bool {
 	for i, c := range s {
 		alphanum := ('a' <= c && c <= 'z') || ('0' <= c && c <= '9')
@@ -413,7 +406,6 @@ func validLabel(s string) bool {
 	return true
 }
 
-// TODO: Move these functions to common?
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
 // installation based on the following precedence order from lowest to highest:
 // 1. -preset
