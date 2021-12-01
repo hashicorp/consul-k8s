@@ -2815,9 +2815,21 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					},
 				})
 				require.NoError(t, err)
+				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					ID:   "pod1-sidecar-proxy-" + serviceName,
+					Name: serviceName + "-sidecar-proxy",
+					Port: 0,
+					Meta: map[string]string{
+						"k8s-namespace":    namespace,
+						"k8s-service-name": serviceName,
+						"managed-by":       "consul-k8s-endpoints-controller",
+						"pod-name":         "pod1",
+					},
+				})
+				require.NoError(t, err)
 			}
 
-			// Create the endpoints controller
+			// Create the endpoints controller.
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
@@ -2831,16 +2843,19 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				ConsulClientCfg:       cfg,
 			}
 
-			// Run the reconcile process to deregister the service if it was registered before
+			// Run the reconcile process to deregister the service if it was registered before.
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
-			// Check that no services are registered with Consul
+			// Check that the correct number of services are registered with Consul.
 			serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
 			require.NoError(t, err)
 			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+			require.NoError(t, err)
+			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
 		})
 	}
 }
