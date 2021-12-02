@@ -1465,6 +1465,18 @@ rollingUpdate:
   [[ "$output" =~ "global.adminPartitions.name has to be \"default\" in the server cluster" ]]
 }
 
+@test "client/DaemonSet: federation and admin partitions cannot be enabled together" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" ]]
+}
+
 #--------------------------------------------------------------------
 # extraContainers
 
