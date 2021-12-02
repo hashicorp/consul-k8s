@@ -1097,4 +1097,3 @@ load _helpers
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
-
