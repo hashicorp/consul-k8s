@@ -42,6 +42,10 @@ spec:
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
         "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
         {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account

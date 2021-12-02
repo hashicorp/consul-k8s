@@ -247,6 +247,7 @@ func defaultHelmValues(releaseName string) map[string]string {
 		"server.standalone.enabled":                "true",
 		"server.standalone.config":                 serverConfig,
 		"injector.enabled":                         "true",
+		"ui.enabled":                               "true",
 	}
 }
 

@@ -1036,16 +1036,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/StatefulSet: CA certificate is specified when TLS is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("--cacert /consul/tls/ca/tls.crt")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "server/StatefulSet: HTTP is disabled in agent when httpsOnly is enabled" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1676,7 +1666,6 @@ load _helpers
     --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
     . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
-
 
   local actual=$(echo $object |
     yq -r '.volumes[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)

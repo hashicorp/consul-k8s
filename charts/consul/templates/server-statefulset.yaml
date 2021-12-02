@@ -109,7 +109,7 @@ spec:
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
-        {{- if .Values.global.tls.enabled }}
+        {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
