@@ -165,9 +165,10 @@ func TestVault(t *testing.T) {
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
 
-		"ingressGateways.enabled":      "true",
-		"ingressGateways.replicas":     "1",
-		"terminatingGateways.replicas": "1",
+		"ingressGateways.enabled":               "true",
+		"ingressGateways.defaults.replicas":     "1",
+		"terminatingGateways.enabled":           "1",
+		"terminatingGateways.defaults.replicas": "1",
 
 		"server.serverCert.secretName": "pki_int/issue/consul-server",
 		"global.tls.caCert.secretName": "pki_int/cert/ca",
