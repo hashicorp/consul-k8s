@@ -159,14 +159,13 @@ func TestVault(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         "connect_root",
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": "connect_inter",
 
-		//"global.acls.manageSystemACLs":       "true",
+		"global.acls.manageSystemACLs":       "true",
 		"global.tls.enabled":                 "true",
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
 
 		"server.serverCert.secretName": "pki_int/issue/consul-server",
 		"global.tls.caCert.secretName": "pki_int/cert/ca",
-		"global.tls.httpsOnly":         "false",
 		"global.tls.enableAutoEncrypt": "true",
 	}
 	logger.Log(t, "Installing Consul")
@@ -175,7 +174,7 @@ func TestVault(t *testing.T) {
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")
-	consulClient := consulCluster.SetupConsulClient(t, false)
+	consulClient := consulCluster.SetupConsulClient(t, true)
 	keys, err := consulClient.Operator().KeyringList(nil)
 	require.NoError(t, err)
 	// There are two identical keys for LAN and WAN since there is only 1 dc.
