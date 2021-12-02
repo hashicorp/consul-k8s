@@ -14,6 +14,10 @@ BUG FIXES:
 * Control Plane:
    * Add a workaround to check that the ACL token is replicated to other Consul servers. [[GH-862](https://github.com/hashicorp/consul-k8s/issues/862)]
 
+BUG FIXES:
+* Helm Chart
+  * Admin Partitions **(Consul Enterprise only)**: Do not mount Consul CA certs to partition-init job if `externalServers.useSystemRoots` is `true`. [[GH-885](https://github.com/hashicorp/consul-k8s/pull/885)]
+
 ## 0.37.0 (November 18, 2021)
 
 BREAKING CHANGES:

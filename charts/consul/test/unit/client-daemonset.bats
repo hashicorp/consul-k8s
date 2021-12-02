@@ -1446,6 +1446,8 @@ rollingUpdate:
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=test' \
       --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=bar' \
       . | tee /dev/stderr |
       yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"test\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
