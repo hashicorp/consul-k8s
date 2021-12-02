@@ -41,7 +41,8 @@ const (
 	flagNameAutoApprove = "auto-approve"
 	defaultAutoApprove  = false
 
-	flagNameNamespace = "namespace"
+	flagNamespace    = "namespace"
+	defaultNamespace = "consul"
 
 	flagNameTimeout = "timeout"
 	defaultTimeout  = "10m"
@@ -51,9 +52,9 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-	// action/upgrade
-	// --install, --reset-values vs --reuse-values,
-	// atomic
+
+	flagInstall    = "install"
+	defaultInstall = false
 )
 
 type Command struct {
@@ -66,6 +67,7 @@ type Command struct {
 	flagPreset          string
 	flagDryRun          bool
 	flagAutoApprove     bool
+	flagNamespace       string
 	flagValueFiles      []string
 	flagSetStringValues []string
 	flagSetValues       []string
@@ -74,6 +76,7 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
+	flagInstall         bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -96,6 +99,12 @@ func (c *Command) init() {
 		Target:  &c.flagAutoApprove,
 		Default: defaultAutoApprove,
 		Usage:   "Skip confirmation prompt.",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNamespace,
+		Target:  &c.flagNamespace,
+		Default: defaultNamespace,
+		Usage:   "Namespace where Consul is installed. Defaults to 'consul'.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameDryRun,
@@ -149,6 +158,12 @@ func (c *Command) init() {
 		Target:  &c.flagWait,
 		Default: defaultWait,
 		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
+	})
+	f.BoolVar(&flag.BoolVar{
+		Name:    flagInstall,
+		Target:  &c.flagInstall,
+		Default: defaultInstall,
+		Usage:   "Fall back to installing Consul if not already installed. Defaults to false.",
 	})
 
 	f = c.set.NewSet("Global Options")
