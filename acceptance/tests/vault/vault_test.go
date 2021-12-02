@@ -144,8 +144,9 @@ func TestVault(t *testing.T) {
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
 
-		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":          "true",
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
@@ -164,8 +165,9 @@ func TestVault(t *testing.T) {
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
 
-		"ingressGateways.enabled":     "true",
-		"terminatingGateways.enabled": "true",
+		"ingressGateways.enabled":      "true",
+		"ingressGateways.replicas":     "1",
+		"terminatingGateways.replicas": "1",
 
 		"server.serverCert.secretName": "pki_int/issue/consul-server",
 		"global.tls.caCert.secretName": "pki_int/cert/ca",
