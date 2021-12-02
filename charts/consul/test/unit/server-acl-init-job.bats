@@ -626,6 +626,9 @@ load _helpers
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
   # Check that the consul-ca-cert volume is not attached
+  local actual=$(echo $object | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
+
   local actual=$(echo $object | jq -r '.spec.containers[] | select(.name="post-install-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
