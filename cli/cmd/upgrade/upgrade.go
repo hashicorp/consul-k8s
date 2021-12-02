@@ -390,22 +390,6 @@ func (c *Command) validateFlags(args []string) error {
 	return nil
 }
 
-// TODO: Make sure the following function is consistent.
-// validLabel checks if a string follows RFC 1123 labels.
-func validLabel(s string) bool {
-	for i, c := range s {
-		alphanum := ('a' <= c && c <= 'z') || ('0' <= c && c <= '9')
-		// If the character is not the last or first, it can be a dash.
-		if i != 0 && i != (len(s)-1) {
-			alphanum = alphanum || (c == '-')
-		}
-		if !alphanum {
-			return false
-		}
-	}
-	return true
-}
-
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
 // installation based on the following precedence order from lowest to highest:
 // 1. -preset
