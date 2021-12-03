@@ -1651,7 +1651,6 @@ load _helpers
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverkey"]' | tee /dev/stderr)"
   local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
-
 }
 
 @test "server/StatefulSet: tls related volumes not attached when tls is enabled on vault" {

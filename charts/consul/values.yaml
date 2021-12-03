@@ -281,8 +281,8 @@ global:
     # kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
-    # If you are using Vault as a secrets backend with TLS the `caCert.secretName` must be provided and should reference
-    # the CA url for your PKI secrets engine with the pem modifier. This is usually of the form `pki/ca/pem` where `pki`
+    # If you are using Vault as a secrets backend with TLS, the `caCert.secretName` must be provided and should reference
+    # the CA path for your PKI secrets engine with the pem modifier. This is usually of the form `pki/ca/pem` where `pki`
     # is the mount point of your PKI secrets engine.
     # Note: This is an unauthenticated endpoint in Vault and as such does not require a policy to be created in Vault.
     # When using Vault the secretKey is not used.
@@ -499,11 +499,11 @@ server:
   # ```
   #
   # Vault Secrets backend:
-  # If you are using Vault as a secrets backend a Vault Policy must be created which allows `["create", "update"]`
-  # capabilities on the PKI issuing endpoint, which is usually of the form `pki_int/issue/consul-server`. 
+  # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
   # Please see the following guide for steps to generate a compatible certificate:
   # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
-  # Note: when using TLS both the server.serverCert and tls.caCert which points to the CA endpoint of this PKI engine
+  # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
   #  must be provided.
   serverCert:
     # The name of the Kubernetes secret or Vault secret path containing the PEM encoded server certificate.

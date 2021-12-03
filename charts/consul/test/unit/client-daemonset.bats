@@ -1710,7 +1710,7 @@ rollingUpdate:
   [ "${actual}" = "${expected}" ]
 }
 
-@test "client/DaemonSet: tls related volumes not attached and command is modified correctly when tls is enabled on vault" {
+@test "client/DaemonSet: tls related volumes not attached and command is modified correctly when tls is enabled with vault" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \

@@ -132,7 +132,7 @@ func TestVault(t *testing.T) {
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
-	// Bootstrap TLS creates the CA infrastructure required for ServerTLS and also creates the `consul-server` roles.
+	// Bootstrap TLS creates the CA infrastructure required for Consul server TLS and also creates the `consul-server` PKI role.
 	bootstrapTLS(t, vaultClient, consulReleaseName)
 
 	consulHelmValues := map[string]string{
@@ -208,9 +208,9 @@ func TestVault(t *testing.T) {
 	}
 }
 
-// bootstrapTLS creates a root CA, intermediate CA and setups up the required roles and policies for the server.
+// bootstrapTLS creates a root CA, intermediate CA and sets up the required roles and policies for the server.
 func bootstrapTLS(t *testing.T, vaultClient *vapi.Client, consulReleaseName string) {
-	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls.
 
 	// Generate the root CA.
 	params := map[string]interface{}{
@@ -252,7 +252,7 @@ func bootstrapTLS(t *testing.T, vaultClient *vapi.Client, consulReleaseName stri
 	_, err = vaultClient.Logical().Write("pki_int/intermediate/set-signed", params)
 	require.NoError(t, err)
 
-	// Create a Vault PKI Role
+	// Create a Vault PKI Role.
 	name := consulReleaseName + "-consul"
 	allowed_domains := fmt.Sprintf("dc1.consul,%s-server,%s-server.default,%s-server.default.svc", name, name, name)
 	params = map[string]interface{}{
