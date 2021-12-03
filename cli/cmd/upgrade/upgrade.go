@@ -46,9 +46,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-
-	flagInstall    = "install"
-	defaultInstall = false
 )
 
 type Command struct {
@@ -152,12 +149,6 @@ func (c *Command) init() {
 		Target:  &c.flagWait,
 		Default: defaultWait,
 		Usage:   "Determines whether to wait for resources in upgrade to be ready before exiting command.",
-	})
-	f.BoolVar(&flag.BoolVar{
-		Name:    flagInstall,
-		Target:  &c.flagInstall,
-		Default: defaultInstall,
-		Usage:   "Fall back to installing Consul if not already installed. Defaults to false.",
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -378,6 +369,10 @@ func (c *Command) validateFlags(args []string) error {
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
+	if !validLabel(c.flagNamespace) {
+		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
+	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
@@ -395,6 +390,21 @@ func (c *Command) validateFlags(args []string) error {
 		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
 	}
 	return nil
+}
+
+// validLabel is a helper function that checks if a string follows RFC 1123 labels.
+func validLabel(s string) bool {
+	for i, c := range s {
+		alphanum := ('a' <= c && c <= 'z') || ('0' <= c && c <= '9')
+		// If the character is not the last or first, it can be a dash.
+		if i != 0 && i != (len(s)-1) {
+			alphanum = alphanum || (c == '-')
+		}
+		if !alphanum {
+			return false
+		}
+	}
+	return true
 }
 
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
