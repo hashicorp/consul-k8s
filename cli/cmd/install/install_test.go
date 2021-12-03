@@ -121,54 +121,6 @@ func TestValidateFlags(t *testing.T) {
 	}
 }
 
-// TestValidLabel calls validLabel() which checks strings match RFC 1123 label convention.
-func TestValidLabel(t *testing.T) {
-	testCases := []struct {
-		description string
-		input       string
-		expected    bool
-	}{
-		{
-			"Standard name with leading numbers works.",
-			"1234-abc",
-			true,
-		},
-		{
-			"All lower case letters works.",
-			"peppertrout",
-			true,
-		},
-		{
-			"Test that dashes in the middle are allowed.",
-			"pepper-trout",
-			true,
-		},
-		{
-			"Capitals violate RFC 1123 lower case label.",
-			"Peppertrout",
-			false,
-		},
-		{
-			"Underscores are not permitted anywhere.",
-			"ab_cd",
-			false,
-		},
-		{
-			"The dash must be in the middle of the word, not on the start/end character.",
-			"peppertrout-",
-			false,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.description, func(t *testing.T) {
-			if result := validLabel(testCase.input); result != testCase.expected {
-				t.Errorf("Incorrect output, got %v and expected %v", result, testCase.expected)
-			}
-		})
-	}
-}
-
 // getInitializedCommand sets up a command struct for tests.
 func getInitializedCommand(t *testing.T) *Command {
 	t.Helper()
