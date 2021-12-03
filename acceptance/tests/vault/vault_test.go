@@ -195,7 +195,7 @@ func TestVault(t *testing.T) {
 
 		"ingressGateways.enabled":               "true",
 		"ingressGateways.defaults.replicas":     "1",
-		"terminatingGateways.enabled":           "1",
+		"terminatingGateways.enabled":           "true",
 		"terminatingGateways.defaults.replicas": "1",
 		"server.serverCert.secretName": "pki/issue/consul-server",
 		"global.tls.caCert.secretName": "pki/cert/ca",
