@@ -131,35 +131,20 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 		Type:   "kv-v2",
 		Config: vapi.MountConfigInput{},
 	})
-	if err != nil {
-		t.Fatal("unable to mount kv-v2 secrets engine", "err", err)
-	}
+	require.NoError(t, err)
 
 	// Enable the PKI Secrets engine.
 	err = v.vaultClient.Sys().Mount("pki", &vapi.MountInput{
 		Type:   "pki",
 		Config: vapi.MountConfigInput{},
 	})
-	if err != nil {
-		t.Fatal("unable to mount pki secrets engine to pki", "err", err)
-	}
-
-	// Enable the PKI Secrets engine for intermediate CA.
-	err = v.vaultClient.Sys().Mount("pki_int", &vapi.MountInput{
-		Type:   "pki",
-		Config: vapi.MountConfigInput{},
-	})
-	if err != nil {
-		t.Fatal("unable to mount pki secrets engine to pki_int", "err", err)
-	}
+	require.NoError(t, err)
 
 	// Enable Kube Auth.
 	err = v.vaultClient.Sys().EnableAuthWithOptions("kubernetes", &vapi.EnableAuthOptions{
 		Type: "kubernetes",
 	})
-	if err != nil {
-		t.Fatal("unable to enable kube auth", "err", err)
-	}
+	require.NoError(t, err)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 

@@ -54,8 +54,8 @@ spec:
         {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}
-        "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.global.tls.caCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-serverca": {{ template "consul.serverTLSCATemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
@@ -244,7 +244,7 @@ spec:
                 -hcl='leave_on_terminate = true' \
                 {{- if .Values.global.tls.enabled }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
-                -hcl='ca_file = "/vault/secrets/serverca"' \
+                -hcl='ca_file = "/vault/secrets/serverca.crt"' \
                 {{- else }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 {{- end }}

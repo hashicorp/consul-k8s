@@ -1700,13 +1700,17 @@ rollingUpdate:
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual="$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/ca/pem\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/cert/ca" ]
+
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -1742,7 +1746,7 @@ rollingUpdate:
   [ "${actual}" = "" ]
 
   local actual=$(echo $object |
-      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca\""))' | tee /dev/stderr)
+      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1759,3 +1763,17 @@ rollingUpdate:
   [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
 }
 
+@test "client/DaemonSet: fail when vault, tls are enabled with a serverCert but no autoencrypt" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}

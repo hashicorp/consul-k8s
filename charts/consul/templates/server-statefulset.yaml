@@ -66,12 +66,12 @@ spec:
         {{- end }}
         {{- end }}
         {{- if .Values.server.serverCert.secretName }}
-        "vault.hashicorp.com/agent-inject-secret-servercert": {{ .Values.server.serverCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-servercert": {{ include "consul.serverTLSCertTemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-serverkey": {{ .Values.server.serverCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-serverkey": {{ include "consul.serverTLSKeyTemplate" . }}
-        "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.global.tls.caCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-serverca": {{ include "consul.serverTLSCATemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-servercert.crt": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-servercert.crt": {{ include "consul.serverTLSCertTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-servercert.key": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-servercert.key": {{ include "consul.serverTLSKeyTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ include "consul.serverTLSCATemplate" . }}
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
@@ -242,9 +242,9 @@ spec:
                 -bootstrap-expect={{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }} \
                 {{- if .Values.global.tls.enabled }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
-                -hcl='ca_file = "/vault/secrets/serverca"' \
-                -hcl='cert_file = "/vault/secrets/servercert"' \
-                -hcl='key_file = "/vault/secrets/serverkey"' \
+                -hcl='ca_file = "/vault/secrets/serverca.crt"' \
+                -hcl='cert_file = "/vault/secrets/servercert.crt"' \
+                -hcl='key_file = "/vault/secrets/servercert.key"' \
                 {{- else }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 -hcl='cert_file = "/consul/tls/server/tls.crt"' \

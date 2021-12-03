@@ -33,7 +33,7 @@ as well as the global.name setting.
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
             "ttl=1h" "alt_names={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
-            {{ "{{" }}- .Data.certificate  -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
@@ -41,7 +41,7 @@ as well as the global.name setting.
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
             "ttl=1h" "alt_names={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
-            {{ "{{" }}- .Data.private_key  -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
@@ -138,7 +138,7 @@ This template is for an init container.
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
         {{- if .Values.global.secretsBackend.vault.enabled }}
-        -ca-file=/vault/secrets/serverca
+        -ca-file=/vault/secrets/serverca.crt
         {{- else }}
         -ca-file=/consul/tls/ca/tls.crt
         {{- end }}
