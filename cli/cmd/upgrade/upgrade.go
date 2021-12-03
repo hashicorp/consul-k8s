@@ -84,8 +84,7 @@ func (c *Command) init() {
 	for name := range config.Presets {
 		presetList = append(presetList, name)
 	}
-	// TODO: I removed the releaseName flag, I think we might need to put it back
-	// TODO: and give it as argument to the run of status.
+
 	c.set = flag.NewSets()
 	f := c.set.NewSet("Command Options")
 	f.BoolVar(&flag.BoolVar{
@@ -201,21 +200,6 @@ func (c *Command) Run(args []string) int {
 		settings.KubeContext = c.flagKubeContext
 	}
 
-	// Setup logger to stream Helm library logs
-	var uiLogger = func(s string, args ...interface{}) {
-		logMsg := fmt.Sprintf(s, args...)
-
-		if c.flagVerbose {
-			// Only output all logs when verbose is enabled
-			c.UI.Output(logMsg, terminal.WithLibraryStyle())
-		} else {
-			// When verbose is not enabled, output all logs except not ready messages for resources
-			if !strings.Contains(logMsg, "not ready") {
-				c.UI.Output(logMsg, terminal.WithLibraryStyle())
-			}
-		}
-	}
-
 	// Set up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
 	// The Helm SDK will use settings.RESTClientGetter for its calls as well, so this will
 	// use a consistent method to target the right cluster for both Helm SDK and non Helm SDK calls.
@@ -234,6 +218,7 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
 
+	uiLogger := c.createUILogger()
 	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
 		c.UI.Output("Could not find existing Consul installation. Run 'consul-k8s install' to create one.")
@@ -253,12 +238,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Create a *chart.Chart object from the files to run the installation from.
-	chart, err := loader.LoadFiles(chartFiles)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
 	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
 
 	// Run a status to get the current chart values.
@@ -273,16 +252,9 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		return 1
 	}
-	c.UI.Output("Ran a `helm status` to gather current Chart values.", terminal.WithSuccessStyle())
 
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	// TODO: We don't need this anymore.
-	_, err = yaml.Marshal(vals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -299,10 +271,10 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
-
-		// Coalesce the user provided over-rides with the chart. This is basically what `upgrade` does anyways.
-		// newChart := common.MergeMaps(chart.Values, vals)
 	}
+
+	// Coalesce the user provided overrides with the chart. This is basically what `upgrade` does anyways.
+	// newChart := common.MergeMaps(chart.Values, vals)
 
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
@@ -463,6 +435,22 @@ func (c *Command) Help() string {
 // Synopsis returns a short string describing the command.
 func (c *Command) Synopsis() string {
 	return "Upgrade Consul on Kubernetes from an existing installation."
+}
+
+func (c *Command) createUILogger() func(string, ...interface{}) {
+	return func(s string, args ...interface{}) {
+		logMsg := fmt.Sprintf(s, args...)
+
+		if c.flagVerbose {
+			// Only output all logs when verbose is enabled
+			c.UI.Output(logMsg, terminal.WithLibraryStyle())
+		} else {
+			// When verbose is not enabled, output all logs except not ready messages for resources
+			if !strings.Contains(logMsg, "not ready") {
+				c.UI.Output(logMsg, terminal.WithLibraryStyle())
+			}
+		}
+	}
 }
 
 // MapDiff takes in two map to string interfaces and returns a list of differences.
