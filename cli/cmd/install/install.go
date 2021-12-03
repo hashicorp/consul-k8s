@@ -3,16 +3,18 @@ package install
 import (
 	"errors"
 	"fmt"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+
 	consulChart "github.com/hashicorp/consul-k8s/charts"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/config"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -81,7 +83,7 @@ type Command struct {
 func (c *Command) init() {
 	// Store all the possible preset values in 'presetList'. Printed in the help message.
 	var presetList []string
-	for name := range Presets {
+	for name := range config.Presets {
 		presetList = append(presetList, name)
 	}
 
@@ -313,7 +315,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = MergeMaps(Convert(GlobalNameConsul), vals)
+	vals = MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
 	// Dry Run should exit here, no need to actual locate/download the charts.
 	if c.flagDryRun {
@@ -454,7 +456,7 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := Presets[c.flagPreset].(map[string]interface{})
+		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
 		vals = MergeMaps(presetMap, vals)
 	}
 	return vals, err
@@ -492,7 +494,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !validLabel(c.flagNamespace) {
