@@ -1,39 +1,28 @@
 package common
 
 import (
-	"embed"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
-var testChart embed.FS
-
-func TestReadChartFiles(t *testing.T) {
-	files, err := ReadChartFiles(testChart, "fixtures/consul")
-	require.NoError(t, err)
-	var foundChart, foundValues, foundTemplate, foundHelper bool
-	for _, f := range files {
-		if f.Name == "Chart.yaml" {
-			require.Equal(t, "chart", string(f.Data))
-			foundChart = true
-		}
-		if f.Name == "values.yaml" {
-			require.Equal(t, "values", string(f.Data))
-			foundValues = true
-		}
-		if f.Name == "templates/foo.yaml" {
-			require.Equal(t, "foo", string(f.Data))
-			foundTemplate = true
-		}
-		if f.Name == "templates/_helpers.tpl" {
-			require.Equal(t, "helpers", string(f.Data))
-			foundHelper = true
-		}
+func TestIsValidLabel(t *testing.T) {
+	cases := []struct {
+		name     string
+		label    string
+		expected bool
+	}{
+		{"Valid label", "such-a-good-label", true},
+		{"Invalid label empty", "", false},
+		{"Invalid label too long", "a-very-very-very-long-label-that-is-more-than-63-characters-long", false},
+		{"Invalid label starts with a dash", "-invalid-label", false},
+		{"Invalid label ends with a dash", "invalid-label-", false},
 	}
-	require.True(t, foundChart)
-	require.True(t, foundValues)
-	require.True(t, foundTemplate)
-	require.True(t, foundHelper)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := IsValidLabel(tc.label)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
 }
