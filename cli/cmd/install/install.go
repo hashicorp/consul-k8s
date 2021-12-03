@@ -315,7 +315,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = MergeMaps(config.Convert(config.GlobalNameConsul), vals)
+	vals = common.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
 	// Dry Run should exit here, no need to actual locate/download the charts.
 	if c.flagDryRun {
@@ -457,30 +457,9 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
 		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
-		vals = MergeMaps(presetMap, vals)
+		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
-}
-
-// MergeMaps is a helper function used in Run. Merges two maps giving b precedent.
-// @source: https://github.com/helm/helm/blob/main/pkg/cli/values/options.go
-func MergeMaps(a, b map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(a))
-	for k, v := range a {
-		out[k] = v
-	}
-	for k, v := range b {
-		if v, ok := v.(map[string]interface{}); ok {
-			if bv, ok := out[k]; ok {
-				if bv, ok := bv.(map[string]interface{}); ok {
-					out[k] = MergeMaps(bv, v)
-					continue
-				}
-			}
-		}
-		out[k] = v
-	}
-	return out
 }
 
 // validateFlags is a helper function that performs sanity checks on the user's provided flags.

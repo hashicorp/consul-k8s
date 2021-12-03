@@ -128,6 +128,27 @@ func CheckForInstallations(settings *helmCLI.EnvSettings, uiLogger action.DebugL
 	return "", "", errors.New("couldn't find consul installation")
 }
 
+// MergeMaps merges two maps giving b precedent.
+// @source: https://github.com/helm/helm/blob/main/pkg/cli/values/options.go
+func MergeMaps(a, b map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(a))
+	for k, v := range a {
+		out[k] = v
+	}
+	for k, v := range b {
+		if v, ok := v.(map[string]interface{}); ok {
+			if bv, ok := out[k]; ok {
+				if bv, ok := bv.(map[string]interface{}); ok {
+					out[k] = MergeMaps(bv, v)
+					continue
+				}
+			}
+		}
+		out[k] = v
+	}
+	return out
+}
+
 func CloseWithError(c *BaseCommand) {
 	if err := c.Close(); err != nil {
 		c.Log.Error(err.Error())
