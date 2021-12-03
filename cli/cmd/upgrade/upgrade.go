@@ -270,7 +270,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	statuser := action.NewStatus(statusConfig)
-	rel, err := statuser.Run(common.DefaultReleaseNamespace)
+	_, err = statuser.Run(common.DefaultReleaseNamespace)
 	if err != nil {
 		return 1
 	}
@@ -293,7 +293,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
+	vals = install.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
 	// Print out the upgrade summary.
 	if !c.flagAutoApprove {
@@ -301,8 +301,9 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
 
-		// Co-alesce the user provided over-rides with the chart. This is basically what `upgrade` does anyways.
-		newChart := install.MergeMaps(chart.Values, vals)
+		// Coalesce the user provided over-rides with the chart. This is basically what `upgrade` does anyways.
+		// newChart := install.MergeMaps(chart.Values, vals)
+	}
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
