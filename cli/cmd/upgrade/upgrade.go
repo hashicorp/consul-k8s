@@ -247,8 +247,7 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
 	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
-	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	chart, err := common.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
