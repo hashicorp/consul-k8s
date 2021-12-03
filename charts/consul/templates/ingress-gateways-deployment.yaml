@@ -59,8 +59,8 @@ spec:
         "vault.hashicorp.com/agent-init-first": "true"
         "vault.hashicorp.com/agent-inject": "true"
         "vault.hashicorp.com/role": {{ $root.Values.global.secretsBackend.vault.consulCARole }}
-        "vault.hashicorp.com/agent-inject-secret-serverca": {{ $root.Values.global.tls.caCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-serverca": {{ template "consul.serverTLSCATemplate" $root }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ $root.Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" $root }}
         {{- if and $root.Values.global.secretsBackend.vault.ca.secretName $root.Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": {{ $root.Values.global.secretsBackend.vault.ca.secretName }}
         "vault.hashicorp.com/ca-cert": /vault/custom/{{ $root.Values.global.secretsBackend.vault.ca.secretKey }}
