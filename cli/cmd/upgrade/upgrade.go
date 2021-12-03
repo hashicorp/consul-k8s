@@ -475,14 +475,15 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	return vals, err
 }
 
-// Help prints help information for this command.
+// Help returns a description of this command and how it can be used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	return fmt.Sprintf("Usage: consul-k8s upgrade [flags]\nUpgrade Consul from an existing installation.\n\n%s", c.help)
+	return fmt.Sprintf("Usage: consul-k8s upgrade [flags]\n%s\n\n%s", c.Synopsis(), c.help)
 }
 
+// Synopsis returns a short string describing the command.
 func (c *Command) Synopsis() string {
-	return "Upgrade Consul on Kubernetes."
+	return "Upgrade Consul on Kubernetes from an existing installation."
 }
 
 // MapDiff takes in two map to string interfaces and returns a list of differences.
