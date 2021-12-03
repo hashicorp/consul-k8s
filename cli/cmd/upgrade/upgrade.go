@@ -290,9 +290,9 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("Succeeded in parsing CLI set values.")
 
-	//// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
-	//// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
-	//// aren't double prefixed with "consul-consul-...".
+	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
+	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
+	// aren't double prefixed with "consul-consul-...".
 	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
 
 	// Print out the upgrade summary.
