@@ -52,9 +52,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-
-	flagInstall    = "install"
-	defaultInstall = false
 )
 
 type Command struct {
@@ -159,12 +156,6 @@ func (c *Command) init() {
 		Default: defaultWait,
 		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
 	})
-	f.BoolVar(&flag.BoolVar{
-		Name:    flagInstall,
-		Target:  &c.flagInstall,
-		Default: defaultInstall,
-		Usage:   "Fall back to installing Consul if not already installed. Defaults to false.",
-	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
@@ -246,10 +237,9 @@ func (c *Command) Run(args []string) int {
 
 	// Note the logic here, common's CheckForInstallations function returns an error if
 	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
-	foundNamespace := ""
+	var foundNamespace string
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
-		// TODO: Don't just error, install.
-		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
+		c.UI.Output("could not find existing Consul installation - run `consul-k8s install`")
 		return 1
 	} else {
 		c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
@@ -371,7 +361,6 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// TODO: Make sure the following function is consistent.
 // validateFlags checks that the user's provided flags are valid.
 func (c *Command) validateFlags(args []string) error {
 	if err := c.set.Parse(args); err != nil {
@@ -385,6 +374,10 @@ func (c *Command) validateFlags(args []string) error {
 	}
 	if _, ok := install.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
+	}
+	if !validLabel(c.flagNamespace) {
+		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
@@ -403,6 +396,21 @@ func (c *Command) validateFlags(args []string) error {
 		c.UI.Output("Performing dry run installation.", terminal.WithInfoStyle())
 	}
 	return nil
+}
+
+// validLabel is a helper function that checks if a string follows RFC 1123 labels.
+func validLabel(s string) bool {
+	for i, c := range s {
+		alphanum := ('a' <= c && c <= 'z') || ('0' <= c && c <= '9')
+		// If the character is not the last or first, it can be a dash.
+		if i != 0 && i != (len(s)-1) {
+			alphanum = alphanum || (c == '-')
+		}
+		if !alphanum {
+			return false
+		}
+	}
+	return true
 }
 
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
