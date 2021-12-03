@@ -1644,16 +1644,17 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-servercert"]' | tee /dev/stderr)
-  [ "${actual}" = "pki_int/issue/test" ]
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-servercert"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data | toJSON -}}\n{{- end -}}'
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverkey"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
 }
 
-@test "server/StatefulSet: tls related volumes not attached and command is modified correctly when tls is enabled on vault" {
+@test "server/StatefulSet: tls related volumes not attached when tls is enabled on vault" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/server-statefulset.yaml  \
@@ -1682,13 +1683,6 @@ load _helpers
   local actual=$(echo $object |
     yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
   [ "${actual}" = "" ]
-
-  local actual=$(echo $object |
-      yq -r '.containers[0].command | any(contains("cat /vault/secrets/servercert | jq -r \".certificate\" > /vault/secrets/tls.crt"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-  local actual=$(echo $object |
-      yq -r '.containers[0].command | any(contains("cat /vault/secrets/servercert | jq -r \".private_key\" > /vault/secrets/tls.key"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 @test "server/StatefulSet: fail when vault, tls are enabled but no caCert provided" {

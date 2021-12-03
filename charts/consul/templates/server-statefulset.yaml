@@ -56,8 +56,8 @@ spec:
         "vault.hashicorp.com/agent-inject": "true"
         "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulServerRole }}"
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
-        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
-        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        "vault.hashicorp.com/agent-extra-secret": {{ .Values.global.secretsBackend.vault.ca.secretName }}
+        "vault.hashicorp.com/ca-cert": /vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}
         {{- end }}
         {{- if .Values.global.gossipEncryption.secretName }}
         {{- with .Values.global.gossipEncryption }}
@@ -67,7 +67,9 @@ spec:
         {{- end }}
         {{- if .Values.server.serverCert.secretName }}
         "vault.hashicorp.com/agent-inject-secret-servercert": {{ .Values.server.serverCert.secretName }}
-        "vault.hashicorp.com/agent-inject-template-servercert": {{ include "consul.serverTLSTemplate" . }}
+        "vault.hashicorp.com/agent-inject-template-servercert": {{ include "consul.serverTLSCertTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-serverkey": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverkey": {{ include "consul.serverTLSKeyTemplate" . }}
         "vault.hashicorp.com/agent-inject-secret-serverca": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca": {{ include "consul.serverTLSCATemplate" . }}
         {{- end }}
@@ -228,14 +230,8 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              {{- if .Values.global.secretsBackend.vault.enabled }}
-              {{- if .Values.global.gossipEncryption.secretName }}
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
-              {{- end }}
-              {{- if .Values.server.serverCert.secretName }}
-              cat /vault/secrets/servercert | jq -r ".certificate" > /vault/secrets/tls.crt
-              cat /vault/secrets/servercert | jq -r ".private_key" > /vault/secrets/tls.key
-              {{- end }}
               {{- end }}
 
               {{ template "consul.extraconfig" }}
@@ -247,8 +243,8 @@ spec:
                 {{- if .Values.global.tls.enabled }}
                 {{- if .Values.global.secretsBackend.vault.enabled }}
                 -hcl='ca_file = "/vault/secrets/serverca"' \
-                -hcl='cert_file = "/vault/secrets/tls.crt"' \
-                -hcl='key_file = "/vault/secrets/tls.key"' \
+                -hcl='cert_file = "/vault/secrets/servercert"' \
+                -hcl='key_file = "/vault/secrets/serverkey"' \
                 {{- else }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
                 -hcl='cert_file = "/consul/tls/server/tls.crt"' \
