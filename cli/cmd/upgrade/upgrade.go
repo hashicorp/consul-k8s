@@ -67,7 +67,6 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
-	flagInstall         bool
 
 	flagKubeConfig  string
 	flagKubeContext string
