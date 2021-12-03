@@ -273,7 +273,7 @@ load _helpers
 
 @test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault is enabled" {
   cd `chart_dir`
-  local command=$(helm template \
+  local object=$(helm template \
       -s templates/tests/test-runner.yaml  \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
@@ -284,10 +284,11 @@ load _helpers
       --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
       --set 'server.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
 
-  # check server address
-  actual=$(echo $command | jq ' . | contains("-ca-file=/vault/secrets/serverca.crt")')
+  actual=$(echo $object | jq '.command | join(" ") | contains("-ca-file=/vault/secrets/serverca.crt")')
   [ "${actual}" = "true" ]
 
+  actual=$(echo $object | jq '.volumeMounts[] | select(.name == "consul-ca-cert")')
+  [ "${actual}" = "" ]
 }

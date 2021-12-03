@@ -1488,7 +1488,8 @@ EOF
 
 #--------------------------------------------------------------------
 # Vault
-@test "ingressGateway/Deployment: configures server CA to come from vault when vault is enabled" {
+
+@test "ingressGateway/Deployment: vault tls annotations are set when tls is enabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1520,6 +1521,7 @@ EOF
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 }
+
 @test "ingressGateway/Deployment: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1559,6 +1561,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "ingressGateway/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1579,6 +1582,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "ingressGateway/Deployment: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \

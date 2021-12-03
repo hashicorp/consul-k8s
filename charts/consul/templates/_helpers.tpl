@@ -31,21 +31,21 @@ as well as the global.name setting.
 
 {{- define "consul.serverTLSCertTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
-            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.consul" .Values.global.datacenter }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSaltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
-{{- define "consul.serverTLSaltNames" -}}
+{{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
 {{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}

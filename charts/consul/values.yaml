@@ -510,7 +510,7 @@ server:
   # Please see the following guide for steps to generate a compatible certificate:
   # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
-  #  must be provided.
+  # must be provided.
   serverCert:
     # The name of the Kubernetes secret or Vault secret path containing the PEM encoded server certificate.
     secretName: null
