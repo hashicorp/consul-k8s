@@ -56,7 +56,7 @@ resources:
 - controller: true
   domain: hashicorp.com
   group: consul
-  kind: PartitionExport
+  kind: ExportedServices
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
 version: "3"

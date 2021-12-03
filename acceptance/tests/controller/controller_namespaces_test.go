@@ -159,9 +159,9 @@ func TestControllerNamespaces(t *testing.T) {
 					// partition-exports
 					entry, _, err = consulClient.ConfigEntries().Get(api.PartitionExports, "default", defaultOpts)
 					require.NoError(r, err)
-					partitionExportsEntry, ok := entry.(*api.PartitionExportsConfigEntry)
+					exportedServicesEntry, ok := entry.(*api.PartitionExportsConfigEntry)
 					require.True(r, ok, "could not cast to PartitionExportsConfigEntry")
-					require.Equal(r, "frontend", partitionExportsEntry.Services[0].Name)
+					require.Equal(r, "frontend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
