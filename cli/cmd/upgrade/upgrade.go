@@ -16,6 +16,7 @@ import (
 	"helm.sh/helm/v3/pkg/getter"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/config"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
@@ -73,7 +74,6 @@ type Command struct {
 	timeoutDuration     time.Duration
 	flagVerbose         bool
 	flagWait            bool
-	flagInstall         bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -85,7 +85,7 @@ type Command struct {
 func (c *Command) init() {
 	// Store all the possible preset values in 'presetList'. Printed in the help message.
 	var presetList []string
-	for name := range install.Presets {
+	for name := range config.Presets {
 		presetList = append(presetList, name)
 	}
 
@@ -277,7 +277,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = install.MergeMaps(install.Convert(install.GlobalNameConsul), vals)
+	vals = install.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
@@ -372,7 +372,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
 		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
-	if _, ok := install.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
+	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
 	if !validLabel(c.flagNamespace) {
@@ -436,7 +436,7 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	}
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
-		presetMap := install.Presets[c.flagPreset].(map[string]interface{})
+		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
 		vals = install.MergeMaps(presetMap, vals)
 	}
 	return vals, err

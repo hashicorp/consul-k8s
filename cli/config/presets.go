@@ -1,4 +1,4 @@
-package install
+package config
 
 import "sigs.k8s.io/yaml"
 
@@ -13,7 +13,7 @@ var Presets = map[string]interface{}{
 	PresetSecure: Convert(secure),
 }
 
-var demo = `
+const demo = `
 global:
   name: consul
 connectInject:
@@ -24,6 +24,7 @@ server:
 `
 
 // TODO: I don't know why the following hangs for me.
+// TODO: This was hanging for Saad. I will look into it.
 //var demo = `
 //global:
 //  name: consul
@@ -48,7 +49,7 @@ server:
 //  enabled: true
 //`
 
-var secure = `
+const secure = `
 global:
   name: consul
   gossipEncryption:
@@ -66,7 +67,7 @@ controller:
   enabled: true
 `
 
-var GlobalNameConsul = `
+const GlobalNameConsul = `
 global:
   name: consul
 `
