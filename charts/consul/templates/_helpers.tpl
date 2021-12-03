@@ -47,7 +47,8 @@ as well as the global.name setting.
 
 {{- define "consul.serverTLSaltNames" -}}
 {{- $name := include "consul.fullname" . -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.default,*.%s-server.default.svc,*.server.%s.%s" $name $name $name $name (.Values.global.datacenter ) (.Values.global.domain) }}
+{{- $ns := .Release.Namespace -}}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
 {{- end -}}
 
 {{/*

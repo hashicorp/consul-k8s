@@ -151,6 +151,12 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # The Vault role for all Consul components to read the ServerTLS CA Certificate (unauthenticated).
+      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
+      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
+      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
+      consulCARole: ""
+
       # Configuration for Vault server CA certificate. This certificate will be mounted
       # to any pod where Vault agent needs to run.
       ca:
@@ -281,10 +287,10 @@ global:
     # kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
-    # If you are using Vault as a secrets backend with TLS, the `caCert.secretName` must be provided and should reference
-    # the CA path for your PKI secrets engine with the pem modifier. This is usually of the form `pki/ca/pem` where `pki`
-    # is the mount point of your PKI secrets engine.
-    # Note: This is an unauthenticated endpoint in Vault and as such does not require a policy to be created in Vault.
+    # If you are using Vault as a secrets backend with TLS, `caCert.secretName` must be provided and should reference
+    # the CA path for your PKI secrets engine. This should be of the form `pki/cert/ca` where `pki` is the mount point of your PKI secrets engine.
+    # A read policy must be created and associated with the CA cert path for `global.tls.caCert.secretName`.
+    # This will be consumed by the `global.secretsBackend.vault.consulCARole` role by all Consul components.
     # When using Vault the secretKey is not used.
     caCert:
       # The name of the Kubernetes secret.

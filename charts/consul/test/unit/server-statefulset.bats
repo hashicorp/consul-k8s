@@ -1684,14 +1684,6 @@ load _helpers
   [ "${actual}" = "" ]
 
   local actual=$(echo $object |
-    yq -r '.volumes[] | select(.name == "consul-ca-key") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
-
-  local actual=$(echo $object |
-    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-client-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
-
-  local actual=$(echo $object |
     yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
