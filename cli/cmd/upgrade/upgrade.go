@@ -234,17 +234,18 @@ func (c *Command) Run(args []string) int {
 
 	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
 
-	// Note the logic here, common's CheckForInstallations function returns an error if
-	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
-	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
-		// TODO: Don't just error, install.
-		c.UI.Output(fmt.Sprintf("could not find existing Consul installation - run `consul-k8s install`"))
+	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
+	if err != nil {
+		c.UI.Output("Could not find existing Consul installation. Run 'consul-k8s install' to create one.")
 		return 1
 	} else {
 		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
 	}
+
+	c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
+	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
 	// Read the embedded chart files into []*loader.BufferedFile.
 	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
@@ -263,7 +264,7 @@ func (c *Command) Run(args []string) int {
 
 	// Run a status to get the current chart values.
 	statusConfig := new(action.Configuration)
-	statusConfig, err = common.InitActionConfig(statusConfig, foundNamespace, settings, uiLogger)
+	statusConfig, err = common.InitActionConfig(statusConfig, namespace, settings, uiLogger)
 	if err != nil {
 		return 1
 	}
@@ -298,7 +299,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
+		c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
 
 		// Coalesce the user provided over-rides with the chart. This is basically what `upgrade` does anyways.
 		// newChart := common.MergeMaps(chart.Values, vals)
@@ -334,7 +335,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = common.InitActionConfig(actionConfig, namespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -342,7 +343,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup the upgrade action.
 	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = c.flagNamespace
+	upgrade.Namespace = namespace
 	upgrade.DryRun = c.flagDryRun
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
@@ -388,7 +389,7 @@ func (c *Command) Run(args []string) int {
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
+	c.UI.Output("Upgraded Consul into namespace %q", namespace, terminal.WithSuccessStyle())
 
 	return 0
 }
