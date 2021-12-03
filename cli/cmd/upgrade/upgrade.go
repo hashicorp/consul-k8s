@@ -475,10 +475,10 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	return vals, err
 }
 
+// Help prints help information for this command.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s upgrade [flags]" + "\n" + "Upgrade Consul from an existing installation." + "\n"
-	return s + "\n" + c.help
+	return fmt.Sprintf("Usage: consul-k8s upgrade [flags]\nUpgrade Consul from an existing installation.\n\n%s", c.help)
 }
 
 func (c *Command) Synopsis() string {
