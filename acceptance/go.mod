@@ -4,8 +4,8 @@ go 1.17
 
 require (
 	github.com/gruntwork-io/terratest v0.31.2
-	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20211207212234-aea9efea5638
-	github.com/hashicorp/consul/api v1.10.1-0.20211206193229-9b44861ce4bc
+	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20211118191758-929940b5ab51
+	github.com/hashicorp/consul/api v1.10.1-0.20211204004731-ed6076db26e7
 	github.com/hashicorp/consul/sdk v0.8.0
 	github.com/hashicorp/vault/api v1.2.0
 	github.com/stretchr/testify v1.7.0
@@ -70,8 +70,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/oklog/run v1.0.0 // indirect
-	github.com/onsi/ginkgo v1.16.4 // indirect
-	github.com/onsi/gomega v1.15.0 // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
