@@ -25,7 +25,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 				},
 				Spec: ExportedServicesSpec{},
 			},
-			Theirs: &capi.PartitionExportsConfigEntry{
+			Theirs: &capi.ExportedServicesConfigEntry{
 				Name:        common.DefaultConsulPartition,
 				CreateIndex: 1,
 				ModifyIndex: 2,
@@ -70,7 +70,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 					},
 				},
 			},
-			Theirs: &capi.PartitionExportsConfigEntry{
+			Theirs: &capi.ExportedServicesConfigEntry{
 				Name: common.DefaultConsulPartition,
 				Services: []capi.ExportedService{
 					{
@@ -116,7 +116,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 			},
 			Theirs: &capi.ServiceConfigEntry{
 				Name: common.DefaultConsulPartition,
-				Kind: capi.PartitionExports,
+				Kind: capi.ExportedServices,
 			},
 			Matches: false,
 		},
@@ -131,7 +131,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 func TestExportedServices_ToConsul(t *testing.T) {
 	cases := map[string]struct {
 		Ours ExportedServices
-		Exp  *capi.PartitionExportsConfigEntry
+		Exp  *capi.ExportedServicesConfigEntry
 	}{
 		"empty fields": {
 			Ours: ExportedServices{
@@ -140,7 +140,7 @@ func TestExportedServices_ToConsul(t *testing.T) {
 				},
 				Spec: ExportedServicesSpec{},
 			},
-			Exp: &capi.PartitionExportsConfigEntry{
+			Exp: &capi.ExportedServicesConfigEntry{
 				Name: common.DefaultConsulPartition,
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -182,7 +182,7 @@ func TestExportedServices_ToConsul(t *testing.T) {
 					},
 				},
 			},
-			Exp: &capi.PartitionExportsConfigEntry{
+			Exp: &capi.ExportedServicesConfigEntry{
 				Name: common.DefaultConsulPartition,
 				Services: []capi.ExportedService{
 					{
@@ -220,7 +220,7 @@ func TestExportedServices_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			exportedServices, ok := act.(*capi.PartitionExportsConfigEntry)
+			exportedServices, ok := act.(*capi.ExportedServicesConfigEntry)
 			require.True(t, ok, "could not cast")
 			require.Equal(t, c.Exp, exportedServices)
 		})
@@ -300,7 +300,7 @@ func TestExportedServices_SyncedConditionWhenStatusNil(t *testing.T) {
 }
 
 func TestExportedServices_ConsulKind(t *testing.T) {
-	require.Equal(t, capi.PartitionExports, (&ExportedServices{}).ConsulKind())
+	require.Equal(t, capi.ExportedServices, (&ExportedServices{}).ConsulKind())
 }
 
 func TestExportedServices_KubeKind(t *testing.T) {

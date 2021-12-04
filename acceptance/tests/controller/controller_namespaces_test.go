@@ -157,10 +157,10 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
 
 					// partition-exports
-					entry, _, err = consulClient.ConfigEntries().Get(api.PartitionExports, "default", defaultOpts)
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.NoError(r, err)
-					exportedServicesEntry, ok := entry.(*api.PartitionExportsConfigEntry)
-					require.True(r, ok, "could not cast to PartitionExportsConfigEntry")
+					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
 					require.Equal(r, "frontend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
@@ -232,7 +232,7 @@ func TestControllerNamespaces(t *testing.T) {
 
 				logger.Log(t, "patching partition-exports custom resource")
 				patchServiceName := "backend"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "partitionexports", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s", "namespace": "front", "consumers":[{"partition": "foo"}]}]}}`, patchServiceName), "--type=merge")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "exportedservices", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s", "namespace": "front", "consumers":[{"partition": "foo"}]}]}}`, patchServiceName), "--type=merge")
 
 				logger.Log(t, "patching mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
@@ -279,11 +279,11 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
 
 					// partition-exports
-					entry, _, err = consulClient.ConfigEntries().Get(api.PartitionExports, "default", defaultOpts)
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.NoError(r, err)
-					partitionExportsEntry, ok := entry.(*api.PartitionExportsConfigEntry)
-					require.True(r, ok, "could not cast to PartitionExportsConfigEntry")
-					require.Equal(r, "backend", partitionExportsEntry.Services[0].Name)
+					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "backend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
@@ -343,7 +343,7 @@ func TestControllerNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "proxydefaults", "global")
 
 				logger.Log(t, "deleting partition-exports custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "partitionexports", "default")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "exportedservices", "default")
 
 				logger.Log(t, "deleting mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "mesh", "mesh")
@@ -381,7 +381,7 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 
 					// partition-exports
-					_, _, err = consulClient.ConfigEntries().Get(api.PartitionExports, "default", defaultOpts)
+					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 

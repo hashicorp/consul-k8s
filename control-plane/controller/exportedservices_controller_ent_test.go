@@ -127,12 +127,12 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 			req.NoError(err)
 			req.False(resp.Requeue)
 
-			cfg, _, err := consulClient.ConfigEntries().Get(capi.PartitionExports, exportedServices.ConsulName(), &capi.QueryOptions{
+			cfg, _, err := consulClient.ConfigEntries().Get(capi.ExportedServices, exportedServices.ConsulName(), &capi.QueryOptions{
 				Namespace: common.DefaultConsulNamespace,
 			})
 			req.NoError(err)
 
-			configEntry, ok := cfg.(*capi.PartitionExportsConfigEntry)
+			configEntry, ok := cfg.(*capi.ExportedServicesConfigEntry)
 			req.True(ok)
 			req.Equal(configEntry.Services[0].Name, "frontend")
 
@@ -240,7 +240,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 
 			// We haven't run reconcile yet so ensure it's created in Consul.
 			{
-				_, _, err := consulClient.ConfigEntries().Set(&capi.PartitionExportsConfigEntry{
+				_, _, err := consulClient.ConfigEntries().Set(&capi.ExportedServicesConfigEntry{
 					Name: "default",
 					Services: []capi.ExportedService{
 						{
@@ -279,11 +279,11 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				cfg, _, err := consulClient.ConfigEntries().Get(capi.PartitionExports, exportedServices.ConsulName(), &capi.QueryOptions{
+				cfg, _, err := consulClient.ConfigEntries().Get(capi.ExportedServices, exportedServices.ConsulName(), &capi.QueryOptions{
 					Namespace: common.DefaultConsulNamespace,
 				})
 				req.NoError(err)
-				entry := cfg.(*capi.PartitionExportsConfigEntry)
+				entry := cfg.(*capi.ExportedServicesConfigEntry)
 				req.Equal("backend", entry.Services[0].Name)
 			}
 		})
@@ -382,7 +382,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 
 			// We haven't run reconcile yet so ensure it's created in Consul.
 			{
-				_, _, err := consulClient.ConfigEntries().Set(&capi.PartitionExportsConfigEntry{
+				_, _, err := consulClient.ConfigEntries().Set(&capi.ExportedServicesConfigEntry{
 					Name: "default",
 					Services: []capi.ExportedService{
 						{
@@ -410,10 +410,10 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 				req.NoError(err)
 				req.False(resp.Requeue)
 
-				_, _, err = consulClient.ConfigEntries().Get(capi.PartitionExports, exportedServices.ConsulName(), &capi.QueryOptions{
+				_, _, err = consulClient.ConfigEntries().Get(capi.ExportedServices, exportedServices.ConsulName(), &capi.QueryOptions{
 					Namespace: common.DefaultConsulNamespace,
 				})
-				req.EqualError(err, fmt.Sprintf(`Unexpected response code: 404 (Config entry not found for "%s" / "%s")`, capi.PartitionExports, exportedServices.ConsulName()))
+				req.EqualError(err, fmt.Sprintf(`Unexpected response code: 404 (Config entry not found for "%s" / "%s")`, capi.ExportedServices, exportedServices.ConsulName()))
 			}
 		})
 	}

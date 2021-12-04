@@ -95,7 +95,7 @@ func (in *ExportedServices) Finalizers() []string {
 }
 
 func (in *ExportedServices) ConsulKind() string {
-	return capi.PartitionExports
+	return capi.ExportedServices
 }
 
 func (in *ExportedServices) ConsulGlobalResource() bool {
@@ -155,7 +155,7 @@ func (in *ExportedServices) ToConsul(datacenter string) api.ConfigEntry {
 	for _, service := range in.Spec.Services {
 		services = append(services, service.toConsul())
 	}
-	return &capi.PartitionExportsConfigEntry{
+	return &capi.ExportedServicesConfigEntry{
 		Name:     in.Name,
 		Services: services,
 		Meta:     meta(datacenter),
@@ -175,12 +175,12 @@ func (in *ExportedService) toConsul() capi.ExportedService {
 }
 
 func (in *ExportedServices) MatchesConsul(candidate api.ConfigEntry) bool {
-	configEntry, ok := candidate.(*capi.PartitionExportsConfigEntry)
+	configEntry, ok := candidate.(*capi.ExportedServicesConfigEntry)
 	if !ok {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.PartitionExportsConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ExportedServicesConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 
 }
 
