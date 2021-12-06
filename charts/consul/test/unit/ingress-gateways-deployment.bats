@@ -1534,6 +1534,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
@@ -1541,6 +1542,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "ingressGateway/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1553,6 +1555,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1574,6 +1577,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1595,6 +1599,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |

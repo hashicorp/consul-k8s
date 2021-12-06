@@ -48,6 +48,9 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# Vault
+
 @test "tlsInitCleanup/PodSecurityPolicy: disabled with global.secretsBackend.vault.enabled=true and global.tls.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \
@@ -55,6 +58,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.caCert.secretName=test' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \

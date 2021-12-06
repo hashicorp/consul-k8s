@@ -163,7 +163,7 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err)
 
 	consulHelmValues := map[string]string{
-                 // TODO: Update the global image once 1.11 is GA.
+		// TODO: Update the global image once 1.11 is GA.
 		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
 
 		"server.enabled":              "true",
@@ -171,7 +171,7 @@ func TestVault(t *testing.T) {
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
-		"global.datacenter": "dc1",
+		"global.datacenter":           "dc1",
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",

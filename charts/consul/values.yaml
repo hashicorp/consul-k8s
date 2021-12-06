@@ -120,7 +120,9 @@ global:
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
   # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
   # and have necessary secrets, policies and roles created prior to installing Consul.
-  # The Vault cluster *must* not have Consul as its storage backend.
+  # The Vault cluster *must* not have the Consul cluster installed by this Helm chart as its storage backend.
+  # It can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
+  # and is being managed separately from this Helm installation.
   # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
   # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
   # secretKey should be in the form of "key".

@@ -564,6 +564,7 @@ load _helpers
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -584,6 +585,7 @@ load _helpers
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -605,6 +607,7 @@ load _helpers
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -626,6 +629,7 @@ load _helpers
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |

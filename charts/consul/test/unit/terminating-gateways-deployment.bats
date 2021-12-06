@@ -1298,6 +1298,7 @@ EOF
 
 #--------------------------------------------------------------------
 # Vault
+
 @test "terminatingGateway/Deployment: configures server CA to come from vault when vault is enabled" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1330,6 +1331,7 @@ EOF
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 }
+
 @test "terminatingGateway/Deployment: vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1342,6 +1344,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
@@ -1349,6 +1352,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "terminatingGateway/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1361,6 +1365,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1369,6 +1374,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "terminatingGateway/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1381,6 +1387,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -1389,6 +1396,7 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
+
 @test "terminatingGateway/Deployment: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1401,6 +1409,7 @@ EOF
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
