@@ -74,7 +74,7 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image": "hashicorp/consul-enterprise:1.11.0-ent-beta3",
+				"global.image": "ashwinvenkatesh/consul@sha256:4be07b9c90fc590827ad72328da332c2003a14d237df317a0c977817f6fdaf0b",
 
 				"global.enableConsulNamespaces":  "true",
 				"global.adminPartitions.enabled": "true",
@@ -156,7 +156,7 @@ func TestControllerNamespaces(t *testing.T) {
 					require.True(r, ok, "could not cast to ProxyConfigEntry")
 					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
 
-					// partition-exports
+					// exported-services
 					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.NoError(r, err)
 					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
