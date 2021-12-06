@@ -3,11 +3,12 @@ package install
 import (
 	"errors"
 	"fmt"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	consulChart "github.com/hashicorp/consul-k8s/charts"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
@@ -179,7 +180,6 @@ type helmValues struct {
 }
 
 type globalValues struct {
-	Image             string            `yaml:"image"`
 	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
 }
 
@@ -291,7 +291,7 @@ func (c *Command) Run(args []string) int {
 	// If an enterprise license secret was provided check that the secret exists
 	// and that the enterprise Consul image is set.
 	if v.Global.EnterpriseLicense.SecretName != "" {
-		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName, v.Global.Image); err != nil {
+		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
@@ -535,8 +535,8 @@ func validLabel(s string) bool {
 
 // checkValidEnterprise checks and validates an enterprise installation.
 // When an enterprise license secret is provided, check that the secret exists
-// in the "consul" namespace, and that the enterprise Consul image is provided.
-func (c *Command) checkValidEnterprise(secretName string, image string) error {
+// in the "consul" namespace.
+func (c *Command) checkValidEnterprise(secretName string) error {
 
 	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
@@ -544,9 +544,6 @@ func (c *Command) checkValidEnterprise(secretName string, image string) error {
 	} else if err != nil {
 		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
-	if !strings.Contains(image, "-ent") {
-		return fmt.Errorf("enterprise Consul image is not provided when enterprise license secret is set: %s", image)
-	}
-	c.UI.Output("Valid enterprise Consul image and secret found.", terminal.WithSuccessStyle())
+	c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
 	return nil
 }
