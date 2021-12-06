@@ -53,6 +53,21 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# admin-partitions
+
+@test "server/StatefulSet: federation and admin partitions cannot be enabled together" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" ]]
+}
+
+#--------------------------------------------------------------------
 # image
 
 @test "server/StatefulSet: image defaults to global.image" {
