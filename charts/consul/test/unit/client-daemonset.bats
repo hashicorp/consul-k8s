@@ -1531,7 +1531,51 @@ rollingUpdate:
   [[ "$output" =~ "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true" ]]
 }
 
+@test "client/DaemonSet: fail when vault, tls are enabled but no caCert provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.tls.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
+}
+
+@test "client/DaemonSet: fail when vault, tls are enabled with a serverCert but no autoencrypt" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
 @test "client/DaemonSet: fail when vault is enabled with tls but autoencrypt is disabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.server.serverCert.secretName=test' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
+@test "client/DaemonSet: fail when vault is enabled with tls but no consulCARole is provided" {
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
@@ -1540,9 +1584,10 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.server.serverCert.secretName=test' \
       --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.enabled=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+  [[ "$output" =~ "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
 }
 
 @test "client/DaemonSet: vault annotations not set by default" {
@@ -1567,6 +1612,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -1585,6 +1631,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.gossipEncryption.secretName=path/to/secret' \
     --set 'global.gossipEncryption.secretKey=gossip' \
     . | tee /dev/stderr |
@@ -1606,6 +1653,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.gossipEncryption.secretName=a/b/c/d' \
     --set 'global.gossipEncryption.secretKey=gossip' \
     . | tee /dev/stderr |
@@ -1697,26 +1745,32 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
   local actual="$(echo $object |
-      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/ca/pem\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/cert/ca" ]
+
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
-@test "client/DaemonSet: tls related volumes not attached and command is modified correctly when tls is enabled on vault" {
+@test "client/DaemonSet: tls related volumes not attached and command is modified correctly when tls is enabled with vault" {
   cd `chart_dir`
   local object=$(helm template \
     -s templates/client-daemonset.yaml  \
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
@@ -1742,20 +1796,6 @@ rollingUpdate:
   [ "${actual}" = "" ]
 
   local actual=$(echo $object |
-      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca\""))' | tee /dev/stderr)
+      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-@test "client/DaemonSet: fail when vault, tls are enabled but no caCert provided" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true'  \
-      --set 'global.secretsBackend.vault.consulServerRole=test' \
-      --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.tls.enabled=true' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
-}
-

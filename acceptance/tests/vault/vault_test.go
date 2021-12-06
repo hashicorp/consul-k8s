@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
-	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,11 +44,11 @@ path "/connect_inter/*" {
 }
 `
 	serverTLSPolicy = `
-path "pki_int/issue/consul-server" {
+path "pki/issue/consul-server" {
   capabilities = ["create", "update"]
 }`
 	caPolicy = `
-path "pki_int/cert/ca" {
+path "pki/cert/ca" {
   capabilities = ["read"]
 }`
 )
@@ -59,6 +58,7 @@ path "pki_int/cert/ca" {
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
+	ns := ctx.KubectlOptions(t).Namespace
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
@@ -90,7 +90,7 @@ func TestVault(t *testing.T) {
 	logger.Log(t, "Creating the consul-server and consul-client roles")
 	params := map[string]interface{}{
 		"bound_service_account_names":      consulClientServiceAccountName,
-		"bound_service_account_namespaces": "default",
+		"bound_service_account_namespaces": ns,
 		"policies":                         "consul-gossip",
 		"ttl":                              "24h",
 	}
@@ -99,7 +99,7 @@ func TestVault(t *testing.T) {
 
 	params = map[string]interface{}{
 		"bound_service_account_names":      consulServerServiceAccountName,
-		"bound_service_account_namespaces": "default",
+		"bound_service_account_namespaces": ns,
 		"policies":                         "consul-gossip,connect-ca,consul-server",
 		"ttl":                              "24h",
 	}
@@ -109,7 +109,7 @@ func TestVault(t *testing.T) {
 	// Create the CA role that all components will use to fetch the Server CA certs.
 	params = map[string]interface{}{
 		"bound_service_account_names":      "*",
-		"bound_service_account_namespaces": "default",
+		"bound_service_account_namespaces": ns,
 		"policies":                         "consul-ca",
 		"ttl":                              "24h",
 	}
@@ -132,10 +132,38 @@ func TestVault(t *testing.T) {
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
-	// Bootstrap TLS creates the CA infrastructure required for ServerTLS and also creates the `consul-server` roles.
-	bootstrapTLS(t, vaultClient, consulReleaseName)
+	// Bootstrap TLS by creating the CA infrastructure required for Consul server TLS and also create the `consul-server` PKI role.
+	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls.
+	// Generate the root CA.
+	params = map[string]interface{}{
+		"common_name": "dc1.consul",
+		"ttl":         "24h",
+	}
+	_, err = vaultClient.Logical().Write("pki/root/generate/internal", params)
+	require.NoError(t, err)
+
+	// Create the Vault PKI Role.
+	name := consulReleaseName + "-consul"
+	allowedDomains := fmt.Sprintf("dc1.consul,%s-server,%s-server.%s,%s-server.%s.svc", name, name, ns, name, ns)
+	params = map[string]interface{}{
+		"allowed_domains":    allowedDomains,
+		"allow_bare_domains": "true",
+		"allow_localhost":    "true",
+		"allow_subdomains":   "true",
+		"generate_lease":     "true",
+		"max_ttl":            "1h",
+	}
+	_, err = vaultClient.Logical().Write("pki/roles/consul-server", params)
+	require.NoError(t, err)
+
+	// Create the server and ca policies
+	err = vaultClient.Sys().PutPolicy("consul-server", serverTLSPolicy)
+	require.NoError(t, err)
+	err = vaultClient.Sys().PutPolicy("consul-ca", caPolicy)
+	require.NoError(t, err)
 
 	consulHelmValues := map[string]string{
+		// TODO: Update the global image once 1.11 is GA.
 		"global.image": "docker.mirror.hashicorp.services/hashicorpdev/consul:latest",
 
 		"server.enabled":              "true",
@@ -143,9 +171,11 @@ func TestVault(t *testing.T) {
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecret,
 		"server.extraVolumes[0].load": "false",
+		"global.datacenter":           "dc1",
 
-		"connectInject.enabled": "true",
-		"controller.enabled":    "true",
+		"connectInject.enabled":  "true",
+		"connectInject.replicas": "1",
+		"controller.enabled":     "true",
 
 		"global.secretsBackend.vault.enabled":          "true",
 		"global.secretsBackend.vault.consulServerRole": "consul-server",
@@ -164,8 +194,14 @@ func TestVault(t *testing.T) {
 		"global.gossipEncryption.secretName": "consul/data/secret/gossip",
 		"global.gossipEncryption.secretKey":  "gossip",
 
-		"server.serverCert.secretName": "pki_int/issue/consul-server",
-		"global.tls.caCert.secretName": "pki_int/cert/ca",
+		"ingressGateways.enabled":               "true",
+		"ingressGateways.defaults.replicas":     "1",
+		"terminatingGateways.enabled":           "true",
+		"terminatingGateways.defaults.replicas": "1",
+
+		"server.serverCert.secretName": "pki/issue/consul-server",
+		"global.tls.caCert.secretName": "pki/cert/ca",
+		"global.tls.httpsOnly":         "false",
 		"global.tls.enableAutoEncrypt": "true",
 
 		// For sync catalog, it is sufficient to check that the deployment is running and ready
@@ -213,71 +249,6 @@ func TestVault(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
 	}
-}
-
-// bootstrapTLS creates a root CA, intermediate CA and setups up the required roles and policies for the server.
-func bootstrapTLS(t *testing.T, vaultClient *vapi.Client, consulReleaseName string) {
-	// Using https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
-
-	// Generate the root CA.
-	params := map[string]interface{}{
-		"common_name": "dc1.consul",
-		"ttl":         "24h",
-	}
-	_, err := vaultClient.Logical().Write("pki/root/generate/internal", params)
-	require.NoError(t, err)
-
-	// Configure the CA and CRL URLs.
-	params = map[string]interface{}{
-		"issuing_certificates":    "http://127.0.0.1:8200/v1/pki/ca",
-		"crl_distribution_points": "http://127.0.0.1:8200/v1/pki/crl",
-	}
-	_, err = vaultClient.Logical().Write("pki/config/urls", params)
-	require.NoError(t, err)
-
-	// Generate an intermediate CA.
-	params = map[string]interface{}{
-		"common_name": "dc1.consul Intermediate Authority",
-	}
-	resp, err := vaultClient.Logical().Write("pki_int/intermediate/generate/internal", params)
-	require.NoError(t, err)
-	csr := resp.Data["csr"].(string)
-
-	// Sign the CSR and import the certificate into Vault.
-	params = map[string]interface{}{
-		"csr":         csr,
-		"common_name": "dc1.consul",
-		"ttl":         "24h",
-	}
-	resp, err = vaultClient.Logical().Write("pki/root/sign-intermediate", params)
-	require.NoError(t, err)
-	intermediateCert := resp.Data["certificate"]
-
-	params = map[string]interface{}{
-		"certificate": intermediateCert,
-	}
-	_, err = vaultClient.Logical().Write("pki_int/intermediate/set-signed", params)
-	require.NoError(t, err)
-
-	// Create a Vault PKI Role
-	name := consulReleaseName + "-consul"
-	allowed_domains := fmt.Sprintf("dc1.consul,%s-server,%s-server.default,%s-server.default.svc", name, name, name)
-	params = map[string]interface{}{
-		"allowed_domains":    allowed_domains,
-		"allow_bare_domains": "true",
-		"allow_localhost":    "true",
-		"allow_subdomains":   "true",
-		"generate_lease":     "true",
-		"max_ttl":            "1h",
-	}
-
-	_, err = vaultClient.Logical().Write("pki_int/roles/consul-server", params)
-	require.NoError(t, err)
-	// Create the server and ca policies
-	err = vaultClient.Sys().PutPolicy("consul-server", serverTLSPolicy)
-	require.NoError(t, err)
-	err = vaultClient.Sys().PutPolicy("consul-ca", caPolicy)
-	require.NoError(t, err)
 }
 
 // generateGossipSecret generates a random 32 byte secret returned as a base64 encoded string.
