@@ -488,10 +488,10 @@ exec /bin/consul snapshot agent \'
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "carole" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca"]' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca"]' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 }
 
@@ -506,6 +506,7 @@ exec /bin/consul snapshot agent \'
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -526,6 +527,7 @@ exec /bin/consul snapshot agent \'
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -547,6 +549,7 @@ exec /bin/consul snapshot agent \'
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
@@ -568,6 +571,7 @@ exec /bin/consul snapshot agent \'
     --set 'global.secretsBackend.vault.enabled=true' \
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
