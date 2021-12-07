@@ -608,33 +608,22 @@ func TestPartitions(t *testing.T) {
 						k8s.CheckStaticServerConnectionFailing(t, clientClusterStaticClientOpts, "http://localhost:1234")
 					}
 
-					intention := &api.ServiceIntentionsConfigEntry{
-						Name:      staticServerName,
-						Kind:      api.ServiceIntentions,
-						Namespace: staticServerNamespace,
-						Sources: []*api.SourceIntention{
-							{
-								Name:      staticClientName,
-								Namespace: staticClientNamespace,
-								Action:    api.IntentionActionAllow,
-							},
-						},
-					}
-
-					// Set the destination namespace to be the same
-					// unless mirrorK8S is true.
-					if !c.mirrorK8S {
-						intention.Namespace = c.destinationNamespace
-						intention.Sources[0].Namespace = c.destinationNamespace
-					}
-
 					logger.Log(t, "creating intention")
-					intention.Sources[0].Partition = secondaryPartition
-					_, _, err := consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: defaultPartition})
-					require.NoError(t, err)
-					intention.Sources[0].Partition = defaultPartition
-					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
-					require.NoError(t, err)
+					if c.destinationNamespace == defaultNamespace {
+						k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-default-default")
+						k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-secondary-default")
+						helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+							k8s.KubectlDeleteK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-default-default")
+							k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-secondary-default")
+						})
+					} else {
+						k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-default-namespaces")
+						k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-secondary-namespaces")
+						helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+							k8s.KubectlDeleteK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-default-namespaces")
+							k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/intentions-secondary-namespaces")
+						})
+					}
 				}
 
 				logger.Log(t, "checking that connection is successful")
