@@ -3,10 +3,72 @@
 BREAKING CHANGES:
 * Control Plane
   * Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
-  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics were
-    scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics
+    were scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
 
 IMPROVEMENTS:
+* Vault as a Secrets Backend
+  * Add support for Vault as a secrets backend for Gossip Encryption, Server TLS certs and Service Mesh TLS certificates,
+    removing the existing usage of Kubernetes Secrets for the respective secrets. [[GH-904](https://github.com/hashicorp/consul-k8s/pull/904/)]
+  * Consul 1.11+ is required.
+  * Vault 1.19+ is required and Vault-K8s 0.14+ must be installed with the Vault Agent Injector (`injector.enabled=true`)
+    and must be configured to talk to the Vault server installation from the Kubernetes cluster that Consul is installed.
+  * `global.tls.enableAutoEncryption=true` is required for TLS support.
+  * If TLS is enabled in Vault `global.secretsBackend.vault.ca` must be provided and should reference a Kube secret
+    which holds a copy of the Vault CA cert.
+
+To enable the Vault Secrets backend for the Consul cluster use the following config:
+
+```yaml
+global:
+  image: hashicorp/consul:1.11.0
+
+  # Gossip Encryption. 
+  gossipEncryption:
+    secretName="consul/data/secrets/gossip"
+    secretKey="key"
+
+  tls:
+    enabled: true
+    enableAutoEncryption: true
+    
+    # Server CA certificate.
+    caCert:
+      secretName: "pki/cert/ca"
+
+  # Vault configuration.
+  secretsBackend:
+    vault:
+      enabled: true
+      
+      # Vault Auth Roles.
+      consulServerRole: "consul-server"
+      consulClientRole: "consul-client"
+      consulCARole: "consul-ca"
+
+      # If Vault TLS is enabled.
+      ca:
+        secretName: "vault-CA-cert"
+        secretKey: "tls.crt"
+     
+      # Connect CA configuration.
+      connectCA:
+        address: 		"https://vault:8200"
+        rootPKIPath: 		"connect_root"
+        intermediatePKIPath: 	"connect_inter"
+
+# Server TLS Certificates.
+server:
+  serverCert:
+    secretName: "pki/issue/consul-server"
+  extraVolumes:
+  - name: "vault-CA-cert"
+    type: "secret"
+    load: false
+```
+Note: See `values.yaml` and [Consul - Vault documentation](https://www.consul.io/docs/k8s/installation/vault/index.mdx)
+for additional information on required Vault policies and configurations.
+
 * CLI
   * Pre-check in the `install` command to verify the correct license secret exists when using an enterprise Consul image. [[GH-875](https://github.com/hashicorp/consul-k8s/pull/875)]
 * Control Plane
