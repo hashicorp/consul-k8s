@@ -254,7 +254,7 @@ func TestPartitions(t *testing.T) {
 			}
 
 			if cfg.EnableTransparentProxy {
-				serverHelmValues["dns.enableRedirection"] = "true"
+				clientHelmValues["dns.enableRedirection"] = "true"
 			}
 
 			// Install the consul cluster without servers in the client cluster kubernetes context.
@@ -473,6 +473,12 @@ func TestPartitions(t *testing.T) {
 					require.NoError(t, err)
 					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 					require.NoError(t, err)
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: defaultPartition})
+						require.NoError(t, err)
+						_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: secondaryPartition})
+						require.NoError(t, err)
+					})
 				}
 
 				logger.Log(t, "checking that connection is successful")
@@ -635,6 +641,12 @@ func TestPartitions(t *testing.T) {
 					intention.Sources[0].Partition = defaultPartition
 					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 					require.NoError(t, err)
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: defaultPartition})
+						require.NoError(t, err)
+						_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: secondaryPartition})
+						require.NoError(t, err)
+					})
 				}
 
 				logger.Log(t, "checking that connection is successful")
@@ -665,11 +677,11 @@ func TestPartitions(t *testing.T) {
 				logger.Log(t, "checking that connection is unsuccessful")
 				if cfg.EnableTransparentProxy {
 					if c.destinationNamespace == defaultNamespace {
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.vitual.%s.ns.%s.ap.dc1.dc.consul", defaultNamespace, secondaryPartition))
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.vitual.%s.ns.%s.ap.dc1.dc.consul", defaultNamespace, defaultPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", defaultNamespace, secondaryPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", defaultNamespace, defaultPartition))
 					} else {
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.vitual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, secondaryPartition))
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.vitual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, defaultPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, secondaryPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, defaultPartition))
 					}
 				} else {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, serverClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
