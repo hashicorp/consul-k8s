@@ -33,6 +33,7 @@ IMPROVEMENTS:
   * Add support for labeling a Kubernetes service with `consul.hashicorp.com/service-ignore` to prevent services from being registered in Consul. [[GH-858](https://github.com/hashicorp/consul-k8s/pull/858)]
 * Helm Chart
   * Fail an installation/upgrade if WAN federation and Admin Partitions are both enabled. [[GH-892](https://github.com/hashicorp/consul-k8s/issues/892)]
+  * Add partition support to Service Resolver, Service Router and Service Splitter CRDs. [[GH-908](https://github.com/hashicorp/consul-k8s/issues/908)]
 
 BUG FIXES:
 * Control Plane:
