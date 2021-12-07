@@ -153,7 +153,7 @@ func (c *Command) Run(args []string) int {
 			c.log.Error("Error reading Partition from Consul", "name", c.flagPartitionName, "error", err.Error())
 		} else if partition == nil {
 			// Retry Admin Partition creation until it succeeds, or we reach the command timeout.
-			_, _, err = consulClient.Partitions().Create(c.ctx, &api.AdminPartition{
+			_, _, err = consulClient.Partitions().Create(c.ctx, &api.Partition{
 				Name:        c.flagPartitionName,
 				Description: "Created by Helm installation",
 			}, nil)
