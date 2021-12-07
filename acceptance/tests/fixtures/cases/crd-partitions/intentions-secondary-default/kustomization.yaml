@@ -1,5 +1,0 @@
-resources:
-  - ../../../bases/partitions/intentions
-
-patchesStrategicMerge:
-- patch.yaml
