@@ -64,6 +64,18 @@ is passed to consul as a -config-file param on command line.
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
 {{- end -}}
 
+{{/*
+Sets up a list of recusor flags for Consul agents by iterating over the IPs of every nameserver
+in /etc/resolv.conf and concatenating them into a string of arguments that can be passed directly
+to the consul agent command.
+*/}}
+{{- define "consul.recursors" -}}
+              recursor_flags=""
+              for ip in $(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
+              do
+                 recursor_flags="$recursor_flags -recursor=$ip"
+              done
+{{- end -}}
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -160,4 +172,22 @@ This template is for an init container.
     limits:
       memory: "50Mi"
       cpu: "50m"
+{{- end -}}
+
+{{/*
+Fails when a reserved name is passed in. This should be used to test against
+Consul namespaces and partition names.
+This template accepts an array that contains two elements. The first element
+is the name that's being checked and the second is the name of the values.yaml
+key that's setting the name.
+
+Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
+
+*/}}
+{{- define "consul.reservedNamesFailer" -}}
+{{- $name := index . 0 -}}
+{{- $key := index . 1 -}}
+{{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
+{{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
+{{- end }}
 {{- end -}}

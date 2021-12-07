@@ -592,6 +592,10 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
 					w.Write([]byte(c.loginResponse))
 				}
+				// Token read request.
+				if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
+					w.Write([]byte(testTokenReadSelfResponse))
+				}
 				// Agent Services get.
 				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
 					servicesGetCounter++
@@ -600,7 +604,7 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			}))
 			defer consulServer.Close()
 
-			// Setup the Command.
+			// Set up the Command.
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
@@ -663,6 +667,10 @@ func TestRun_LoginWithRetries(t *testing.T) {
 						w.Write([]byte(testLoginResponse))
 					}
 				}
+				// Token read request.
+				if r != nil && r.URL.Path == "/v1/acl/token/self" && r.Method == "GET" {
+					w.Write([]byte(testTokenReadSelfResponse))
+				}
 				// Agent Services get.
 				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
 					w.Write([]byte(testServiceListResponse))
@@ -702,6 +710,79 @@ func TestRun_LoginWithRetries(t *testing.T) {
 	}
 }
 
+// Test that we check token exists when reading it in the stale consistency mode.
+func TestRun_EnsureTokenExists(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		neverSucceed bool
+	}{
+		"succeed after first retry": {neverSucceed: false},
+		"never succeed":             {neverSucceed: true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Create a fake input bearer token file and an output file.
+			bearerFile := common.WriteTempFile(t, "bearerTokenFile")
+			tokenFile := common.WriteTempFile(t, "")
+			proxyFile := common.WriteTempFile(t, "")
+
+			// Start the mock Consul server.
+			counter := 0
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// ACL Login.
+				if r != nil && r.URL.Path == "/v1/acl/login" && r.Method == "POST" {
+					w.Write([]byte(testLoginResponse))
+				}
+				// Token read request.
+				if r != nil &&
+					r.URL.Path == "/v1/acl/token/self" &&
+					r.Method == "GET" &&
+					r.URL.Query().Has("stale") {
+
+					// Fail the first request but succeed on the next.
+					if counter == 0 || c.neverSucceed {
+						counter++
+						w.WriteHeader(http.StatusForbidden)
+						w.Write([]byte("ACL not found"))
+					} else {
+						w.Write([]byte(testTokenReadSelfResponse))
+					}
+				}
+				// Agent Services get.
+				if r != nil && r.URL.Path == "/v1/agent/services" && r.Method == "GET" {
+					w.Write([]byte(testServiceListResponse))
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:              ui,
+				tokenSinkFile:   tokenFile,
+				bearerTokenFile: bearerFile,
+				proxyIDFile:     proxyFile,
+			}
+			code := cmd.Run([]string{
+				"-pod-name", testPodName,
+				"-pod-namespace", testPodNamespace,
+				"-acl-auth-method", test.AuthMethod,
+				"-service-account-name", testServiceAccountName,
+				"-http-addr", serverURL.String()})
+			if c.neverSucceed {
+				require.Equal(t, 1, code)
+			} else {
+				require.Equal(t, 0, code)
+				require.Equal(t, 1, counter)
+			}
+		})
+	}
+}
+
 const (
 	metaKeyPodName         = "pod-name"
 	metaKeyKubeNS          = "k8s-namespace"
@@ -710,7 +791,7 @@ const (
 	testPodName            = "counting-pod"
 	testServiceAccountName = "counting"
 
-	// sample response from https://consul.io/api-docs/acl#sample-response
+	// Sample response from https://consul.io/api-docs/acl#sample-response.
 	testLoginResponse = `{
   "AccessorID": "926e2bd2-b344-d91b-0c83-ae89f372cd9b",
   "SecretID": "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586",
@@ -733,6 +814,30 @@ const (
   "CreateIndex": 36,
   "ModifyIndex": 36
 }`
+
+	// Sample response from https://www.consul.io/api-docs/acl/tokens#read-self-token.
+	testTokenReadSelfResponse = `
+{
+  "AccessorID": "6a1253d2-1785-24fd-91c2-f8e78c745511",
+  "SecretID": "45a3bd52-07c7-47a4-52fd-0745e0cfe967",
+  "Description": "Agent token for 'node1'",
+  "Policies": [
+    {
+      "ID": "165d4317-e379-f732-ce70-86278c4558f7",
+      "Name": "node1-write"
+    },
+    {
+      "ID": "e359bd81-baca-903e-7e64-1ccd9fdc78f5",
+      "Name": "node-read"
+    }
+  ],
+  "Local": false,
+  "CreateTime": "2018-10-24T12:25:06.921933-04:00",
+  "Hash": "UuiRkOQPRCvoRZHRtUxxbrmwZ5crYrOdZ0Z1FTFbTbA=",
+  "CreateIndex": 59,
+  "ModifyIndex": 59
+}
+`
 
 	testServiceListResponse = `{
   "counting-counting": {

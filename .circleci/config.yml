@@ -6,11 +6,11 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/circleci/golang:1.16
+      - image: docker.mirror.hashicorp.services/circleci/golang:1.17
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      CONSUL_VERSION: 1.11.0-beta1 # Consul's OSS version to use in tests
-      CONSUL_ENT_VERSION: 1.11.0+ent-beta1 # Consul's enterprise version to use in tests
+      CONSUL_VERSION: 1.11.0-beta3 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.11.0+ent-beta3 # Consul's enterprise version to use in tests
 
 control-plane-path : &control-plane-path control-plane
 cli-path : &cli-path cli
@@ -30,9 +30,9 @@ commands:
       - run:
           name: Install gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-            rm go1.16.5.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.17.3.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.3.linux-amd64.tar.gz
+            rm go1.17.3.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
             wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz

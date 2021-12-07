@@ -13,6 +13,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: gossip-encryption-autogenerate
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "1"
@@ -25,7 +26,7 @@ spec:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: gossip-encryption-autogeneneration
+        component: gossip-encryption-autogenerate
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
     spec:

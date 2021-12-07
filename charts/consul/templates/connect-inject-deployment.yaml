@@ -8,6 +8,7 @@
 {{- if .Values.connectInject.centralConfig }}{{ if .Values.connectInject.centralConfig.proxyDefaults }}{{- if ne (trim .Values.connectInject.centralConfig.proxyDefaults) `{}` }}{{ fail "connectInject.centralConfig.proxyDefaults is no longer supported; instead you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end }}{{ end }}{{ end -}}
 {{- if .Values.connectInject.imageEnvoy }}{{ fail "connectInject.imageEnvoy must be specified in global.imageEnvoy" }}{{ end }}
 {{- if .Values.global.lifecycleSidecarContainer }}{{ fail "global.lifecycleSidecarContainer has been renamed to global.consulSidecarContainer. Please set values using global.consulSidecarContainer." }}{{ end }}
+{{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -19,6 +20,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: connect-injector
 spec:
   replicas: {{ .Values.connectInject.replicas }}
   selector:
@@ -92,8 +94,6 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              CONSUL_FULLNAME="{{template "consul.fullname" . }}"
-
               consul-k8s-control-plane inject-connect \
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
@@ -116,6 +116,10 @@ spec:
                 -transparent-proxy-default-overwrite-probes=true \
                 {{- else }}
                 -transparent-proxy-default-overwrite-probes=false \
+                {{- end }}
+                -resource-prefix={{ template "consul.fullname" . }} \
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
+                -enable-consul-dns=true \
                 {{- end }}
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \

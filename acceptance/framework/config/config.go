@@ -66,8 +66,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	if t.EnterpriseLicense != "" {
-		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretName", LicenseSecretName)
-		setIfNotEmpty(helmValues, "server.enterpriseLicense.secretKey", LicenseSecretKey)
+		setIfNotEmpty(helmValues, "global.enterpriseLicense.secretName", LicenseSecretName)
+		setIfNotEmpty(helmValues, "global.enterpriseLicense.secretKey", LicenseSecretKey)
 	}
 
 	if t.EnableOpenshift {

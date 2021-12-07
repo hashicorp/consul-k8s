@@ -6,6 +6,7 @@
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}{{ fail "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
+{{- if and .Values.global.federation.enabled .Values.global.adminPartitions.enabled }}{{ fail "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" }}{{ end }}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -17,6 +18,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client
 spec:
   {{- if .Values.client.updateStrategy }}
   updateStrategy:
@@ -154,10 +156,10 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- else }}
-        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
         - name: consul-license
           secret:
-            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+            secretName: {{ .Values.global.enterpriseLicense.secretName }}
         {{- end }}
         {{- end }}
       containers:
@@ -206,9 +208,9 @@ spec:
                 {{- end }}
             {{- end }}
             {{- end }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
             - name: CONSUL_LICENSE_PATH
-              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -230,6 +232,9 @@ spec:
 
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
+              {{- end }}
+              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
+              {{ template "consul.recursors" }}
               {{- end }}
 
               {{ template "consul.extraconfig" }}
@@ -309,6 +314,9 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
+                $recursor_flags \
+                {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -domain={{ .Values.global.domain }}
           volumeMounts:
@@ -337,7 +345,7 @@ spec:
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- else }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true

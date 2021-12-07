@@ -90,6 +90,12 @@ const (
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
 
+	// keyConsulDNS enables or disables Consul DNS for a given pod. It can also be set as a label
+	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
+	// with their own annotation.
+	// This annotation/label takes a boolean value (true/false).
+	keyConsulDNS = "consul.hashicorp.com/consul-dns"
+
 	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
 	// with their own annotation.
@@ -115,6 +121,10 @@ const (
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/handler.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
+
+	// labelServiceIgnore is a label that can be added to a service to prevent it from being
+	// registered with Consul.
+	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"

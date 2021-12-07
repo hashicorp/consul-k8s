@@ -11,3 +11,7 @@ copy-crds-to-chart:
 # Deletes AWS resources left behind after failed acceptance tests.
 ci.aws-acceptance-test-cleanup:
 	@cd hack/aws-acceptance-test-cleanup; go run ./... -auto-approve
+
+# Run bats tests in parallel from the root of the repository.
+bats-tests:
+	 bats --jobs 4 charts/consul/test/unit

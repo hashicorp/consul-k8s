@@ -53,6 +53,21 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# admin-partitions
+
+@test "server/StatefulSet: federation and admin partitions cannot be enabled together" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" ]]
+}
+
+#--------------------------------------------------------------------
 # image
 
 @test "server/StatefulSet: image defaults to global.image" {
@@ -136,6 +151,28 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.updateStrategy.rollingUpdate.partition' | tee /dev/stderr)
   [ "${actual}" = "2" ]
+}
+
+#--------------------------------------------------------------------
+# volumeClaim name
+
+@test "server/StatefulSet: no truncation for namespace <= 58 chars" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.volumeClaimTemplates[0].metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "data-default" ]
+}
+
+@test "server/StatefulSet: truncation for namespace > 58 chars" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -n really-really-really-really-really-really-really-long-namespace \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.spec.volumeClaimTemplates[0].metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "data-really-really-really-really-really-really-really-long-name" ]
 }
 
 #--------------------------------------------------------------------
@@ -559,6 +596,28 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# DNS
+
+@test "server/StatefulSet: recursor flags unset by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: add recursor flags if dns.enableRedirection is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'dns.enableRedirection=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("$recursor_flags")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # annotations
 
 @test "server/StatefulSet: no annotations defined by default" {
@@ -664,7 +723,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = df8f3705556144cfb39ae46653965f84faf85001af69306f74d01793503908f4 ]
+  [ "${actual}" = 2c5397272acdc6fe5b079bf25c846c5a17f474603c794c64e7226ce0690625f7 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -674,7 +733,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = a97d7f332bb6585541f1eab2d1782f8b00bd16b883c34b2db3dd3ce7d67ba39e ]
+  [ "${actual}" = b0d22cb051216505edc0e61b57f9eacc0d7e15b24719d815842df88f06f1abe0 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -684,7 +743,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 023154f44972402c58062dbb8ab09095563dd99c23b9dab9d51d705486e767b7 ]
+  [ "${actual}" = 7772975be982e25cc8df101375374e2ba672a55737f8f1580011e0d88d8752a8 ]
 }
 
 #--------------------------------------------------------------------
@@ -1286,8 +1345,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","secret":{"secretName":"foo"}}' ]
@@ -1297,8 +1356,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","mountPath":"/consul/license","readOnly":true}' ]
@@ -1308,8 +1367,8 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.enterpriseLicense.secretName=foo' \
-      --set 'server.enterpriseLicense.secretKey=bar' \
+      --set 'global.enterpriseLicense.secretName=foo' \
+      --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
       yq -r -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]

@@ -11,6 +11,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client
 data:
   extra-from-values.json: |-
 {{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
@@ -24,8 +25,7 @@ data:
        in the UI. */}}
   config.json: |-
     {
-      "check_update_interval": "0s",
-      "use_streaming_backend": false
+      "check_update_interval": "0s"
     }
   {{- end }}
 {{- end }}

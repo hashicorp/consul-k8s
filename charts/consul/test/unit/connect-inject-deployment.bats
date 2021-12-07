@@ -520,6 +520,40 @@ EOF
 }
 
 #--------------------------------------------------------------------
+# DNS
+
+@test "connectInject/Deployment: -enable-consul-dns unset by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-consul-dns is true if dns.enabled=true and dns.enableRedirection=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'dns.enableRedirection=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-consul-dns=true")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -resource-prefix always set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-resource-prefix=RELEASE-NAME-consul")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # global.tls.enabled
 
 @test "connectInject/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
@@ -1641,4 +1675,40 @@ EOF
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)"
   [ "${actual}" = "test" ]
+}
+
+# consulDestinationNamespace reserved name
+
+@test "connectInject/Deployment: fails when consulDestinationNamespace=system" {
+  reservedNameTest "system"
+}
+
+@test "connectInject/Deployment: fails when consulDestinationNamespace=universal" {
+  reservedNameTest "universal"
+}
+
+@test "connectInject/Deployment: fails when consulDestinationNamespace=consul" {
+  reservedNameTest "consul"
+}
+
+@test "connectInject/Deployment: fails when consulDestinationNamespace=operator" {
+  reservedNameTest "operator"
+}
+
+@test "connectInject/Deployment: fails when consulDestinationNamespace=root" {
+  reservedNameTest "root"
+}
+
+# reservedNameTest is a helper function that tests if certain Consul destination
+# namespace names fail because the name is reserved.
+reservedNameTest() {
+  cd `chart_dir`
+  local -r name="$1"
+		run helm template \
+				-s templates/connect-inject-deployment.yaml  \
+				--set 'connectInject.enabled=true' \
+				--set "connectInject.consulNamespaces.consulDestinationNamespace=$name" .
+
+		[ "$status" -eq 1 ]
+		[[ "$output" =~ "The name $name set for key connectInject.consulNamespaces.consulDestinationNamespace is reserved by Consul for future use" ]]
 }

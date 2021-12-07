@@ -87,10 +87,15 @@ func ConnectInjectConnectivityCheck(t *testing.T, ctx environment.TestContext, c
 		}
 
 		logger.Log(t, "creating intention")
-		_, err := consulClient.Connect().IntentionUpsert(&api.Intention{
-			SourceName:      staticClientName,
-			DestinationName: staticServerName,
-			Action:          api.IntentionActionAllow,
+		_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+			Kind: api.ServiceIntentions,
+			Name: staticServerName,
+			Sources: []*api.SourceIntention{
+				{
+					Name:   staticClientName,
+					Action: api.IntentionActionAllow,
+				},
+			},
 		}, nil)
 		require.NoError(t, err)
 	}

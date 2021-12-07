@@ -3,7 +3,6 @@ package uninstall
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -257,10 +256,11 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("Name: %s", foundReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace %s", foundReleaseNamespace, terminal.WithInfoStyle())
 	}
-	// Prompt with a warning for approval before deleting PVCs, Secrets, Service Accounts, Roles, and Role Bindings.
+	// Prompt with a warning for approval before deleting PVCs, Secrets, Service Accounts, Roles, Role Bindings,
+	// Jobs, Cluster Roles, and Cluster Role Bindings.
 	if !c.flagAutoApprove {
 		confirmation, err := c.UI.Input(&terminal.Input{
-			Prompt: fmt.Sprintf("WARNING: Proceed with deleting PVCs, Secrets, Service Accounts, Roles, and Role Bindings for the following installation? \n\n   Name: %s \n   Namespace: %s \n\n   Only approve if all data from this installation can be deleted. (y/N)", foundReleaseName, foundReleaseNamespace),
+			Prompt: fmt.Sprintf("WARNING: Proceed with deleting PVCs, Secrets, Service Accounts, Roles, Role Bindings, Jobs, Cluster Roles, and Cluster Role Bindings for the following installation? \n\n   Name: %s \n   Namespace: %s \n\n   Only approve if all data from this installation can be deleted. (y/N)", foundReleaseName, foundReleaseNamespace),
 			Style:  terminal.WarningStyle,
 			Secret: false,
 		})
@@ -295,6 +295,21 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := c.deleteRoleBindings(foundReleaseName, foundReleaseNamespace); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if err := c.deleteJobs(foundReleaseName, foundReleaseNamespace); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if err := c.deleteClusterRoles(foundReleaseName); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	if err := c.deleteClusterRoleBindings(foundReleaseName); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
@@ -364,10 +379,11 @@ func (c *Command) deletePVCs(foundReleaseName, foundReleaseNamespace string) err
 	return nil
 }
 
-// deleteSecrets deletes any secrets that have foundReleaseName in their name.
+// deleteSecrets deletes any secrets that have the label "managed-by" set to "consul-k8s".
 func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) error {
-	var secretNames []string
-	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{})
+	secrets, err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue,
+	})
 	if err != nil {
 		return fmt.Errorf("deleteSecrets: %s", err)
 	}
@@ -375,14 +391,13 @@ func (c *Command) deleteSecrets(foundReleaseName, foundReleaseNamespace string) 
 		c.UI.Output("No Consul secrets found.", terminal.WithSuccessStyle())
 		return nil
 	}
+	var secretNames []string
 	for _, secret := range secrets.Items {
-		if strings.HasPrefix(secret.Name, foundReleaseName) {
-			err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)
-			}
-			secretNames = append(secretNames, secret.Name)
+		err := c.kubernetes.CoreV1().Secrets(foundReleaseNamespace).Delete(c.Ctx, secret.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteSecrets: error deleting Secret %q: %s", secret.Name, err)
 		}
+		secretNames = append(secretNames, secret.Name)
 	}
 	if len(secretNames) > 0 {
 		for _, secret := range secretNames {
@@ -473,6 +488,90 @@ func (c *Command) deleteRoleBindings(foundReleaseName, foundReleaseNamespace str
 			c.UI.Output("Deleted Role Binding => %s", rolebinding, terminal.WithSuccessStyle())
 		}
 		c.UI.Output("Consul rolebindings deleted.", terminal.WithSuccessStyle())
+	}
+	return nil
+}
+
+// deleteJobs deletes jobs that have the label release={{foundReleaseName}}.
+func (c *Command) deleteJobs(foundReleaseName, foundReleaseNamespace string) error {
+	var jobNames []string
+	jobSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	jobs, err := c.kubernetes.BatchV1().Jobs(foundReleaseNamespace).List(c.Ctx, jobSelector)
+	if err != nil {
+		return fmt.Errorf("deleteJobs: %s", err)
+	}
+	if len(jobs.Items) == 0 {
+		c.UI.Output("No Consul jobs found.", terminal.WithSuccessStyle())
+		return nil
+	}
+	for _, job := range jobs.Items {
+		err := c.kubernetes.BatchV1().Jobs(foundReleaseNamespace).Delete(c.Ctx, job.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteJobs: error deleting Job %q: %s", job.Name, err)
+		}
+		jobNames = append(jobNames, job.Name)
+	}
+	if len(jobNames) > 0 {
+		for _, job := range jobNames {
+			c.UI.Output("Deleted Jobs => %s", job, terminal.WithSuccessStyle())
+		}
+		c.UI.Output("Consul jobs deleted.", terminal.WithSuccessStyle())
+	}
+	return nil
+}
+
+// deleteClusterRoles deletes clusterRoles that have the label release={{foundReleaseName}}.
+func (c *Command) deleteClusterRoles(foundReleaseName string) error {
+	var clusterRolesNames []string
+	clusterRolesSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	clusterRoles, err := c.kubernetes.RbacV1().ClusterRoles().List(c.Ctx, clusterRolesSelector)
+	if err != nil {
+		return fmt.Errorf("deleteClusterRoles: %s", err)
+	}
+	if len(clusterRoles.Items) == 0 {
+		c.UI.Output("No Consul cluster roles found.", terminal.WithSuccessStyle())
+		return nil
+	}
+	for _, clusterRole := range clusterRoles.Items {
+		err := c.kubernetes.RbacV1().ClusterRoles().Delete(c.Ctx, clusterRole.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteClusterRoles: error deleting cluster role %q: %s", clusterRole.Name, err)
+		}
+		clusterRolesNames = append(clusterRolesNames, clusterRole.Name)
+	}
+	if len(clusterRolesNames) > 0 {
+		for _, clusterRole := range clusterRolesNames {
+			c.UI.Output("Deleted cluster role => %s", clusterRole, terminal.WithSuccessStyle())
+		}
+		c.UI.Output("Consul cluster roles deleted.", terminal.WithSuccessStyle())
+	}
+	return nil
+}
+
+// deleteClusterRoleBindings deletes clusterrolebindings that have the label release={{foundReleaseName}}.
+func (c *Command) deleteClusterRoleBindings(foundReleaseName string) error {
+	var clusterRoleBindingsNames []string
+	clusterRoleBindingsSelector := metav1.ListOptions{LabelSelector: fmt.Sprintf("release=%s", foundReleaseName)}
+	clusterRoleBindings, err := c.kubernetes.RbacV1().ClusterRoleBindings().List(c.Ctx, clusterRoleBindingsSelector)
+	if err != nil {
+		return fmt.Errorf("deleteClusterRoleBindings: %s", err)
+	}
+	if len(clusterRoleBindings.Items) == 0 {
+		c.UI.Output("No Consul cluster role bindings found.", terminal.WithSuccessStyle())
+		return nil
+	}
+	for _, clusterRoleBinding := range clusterRoleBindings.Items {
+		err := c.kubernetes.RbacV1().ClusterRoleBindings().Delete(c.Ctx, clusterRoleBinding.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("deleteClusterRoleBindings: error deleting cluster role binding %q: %s", clusterRoleBinding.Name, err)
+		}
+		clusterRoleBindingsNames = append(clusterRoleBindingsNames, clusterRoleBinding.Name)
+	}
+	if len(clusterRoleBindingsNames) > 0 {
+		for _, clusterRoleBinding := range clusterRoleBindingsNames {
+			c.UI.Output("Deleted cluster role binding => %s", clusterRoleBinding, terminal.WithSuccessStyle())
+		}
+		c.UI.Output("Consul cluster role bindings deleted.", terminal.WithSuccessStyle())
 	}
 	return nil
 }
