@@ -61,9 +61,12 @@ type ServiceSplit struct {
 	// ServiceSubset is a named subset of the given service to resolve instead of one defined
 	// as that service's DefaultSubset. If empty the default subset is used.
 	ServiceSubset string `json:"serviceSubset,omitempty"`
-	// The namespace to resolve the service from instead of the current namespace.
-	// If empty the current namespace is assumed.
+	// Namespace is the Consul namespace to resolve the service from instead of
+	// the current namespace. If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Consul partition to resolve the service from instead of
+	// the current partition. If empty the current partition is assumed.
+	Partition string `json:"partition,omitempty"`
 	// Allow HTTP header manipulation to be configured.
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
 	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
@@ -168,7 +171,7 @@ func (in *ServiceSplitter) MatchesConsul(candidate capi.ConfigEntry) bool {
 func (in *ServiceSplitter) Validate(consulMeta common.ConsulMeta) error {
 	errs := in.Spec.Splits.validate(field.NewPath("spec").Child("splits"))
 
-	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -198,18 +201,26 @@ func (in ServiceSplit) toConsul() capi.ServiceSplit {
 		Service:         in.Service,
 		ServiceSubset:   in.ServiceSubset,
 		Namespace:       in.Namespace,
+		Partition:       in.Partition,
 		RequestHeaders:  in.RequestHeaders.toConsul(),
 		ResponseHeaders: in.ResponseHeaders.toConsul(),
 	}
 }
 
-func (in *ServiceSplitter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+func (in *ServiceSplitter) validateEnterprise(consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !namespacesEnabled {
+	if !consulMeta.NamespacesEnabled {
 		for i, s := range in.Spec.Splits {
 			if s.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("namespace"), s.Namespace, `Consul Enterprise namespaces must be enabled to set split.namespace`))
+			}
+		}
+	}
+	if !consulMeta.PartitionsEnabled {
+		for i, s := range in.Spec.Splits {
+			if s.Partition != "" {
+				errs = append(errs, field.Invalid(path.Child("splits").Index(i).Child("partition"), s.Partition, `Consul Enterprise partitions must be enabled to set split.partition`))
 			}
 		}
 	}
