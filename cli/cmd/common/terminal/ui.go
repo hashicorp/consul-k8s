@@ -101,6 +101,8 @@ const (
 	LibraryStyle     = "library"
 	SuccessStyle     = "success"
 	SuccessBoldStyle = "success-bold"
+	DiffAddedStyle   = "diff-added"
+	DiffRemovedStyle = "diff-removed"
 )
 
 type config struct {
@@ -137,7 +139,7 @@ func WithErrorStyle() Option {
 	}
 }
 
-// WithWarningStyle styles the output as an error message.
+// WithWarningStyle styles the output as an warning message.
 func WithWarningStyle() Option {
 	return func(c *config) {
 		c.Style = WarningStyle
@@ -151,13 +153,28 @@ func WithSuccessStyle() Option {
 	}
 }
 
-// WithLibraryStyle styles the output as a success message.
+// WithLibraryStyle styles the output with an arrow pointing to a section.
 func WithLibraryStyle() Option {
 	return func(c *config) {
 		c.Style = LibraryStyle
 	}
 }
 
+// WithDiffAddedStyle colors the output in green.
+func WithDiffAddedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffAddedStyle
+	}
+}
+
+// WithDiffRemovedStyle colors the output in red.
+func WithDiffRemovedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffRemovedStyle
+	}
+}
+
+// WithStyle allows for setting a style by passing a string.
 func WithStyle(style string) Option {
 	return func(c *config) {
 		c.Style = style
@@ -179,4 +196,6 @@ var (
 	colorSuccessBold = color.New(color.FgGreen, color.Bold)
 	colorWarning     = color.New(color.FgYellow)
 	colorWarningBold = color.New(color.FgYellow, color.Bold)
+	colorDiffAdded   = color.New(color.FgGreen)
+	colorDiffRemoved = color.New(color.FgRed)
 )
