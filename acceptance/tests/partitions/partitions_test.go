@@ -535,7 +535,7 @@ func TestPartitions(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, services, 1)
 
-				logger.Log(t, "creating partition exports")
+				logger.Log(t, "creating exported services")
 				if c.destinationNamespace == defaultNamespace {
 					k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
 					k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")

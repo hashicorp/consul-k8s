@@ -1,3 +1,2 @@
 resources:
-  - exportedservices-default.yaml
   - exportedservices-secondary.yaml
