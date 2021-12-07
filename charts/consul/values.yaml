@@ -556,6 +556,8 @@ server:
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
+  # See https://www.consul.io/docs/install/performance#read-write-tuning for considerations around choosing a
+  # performant storage class.
   # @type: string
   storageClass: null
 
