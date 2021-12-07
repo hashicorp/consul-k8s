@@ -118,10 +118,11 @@ global:
   enablePodSecurityPolicies: false
 
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
-  # The Vault cluster needs to have the Kubernetes Auth Method, 
-  # KV2 and PKI secrets engines enabled and have necessary secrets, 
-  # policies and roles created prior to installing Consul.
-  # The Vault cluster should not have Consul as its storage backend.
+  # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
+  # and have necessary secrets, policies and roles created prior to installing Consul.
+  # The Vault cluster *must* not have the Consul cluster installed by this Helm chart as its storage backend.
+  # It can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
+  # and is being managed separately from this Helm installation.
   # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
   # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
   # secretKey should be in the form of "key".
@@ -151,6 +152,12 @@ global:
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
+
+      # The Vault role for all Consul components to read the ServerTLS CA Certificate (unauthenticated).
+      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
+      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
+      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
+      consulCARole: ""
 
       # Configuration for Vault server CA certificate. This certificate will be mounted
       # to any pod where Vault agent needs to run.
@@ -206,7 +213,7 @@ global:
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
   # a key, saving this as a Kubernetes secret or Vault secret path and key.
-  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" field to the secretName as required by
+  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" component of the secretName path as required by
   # the Vault KV-2 secrets engine [see example].
   #
   # ```
@@ -274,15 +281,19 @@ global:
     # both clients and servers and to only accept HTTPS connections.
     httpsOnly: true
 
-    # A Kubernetes secret containing the certificate of the CA to use for
-    # TLS communication within the Consul cluster. If you have generated the CA yourself
-    # with the consul CLI, you could use the following command to create the secret
+    # A secret containing the certificate of the CA to use for TLS communication within the Consul cluster.
+    # If you have generated the CA yourself with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
     # ```bash
     # kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
+    # If you are using Vault as a secrets backend with TLS, `caCert.secretName` must be provided and should reference
+    # the CA path for your PKI secrets engine. This should be of the form `pki/cert/ca` where `pki` is the mount point of your PKI secrets engine.
+    # A read policy must be created and associated with the CA cert path for `global.tls.caCert.secretName`.
+    # This will be consumed by the `global.secretsBackend.vault.consulCARole` role by all Consul components.
+    # When using Vault the secretKey is not used.
     caCert:
       # The name of the Kubernetes secret.
       secretName: null
@@ -470,10 +481,11 @@ server:
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
 
-  # A Kubernetes secret containing a certificate & key for the server agents to use
+  # A secret containing a certificate & key for the server agents to use
   # for TLS communication within the Consul cluster. Cert needs to be provided with
   # additional DNS name SANs so that it will work within the Kubernetes cluster:
   #
+  # Kubernetes Secrets backend:
   # ```bash
   # consul tls cert create -server -days=730 -domain=consul -ca=consul-agent-ca.pem \
   #     -key=consul-agent-ca-key.pem -dc={{datacenter}} \
@@ -485,8 +497,7 @@ server:
   #     -additional-dnsname="server.{{datacenter}}.{{domain}}"
   # ```
   #
-  # If you have generated the
-  # server-cert yourself with the consul CLI, you could use the following command
+  # If you have generated the server-cert yourself with the consul CLI, you could use the following command
   # to create the secret in Kubernetes:
   #
   # ```bash
@@ -494,8 +505,16 @@ server:
   #     --from-file='tls.crt=./dc1-server-consul-0.pem'
   #     --from-file='tls.key=./dc1-server-consul-0-key.pem'
   # ```
+  #
+  # Vault Secrets backend:
+  # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
+  # Please see the following guide for steps to generate a compatible certificate:
+  # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+  # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
+  # must be provided.
   serverCert:
-    # The name of the Kubernetes secret.
+    # The name of the Kubernetes secret or Vault secret path containing the PEM encoded server certificate.
     secretName: null
 
   # Exposes the servers' gossip and RPC ports as hostPorts. To enable a client
