@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20211118191758-929940b5ab51
-	github.com/hashicorp/consul/api v1.10.1-0.20211204004731-ed6076db26e7
+	github.com/hashicorp/consul/api v1.10.1-0.20211206193229-9b44861ce4bc
 	github.com/hashicorp/consul/sdk v0.8.0
 	github.com/hashicorp/vault/api v1.2.0
 	github.com/stretchr/testify v1.7.0
