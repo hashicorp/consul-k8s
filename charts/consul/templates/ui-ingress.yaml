@@ -5,7 +5,7 @@
 This is because while networks.k8s.io/v1 was introduced in Kubernetes v1.15+, the Ingress resource was
 promoted to v1 only in Kubernetes v1.19+. This ensures the correct API version is chosen that supports
 the Ingress resource. */}}
-{{- if semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion }}
+{{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "19" ) }}
 apiVersion: networking.k8s.io/v1
 {{- else }}
 apiVersion: networking.k8s.io/v1beta1
@@ -25,12 +25,12 @@ metadata:
     {{ tpl .Values.ui.ingress.annotations . | nindent 4 | trim }}
   {{- end }}
 spec:
-  {{- if and .Values.ui.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
-  ingressClassName: {{ .Values.ui.ingress.className }}
+  {{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "18" ) }}
+  ingressClassName: {{ .Values.ui.ingress.ingressClassName }}
   {{- end }}
   rules:
   {{ $global := .Values.global }}
-  {{- if semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion }}
+  {{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "19" ) }}
   {{- range .Values.ui.ingress.hosts }}
   - host: {{ .host | quote }}
     http:
