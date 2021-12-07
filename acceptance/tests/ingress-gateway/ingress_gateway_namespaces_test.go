@@ -132,12 +132,17 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
-				_, err = consulClient.Connect().IntentionUpsert(&api.Intention{
-					SourceName:      "ingress-gateway",
-					SourceNS:        testNamespace,
-					DestinationName: "static-server",
-					DestinationNS:   testNamespace,
-					Action:          api.IntentionActionAllow,
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+					Kind:      api.ServiceIntentions,
+					Name:      "static-server",
+					Namespace: testNamespace,
+					Sources: []*api.SourceIntention{
+						{
+							Name:      "ingress-gateway",
+							Namespace: testNamespace,
+							Action:    api.IntentionActionAllow,
+						},
+					},
 				}, nil)
 				require.NoError(t, err)
 			}
@@ -252,12 +257,17 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 
 				// Now we create the allow intention.
 				logger.Log(t, "creating ingress-gateway => static-server intention")
-				_, err = consulClient.Connect().IntentionUpsert(&api.Intention{
-					SourceName:      "ingress-gateway",
-					SourceNS:        "default",
-					DestinationName: "static-server",
-					DestinationNS:   testNamespace,
-					Action:          api.IntentionActionAllow,
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+					Kind:      api.ServiceIntentions,
+					Name:      "static-server",
+					Namespace: testNamespace,
+					Sources: []*api.SourceIntention{
+						{
+							Name:      "ingress-gateway",
+							Namespace: "default",
+							Action:    api.IntentionActionAllow,
+						},
+					},
 				}, nil)
 				require.NoError(t, err)
 			}

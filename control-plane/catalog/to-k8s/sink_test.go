@@ -150,8 +150,7 @@ func TestK8SSink_createExists(t *testing.T) {
 
 		if actual == nil {
 			r.Fatal("web not found")
-		}
-		if actual.Spec.ExternalName != "example.com." {
+		} else if actual.Spec.ExternalName != "example.com." {
 			r.Fatal("modified")
 		}
 	})

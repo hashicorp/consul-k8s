@@ -17,6 +17,9 @@ import (
 	"time"
 )
 
+// NOTE: A lot of this code is taken from
+// https://github.com/hashicorp/consul/blob/44c023a3020fdd139c5be330f318a3c12339f08e/agent/connect/parsing.go.
+
 // GenerateCA generates a CA with the provided
 // common name valid for 10 years. It returns the private key as
 // a crypto.Signer and a PEM string and certificate
@@ -162,6 +165,22 @@ func ParseSigner(pemValue string) (crypto.Signer, error) {
 	switch block.Type {
 	case "EC PRIVATE KEY":
 		return x509.ParseECPrivateKey(block.Bytes)
+
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
+
+	case "PRIVATE KEY":
+		signer, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		pk, ok := signer.(crypto.Signer)
+		if !ok {
+			return nil, fmt.Errorf("private key is not a valid format")
+		}
+
+		return pk, nil
+
 	default:
 		return nil, fmt.Errorf("unknown PEM block type for signing key: %s", block.Type)
 	}

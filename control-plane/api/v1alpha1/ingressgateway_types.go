@@ -61,6 +61,19 @@ type IngressGatewaySpec struct {
 type GatewayTLSConfig struct {
 	// Indicates that TLS should be enabled for this gateway service.
 	Enabled bool `json:"enabled"`
+
+	// SDS allows configuring TLS certificate from an SDS service.
+	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+}
+
+type GatewayServiceTLSConfig struct {
+	// SDS allows configuring TLS certificate from an SDS service.
+	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+}
+
+type GatewayTLSSDSConfig struct {
+	ClusterName  string `json:"clusterName,omitempty"`
+	CertResource string `json:"certResource,omitempty"`
 }
 
 // IngressListener manages the configuration for a listener on a specific port.
@@ -73,6 +86,9 @@ type IngressListener struct {
 	// services over a single port, or additional discovery chain features. The
 	// current supported values are: (tcp | http | http2 | grpc).
 	Protocol string `json:"protocol,omitempty"`
+
+	// TLS config for this listener.
+	TLS *GatewayTLSConfig `json:"gatewayTLSConfig,omitempty"`
 
 	// Services declares the set of services to which the listener forwards
 	// traffic.
@@ -111,6 +127,17 @@ type IngressService struct {
 	// Namespace is the namespace where the service is located.
 	// Namespacing is a Consul Enterprise feature.
 	Namespace string `json:"namespace,omitempty"`
+
+	// Partition is the admin-partition where the service is located.
+	// Partitioning is a Consul Enterprise feature.
+	Partition string `json:"partition,omitempty"`
+
+	// TLS allows specifying some TLS configuration per listener.
+	TLS *GatewayServiceTLSConfig `json:"gatewayServiceTLSConfig,omitempty"`
+
+	// Allow HTTP header manipulation to be configured.
+	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
+	ResponseHeaders *HTTPHeaderModifiers `json:"responseHeaders,omitempty"`
 }
 
 func (in *IngressGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -199,7 +226,7 @@ func (in *IngressGateway) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.IngressGatewayConfigEntry{
 		Kind:      in.ConsulKind(),
 		Name:      in.ConsulName(),
-		TLS:       in.Spec.TLS.toConsul(),
+		TLS:       *in.Spec.TLS.toConsul(),
 		Listeners: listeners,
 		Meta:      meta(datacenter),
 	}
@@ -219,10 +246,8 @@ func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
 	path := field.NewPath("spec")
 
 	for i, v := range in.Spec.Listeners {
-		errs = append(errs, v.validate(path.Child("listeners").Index(i))...)
+		errs = append(errs, v.validate(path.Child("listeners").Index(i), consulMeta)...)
 	}
-
-	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -251,9 +276,13 @@ func (in *IngressGateway) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	}
 }
 
-func (in GatewayTLSConfig) toConsul() capi.GatewayTLSConfig {
-	return capi.GatewayTLSConfig{
+func (in *GatewayTLSConfig) toConsul() *capi.GatewayTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayTLSConfig{
 		Enabled: in.Enabled,
+		SDS:     in.SDS.toConsul(),
 	}
 }
 
@@ -262,22 +291,47 @@ func (in IngressListener) toConsul() capi.IngressListener {
 	for _, s := range in.Services {
 		services = append(services, s.toConsul())
 	}
+
 	return capi.IngressListener{
 		Port:     in.Port,
 		Protocol: in.Protocol,
+		TLS:      in.TLS.toConsul(),
 		Services: services,
 	}
 }
 
 func (in IngressService) toConsul() capi.IngressService {
 	return capi.IngressService{
-		Name:      in.Name,
-		Hosts:     in.Hosts,
-		Namespace: in.Namespace,
+		Name:            in.Name,
+		Hosts:           in.Hosts,
+		Namespace:       in.Namespace,
+		Partition:       in.Partition,
+		TLS:             in.TLS.toConsul(),
+		RequestHeaders:  in.RequestHeaders.toConsul(),
+		ResponseHeaders: in.ResponseHeaders.toConsul(),
 	}
 }
 
-func (in IngressListener) validate(path *field.Path) field.ErrorList {
+func (in *GatewayTLSSDSConfig) toConsul() *capi.GatewayTLSSDSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayTLSSDSConfig{
+		ClusterName:  in.ClusterName,
+		CertResource: in.CertResource,
+	}
+}
+
+func (in *GatewayServiceTLSConfig) toConsul() *capi.GatewayServiceTLSConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.GatewayServiceTLSConfig{
+		SDS: in.SDS.toConsul(),
+	}
+}
+
+func (in IngressListener) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	validProtocols := []string{"tcp", "http", "http2", "grpc"}
 	if !sliceContains(validProtocols, in.Protocol) {
@@ -307,27 +361,21 @@ func (in IngressListener) validate(path *field.Path) field.ErrorList {
 				fmt.Sprintf("hosts must be empty if name is %q", wildcardServiceName)))
 		}
 
+		if svc.Partition != "" && !consulMeta.PartitionsEnabled {
+			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("partition"),
+				svc.Partition, `Consul Enterprise admin-partitions must be enabled to set service.partition`))
+		}
+
+		if svc.Namespace != "" && !consulMeta.NamespacesEnabled {
+			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("namespace"),
+				svc.Namespace, `Consul Enterprise namespaces must be enabled to set service.namespace`))
+		}
+
 		if len(svc.Hosts) > 0 && in.Protocol == "tcp" {
 			asJSON, _ := json.Marshal(svc.Hosts)
 			errs = append(errs, field.Invalid(path.Child("services").Index(i).Child("hosts"),
 				string(asJSON),
 				"hosts must be empty if protocol is \"tcp\""))
-		}
-	}
-	return errs
-}
-
-func (in *IngressGateway) validateNamespaces(namespacesEnabled bool) field.ErrorList {
-	var errs field.ErrorList
-	path := field.NewPath("spec")
-	if !namespacesEnabled {
-		for i, listener := range in.Spec.Listeners {
-			for j, service := range listener.Services {
-				if service.Namespace != "" {
-					errs = append(errs, field.Invalid(path.Child("listeners").Index(i).Child("services").Index(j).Child("namespace"),
-						service.Namespace, `Consul Enterprise namespaces must be enabled to set service.namespace`))
-				}
-			}
 		}
 	}
 	return errs

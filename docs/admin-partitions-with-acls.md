@@ -25,6 +25,8 @@ connectInject:
     mirroringK8S: true
 controller:
   enabled: true
+meshGateway:
+  enabled: true
 ```
 
 Identify the LoadBalancer External IP of the `partition-service`
@@ -89,6 +91,8 @@ connectInject:
   consulNamespaces:
     mirroringK8S: true
 controller:
+  enabled: true
+meshGateway:
   enabled: true
 ```
 This should create clusters that have Admin Partitions deployed on them with ACLs enabled.

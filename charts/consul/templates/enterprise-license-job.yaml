@@ -1,5 +1,6 @@
+{{- if .Values.server.enterpriseLicense }}{{ fail "server.enterpriseLicense has been moved to global.enterpriseLicense" }}{{ end -}}
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey (not .Values.server.enterpriseLicense.enableLicenseAutoload)) }}
+{{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey (not .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -13,6 +14,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: license
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "100"
@@ -54,8 +56,8 @@ spec:
             - name: ENTERPRISE_LICENSE
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.server.enterpriseLicense.secretName }}
-                  key: {{ .Values.server.enterpriseLicense.secretKey }}
+                  name: {{ .Values.global.enterpriseLicense.secretName }}
+                  key: {{ .Values.global.enterpriseLicense.secretKey }}
             - name: CONSUL_HTTP_ADDR
               {{- if .Values.global.tls.enabled }}
               value: https://{{ template "consul.fullname" . }}-server:8501

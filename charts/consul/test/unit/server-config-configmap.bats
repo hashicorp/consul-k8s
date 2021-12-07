@@ -86,6 +86,28 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/ConfigMap: does not create ui config when .ui.enabled=false and .ui.metrics.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'ui.metrics.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .global.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'global.metrics.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "server/ConfigMap: does not create ui config when .ui.enabled=true and .ui.metrics.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \

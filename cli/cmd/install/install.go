@@ -3,6 +3,7 @@ package install
 import (
 	"errors"
 	"fmt"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"strings"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
-
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -174,6 +174,20 @@ func (c *Command) init() {
 	c.Init()
 }
 
+type helmValues struct {
+	Global globalValues `yaml:"global"`
+}
+
+type globalValues struct {
+	Image             string            `yaml:"image"`
+	EnterpriseLicense enterpriseLicense `yaml:"enterpriseLicense"`
+}
+
+type enterpriseLicense struct {
+	SecretName string `yaml:"secretName"`
+	SecretKey  string `yaml:"secretKey"`
+}
+
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
@@ -265,6 +279,22 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
+	}
+
+	var v helmValues
+	err = yaml.Unmarshal(valuesYaml, &v)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+
+	// If an enterprise license secret was provided check that the secret exists
+	// and that the enterprise Consul image is set.
+	if v.Global.EnterpriseLicense.SecretName != "" {
+		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName, v.Global.Image); err != nil {
+			c.UI.Output(err.Error(), terminal.WithErrorStyle())
+			return 1
+		}
 	}
 
 	// Print out the installation summary.
@@ -385,17 +415,18 @@ func (c *Command) checkForPreviousPVCs() error {
 
 // checkForPreviousSecrets checks for the bootstrap token and returns an error if found.
 func (c *Command) checkForPreviousSecrets() error {
-	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{})
+	secrets, err := c.kubernetes.CoreV1().Secrets("").List(c.Ctx, metav1.ListOptions{LabelSelector: common.CLILabelKey + "=" + common.CLILabelValue})
 	if err != nil {
 		return fmt.Errorf("error listing secrets: %s", err)
 	}
 	for _, secret := range secrets.Items {
 		// future TODO: also check for federation secret
-		if strings.Contains(secret.Name, "consul-bootstrap-acl-token") {
-			return fmt.Errorf("found consul-acl-bootstrap-token secret from previous installations: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
+		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
+			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
 				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
 		}
 	}
+
 	c.UI.Output("No previous secrets found", terminal.WithSuccessStyle())
 	return nil
 }
@@ -500,4 +531,22 @@ func validLabel(s string) bool {
 		}
 	}
 	return true
+}
+
+// checkValidEnterprise checks and validates an enterprise installation.
+// When an enterprise license secret is provided, check that the secret exists
+// in the "consul" namespace, and that the enterprise Consul image is provided.
+func (c *Command) checkValidEnterprise(secretName string, image string) error {
+
+	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		return fmt.Errorf("enterprise license secret %q is not found in the %q namespace; please make sure that the secret exists in the %q namespace", secretName, c.flagNamespace, c.flagNamespace)
+	} else if err != nil {
+		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
+	}
+	if !strings.Contains(image, "-ent") {
+		return fmt.Errorf("enterprise Consul image is not provided when enterprise license secret is set: %s", image)
+	}
+	c.UI.Output("Valid enterprise Consul image and secret found.", terminal.WithSuccessStyle())
+	return nil
 }

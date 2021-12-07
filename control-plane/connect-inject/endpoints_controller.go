@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
@@ -117,10 +118,13 @@ type EndpointsController struct {
 	context.Context
 }
 
+// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
+// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
 
+	// Ignore the request if the namespace of the endpoint is not allowed.
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
@@ -137,12 +141,19 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterServiceOnAllAgents handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		if err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
+		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
+	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
+	if isLabeledIgnore(serviceEndpoints.Labels) {
+		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
+		r.Log.Info("Ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
+		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
 		return ctrl.Result{}, err
 	}
 
@@ -154,17 +165,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
-		// Combine all addresses to a map, with a value indicating whether an address is ready or not.
-		allAddresses := make(map[corev1.EndpointAddress]string)
-		for _, readyAddress := range subset.Addresses {
-			allAddresses[readyAddress] = api.HealthPassing
-		}
-
-		for _, notReadyAddress := range subset.NotReadyAddresses {
-			allAddresses[notReadyAddress] = api.HealthCritical
-		}
-
-		for address, healthStatus := range allAddresses {
+		for address, healthStatus := range mapAddresses(subset) {
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				endpointPods.Add(address.TargetRef.Name)
 				if err := r.registerServicesAndHealthCheck(ctx, serviceEndpoints, address, healthStatus, endpointAddressMap); err != nil {
@@ -200,7 +201,7 @@ func (r *EndpointsController) SetupWithManager(mgr ctrl.Manager) error {
 		).Complete(r)
 }
 
-// registerServicesAndHealthCheck creates Consul registrations for the service and proxy and register them with Consul.
+// registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
 func (r *EndpointsController) registerServicesAndHealthCheck(ctx context.Context, serviceEndpoints corev1.Endpoints, address corev1.EndpointAddress, healthStatus string, endpointAddressMap map[string]bool) error {
 	// Get pod associated with this address.
@@ -726,6 +727,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -1004,10 +1006,31 @@ func (r *EndpointsController) consulNamespace(namespace string) string {
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
 func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[keyInjectStatus]; ok {
-		if anno == injected {
-			return true
-		}
+	if anno, ok := pod.Annotations[keyInjectStatus]; ok && anno == injected {
+		return true
 	}
 	return false
+}
+
+// mapAddresses combines all addresses to a mapping of address to its health status.
+func mapAddresses(addresses corev1.EndpointSubset) map[corev1.EndpointAddress]string {
+	m := make(map[corev1.EndpointAddress]string)
+	for _, readyAddress := range addresses.Addresses {
+		m[readyAddress] = api.HealthPassing
+	}
+
+	for _, notReadyAddress := range addresses.NotReadyAddresses {
+		m[notReadyAddress] = api.HealthCritical
+	}
+
+	return m
+}
+
+// isLabeledIgnore checks the value of the label `consul.hashicorp.com/service-ignore` and returns true if the
+// label exists and is "truthy". Otherwise, it returns false.
+func isLabeledIgnore(labels map[string]string) bool {
+	value, labelExists := labels[labelServiceIgnore]
+	shouldIgnore, err := strconv.ParseBool(value)
+
+	return shouldIgnore && labelExists && err == nil
 }
