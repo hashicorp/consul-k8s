@@ -877,7 +877,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.openshift.enabled & client.containerSecurityContext
 
-@test "client/DaemonSet: container level securityContexts are not set when global.openshift.enabled=true" {
+@test "server/StatefulSet: container level securityContexts are not set when global.openshift.enabled=true" {
   cd `chart_dir`
   local manifest=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -897,7 +897,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
@@ -922,25 +922,20 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretName is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretName is set but not global.gossipEncyption.secretKey" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretName=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
-@test "server/StatefulSet: gossip encryption disabled in server StatefulSet when secretKey is missing" {
+@test "server/StatefulSet: fail if global.gossipEncyption.gossipEncryption.secretKey is set but not global.gossipEncyption.secretName" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'global.gossipEncryption.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY") | length > 0' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+      --set 'global.gossipEncryption.secretKey=bar' .
+  [[ "$output" =~ "gossipEncryption.secretKey and secretName must both be specified." ]]
 }
 
 @test "server/StatefulSet: gossip environment variable present in server StatefulSet when all config is provided" {
@@ -1097,16 +1092,6 @@ load _helpers
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("https://127.0.0.1:8501")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "server/StatefulSet: CA certificate is specified when TLS is enabled" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].readinessProbe.exec.command | join(" ") | contains("--cacert /consul/tls/ca/tls.crt")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1473,4 +1458,339 @@ load _helpers
       yq -r '.spec.template.spec.containers | length' | tee /dev/stderr)
 
   [ "${object}" = 1 ]
+}
+
+#--------------------------------------------------------------------
+# vault integration
+
+@test "server/StatefulSet: fail when vault is enabled but the consulServerRole is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true" ]]
+}
+
+@test "server/StatefulSet: fail when vault is enabled with tls but autoencrypt is disabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.server.serverCert.secretName=test' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
+@test "server/StatefulSet: fail when vault, tls are enabled but no caCert provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.tls.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." ]]
+}
+
+@test "server/StatefulSet: fail when vault, tls are enabled with a serverCert but no autoencrypt" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
+@test "server/StatefulSet: fail when vault is enabled with tls but no consulCARole is provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true'  \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.server.serverCert.secretName=test' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+}
+
+@test "server/StatefulSet: vault annotations not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"] | length > 0 ' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault annotations added when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "test" ]
+}
+
+@test "server/StatefulSet: vault gossip annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.gossipEncryption.secretName=path/to/secret' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-gossip.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-gossip.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.gossip -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault no GOSSIP_KEY env variable and command defines GOSSIP_KEY" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.gossipEncryption.secretName=a/b/c/d' \
+    --set 'global.gossipEncryption.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "GOSSIP_KEY")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
+      | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: vault CA is not configured by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the volume is defined.
+  local actual=$(echo $object |
+    yq -r '.spec.volumes[] | select(.name=="vault-ca")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that the volume mount is added.
+  local actual=$(echo $object |
+    yq -r '.spec.containers[] | select(.name=="consul").volumeMounts[] | select(.name=="vault-ca")' \
+      | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that Vault agent annotations are added.
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault CA is not configured when secretName is set but secretKey is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the volume is defined.
+  local actual=$(echo $object |
+    yq -r '.spec.volumes[] | select(.name=="vault-ca")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that the volume mount is added.
+  local actual=$(echo $object |
+    yq -r '.spec.containers[] | select(.name=="consul").volumeMounts[] | select(.name=="vault-ca")' \
+      | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that Vault agent annotations are added.
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault CA is not configured when secretKey is set but secretName is not" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the volume is defined.
+  local actual=$(echo $object |
+    yq -r '.spec.volumes[] | select(.name=="vault-ca")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that the volume mount is added.
+  local actual=$(echo $object |
+    yq -r '.spec.containers[] | select(.name=="consul").volumeMounts[] | select(.name=="vault-ca")' \
+      | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  # Check that Vault agent annotations are added.
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: vault CA is configured when both secretName and secretKey are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that the volume is defined.
+  local actual=$(echo $object |
+    yq -r '.spec.volumes[] | select(.name=="vault-ca").secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "ca" ]
+
+  # Check that the volume mount is added.
+  local actual=$(echo $object |
+    yq -r '.spec.containers[] | select(.name=="consul").volumeMounts[] | select(.name=="vault-ca")' \
+      | tee /dev/stderr)
+  [ "${actual}" != "" ]
+
+  # Check that Vault agent annotations are added.
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
+  [ "${actual}" = "ca" ]
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
+  [ "${actual}" = "/vault/custom/tls.crt" ]
+}
+
+@test "server/StatefulSet: vault tls annotations are set when tls is enabled and command modified correctly" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/cert/ca" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/cert/ca\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-servercert.crt"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/issue/test" ]
+
+  local actual=$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-servercert.key"]' | tee /dev/stderr)"
+  [ "${actual}" = "pki_int/issue/test" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual=$(echo $object |
+    yq -r '.spec.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: tls related volumes not attached when tls is enabled on vault" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq -r '.volumes[] | select(.name == "consul-ca-cert") | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
 }

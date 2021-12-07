@@ -2,7 +2,6 @@ package consul
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -115,7 +114,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	h.checkForPriorInstallations(t)
+	helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 
 	helm.Install(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 
@@ -279,49 +278,6 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 	require.NoError(t, err)
 
 	return consulClient
-}
-
-// checkForPriorInstallations checks if there is an existing Helm release
-// for this Helm chart already installed. If there is, it fails the tests.
-func (h *HelmCluster) checkForPriorInstallations(t *testing.T) {
-	t.Helper()
-
-	var helmListOutput string
-	// Check if there's an existing cluster and fail if there is one.
-	// We may need to retry since this is the first command run once the Kube
-	// cluster is created and sometimes the API server returns errors.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
-		var err error
-		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
-		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
-		// get used to fail the test, just for logging.
-		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--output", "json")
-		require.NoError(r, err)
-	})
-
-	var installedReleases []map[string]string
-
-	err := json.Unmarshal([]byte(helmListOutput), &installedReleases)
-	require.NoError(t, err, "unmarshalling %q", helmListOutput)
-
-	for _, r := range installedReleases {
-		require.NotContains(t, r["chart"], "consul", fmt.Sprintf("detected an existing installation of Consul %s, release name: %s", r["chart"], r["name"]))
-	}
-
-	// Wait for all pods in the "default" namespace to exit. A previous
-	// release may not be listed by Helm but its pods may still be terminating.
-	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
-		consulPods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
-		require.NoError(r, err)
-		if len(consulPods.Items) > 0 {
-			var podNames []string
-			for _, p := range consulPods.Items {
-				podNames = append(podNames, p.Name)
-			}
-			r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
-		}
-	})
-
 }
 
 // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,

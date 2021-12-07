@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/gruntwork-io/terratest/modules/helm"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/random"
@@ -25,6 +28,48 @@ func RandomName() string {
 	return fmt.Sprintf("test-%s", strings.ToLower(random.UniqueId()))
 }
 
+// CheckForPriorInstallations checks if there is an existing Helm release
+// for this Helm chart already installed. If there is, it fails the tests.
+func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, options *helm.Options, chartName, labelSelector string) {
+	t.Helper()
+
+	var helmListOutput string
+	// Check if there's an existing cluster and fail if there is one.
+	// We may need to retry since this is the first command run once the Kube
+	// cluster is created and sometimes the API server returns errors.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 3}, t, func(r *retry.R) {
+		var err error
+		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
+		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
+		// get used to fail the test, just for logging.
+		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(t, options, "list", "--output", "json")
+		require.NoError(r, err)
+	})
+
+	var installedReleases []map[string]string
+
+	err := json.Unmarshal([]byte(helmListOutput), &installedReleases)
+	require.NoError(t, err, "unmarshalling %q", helmListOutput)
+
+	for _, r := range installedReleases {
+		require.NotContains(t, r["chart"], chartName, fmt.Sprintf("detected an existing installation of %s %s, release name: %s", chartName, r["chart"], r["name"]))
+	}
+
+	// Wait for all pods in the "default" namespace to exit. A previous
+	// release may not be listed by Helm but its pods may still be terminating.
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
+		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		require.NoError(r, err)
+		if len(pods.Items) > 0 {
+			var podNames []string
+			for _, p := range pods.Items {
+				podNames = append(podNames, p.Name)
+			}
+			r.Errorf("pods from previous installation still running: %s", strings.Join(podNames, ", "))
+		}
+	})
+}
+
 // WaitForAllPodsToBeReady waits until all pods with the provided podLabelSelector
 // are in the ready status. It checks every 5 seconds for a total of 20 tries.
 // If there is at least one container in a pod that isn't ready after that,
@@ -32,7 +77,7 @@ func RandomName() string {
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	logger.Log(t, "Waiting for pods to be ready.")
+	logger.Logf(t, "Waiting for pods with label %q to be ready.", podLabelSelector)
 
 	// Wait up to 10m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
@@ -41,6 +86,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items)
 
 		var notReadyPods []string
 		for _, pod := range pods.Items {
@@ -55,7 +101,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	logger.Log(t, "Finished waiting for pods to be ready.")
 }
 
-// Sets up a goroutine that will wait for interrupt signals
+// SetupInterruptHandler sets up a goroutine that will wait for interrupt signals
 // and call cleanup function when it catches it.
 func SetupInterruptHandler(cleanup func()) {
 	c := make(chan os.Signal, 1)
