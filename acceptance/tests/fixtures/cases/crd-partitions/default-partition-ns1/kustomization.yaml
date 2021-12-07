@@ -1,5 +1,5 @@
 resources:
-  - ../../../bases/partitions/exportedservices-default
+  - ../../../bases/exportedservices-default
 
 patchesStrategicMerge:
 - patch.yaml
