@@ -131,18 +131,20 @@ func (v *VaultCluster) bootstrap(t *testing.T, ctx environment.TestContext) {
 		Type:   "kv-v2",
 		Config: vapi.MountConfigInput{},
 	})
-	if err != nil {
-		t.Fatal("unable to mount kv-v2 secrets engine", "err", err)
-	}
-	// TODO: add the PKI Secrets Engine when we have a need for it.
+	require.NoError(t, err)
+
+	// Enable the PKI Secrets engine.
+	err = v.vaultClient.Sys().Mount("pki", &vapi.MountInput{
+		Type:   "pki",
+		Config: vapi.MountConfigInput{},
+	})
+	require.NoError(t, err)
 
 	// Enable Kube Auth.
 	err = v.vaultClient.Sys().EnableAuthWithOptions("kubernetes", &vapi.EnableAuthOptions{
 		Type: "kubernetes",
 	})
-	if err != nil {
-		t.Fatal("unable to enable kube auth", "err", err)
-	}
+	require.NoError(t, err)
 
 	v.logger.Logf(t, "updating vault kube auth config")
 
@@ -230,6 +232,7 @@ func defaultHelmValues(releaseName string) map[string]string {
 		"server.standalone.enabled":                "true",
 		"server.standalone.config":                 serverConfig,
 		"injector.enabled":                         "true",
+		"ui.enabled":                               "true",
 	}
 }
 
