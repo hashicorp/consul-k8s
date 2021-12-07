@@ -34,12 +34,23 @@ spec:
         component: server-acl-init
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        "vault.hashicorp.com/agent-pre-populate-only": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
       {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
       volumes:
-        {{- if .Values.global.tls.enabled }}
+        {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
@@ -77,7 +88,7 @@ spec:
                   fieldPath: metadata.namespace
           {{- if (or .Values.global.tls.enabled (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
           volumeMounts:
-            {{- if .Values.global.tls.enabled }}
+            {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
@@ -119,7 +130,11 @@ spec:
                 {{- if .Values.global.tls.enabled }}
                 -use-https \
                 {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
+                -consul-ca-cert=/vault/secrets/serverca.crt \
+                {{- else }}
                 -consul-ca-cert=/consul/tls/ca/tls.crt \
+                {{- end }}
                 {{- end }}
                 {{- if not .Values.externalServers.enabled }}
                 -server-port=8501 \

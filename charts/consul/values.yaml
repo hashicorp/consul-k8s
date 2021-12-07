@@ -117,25 +117,127 @@ global:
   # created by this chart. See https://kubernetes.io/docs/concepts/policy/pod-security-policy/.
   enablePodSecurityPolicies: false
 
-  # Configures Consul's gossip encryption key, set as a Kubernetes secret
+  # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
+  # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
+  # and have necessary secrets, policies and roles created prior to installing Consul.
+  # See https://www.consul.io/docs/k8s/installation/vault for full instructions.
+  #
+  # The Vault cluster *must* not have the Consul cluster installed by this Helm chart as its storage backend
+  # as that would cause a circular dependency.
+  # It can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
+  # and is being managed separately from this Helm installation.
+  #
+  # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
+  # secretName should be in the form of  "vault-kv2-mount-path/data/secret-name".
+  # secretKey should be in the form of "key".
+  secretsBackend:
+    vault:
+      # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
+      enabled: false
+
+      # The Vault role for the Consul server.
+      # The role must be connected to the Consul server's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/server-serviceaccount.yaml <release-name> hashicorp/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulServerRole: ""
+
+      # The Vault role for the Consul client.
+      # The role must be connected to the Consul client's service account and
+      # have a policy with read capabilities for the following secrets:
+      # - gossip encryption key defined by `global.gossipEncryption.secretName`.
+      # To discover the service account name of the Consul server, run
+      #     ```
+      #     helm template -s templates/client-daemonset.yaml <release-name> charts/consul
+      #     ```
+      # and check the name of `metadata.name`.
+      consulClientRole: ""
+
+      # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
+      # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
+      # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
+      # read capabilities to `global.tls.caCert.secretName`, which is usually `pki/cert/ca`.
+      consulCARole: ""
+
+      # Configuration for Vault server CA certificate. This certificate will be mounted
+      # to any pod where Vault agent needs to run.
+      ca:
+        # secretName is the name of the Kubernetes secret that holds the Vault CA certificate.
+        # A Kubernetes secret must be in the same namespace that Consul is installed into.
+        secretName: ""
+        # secretKey is the key within the Kubernetes secret that holds the Vault CA certificate.
+        secretKey: ""
+
+      # Configuration for the Vault Connect CA provider.
+      # The provider will be configured to use the Vault Kubernetes auth method
+      # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
+      # to have permissions to the root and intermediate PKI paths.
+      # Please see https://www.consul.io/docs/connect/ca/vault#vault-acl-policies
+      # for information on how to configure the Vault policies.
+      connectCA:
+        # The address of the Vault server.
+        address: ""
+
+        # The path to a PKI secrets engine for the root certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#rootpkipath.
+        rootPKIPath: ""
+
+        # The path to a PKI secrets engine for the generated intermediate certificate.
+        # Please see https://www.consul.io/docs/connect/ca/vault#intermediatepkipath.
+        intermediatePKIPath: ""
+
+        # Additional Connect CA configuration in JSON format.
+        # Please see https://www.consul.io/docs/connect/ca/vault#common-ca-config-options
+        # for additional configuration options.
+        #
+        # Example:
+        #
+        # ```yaml
+        # additionalConfig: |
+        #   {
+        #     "connect": [{
+        #       "ca_config": [{
+        #            "leaf_cert_ttl": "36h"
+        #         }]
+        #     }]
+        #   }
+        # ```
+        additionalConfig: |
+          {}
+
+  # Configures Consul's gossip encryption key.
   # (see `-encrypt` (https://consul.io/docs/agent/options#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
   # Values for secretName and secretKey should not be set if autoGenerate is true.
   # To manually generate a gossip encryption key, set secretName and secretKey and use Consul to generate
-  # a Kubernetes secret referencing these values.
+  # a key, saving this as a Kubernetes secret or Vault secret path and key.
+  # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" component of the secretName path as required by
+  # the Vault KV-2 secrets engine [see example].
   #
   # ```
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
+  #
+  # Vault CLI Example:
+  # ```
+  # $ vault kv put consul/secrets/gossip key=$(consul keygen)
+  # ```
+  # `gossipEncryption.secretName="consul/data/secrets/gossip"`
+  # `gossipEncryption.secretKey="key"`
+
   gossipEncryption:
     # Automatically generate a gossip encryption key and save it to a Kubernetes secret.
     autoGenerate: false
-    # secretName is the name of the Kubernetes secret that holds the gossip
-    # encryption key. The secret must be in the same namespace that Consul is installed into.
+    # secretName is the name of the Kubernetes secret or Vault secret path that holds the gossip
+    # encryption key. A Kubernetes secret must be in the same namespace that Consul is installed into.
     secretName: ""
-    # secretKey is the key within the Kubernetes secret that holds the gossip
+    # secretKey is the key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
 
@@ -183,15 +285,19 @@ global:
     # both clients and servers and to only accept HTTPS connections.
     httpsOnly: true
 
-    # A Kubernetes secret containing the certificate of the CA to use for
-    # TLS communication within the Consul cluster. If you have generated the CA yourself
-    # with the consul CLI, you could use the following command to create the secret
+    # A secret containing the certificate of the CA to use for TLS communication within the Consul cluster.
+    # If you have generated the CA yourself with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
     # ```bash
     # kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
+    # If you are using Vault as a secrets backend with TLS, `caCert.secretName` must be provided and should reference
+    # the CA path for your PKI secrets engine. This should be of the form `pki/cert/ca` where `pki` is the mount point of your PKI secrets engine.
+    # A read policy must be created and associated with the CA cert path for `global.tls.caCert.secretName`.
+    # This will be consumed by the `global.secretsBackend.vault.consulCARole` role by all Consul components.
+    # When using Vault the secretKey is not used.
     caCert:
       # The name of the Kubernetes secret.
       secretName: null
@@ -379,10 +485,11 @@ server:
   # @type: int
   bootstrapExpect: null
 
-  # A Kubernetes secret containing a certificate & key for the server agents to use
+  # A secret containing a certificate & key for the server agents to use
   # for TLS communication within the Consul cluster. Cert needs to be provided with
   # additional DNS name SANs so that it will work within the Kubernetes cluster:
   #
+  # Kubernetes Secrets backend:
   # ```bash
   # consul tls cert create -server -days=730 -domain=consul -ca=consul-agent-ca.pem \
   #     -key=consul-agent-ca-key.pem -dc={{datacenter}} \
@@ -394,8 +501,7 @@ server:
   #     -additional-dnsname="server.{{datacenter}}.{{domain}}"
   # ```
   #
-  # If you have generated the
-  # server-cert yourself with the consul CLI, you could use the following command
+  # If you have generated the server-cert yourself with the consul CLI, you could use the following command
   # to create the secret in Kubernetes:
   #
   # ```bash
@@ -403,8 +509,16 @@ server:
   #     --from-file='tls.crt=./dc1-server-consul-0.pem'
   #     --from-file='tls.key=./dc1-server-consul-0-key.pem'
   # ```
+  #
+  # Vault Secrets backend:
+  # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
+  # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`. 
+  # Please see the following guide for steps to generate a compatible certificate:
+  # https://learn.hashicorp.com/tutorials/consul/vault-pki-consul-secure-tls
+  # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
+  # must be provided.
   serverCert:
-    # The name of the Kubernetes secret.
+    # The name of the Kubernetes secret or Vault secret path containing the PEM encoded server certificate.
     secretName: null
 
   # Exposes the servers' gossip and RPC ports as hostPorts. To enable a client

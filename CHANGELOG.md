@@ -3,11 +3,25 @@
 BREAKING CHANGES:
 * Control Plane
   * Update minimum go version for project to 1.17 [[GH-878](https://github.com/hashicorp/consul-k8s/pull/878)]
-  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics were
-    scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics
+    were scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+
+FEATURES:
+* Vault as a Secrets Backend: Add support for Vault as a secrets backend for Gossip Encryption, Server TLS certs and Service Mesh TLS certificates,
+    removing the existing usage of Kubernetes Secrets for the respective secrets. [[GH-904](https://github.com/hashicorp/consul-k8s/pull/904/)]
+
+  See the [Consul Kubernetes and Vault documentation](https://www.consul.io/docs/k8s/installation/vault)
+  for full install instructions.
+  
+  Requirements: 
+  * Consul 1.11+
+  * Vault 1.19+ and Vault-K8s 0.14+ must be installed with the Vault Agent Injector enabled (`injector.enabled=true`)
+    into the Kubernetes cluster that Consul is installed into.
+  * `global.tls.enableAutoEncryption=true` is required for TLS support.
+  * If TLS is enabled in Vault, `global.secretsBackend.vault.ca` must be provided and should reference a Kube secret
+    which holds a copy of the Vault CA cert.
 
 IMPROVEMENTS:
-* CLI
   * Pre-check in the `install` command to verify the correct license secret exists when using an enterprise Consul image. [[GH-875](https://github.com/hashicorp/consul-k8s/pull/875)]
 * Control Plane
   * Add a label "managed-by" to every secret the control-plane creates. Only delete said secrets on an uninstall. [[GH-835](https://github.com/hashicorp/consul-k8s/pull/835)]

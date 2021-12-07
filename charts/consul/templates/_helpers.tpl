@@ -15,6 +15,42 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.vaultGossipTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
+            {{ "{{" }}- {{ printf ".Data.data.%s" .secretKey }} -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSCATemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{- end -}}
+
 {{/*
 Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
 substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file
@@ -114,12 +150,18 @@ This template is for an init container.
         {{- else }}
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        -ca-file=/vault/secrets/serverca.crt
+        {{- else }}
         -ca-file=/consul/tls/ca/tls.crt
+        {{- end }}
         {{- end }}
   volumeMounts:
     {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+    {{- if not .Values.global.secretsBackend.vault.enabled }}
     - name: consul-ca-cert
       mountPath: /consul/tls/ca
+    {{- end }}
     {{- end }}
     - name: consul-auto-encrypt-ca-cert
       mountPath: /consul/tls/client/ca

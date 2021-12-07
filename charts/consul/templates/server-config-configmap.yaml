@@ -12,6 +12,39 @@ metadata:
     release: {{ .Release.Name }}
     component: server
 data:
+  {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
+  {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
+  {{- with .Values.global.secretsBackend.vault }}
+  connect-ca-config.json: |
+    {
+      "connect": [
+        {
+          "ca_config": [
+            {
+              "address": "{{ .connectCA.address }}",
+              {{- if and .ca.secretName .ca.secretKey }}
+              "ca_file": "/consul/vault-ca/tls.crt",
+              {{- end }}
+              "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              "root_pki_path": "{{ .connectCA.rootPKIPath }}",
+              "auth_method": {
+                "type": "kubernetes",
+                "params": {
+                  "role": "{{ .consulServerRole }}"
+                }
+              }
+            }
+          ],
+          "ca_provider": "vault"
+        }
+      ]
+    }
+  {{- if .connectCA.additionalConfig }}
+  additional-connect-ca-config.json: |
+{{ tpl .connectCA.additionalConfig $ | trimAll "\"" | indent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
   extra-from-values.json: |-
 {{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}
