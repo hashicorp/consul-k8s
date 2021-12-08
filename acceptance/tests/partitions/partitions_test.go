@@ -37,7 +37,7 @@ func TestPartitions(t *testing.T) {
 	}
 
 	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping this test because -enable-transparent-proxy is true")
+		t.Skipf("skipping this test as Transparent Proxy behavior is flaky")
 	}
 
 	const defaultPartition = "default"
