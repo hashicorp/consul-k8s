@@ -31,7 +31,6 @@ import (
 
 func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 	tt.Parallel()
-	tt.Skip()
 
 	cases := map[string]struct {
 		Mirror       bool
@@ -151,7 +150,6 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 
 func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 	tt.Parallel()
-	tt.Skip()
 
 	cases := map[string]struct {
 		Mirror       bool
@@ -294,7 +292,6 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 
 func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 	tt.Parallel()
-	tt.Skip()
 
 	cases := map[string]struct {
 		Mirror       bool
