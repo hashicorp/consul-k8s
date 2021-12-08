@@ -76,6 +76,11 @@ spec:
                             the request when a retryable result occurs
                           format: int32
                           type: integer
+                        partition:
+                          description: Partition is the Consul partition to resolve
+                            the service from instead of the current partition. If
+                            empty the current partition is assumed.
+                          type: string
                         prefixRewrite:
                           description: PrefixRewrite defines how to rewrite the HTTP
                             request path before proxying it to its final destination.
