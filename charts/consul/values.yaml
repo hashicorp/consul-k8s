@@ -1338,6 +1338,9 @@ ui:
     # @type: boolean
     enabled: false
 
+    # Optionally set the ingressClassName.
+    ingressClassName: ""
+
     # pathType override - see: https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
     pathType: Prefix
 
