@@ -3,7 +3,9 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -121,12 +123,17 @@ func TestAppMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, podList.Items, 1)
 	podIP := podList.Items[0].Status.PodIP
-	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
-	require.NoError(t, err)
-	// This assertion represents the metrics from the envoy sidecar.
-	require.Contains(t, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
-	// This assertion represents the metrics from the application.
-	require.Contains(t, metricsOutput, `service_started_total 1`)
+
+	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
+	// to start.
+	retry.RunWith(&retry.Counter{Count: 3, Wait: 1 * time.Second}, t, func(r *retry.R) {
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+staticClientName, "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+		require.NoError(r, err)
+		// This assertion represents the metrics from the envoy sidecar.
+		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
+		// This assertion represents the metrics from the application.
+		require.Contains(r, metricsOutput, `service_started_total 1`)
+	})
 }
 
 func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
