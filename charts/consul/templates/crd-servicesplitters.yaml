@@ -62,9 +62,14 @@ spec:
                 items:
                   properties:
                     namespace:
-                      description: The namespace to resolve the service from instead
-                        of the current namespace. If empty the current namespace is
-                        assumed.
+                      description: Namespace is the Consul namespace to resolve the
+                        service from instead of the current namespace. If empty the
+                        current namespace is assumed.
+                      type: string
+                    partition:
+                      description: Partition is the Consul partition to resolve the
+                        service from instead of the current partition. If empty the
+                        current partition is assumed.
                       type: string
                     requestHeaders:
                       description: Allow HTTP header manipulation to be configured.

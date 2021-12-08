@@ -34,6 +34,7 @@ IMPROVEMENTS:
 * Helm Chart
   * Fail an installation/upgrade if WAN federation and Admin Partitions are both enabled. [[GH-892](https://github.com/hashicorp/consul-k8s/issues/892)]
   * Add support for setting `ingressClassName` for UI. [[GH-909](https://github.com/hashicorp/consul-k8s/pull/909)]
+  * Add partition support to Service Resolver, Service Router and Service Splitter CRDs. [[GH-908](https://github.com/hashicorp/consul-k8s/issues/908)]
 
 BUG FIXES:
 * Control Plane:

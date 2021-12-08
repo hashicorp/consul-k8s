@@ -128,6 +128,9 @@ type ServiceRouteDestination struct {
 	// Namespace is the Consul namespace to resolve the service from instead of
 	// the current namespace. If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Consul partition to resolve the service from instead of
+	// the current partition. If empty the current partition is assumed.
+	Partition string `json:"partition,omitempty"`
 	// PrefixRewrite defines how to rewrite the HTTP request path before proxying
 	// it to its final destination.
 	// This requires that either match.http.pathPrefix or match.http.pathExact
@@ -254,7 +257,7 @@ func (in *ServiceRouter) Validate(consulMeta common.ConsulMeta) error {
 		errs = append(errs, r.validate(path.Child("routes").Index(i))...)
 	}
 
-	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -328,6 +331,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		Service:               in.Service,
 		ServiceSubset:         in.ServiceSubset,
 		Namespace:             in.Namespace,
+		Partition:             in.Partition,
 		PrefixRewrite:         in.PrefixRewrite,
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
@@ -338,14 +342,23 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 	}
 }
 
-func (in *ServiceRouter) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+func (in *ServiceRouter) validateEnterprise(consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !namespacesEnabled {
+	if !consulMeta.NamespacesEnabled {
 		for i, r := range in.Spec.Routes {
 			if r.Destination != nil {
 				if r.Destination.Namespace != "" {
 					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("namespace"), r.Destination.Namespace, `Consul Enterprise namespaces must be enabled to set destination.namespace`))
+				}
+			}
+		}
+	}
+	if !consulMeta.PartitionsEnabled {
+		for i, r := range in.Spec.Routes {
+			if r.Destination != nil {
+				if r.Destination.Partition != "" {
+					errs = append(errs, field.Invalid(path.Child("routes").Index(i).Child("destination").Child("partition"), r.Destination.Partition, `Consul Enterprise partitions must be enabled to set destination.partition`))
 				}
 			}
 		}

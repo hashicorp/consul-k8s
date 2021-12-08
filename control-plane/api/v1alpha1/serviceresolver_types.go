@@ -81,9 +81,12 @@ type ServiceResolverRedirect struct {
 	// of one defined as that service's DefaultSubset If empty the default
 	// subset is used.
 	ServiceSubset string `json:"serviceSubset,omitempty"`
-	// Namespace is the namespace to resolve the service from instead of the
-	// current one.
+	// Namespace is the Consul namespace to resolve the service from instead of
+	// the current namespace. If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Consul partition to resolve the service from instead of
+	// the current partition. If empty the current partition is assumed.
+	Partition string `json:"partition,omitempty"`
 	// Datacenter is the datacenter to resolve the service from instead of the
 	// current one.
 	Datacenter string `json:"datacenter,omitempty"`
@@ -301,7 +304,7 @@ func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 
-	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -435,10 +438,10 @@ func (in *CookieConfig) validate(path *field.Path) *field.Error {
 	return nil
 }
 
-func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !namespacesEnabled {
+	if !consulMeta.NamespacesEnabled {
 		if in.Spec.Redirect != nil {
 			if in.Spec.Redirect.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `Consul Enterprise namespaces must be enabled to set redirect.namespace`))
@@ -449,7 +452,13 @@ func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.Erro
 				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `Consul Enterprise namespaces must be enabled to set failover.namespace`))
 			}
 		}
-
+	}
+	if !consulMeta.PartitionsEnabled {
+		if in.Spec.Redirect != nil {
+			if in.Spec.Redirect.Partition != "" {
+				errs = append(errs, field.Invalid(path.Child("redirect").Child("partition"), in.Spec.Redirect.Partition, `Consul Enterprise partitions must be enabled to set redirect.partition`))
+			}
+		}
 	}
 	return errs
 }

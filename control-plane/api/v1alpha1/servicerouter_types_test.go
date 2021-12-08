@@ -521,6 +521,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceRouter
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -568,6 +569,56 @@ func TestServiceRouter_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destA",
+								Namespace: "namespace-a",
+								Partition: "other",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service: "destA",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"http match queryParam": {
@@ -712,10 +763,61 @@ func TestServiceRouter_Validate(t *testing.T) {
 				"spec.routes[1].destination.namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set destination.namespace",
 			},
 		},
+		"partitions disabled: single destination partition specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"servicerouter.consul.hashicorp.com \"foo\" is invalid: spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
+		"partitions disabled: multiple destination partitions specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-b",
+								Partition: "partition-b",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+				"spec.routes[1].destination.partition: Invalid value: \"partition-b\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled})
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
