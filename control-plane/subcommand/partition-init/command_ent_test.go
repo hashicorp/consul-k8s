@@ -94,7 +94,7 @@ func TestRun_PartitionExists(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the Admin Partition before the test runs.
-	_, _, err = consul.Partitions().Create(context.Background(), &api.AdminPartition{Name: partitionName, Description: "Created before test"}, nil)
+	_, _, err = consul.Partitions().Create(context.Background(), &api.Partition{Name: partitionName, Description: "Created before test"}, nil)
 	require.NoError(t, err)
 
 	ui := cli.NewMockUi()

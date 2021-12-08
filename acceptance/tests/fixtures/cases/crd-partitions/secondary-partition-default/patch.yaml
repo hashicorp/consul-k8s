@@ -1,5 +1,5 @@
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: PartitionExports
+kind: ExportedServices
 metadata:
   name: secondary
 spec:

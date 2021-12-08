@@ -8,7 +8,7 @@ const (
 	ServiceRouter      string = "servicerouter"
 	ServiceSplitter    string = "servicesplitter"
 	ServiceIntentions  string = "serviceintentions"
-	PartitionExports   string = "partitionexports"
+	ExportedServices   string = "exportedservices"
 	IngressGateway     string = "ingressgateway"
 	TerminatingGateway string = "terminatinggateway"
 

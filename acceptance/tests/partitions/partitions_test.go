@@ -96,7 +96,7 @@ func TestPartitions(t *testing.T) {
 
 			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-beta3",
+				"global.image":      "ashwinvenkatesh/consul@sha256:dce7a25b9e15271d8102a0f14fae71af0b9c789bafd8cbe4a7d0f8c34abe0296",
 
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
@@ -192,7 +192,7 @@ func TestPartitions(t *testing.T) {
 			// Create client cluster.
 			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-beta3",
+				"global.image":      "ashwinvenkatesh/consul@sha256:dce7a25b9e15271d8102a0f14fae71af0b9c789bafd8cbe4a7d0f8c34abe0296",
 				"global.enabled":    "false",
 
 				"global.tls.enabled":           "true",
@@ -535,7 +535,7 @@ func TestPartitions(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, services, 1)
 
-				logger.Log(t, "creating partition exports")
+				logger.Log(t, "creating exported services")
 				if c.destinationNamespace == defaultNamespace {
 					k8s.KubectlApplyK(t, serverClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
 					k8s.KubectlApplyK(t, clientClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
