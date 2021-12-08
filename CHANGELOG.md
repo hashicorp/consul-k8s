@@ -20,8 +20,13 @@ FEATURES:
   * `global.tls.enableAutoEncryption=true` is required for TLS support.
   * If TLS is enabled in Vault, `global.secretsBackend.vault.ca` must be provided and should reference a Kube secret
     which holds a copy of the Vault CA cert.
+  * Add boolean metric to merged metrics response `consul_merged_service_metrics_success` to indicate if service metrics were
+    scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
+* Helm
+  * Rename `PartitionExports` CRD to `ExportedServices`. [[GH-902](https://github.com/hashicorp/consul-k8s/pull/902)]
 
 IMPROVEMENTS:
+* CLI
   * Pre-check in the `install` command to verify the correct license secret exists when using an enterprise Consul image. [[GH-875](https://github.com/hashicorp/consul-k8s/pull/875)]
 * Control Plane
   * Add a label "managed-by" to every secret the control-plane creates. Only delete said secrets on an uninstall. [[GH-835](https://github.com/hashicorp/consul-k8s/pull/835)]

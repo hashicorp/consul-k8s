@@ -9,6 +9,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - exportedservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - exportedservices/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - ingressgateways
   verbs:
   - create
@@ -42,26 +62,6 @@ rules:
   - consul.hashicorp.com
   resources:
   - mesh/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - consul.hashicorp.com
-  resources:
-  - partitionexports
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - consul.hashicorp.com
-  resources:
-  - partitionexports/status
   verbs:
   - get
   - patch

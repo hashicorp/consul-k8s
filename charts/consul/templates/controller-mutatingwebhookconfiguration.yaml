@@ -200,4 +200,25 @@ webhooks:
     resources:
       - terminatinggateways
   sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-exportedservices
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-exportedservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+      - consul.hashicorp.com
+    apiVersions:
+      - v1alpha1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - exportedservices
+  sideEffects: None
 {{- end }}
