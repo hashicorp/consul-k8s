@@ -85,7 +85,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "ashwinvenkatesh/consul@sha256:3a025bb8889708d219b3ee4c146b841f91f0a4eaf71fb05e4056789e0fbab5e1"
+  image: "ashwinvenkatesh/consul@sha256:a2638301c2386131f186c3ec30afc2073c8c74aeaadff63dae0089f5402bd0f0"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
