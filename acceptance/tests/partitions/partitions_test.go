@@ -36,10 +36,6 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping this test as Transparent Proxy behavior is flaky")
-	}
-
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
