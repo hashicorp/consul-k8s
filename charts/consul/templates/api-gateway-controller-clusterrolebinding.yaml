@@ -1,0 +1,21 @@
+{{- if (or (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled) (and (eq (.Values.apiGateway.enabled | toString) "-") .Values.global.enabled)) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "consul.fullname" . }}-api-gateway-controller-role-binding
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: api-gateway-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "consul.fullname" . }}-api-gateway-controller
+subjects:
+- kind: ServiceAccount
+  name: {{ template "consul.fullname" . }}-api-gateway-controller-svc-account
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+

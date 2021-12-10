@@ -2458,6 +2458,100 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
+# Conffiguration setings for the Consul API Gateway integration
+apiGateway:
+  # When true the helm chart will install the Consul API Gateway controller
+  enabled: false
+
+  # Image to use for the api-gateway-controller pods and gateway instances
+  # @type: string
+  image: "hashicorp/consul-api-gateway:0.1.0-techpreview"
+
+
+  # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: info
+  managedGatewayClass:
+    enabled: true
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for gateway pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
+    # This value defines the type of service created for gateways (e.g. LoadBalancer, ClusterIP)
+    serviceType: LoadBalancer
+
+    # This value toggles if the gateway ports should be mapped to host ports
+    useHostPorts: false
+
+    copyAnnotations:
+      # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
+      #
+      # Example:
+      #
+      # ```yaml
+      # service: |
+      # - external-dns.alpha.kubernetes.io/hostname
+      # ```
+      #
+      # @type: string
+      service: null
+
+    # Override global log verbosity level for ateway pods. One of "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: info
+    
+    
+
+  controller:
+    replicas: 1
+
+    # Annotations to apply to the api-gateway-controller pods.
+    #
+    # ```yaml
+    # annotations: |
+    #   "annotation-key": "annotation-value"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+    # This value references an existing
+    # Kubernetes `priorityClassName` (https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+    # that can be assigned to api-gateway-controller pods.
+    priorityClassName: ""
+
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for api-gateway-controller pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+    service:
+      # Annotations to apply to the api-gateway-controller service.
+      #
+      # ```yaml
+      # annotations: |
+      #   "annotation-key": "annotation-value"
+      # ```
+      #
+      # @type: string
+      annotations: null
+
 # Configuration settings for the webhook-cert-manager
 # `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
 webhookCertManager:
