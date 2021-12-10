@@ -56,6 +56,9 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		KubectlOptions: kopts,
 		Logger:         logger,
 	}
+	if cfg.EnablePodSecurityPolicies {
+		vaultHelmOpts.SetValues["global.psp.enable"] = "true"
+	}
 	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")
 	// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
 	// asserting a chart version on Install which would fail in an obvious way should this not succeed.
