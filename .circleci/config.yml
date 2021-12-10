@@ -156,7 +156,7 @@ jobs:
       - save_cache:
           key: consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
@@ -310,7 +310,7 @@ jobs:
       - save_cache:
           key: consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -344,7 +344,7 @@ jobs:
       - save_cache:
           key: consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
@@ -382,7 +382,7 @@ jobs:
       - save_cache:
           key: consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
