@@ -57,6 +57,8 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
+	flagCreateAPIGatewayToken bool
+
 	// Flags to configure Consul connection.
 	flagServerAddresses     []string
 	flagServerPort          uint
@@ -162,6 +164,8 @@ func (c *Command) init() {
 		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
+	c.flags.BoolVar(&c.flagCreateAPIGatewayToken, "create-api-gateway-token", false,
+        "Toggle for creating a token for the API Gateway controller integration.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
@@ -521,6 +525,14 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateSnapshotAgentToken {
 		err := c.createLocalACL("client-snapshot-agent", snapshotAgentRules, consulDC, isPrimary, consulClient)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateAPIGatewayToken {
+		err := c.createLocalACL("api-gateway-controller", apiGatewayControllerRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
