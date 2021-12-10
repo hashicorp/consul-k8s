@@ -92,7 +92,7 @@ func TestPartitions(t *testing.T) {
 
 			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-rc",
+				"global.image":      "ashwinvenkatesh/consul@sha256:1735fa854822a61b3908ac3ed0254d9a9d5d984360a64a4553dccca30c4691ec",
 
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
@@ -193,7 +193,7 @@ func TestPartitions(t *testing.T) {
 			// Create client cluster.
 			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-rc",
+				"global.image":      "ashwinvenkatesh/consul@sha256:1735fa854822a61b3908ac3ed0254d9a9d5d984360a64a4553dccca30c4691ec",
 				"global.enabled":    "false",
 
 				"global.tls.enabled":           "true",
