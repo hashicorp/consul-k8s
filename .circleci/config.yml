@@ -145,7 +145,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       - run:
           name: go mod download
@@ -154,7 +154,7 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+          key: consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
           paths:
             - "/home/circleci/go/pkg/mod"
 
@@ -193,7 +193,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
       - run:
@@ -224,7 +224,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
       - run:
@@ -263,7 +263,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
       - run:
           name: build local
           working_directory: *control-plane-path
@@ -299,7 +299,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+            - consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
 
       - run:
           name: go mod download
@@ -308,7 +308,7 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+          key: consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
           paths:
             - "/home/circleci/go/pkg/mod"
 
@@ -333,7 +333,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run:
           name: go mod download
@@ -342,7 +342,7 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+          key: consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
             - "/home/circleci/go/pkg/mod"
 
@@ -371,7 +371,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run:
           name: go mod download
@@ -380,7 +380,7 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+          key: consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
           paths:
             - "/home/circleci/go/pkg/mod"
 
@@ -409,7 +409,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -432,7 +432,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -455,7 +455,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -643,7 +643,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -698,7 +698,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -759,7 +759,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -812,7 +812,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
