@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/cenkalti/backoff"
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
