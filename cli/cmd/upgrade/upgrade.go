@@ -93,19 +93,19 @@ func (c *Command) init() {
 		Name:    flagNameDryRun,
 		Target:  &c.flagDryRun,
 		Default: defaultDryRun,
-		Usage:   "Run pre-install checks and display summary of installation.",
+		Usage:   "Run pre-upgrade checks and display summary of upgrade.",
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:    flagNameConfigFile,
 		Aliases: []string{"f"},
 		Target:  &c.flagValueFiles,
-		Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
+		Usage:   "Path to a file to customize the upgrade, such as Consul Helm chart values file. Can be specified multiple times.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamePreset,
 		Target:  &c.flagPreset,
 		Default: defaultPreset,
-		Usage:   fmt.Sprintf("Use an installation preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
+		Usage:   fmt.Sprintf("Use an upgrade preset, one of %s. Defaults to none", strings.Join(presetList, ", ")),
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetValues,
@@ -127,20 +127,20 @@ func (c *Command) init() {
 		Name:    flagNameTimeout,
 		Target:  &c.flagTimeout,
 		Default: defaultTimeout,
-		Usage:   "Timeout to wait for installation to be ready.",
+		Usage:   "Timeout to wait for upgrade to be ready.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameVerbose,
 		Aliases: []string{"v"},
 		Target:  &c.flagVerbose,
 		Default: defaultVerbose,
-		Usage:   "Output verbose logs from the install command with the status of resources being installed.",
+		Usage:   "Output verbose logs from the upgrade command with the status of resources being upgraded.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameWait,
 		Target:  &c.flagWait,
 		Default: defaultWait,
-		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
+		Usage:   "Determines whether to wait for resources in upgrade to be ready before exiting command.",
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -228,7 +228,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output("could not find existing Consul installation - run `consul-k8s install`")
 		return 1
 	} else {
-		c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
+		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
 
@@ -310,7 +310,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Create a *chart.Chart object from the files to run the installation from.
+	// Create a *chart.Chart object from the files to run the upgrade from.
 	chart, err := loader.LoadFiles(chartFiles)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -375,13 +375,13 @@ func (c *Command) validateFlags(args []string) error {
 	}
 
 	if c.flagDryRun {
-		c.UI.Output("Performing dry run installation.", terminal.WithInfoStyle())
+		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
 	}
 	return nil
 }
 
 // mergeValuesFlagsWithPrecedence is responsible for merging all the values to determine the values file for the
-// installation based on the following precedence order from lowest to highest:
+// upgrade based on the following precedence order from lowest to highest:
 // 1. -preset
 // 2. -f values-file
 // 3. -set
