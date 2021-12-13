@@ -1,5 +1,14 @@
 ## UNRELEASED
 
+FEATURES:
+* CLI
+   * **BETA** Add `upgrade` command to modify Consul installation on Kubernetes. [[GH-898](https://github.com/hashicorp/consul-k8s/pull/898)]
+
+IMPROVEMENTS:
+* Control Plane
+  * Bump `consul-k8s-control-plane` UBI images for OpenShift to use base image `ubi-minimal:8.5`: [[GH-922](https://github.com/hashicorp/consul-k8s/pull/922)]
+ 
+
 ## 0.38.0 (December 08, 2021)
 
 BREAKING CHANGES:
@@ -26,10 +35,6 @@ FEATURES:
     scraped successfully. [[GH-551](https://github.com/hashicorp/consul-k8s/pull/551)]
 * Helm
   * Rename `PartitionExports` CRD to `ExportedServices`. [[GH-902](https://github.com/hashicorp/consul-k8s/pull/902)]
-
-FEATURES:
-* CLI
-   * **BETA** Add `upgrade` command to modify Consul installation on Kubernetes. [[GH-898](https://github.com/hashicorp/consul-k8s/pull/898)]
 
 IMPROVEMENTS:
 * CLI
