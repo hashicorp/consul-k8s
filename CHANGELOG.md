@@ -29,7 +29,7 @@ FEATURES:
 
 FEATURES:
 * CLI
-   * Add `upgrade` command to modify Consul installation on Kubernetes. [[GH-898](https://github.com/hashicorp/consul-k8s/pull/898)]
+   * **BETA** Add `upgrade` command to modify Consul installation on Kubernetes. [[GH-898](https://github.com/hashicorp/consul-k8s/pull/898)]
 
 IMPROVEMENTS:
 * CLI
