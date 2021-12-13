@@ -42,9 +42,6 @@ const (
 	flagNameAutoApprove = "auto-approve"
 	defaultAutoApprove  = false
 
-	flagNamespace    = "namespace"
-	defaultNamespace = "consul"
-
 	flagNameTimeout = "timeout"
 	defaultTimeout  = "10m"
 
@@ -65,7 +62,6 @@ type Command struct {
 	flagPreset          string
 	flagDryRun          bool
 	flagAutoApprove     bool
-	flagNamespace       string
 	flagValueFiles      []string
 	flagSetStringValues []string
 	flagSetValues       []string
@@ -293,7 +289,7 @@ func (c *Command) Run(args []string) int {
 	if !c.flagDryRun {
 		c.UI.Output("Running Upgrade", terminal.WithHeaderStyle())
 	} else {
-		c.UI.Output("Performing Dry Upgrade", terminal.WithHeaderStyle())
+		c.UI.Output("Performing Dry Run Upgrade", terminal.WithHeaderStyle())
 	}
 
 	// Setup action configuration for Helm Go SDK function calls.
@@ -324,9 +320,9 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
+	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
 
-	// Run the install.
+	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
 	re, err := upgrade.Run(common.DefaultReleaseName, chart, vals)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
