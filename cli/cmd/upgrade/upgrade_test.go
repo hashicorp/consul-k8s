@@ -32,10 +32,6 @@ func TestValidateFlags(t *testing.T) {
 			[]string{"-timeout=invalid-timeout"},
 		},
 		{
-			"Should error on an invalid namespace.",
-			[]string{"-namespace=\" nsWithSpace\""},
-		},
-		{
 			"Should have errored on a non-existant file.",
 			[]string{"-f=\"does_not_exist.txt\""},
 		},
