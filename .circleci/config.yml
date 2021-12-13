@@ -96,17 +96,20 @@ commands:
                   pkgs=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
                   echo "Running $(echo $pkgs | wc -w) packages:"
                   echo $pkgs
-                  if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- github.com/hashicorp/consul-k8s/acceptance/tests/partitions -p 1 -timeout 2h -failfast \
-                        << parameters.additional-flags >> \
-                        ${ENABLE_ENTERPRISE:+-enable-enterprise} \
-                        -enable-multi-cluster \
-                        -debug-directory="$TEST_RESULTS/debug" \
-                        -consul-k8s-image=<< parameters.consul-k8s-image >>
-                  then
-                    echo "Tests in ${pkg} failed, aborting early"
-                    exit_code=1
-                    break
-                  fi
+                  for pkg in $pkgs
+                  do
+                    if ! gotestsum --no-summary=all --jsonfile=jsonfile-${pkg////-} -- $pkg -p 1 -timeout 2h -failfast \
+                          << parameters.additional-flags >> \
+                          ${ENABLE_ENTERPRISE:+-enable-enterprise} \
+                          -enable-multi-cluster \
+                          -debug-directory="$TEST_RESULTS/debug" \
+                          -consul-k8s-image=<< parameters.consul-k8s-image >>
+                    then
+                      echo "Tests in ${pkg} failed, aborting early"
+                      exit_code=1
+                      break
+                    fi
+                  done
                   gotestsum --raw-command --junitfile "$TEST_RESULTS/gotestsum-report.xml" -- cat jsonfile*
                   exit $exit_code
 
