@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/status"
 	"github.com/hashicorp/consul-k8s/cli/cmd/uninstall"
+	"github.com/hashicorp/consul-k8s/cli/cmd/upgrade"
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
 	"github.com/hashicorp/consul-k8s/cli/version"
 	"github.com/hashicorp/go-hclog"
@@ -33,6 +34,11 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 		},
 		"status": func() (cli.Command, error) {
 			return &status.Command{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"upgrade": func() (cli.Command, error) {
+			return &upgrade.Command{
 				BaseCommand: baseCommand,
 			}, nil
 		},
