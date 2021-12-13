@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-
 	consulChart "github.com/hashicorp/consul-k8s/charts"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
