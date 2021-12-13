@@ -13,42 +13,32 @@ var Presets = map[string]interface{}{
 	PresetSecure: Convert(secure),
 }
 
+// demo is a preset of common values for setting up Consul.
 const demo = `
 global:
   name: consul
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
 connectInject:
   enabled: true
+  metrics:
+    defaultEnabled: true
+    defaultEnableMerging: true
+    enableGatewayMetrics: true
 server:
   replicas: 1
-  bootstrapExpect: 1
+controller:
+  enabled: true
+ui:
+  enabled: true
+  service:
+    enabled: true
+prometheus:
+  enabled: true
 `
 
-// TODO: I don't know why the following hangs for me.
-// TODO: This was hanging for Saad. I will look into it.
-//var demo = `
-//global:
-//  name: consul
-//  metrics:
-//    enabled: true
-//    enableAgentMetrics: true
-//connectInject:
-//  enabled: true
-//  metrics:
-//    defaultEnabled: true
-//    defaultEnableMerging: true
-//    enableGatewayMetrics: true
-//server:
-//  replicas: 1
-//controller:
-//  enabled: true
-//ui:
-//  enabled: true
-//  service:
-//    enabled: true
-//prometheus:
-//  enabled: true
-//`
-
+// secure is a preset of common values for setting up Consul in a secure manner.
 const secure = `
 global:
   name: consul
@@ -67,6 +57,7 @@ controller:
   enabled: true
 `
 
+// GlobalNameConsul is used to set the global name of an install to consul.
 const GlobalNameConsul = `
 global:
   name: consul
