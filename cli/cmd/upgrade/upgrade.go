@@ -9,20 +9,16 @@ import (
 	"time"
 
 	consulChart "github.com/hashicorp/consul-k8s/charts"
-	"helm.sh/helm/v3/pkg/chart/loader"
-
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
-
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/config"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-
-	"github.com/hashicorp/consul-k8s/cli/cmd/install"
-
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/cmd/install"
+	"github.com/hashicorp/consul-k8s/cli/config"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 )

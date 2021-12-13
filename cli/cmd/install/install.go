@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-
 	consulChart "github.com/hashicorp/consul-k8s/charts"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
@@ -20,6 +18,7 @@ import (
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
