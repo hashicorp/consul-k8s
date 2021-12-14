@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -46,9 +44,6 @@ const (
 
 	flagNameWait = "wait"
 	defaultWait  = true
-	// action/upgrade
-	// --install, --reset-values vs --reuse-values,
-	// atomic
 )
 
 type Command struct {
@@ -59,7 +54,6 @@ type Command struct {
 	set *flag.Sets
 
 	flagPreset          string
-	flagNamespace       string
 	flagDryRun          bool
 	flagAutoApprove     bool
 	flagValueFiles      []string
@@ -92,12 +86,6 @@ func (c *Command) init() {
 		Target:  &c.flagAutoApprove,
 		Default: defaultAutoApprove,
 		Usage:   "Skip confirmation prompt.",
-	})
-	f.StringVar(&flag.StringVar{
-		Name:    flagNameNamespace,
-		Target:  &c.flagNamespace,
-		Default: defaultNamespace,
-		Usage:   "Namespace where Consul is installed. Defaults to 'consul'.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameDryRun,
@@ -176,8 +164,6 @@ func (c *Command) init() {
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-
-	// The logger is initialized in main with the name cli. Here, we reset the name to install so log lines would be prefixed with install.
 	c.Log.ResetNamed("upgrade")
 
 	defer common.CloseWithError(c.BaseCommand)
@@ -223,13 +209,8 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		c.UI.Output("Could not find existing Consul installation. Run 'consul-k8s install' to create one.")
 		return 1
-	} else {
-		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
-		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
 	}
-
-	c.UI.Output("Existing installation found.", terminal.WithSuccessStyle())
+	c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
 	chart, err := common.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
@@ -237,8 +218,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-
-	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
+	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
 
 	// Run a status to get the current chart values.
 	statusConfig := new(action.Configuration)
@@ -314,21 +294,6 @@ func (c *Command) Run(args []string) int {
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
 
-	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Create a *chart.Chart object from the files to run the upgrade from.
-	chart, err := loader.LoadFiles(chartFiles)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
-
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
 	re, err := upgrade.Run(common.DefaultReleaseName, chart, vals)
 	if err != nil {
@@ -373,10 +338,6 @@ func (c *Command) validateFlags(args []string) error {
 	}
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
-	}
-	if !common.IsValidLabel(c.flagNamespace) {
-		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
@@ -451,58 +412,4 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 			}
 		}
 	}
-}
-
-// MapDiff takes in two map to string interfaces and returns a list of differences.
-func MapDiff(a, b map[string]interface{}) (map[string]interface{}, map[string]interface{}) {
-	from, to := map[string]interface{}{}, map[string]interface{}{}
-
-	for aKey, aVal := range a {
-		//if aKey == "global" {
-		//	fmt.Println("Break here!")
-		//} else if aKey == "name" {
-		//	fmt.Println("ok like really break here lmao")
-		//}
-		bVal, matchingKeys := b[aKey]
-		if matchingKeys {
-			// Spotted a difference!
-			if !reflect.DeepEqual(aVal, bVal) {
-				// Determine types of the interface{}
-				aIsMap := false
-
-				switch aVal.(type) {
-				case map[string]interface{}:
-					aIsMap = true
-				}
-
-				bIsMap := false
-
-				switch bVal.(type) {
-				case map[string]interface{}:
-					bIsMap = true
-				}
-
-				if !aIsMap && !bIsMap {
-					from[aKey] = aVal
-					to[aKey] = bVal
-				} else {
-					from[aKey], to[aKey] = MapDiff(aVal.(map[string]interface{}), bVal.(map[string]interface{}))
-				}
-			}
-		} else {
-			from[aKey] = aVal
-			to[aKey] = nil
-		}
-	}
-
-	// We also need to iterate through b, in case it has keys not present in a.
-	for bKey, bVal := range b {
-		_, matchingKeys := a[bKey]
-		if !matchingKeys {
-			from[bKey] = nil
-			to[bKey] = bVal
-		}
-	}
-
-	return from, to
 }
