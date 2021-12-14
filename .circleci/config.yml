@@ -957,7 +957,7 @@ workflows:
 #          requires:
 #            - build-distros-amd64
       # Run acceptance tests using the docker image built for the control plane
-#      - acceptance
+      - acceptance
 #          requires:
 #            - dev-upload-docker
 #            - unit-test-helm-templates
