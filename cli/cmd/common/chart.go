@@ -4,8 +4,10 @@ import (
 	"embed"
 	"path/filepath"
 
+	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	helmCLI "helm.sh/helm/v3/pkg/cli"
 )
 
 // LoadChart will attempt to load a chart from the embedded file system.
@@ -70,4 +72,18 @@ func readFile(chart embed.FS, f string, pathPrefix string) (*loader.BufferedFile
 		Name: rel,
 		Data: bytes,
 	}, nil
+}
+
+// FetchChartValues will attempt to fetch the values from the currently installed Helm chart.
+func FetchChartValues(namespace string, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (map[string]interface{}, error) {
+	cfg := new(action.Configuration)
+	cfg, err := InitActionConfig(cfg, namespace, settings, uiLogger)
+	if err != nil {
+		return nil, err
+	}
+
+	status := action.NewStatus(cfg)
+	release, err := status.Run(namespace)
+
+	return release.Config, err
 }

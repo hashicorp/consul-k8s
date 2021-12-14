@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
+	"github.com/kylelemons/godebug/diff"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -220,16 +221,9 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
 
-	// Run a status to get the current chart values.
-	statusConfig := new(action.Configuration)
-	statusConfig, err = common.InitActionConfig(statusConfig, namespace, settings, uiLogger)
+	currentChartValues, err := common.FetchChartValues(namespace, settings, uiLogger)
 	if err != nil {
-		return 1
-	}
-
-	statuser := action.NewStatus(statusConfig)
-	_, err = statuser.Run(common.DefaultReleaseNamespace)
-	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
@@ -239,7 +233,6 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	c.UI.Output("Succeeded in parsing CLI set values.")
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
@@ -247,14 +240,15 @@ func (c *Command) Run(args []string) int {
 	chartValues = common.MergeMaps(config.Convert(config.GlobalNameConsul), chartValues)
 
 	// Print out the upgrade summary.
-	if !c.flagAutoApprove {
-		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
-	}
+	c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
+	c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
+	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
 
-	// Coalesce the user provided overrides with the chart. This is basically what `upgrade` does anyways.
-	// newChart := common.MergeMaps(chart.Values, vals)
+	err = c.printDiff(currentChartValues, chartValues)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
 
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
@@ -347,7 +341,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return fmt.Errorf("File '%s' does not exist.", filename)
+				return fmt.Errorf("file '%s' does not exist", filename)
 			}
 		}
 	}
@@ -398,6 +392,7 @@ func (c *Command) Synopsis() string {
 	return "Upgrade Consul on Kubernetes from an existing installation."
 }
 
+// createUILogger creates a logger that will write to the UI.
 func (c *Command) createUILogger() func(string, ...interface{}) {
 	return func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
@@ -412,4 +407,30 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 			}
 		}
 	}
+}
+
+// printDiff marshalls both maps to YAML and prints the diff between the two.
+func (c *Command) printDiff(old, new map[string]interface{}) error {
+	oldYAML, err := yaml.Marshal(old)
+	if err != nil {
+		return err
+	}
+	newYAML, err := yaml.Marshal(new)
+	if err != nil {
+		return err
+	}
+
+	difference := diff.Diff(string(oldYAML), string(newYAML))
+
+	for _, line := range strings.Split(difference, "\n") {
+		if strings.HasPrefix(line, "+") {
+			c.UI.Output(line, terminal.WithDiffAddedStyle())
+		} else if strings.HasPrefix(line, "-") {
+			c.UI.Output(line, terminal.WithDiffRemovedStyle())
+		} else {
+			c.UI.Output(line)
+		}
+	}
+
+	return nil
 }
