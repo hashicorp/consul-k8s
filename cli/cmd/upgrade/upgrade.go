@@ -289,7 +289,7 @@ func (c *Command) Run(args []string) int {
 	upgrade.Timeout = c.timeoutDuration
 
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
-	re, err := upgrade.Run(common.DefaultReleaseName, chart, vals)
+	re, err := upgrade.Run(common.DefaultReleaseName, chart, chartValues)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
