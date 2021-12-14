@@ -174,6 +174,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// Format is already checked in validateFlags() so the error is ignored.
+	c.timeoutDuration, _ = time.ParseDuration(c.flagTimeout)
+
+	if c.flagDryRun {
+		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
+	}
+
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
 
@@ -243,13 +250,13 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 	c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
-
 	err = c.printDiff(currentChartValues, chartValues)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
+	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "Proceed with upgrade? (y/N)",
@@ -289,7 +296,7 @@ func (c *Command) Run(args []string) int {
 	upgrade.Timeout = c.timeoutDuration
 
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
-	re, err := upgrade.Run(common.DefaultReleaseName, chart, chartValues)
+	release, err := upgrade.Run(common.DefaultReleaseName, chart, chartValues)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -299,13 +306,13 @@ func (c *Command) Run(args []string) int {
 	if c.flagDryRun {
 		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
 
-		configYaml, err := yaml.Marshal(re.Config)
+		configYaml, err := yaml.Marshal(release.Config)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
 
-		if len(re.Config) == 0 {
+		if len(release.Config) == 0 {
 			c.UI.Output("Config: "+string(configYaml), terminal.WithInfoStyle())
 		} else {
 			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
@@ -333,11 +340,9 @@ func (c *Command) validateFlags(args []string) error {
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
-	duration, err := time.ParseDuration(c.flagTimeout)
-	if err != nil {
+	if _, err := time.ParseDuration(c.flagTimeout); err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
 	}
-	c.timeoutDuration = duration
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
@@ -346,9 +351,6 @@ func (c *Command) validateFlags(args []string) error {
 		}
 	}
 
-	if c.flagDryRun {
-		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
-	}
 	return nil
 }
 
@@ -409,7 +411,7 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 	}
 }
 
-// printDiff marshalls both maps to YAML and prints the diff between the two.
+// printDiff marshals both maps to YAML and prints the diff between the two.
 func (c *Command) printDiff(old, new map[string]interface{}) error {
 	oldYAML, err := yaml.Marshal(old)
 	if err != nil {
