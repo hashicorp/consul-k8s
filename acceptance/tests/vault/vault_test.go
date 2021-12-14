@@ -58,7 +58,7 @@ path "pki/cert/ca" {
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
 	if cfg.EnablePodSecurityPolicies {
-		t.Skipf("skipping this test because PSPs are not yet supported for Vault")
+		t.Skipf("skipping this test because PSPs don't yet work with the acceptance test Vault installation")
 	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
