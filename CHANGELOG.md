@@ -6,7 +6,8 @@ FEATURES:
 
 IMPROVEMENTS:
 * Control Plane
-  * Bump `consul-k8s-control-plane` UBI images for OpenShift to use base image `ubi-minimal:8.5`: [[GH-922](https://github.com/hashicorp/consul-k8s/pull/922)]
+  * Bump `consul-k8s-control-plane` UBI images for OpenShift to use base image `ubi-minimal:8.5`. [[GH-922](https://github.com/hashicorp/consul-k8s/pull/922)]
+  * Support the value `$POD_NAME` for the annotation `consul.hashicorp.com/service-tags` that will now be interpolated and set to the pod name. [[GH-931](https://github.com/hashicorp/consul-k8s/pull/931)]
  
 
 ## 0.38.0 (December 08, 2021)

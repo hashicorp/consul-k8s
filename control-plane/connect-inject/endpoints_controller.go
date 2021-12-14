@@ -416,15 +416,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 			meta[strings.TrimPrefix(k, annotationMeta)] = v
 		}
 	}
-
-	var tags []string
-	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
-		tags = strings.Split(raw, ",")
-	}
-	// Get the tags from the deprecated tags annotation and combine.
-	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
-		tags = append(tags, strings.Split(raw, ",")...)
-	}
+	tags := consulTags(pod)
 
 	service := &api.AgentServiceRegistration{
 		ID:        serviceID,
@@ -433,9 +425,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		Address:   pod.Status.PodIP,
 		Meta:      meta,
 		Namespace: r.consulNamespace(pod.Namespace),
-	}
-	if len(tags) > 0 {
-		service.Tags = tags
+		Tags:      tags,
 	}
 
 	proxyServiceName := getProxyServiceName(pod, serviceEndpoints)
@@ -496,9 +486,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 				AliasService: serviceID,
 			},
 		},
-	}
-	if len(tags) > 0 {
-		proxyService.Tags = tags
+		Tags: tags,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
@@ -1033,4 +1021,30 @@ func isLabeledIgnore(labels map[string]string) bool {
 	shouldIgnore, err := strconv.ParseBool(value)
 
 	return shouldIgnore && labelExists && err == nil
+}
+
+// consulTags returns tags that should be added to the Consul service and proxy registrations.
+func consulTags(pod corev1.Pod) []string {
+	var tags []string
+	if raw, ok := pod.Annotations[annotationTags]; ok && raw != "" {
+		tags = strings.Split(raw, ",")
+	}
+	// Get the tags from the deprecated tags annotation and combine.
+	if raw, ok := pod.Annotations[annotationConnectTags]; ok && raw != "" {
+		tags = append(tags, strings.Split(raw, ",")...)
+	}
+
+	var interpolatedTags []string
+	for _, t := range tags {
+		// Support light interpolation to preserve backwards compatibility where tags could
+		// be environment variables.
+		// Right now the only string we interpolate is $POD_NAME since that's all
+		// users have asked for as of now. More can be added here in the future.
+		if t == "$POD_NAME" {
+			t = pod.Name
+		}
+		interpolatedTags = append(interpolatedTags, t)
+	}
+
+	return interpolatedTags
 }
