@@ -36,10 +36,6 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
 	}
 
-	if cfg.EnableTransparentProxy {
-		t.Skipf("skipping this test as Transparent Proxy behavior is flaky")
-	}
-
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
@@ -96,7 +92,6 @@ func TestPartitions(t *testing.T) {
 
 			serverHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-rc",
 
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
@@ -197,7 +192,6 @@ func TestPartitions(t *testing.T) {
 			// Create client cluster.
 			clientHelmValues := map[string]string{
 				"global.datacenter": "dc1",
-				"global.image":      "hashicorp/consul-enterprise:1.11.0-ent-rc",
 				"global.enabled":    "false",
 
 				"global.tls.enabled":           "true",
