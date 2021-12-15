@@ -139,7 +139,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		UI: ui,
 	}
 
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	// Start the consul agent asynchronously
 	var a *testutil.TestServer

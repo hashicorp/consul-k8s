@@ -944,7 +944,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 
 	// We need to reserve all 6 ports to avoid potential
 	// port collisions with other tests.
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
 
 	// Create fake k8s.

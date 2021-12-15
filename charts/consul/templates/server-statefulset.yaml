@@ -96,12 +96,8 @@ spec:
         {{ tpl .Values.server.tolerations . | nindent 8 | trim }}
     {{- end }}
     {{- if .Values.server.topologySpreadConstraints }}
-    {{- if and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "18") }}
       topologySpreadConstraints:
         {{ tpl .Values.server.topologySpreadConstraints . | nindent 8 | trim }}
-    {{- else }}
-    {{- fail "`topologySpreadConstraints` requires Kubernetes 1.18 and above." }}
-    {{- end }}
     {{- end }}
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
