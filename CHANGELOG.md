@@ -1,4 +1,4 @@
-## UNRELEASED
+## 0.39.0 (December 15, 2021)
 
 FEATURES:
 * Helm
