@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
-	"github.com/kylelemons/godebug/diff"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -211,7 +210,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
-
 	uiLogger := c.createUILogger()
 	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
@@ -250,11 +248,7 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 	c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
-	err = c.printDiff(currentChartValues, chartValues)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
+	c.printDiff(currentChartValues, chartValues)
 
 	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
 	if !c.flagAutoApprove && !c.flagDryRun {
@@ -412,19 +406,9 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 }
 
 // printDiff marshals both maps to YAML and prints the diff between the two.
-func (c *Command) printDiff(old, new map[string]interface{}) error {
-	oldYAML, err := yaml.Marshal(old)
-	if err != nil {
-		return err
-	}
-	newYAML, err := yaml.Marshal(new)
-	if err != nil {
-		return err
-	}
-
-	difference := diff.Diff(string(oldYAML), string(newYAML))
-
-	for _, line := range strings.Split(difference, "\n") {
+func (c *Command) printDiff(old, new map[string]interface{}) {
+	diff := common.Diff(old, new)
+	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			c.UI.Output(line, terminal.WithDiffAddedStyle())
 		} else if strings.HasPrefix(line, "-") {
@@ -433,6 +417,4 @@ func (c *Command) printDiff(old, new map[string]interface{}) error {
 			c.UI.Output(line)
 		}
 	}
-
-	return nil
 }
