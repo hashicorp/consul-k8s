@@ -1,4 +1,5 @@
 provider "aws" {
+  alias = "awsprovider"
   version = ">= 2.28.1"
   region  = var.region
 
@@ -7,7 +8,9 @@ provider "aws" {
     duration_seconds = 2700
   }
 }
-
+data "aws_caller_identity" "caller" {
+  provider = aws.awsprovider
+}
 resource "random_id" "suffix" {
   count       = var.cluster_count
   byte_length = 4
@@ -26,10 +29,10 @@ module "vpc" {
   version = "2.47.0"
 
   name                 = "consul-k8s-${random_id.suffix[count.index].dec}"
-  cidr                 = "10.0.0.0/16"
+  cidr                 = format("10.%s.0.0/16", count.index)
   azs                  = data.aws_availability_zones.available.names
-  private_subnets      = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets       = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
+  private_subnets      = [format("10.%s.1.0/24", count.index), format("10.%s.2.0/24", count.index), format("10.%s.3.0/24", count.index)]
+  public_subnets       = [format("10.%s.4.0/24", count.index), format("10.%s.5.0/24", count.index), format("10.%s.6.0/24", count.index)]
   enable_nat_gateway   = true
   single_nat_gateway   = true
   enable_dns_hostnames = true
@@ -84,4 +87,78 @@ data "aws_eks_cluster" "cluster" {
 data "aws_eks_cluster_auth" "cluster" {
   count = var.cluster_count
   name  = module.eks[count.index].cluster_id
+}
+
+
+resource "aws_security_group_rule" "allowingressfrom1-0" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = "tcp"
+  cidr_blocks       = [module.vpc[1].vpc_cidr_block]
+  security_group_id = module.eks[0].cluster_primary_security_group_id
+}
+
+resource "aws_security_group_rule" "allowingressfrom0-1" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = "tcp"
+  cidr_blocks       = [module.vpc[0].vpc_cidr_block]
+  security_group_id = module.eks[1].cluster_primary_security_group_id
+}
+
+
+# Requester's side of the connection.
+resource "aws_vpc_peering_connection" "peer" {
+  vpc_id        = module.vpc[0].vpc_id
+  peer_vpc_id   = module.vpc[1].vpc_id
+  peer_owner_id = data.aws_caller_identity.caller.account_id
+  peer_region   = var.region
+  auto_accept   = false
+
+  tags = {
+    Side = "Requester"
+  }
+}
+
+# Accepter's side of the connection.
+resource "aws_vpc_peering_connection_accepter" "peer" {
+  provider                  = aws.awsprovider
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+  auto_accept               = true
+
+  tags = {
+    Side = "Accepter"
+  }
+}
+
+data "aws_route_tables" "rtseks0" {
+  vpc_id = module.vpc[0].vpc_id
+
+  filter {
+    name   = "tag:Name"
+    values = [format("%s-*", module.eks[0].cluster_id)]
+  }
+}
+data "aws_route_tables" "rtseks1" {
+  vpc_id = module.vpc[1].vpc_id
+
+  filter {
+    name   = "tag:Name"
+    values = [format("%s-*", module.eks[1].cluster_id)]
+  }
+}
+
+resource "aws_route" "peering0" {
+  count                     = 2 # we know its the public and private route tables
+  route_table_id            = tolist(data.aws_route_tables.rtseks0.ids)[count.index]
+  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+}
+resource "aws_route" "peering1" {
+  count                     = 2
+  route_table_id            = tolist(data.aws_route_tables.rtseks1.ids)[count.index]
+  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
 }
