@@ -6,7 +6,7 @@ global:
   enableConsulNamespaces: true
   tls:
     enabled: true
-  image: hashicorp/consul-enterprise:1.11.0-ent-beta1
+  image: hashicorp/consul-enterprise:1.11.1
   adminPartitions:
     enabled: true
   acls:
@@ -56,7 +56,7 @@ Configure the workload cluster using the following:
 global:
   enabled: false
   enableConsulNamespaces: true
-  image: hashicorp/consul-enterprise:1.11.0-ent-beta1
+  image: hashicorp/consul-enterprise:1.11.1
   adminPartitions:
     enabled: true
     name: "partition-name"

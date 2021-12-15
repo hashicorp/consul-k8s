@@ -1,6 +1,10 @@
 ## UNRELEASED
 
 FEATURES:
+* Helm
+  * Support Consul 1.11.1. [[GH-935](https://github.com/hashicorp/consul-k8s/pull/935)]
+  * Support Envoy 1.20.0. [[GH-935](https://github.com/hashicorp/consul-k8s/pull/935)]
+  * Minimum Kubernetes versions supported is 1.18+. [[GH-935](https://github.com/hashicorp/consul-k8s/pull/935)]
 * CLI
    * **BETA** Add `upgrade` command to modify Consul installation on Kubernetes. [[GH-898](https://github.com/hashicorp/consul-k8s/pull/898)]
 
@@ -27,7 +31,7 @@ FEATURES:
   
   Requirements: 
   * Consul 1.11+
-  * Vault 1.19+ and Vault-K8s 0.14+ must be installed with the Vault Agent Injector enabled (`injector.enabled=true`)
+  * Vault 1.9+ and Vault-K8s 0.14+ must be installed with the Vault Agent Injector enabled (`injector.enabled=true`)
     into the Kubernetes cluster that Consul is installed into.
   * `global.tls.enableAutoEncryption=true` is required for TLS support.
   * If TLS is enabled in Vault, `global.secretsBackend.vault.ca` must be provided and should reference a Kube secret

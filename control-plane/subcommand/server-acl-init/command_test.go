@@ -1169,7 +1169,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	require := require.New(t)
 	k8s := fake.NewSimpleClientset()
 
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	ui := cli.NewMockUi()
 	cmd := Command{

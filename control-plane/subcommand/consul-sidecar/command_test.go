@@ -91,7 +91,7 @@ func TestRunSignalHandlingMetricsOnly(t *testing.T) {
 				UI: ui,
 			}
 
-			randomPorts := freeport.MustTake(1)
+			randomPorts := freeport.GetN(t, 1)
 			// Run async because we need to kill it when the test is over.
 			exitChan := runCommandAsynchronously(&cmd, []string{
 				"-enable-service-registration=false",
@@ -163,7 +163,7 @@ func TestRunSignalHandlingAllProcessesEnabled(t *testing.T) {
 
 			require.NoError(t, err)
 
-			randomPorts := freeport.MustTake(1)
+			randomPorts := freeport.GetN(t, 1)
 			// Run async because we need to kill it when the test is over.
 			exitChan := runCommandAsynchronously(&cmd, []string{
 				"-service-config", configFile,
@@ -301,7 +301,7 @@ func TestMergedMetricsServer(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			randomPorts := freeport.MustTake(2)
+			randomPorts := freeport.GetN(t, 2)
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                       ui,
@@ -485,7 +485,7 @@ func TestRun_ServicesRegistration_ConsulDown(t *testing.T) {
 
 	// we need to reserve all 6 ports to avoid potential
 	// port collisions with other tests
-	randomPorts := freeport.MustTake(6)
+	randomPorts := freeport.GetN(t, 6)
 
 	// Run async because we need to kill it when the test is over.
 	exitChan := runCommandAsynchronously(&cmd, []string{

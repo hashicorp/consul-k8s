@@ -278,16 +278,3 @@ load _helpers
     yq -r '.spec.ingressClassName' | tee /dev/stderr)
   [ "${actual}" = "nginx" ]
 }
-
-@test "ui/Ingress: cannot set ingressClassName for Kube version < 1.18" {
-  cd `chart_dir`
-  local actual=$(helm template \
-    -s templates/ui-ingress.yaml  \
-    --set 'ui.ingress.enabled=true' \
-    --set 'ui.ingress.ingressClassName=nginx' \
-    --kube-version "1.17" \
-    . | tee /dev/stderr |
-    yq -r '.spec.ingressClassName' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
