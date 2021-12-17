@@ -1,5 +1,5 @@
 provider "aws" {
-  alias = "awsprovider"
+#  alias = "awsprovider"
   version = ">= 2.28.1"
   region  = var.region
 
@@ -9,7 +9,7 @@ provider "aws" {
   }
 }
 data "aws_caller_identity" "caller" {
-  provider = aws.awsprovider
+#  provider = aws.awsprovider
 }
 resource "random_id" "suffix" {
   count       = var.cluster_count
@@ -124,7 +124,7 @@ resource "aws_vpc_peering_connection" "peer" {
 
 # Accepter's side of the connection.
 resource "aws_vpc_peering_connection_accepter" "peer" {
-  provider                  = aws.awsprovider
+#  provider                  = aws.awsprovider
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
   auto_accept               = true
 
