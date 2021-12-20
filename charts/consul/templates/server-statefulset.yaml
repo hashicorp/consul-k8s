@@ -295,6 +295,9 @@ spec:
                 {{- end }}
                 {{- if .Values.ui.enabled }}
                 -ui \
+                {{- if .Values.ui.dashboardURLTemplates.service }}
+                -hcl='ui_config { dashboard_url_templates { service = "{{ .Values.ui.dashboardURLTemplates.service }}" } }' \
+                {{- end }}
                 {{- end }}
                 {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
                 {{- range $index := until (.Values.server.replicas | int) }}
