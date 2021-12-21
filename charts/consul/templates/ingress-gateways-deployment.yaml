@@ -88,7 +88,7 @@ spec:
       tolerations:
         {{ tpl (default $defaults.tolerations .tolerations) $root | nindent 8 | trim }}
       {{- end }}
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
         - name: consul-bin

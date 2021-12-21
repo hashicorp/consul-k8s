@@ -1610,3 +1610,29 @@ EOF
   local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
+
+#--------------------------------------------------------------------
+# terminationGracePeriodSeconds
+
+@test "ingressGateways/Deployment: terminationGracePeriodSeconds defaults to 10" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds' | tee /dev/stderr)
+  [ "${actual}" = "10" ]
+}
+
+@test "ingressGateways/Deployment: terminationGracePeriodSeconds set defaults to 30" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.terminationGracePeriodSeconds=30' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds' | tee /dev/stderr)
+  [ "${actual}" = "30" ]
+}
