@@ -2304,7 +2304,7 @@ ingressGateways:
     # Optional priorityClassName.
     priorityClassName: ""
 
-    # Amount of seconds to wait before killing the pod
+    # Amount of seconds to wait for graceful termination before killing the pod.
     terminationGracePeriodSeconds: 10
 
     # Annotations to apply to the ingress gateway deployment. Annotations defined
