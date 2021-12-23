@@ -62,12 +62,11 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: aclconfig
           emptyDir: {}
-        {{- else }}
+        {{- end }}
         {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
         - name: consul-license
           secret:
             secretName: {{ .Values.global.enterpriseLicense.secretName }}
-        {{- end }}
         {{- end }}
         {{- if .Values.global.tls.enabled }}
         {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
@@ -112,12 +111,11 @@ spec:
                 secretKeyRef:
                   name: "{{ template "consul.fullname" . }}-client-snapshot-agent-acl-token"
                   key: "token"
-            {{- else }}
+            {{- end }}
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: CONSUL_LICENSE_PATH
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
-            {{- end}}
           command:
             - "/bin/sh"
             - "-ec"
@@ -144,12 +142,11 @@ spec:
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: aclconfig
               mountPath: /consul/aclconfig
-            {{- else }}
+            {{- end }}
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true
-            {{- end }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             {{- if .Values.global.tls.enableAutoEncrypt}}
