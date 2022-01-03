@@ -50,7 +50,7 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
 ## Helm
 
-Within the 'charts/consul' directory is the official HashiCorp Helm chart for installing
+Within the ['charts/consul'](charts/consul) directory is the official HashiCorp Helm chart for installing
 and configuring Consul on Kubernetes. This chart supports multiple use
 cases of Consul on Kubernetes, depending on the values provided.
 
