@@ -1614,7 +1614,7 @@ EOF
 #--------------------------------------------------------------------
 # terminationGracePeriodSeconds
 
-@test "ingressGateways/Deployment: can set terminationGracePeriodSeconds through defaults" {
+@test "ingressGateways/Deployment: terminationGracePeriodSeconds defaults to 10" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
@@ -1625,16 +1625,27 @@ EOF
   [ "${actual}" = "10" ]
 }
 
+@test "ingressGateways/Deployment: terminationGracePeriodSeconds can be set through defaults" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.terminationGracePeriodSeconds=5' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds' | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+}
+
 @test "ingressGateways/Deployment: can set terminationGracePeriodSeconds through specific gateway overriding defaults" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'ingressGateways.defaults.replicas=3' \
+      --set 'ingressGateways.defaults.terminationGracePeriodSeconds=5' \
       --set 'ingressGateways.gateways[0].name=gateway1' \
-      --set 'ingressGateways.gateways[0].replicas=12' \
-      --set 'ingressGateways.defaults.terminationGracePeriodSeconds=30' \
+      --set 'ingressGateways.gateways[0].terminationGracePeriodSeconds=30' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds' | tee /dev/stderr)
   [ "${actual}" = "30" ]
