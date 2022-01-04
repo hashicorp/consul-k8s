@@ -1,5 +1,4 @@
 provider "aws" {
-#  alias = "awsprovider"
   version = ">= 2.28.1"
   region  = var.region
 
@@ -8,9 +7,7 @@ provider "aws" {
     duration_seconds = 2700
   }
 }
-data "aws_caller_identity" "caller" {
-#  provider = aws.awsprovider
-}
+data "aws_caller_identity" "caller" {}
 resource "random_id" "suffix" {
   count       = var.cluster_count
   byte_length = 4
@@ -26,7 +23,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "2.47.0"
+  version = "3.11.0"
 
   name                 = "consul-k8s-${random_id.suffix[count.index].dec}"
   cidr                 = format("10.%s.0.0/16", count.index)
@@ -124,7 +121,6 @@ resource "aws_vpc_peering_connection" "peer" {
 
 # Accepter's side of the connection.
 resource "aws_vpc_peering_connection_accepter" "peer" {
-#  provider                  = aws.awsprovider
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
   auto_accept               = true
 
@@ -133,6 +129,7 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
   }
 }
 
+# Get the route table ids that are associated with eks cluster 0
 data "aws_route_tables" "rtseks0" {
   vpc_id = module.vpc[0].vpc_id
 
@@ -141,6 +138,7 @@ data "aws_route_tables" "rtseks0" {
     values = [format("%s-*", module.eks[0].cluster_id)]
   }
 }
+# Get the route table ids that are associated with eks cluster 1
 data "aws_route_tables" "rtseks1" {
   vpc_id = module.vpc[1].vpc_id
 
