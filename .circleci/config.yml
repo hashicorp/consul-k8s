@@ -971,10 +971,7 @@ workflows:
             - unit-test-helm-templates
             - unit-acceptance-framework
             - unit-cli
-      - cleanup-eks-resources
-      - acceptance-eks-1-18:
-          requires:
-            - cleanup-eks-resources
+      - acceptance-eks-1-18
   nightly-acceptance-tests:
     triggers:
       - schedule:
