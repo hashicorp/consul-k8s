@@ -1,8 +1,10 @@
 package common
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,6 +28,22 @@ func TestDiff(t *testing.T) {
 			expected: "",
 		},
 		{
+			name: "Two equal maps should return the map parsed as YAML",
+			args: args{
+				a: map[string]interface{}{
+					"foo": "bar",
+					"baz": "qux",
+					"liz": map[string]interface{}{"qux": []string{"quux", "quuz"}},
+				},
+				b: map[string]interface{}{
+					"foo": "bar",
+					"baz": "qux",
+					"liz": map[string]interface{}{"qux": []string{"quux", "quuz"}},
+				},
+			},
+			expected: "  baz: qux\n  foo: bar\n  liz:\n    qux:\n    - quux\n    - quuz\n",
+		},
+		{
 			name: "New elements should be prefixed with a plus sign",
 			args: args{
 				a: map[string]interface{}{
@@ -36,7 +54,7 @@ func TestDiff(t *testing.T) {
 					"baz": "qux",
 				},
 			},
-			expected: "  foo: bar\n+ baz: qux\n",
+			expected: "+ baz: qux\n  foo: bar\n",
 		},
 		{
 			name: "New non-string elements should be prefixed with a plus sign",
@@ -52,13 +70,24 @@ func TestDiff(t *testing.T) {
 					},
 				},
 			},
-			expected: "  foo: bar\n+ baz: [qux]\n+ qux:\n+     quux: corge\n",
+			expected: "+ baz:\n+ - qux\n  foo: bar\n+ qux:\n+   quux: corge\n",
+		},
+		{
+			name: "Upgrade from demo to secure",
+			args: args{
+				a: config.Presets["demo"].(map[string]interface{}),
+				b: config.Presets["secure"].(map[string]interface{}),
+			},
+			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := Diff(tt.args.a, tt.args.b)
+			actual, err := Diff(tt.args.a, tt.args.b)
+			require.NoError(t, err)
+			fmt.Println(tt.expected)
+			fmt.Println(actual)
 			require.Equal(t, tt.expected, actual)
 		})
 	}
