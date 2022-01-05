@@ -406,8 +406,12 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 }
 
 // printDiff marshals both maps to YAML and prints the diff between the two.
-func (c *Command) printDiff(old, new map[string]interface{}) {
-	diff := common.Diff(old, new)
+func (c *Command) printDiff(old, new map[string]interface{}) error {
+	diff, err := common.Diff(old, new)
+	if err != nil {
+		return err
+	}
+
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			c.UI.Output(line, terminal.WithDiffAddedStyle())
@@ -417,4 +421,6 @@ func (c *Command) printDiff(old, new map[string]interface{}) {
 			c.UI.Output(line)
 		}
 	}
+
+	return nil
 }

@@ -1,21 +1,105 @@
 package common
 
 import (
+	"reflect"
+	"sort"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 )
 
-func Diff(a, b map[string]interface{}) string {
+// Diff returns a string representation of the difference between two maps as YAML.
+func Diff(a, b map[string]interface{}) (string, error) {
 	if len(a) == 0 && len(b) == 0 {
-		return ""
+		return "", nil
 	}
 
 	buf := new(strings.Builder)
-	diffRecursively(a, b, buf)
+	err := diffRecursively(a, b, buf)
 
-	return buf.String()
+	return buf.String(), err
 }
 
-// collectKeys iterates over both maps and collects all keys, ignoring duplicates.
+// diffRecursively recursively iterates over both maps and writes the differences to the given buffer.
+func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
+	// Get the union of keys in a and b sorted alphabetically.
+	keys := collectKeys(a, b)
+
+	for _, key := range keys {
+		valueInA, inA := a[key]
+		valueInB, inB := b[key]
+
+		aSlice := map[string]interface{}{
+			key: valueInA,
+		}
+		bSlice := map[string]interface{}{
+			key: valueInB,
+		}
+
+		// If the key is in both a and b, compare the values.
+		if inA && inB {
+			// If the map slices are the same, write as unchanged YAML.
+			if reflect.DeepEqual(aSlice, bSlice) {
+				asYaml, err := yaml.Marshal(aSlice)
+				if err != nil {
+					return err
+				}
+
+				lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
+				writeWithPrepend("  ", lines, buf)
+				continue
+			}
+
+			// If the map slices are different and there is another level of depth to the map, recurse.
+			if len(aSlice) > 1 && len(bSlice) > 1 {
+				diffRecursively(aSlice, bSlice, buf)
+				continue
+			}
+
+			// If the map slices are different and there is no other level of depth to the map, write as changed YAML.
+			aSliceAsYaml, err := yaml.Marshal(aSlice)
+			if err != nil {
+				return err
+			}
+
+			bSliceAsYaml, err := yaml.Marshal(bSlice)
+			if err != nil {
+				return err
+			}
+
+			writeWithPrepend("- ", strings.Split(strings.TrimSpace(string(aSliceAsYaml)), "\n"), buf)
+			writeWithPrepend("+ ", strings.Split(strings.TrimSpace(string(bSliceAsYaml)), "\n"), buf)
+		}
+
+		// If the key is in a but not in b, write as removed.
+		if inA && !inB {
+			asYaml, err := yaml.Marshal(aSlice)
+			if err != nil {
+				return err
+			}
+
+			lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
+			writeWithPrepend("- ", lines, buf)
+			continue
+		}
+
+		// If the key is in b but not in a, write as added.
+		if !inA && inB {
+			asYaml, err := yaml.Marshal(bSlice)
+			if err != nil {
+				return err
+			}
+
+			lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
+			writeWithPrepend("+ ", lines, buf)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// collectKeys iterates over both maps and collects all keys sorted alphabetically, ignoring duplicates.
 func collectKeys(a, b map[string]interface{}) []string {
 	keys := make([]string, 0, len(a)+len(b))
 	for key := range a {
@@ -26,87 +110,16 @@ func collectKeys(a, b map[string]interface{}) []string {
 			keys = append(keys, key)
 		}
 	}
+
+	sort.Strings(keys)
 	return keys
 }
 
-func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) {
-	// Get the union of keys in a and b.
-	keys := collectKeys(a, b)
-
-	for _, key := range keys {
-		valueInA, inA := a[key]
-		valueInB, inB := b[key]
-
-		// If the key is in both maps and the values are equal strings, write as unchanged.
-		if inA && inB && isType(valueInA, "string") && isType(valueInB, "string") {
-			if valueInA.(string) == valueInB.(string) {
-				writeUnchanged(key, valueInA.(string), buf)
-				continue
-			}
-		}
-
-		// If the key is in a but not in b, write as removed.
-		if inA && !inB {
-			writeRemoved(key, valueInA, buf)
-			continue
-		}
-
-		// If the key is in b but not in a, write as added.
-		if !inA && inB {
-			writeAdded(key, valueInB, buf)
-			continue
-		}
-
-		// If the key is in both a and b, compare the values recursively.
-		if a[key] != b[key] {
-			diffRecursively(a[key].(map[string]interface{}), b[key].(map[string]interface{}), buf)
-		}
+// writeWithPrepend writes each line to the buffer with the given prefix.
+func writeWithPrepend(prepend string, lines []string, buf *strings.Builder) {
+	for _, line := range lines {
+		buf.WriteString(prepend)
+		buf.WriteString(line)
+		buf.WriteString("\n")
 	}
-}
-
-func isType(value interface{}, expectedType string) bool {
-	switch value.(type) {
-	case string:
-		return expectedType == "string"
-	case int:
-		return expectedType == "int"
-	case float64:
-		return expectedType == "float64"
-	case bool:
-		return expectedType == "bool"
-	case map[string]interface{}:
-		return expectedType == "map"
-	case []interface{}:
-		return expectedType == "array"
-	default:
-		return false
-	}
-}
-
-func writeUnchanged(key, value string, buf *strings.Builder) {
-	buf.WriteString("  ")
-	buf.WriteString(key)
-	buf.WriteString(": ")
-	buf.WriteString(value)
-	buf.WriteString("\n")
-}
-
-func writeRemoved(key string, value interface{}, buf *strings.Builder) {
-	buf.WriteString("- ")
-	buf.WriteString(key)
-	buf.WriteString(": ")
-	buf.WriteString(value.(string))
-	buf.WriteString("\n")
-}
-
-func writeAdded(key string, value interface{}, buf *strings.Builder) {
-	buf.WriteString("+ ")
-	buf.WriteString(key)
-	buf.WriteString(": ")
-	buf.WriteString(value.(string))
-	buf.WriteString("\n")
-}
-
-func coerceToString(value interface{}) string {
-	return ""
 }
