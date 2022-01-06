@@ -488,7 +488,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.2"
+          version: "v1.22.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -520,7 +520,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.2"
+          version: "v1.22.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -600,7 +600,7 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-19:
+  acceptance-gke-1-20:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -666,7 +666,7 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-20:
+  acceptance-aks-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -721,7 +721,7 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-18:
+  acceptance-eks-1-19:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -835,7 +835,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-22:
+  acceptance-kind-1-23:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -845,7 +845,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.22.1"
+          version: "v1.23.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -985,26 +985,13 @@ workflows:
 #      - acceptance-openshift:
 #          requires:
 #          - cleanup-azure-resources
-      - acceptance-gke-1-19:
+      - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
-      - acceptance-eks-1-18:
+      - acceptance-eks-1-19:
           requires:
             - cleanup-eks-resources
-      - acceptance-aks-1-20:
+      - acceptance-aks-1-21:
           requires:
             - cleanup-azure-resources
-      - acceptance-kind-1-22
-#  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
-#    jobs:
-#      - helm-chart-pipeline-approval:
-#          type: approval
-#      - update-helm-charts-index:
-#          requires:
-#            - helm-chart-pipeline-approval
-#          context: helm-charts-trigger-consul
-#          filters:
-#            tags:
-#              only: /^v.*/
-#            branches:
-#              ignore: /.*/
+      - acceptance-kind-1-23
