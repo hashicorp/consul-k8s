@@ -32,6 +32,10 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	//if !cfg.UseKind {
+	//	t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
+	//}
+
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
@@ -251,6 +255,7 @@ func TestPartitions(t *testing.T) {
 			// Ensure consul client are created.
 			agentPodList, err := clientClusterContext.KubernetesClient(t).CoreV1().Pods(clientClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 			require.NoError(t, err)
+			//require.Len(t, agentPodList.Items, 1)
 
 			output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", clientClusterContext.KubectlOptions(t).Namespace)
 			require.NoError(t, err)
