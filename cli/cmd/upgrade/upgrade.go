@@ -252,7 +252,10 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
 	c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
-	c.printDiff(currentChartValues, chartValues)
+	if err = c.printDiff(currentChartValues, chartValues); err != nil {
+		c.UI.Output("Could not print diff between charts.", terminal.WithErrorStyle())
+		return 1
+	}
 
 	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
 	if !c.flagAutoApprove && !c.flagDryRun {
