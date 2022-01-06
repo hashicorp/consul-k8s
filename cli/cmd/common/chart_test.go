@@ -5,48 +5,45 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/chart"
 )
 
+// Embed a test chart to test against.
+//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
+var testChartFiles embed.FS
+
 func TestLoadChart(t *testing.T) {
-	// TODO: Make this work
-	chartFs := embed.FS{}
-	chartDirName := "testdata/testchart"
+	directory := "fixtures/consul"
 
-	expected := chart.Chart{}
+	expectedApiVersion := "v2"
+	expectedName := "Foo"
+	expectedVersion := "0.1.0"
+	expectedDescription := "Mock Helm Chart for testing."
+	expectedValues := map[string]interface{}{
+		"key": "value",
+	}
 
-	actual, err := LoadChart(chartFs, chartDirName)
+	actual, err := LoadChart(testChartFiles, directory)
 	require.NoError(t, err)
-	require.Equal(t, expected, *actual)
+	require.Equal(t, expectedApiVersion, actual.Metadata.APIVersion)
+	require.Equal(t, expectedName, actual.Metadata.Name)
+	require.Equal(t, expectedVersion, actual.Metadata.Version)
+	require.Equal(t, expectedDescription, actual.Metadata.Description)
+	require.Equal(t, expectedValues, actual.Values)
 }
 
-//go:embed fixtures/consul/* fixtures/consul/templates/_helpers.tpl
-var testChart embed.FS
-
 func TestReadChartFiles(t *testing.T) {
-	files, err := ReadChartFiles(testChart, "fixtures/consul")
+	directory := "fixtures/consul"
+	expectedFileNames := []string{"Chart.yaml", "values.yaml", "templates/_helpers.tpl", "templates/foo.yaml"}
+
+	files, err := ReadChartFiles(testChartFiles, directory)
 	require.NoError(t, err)
-	var foundChart, foundValues, foundTemplate, foundHelper bool
-	for _, f := range files {
-		if f.Name == "Chart.yaml" {
-			require.Equal(t, "chart", string(f.Data))
-			foundChart = true
-		}
-		if f.Name == "values.yaml" {
-			require.Equal(t, "values", string(f.Data))
-			foundValues = true
-		}
-		if f.Name == "templates/foo.yaml" {
-			require.Equal(t, "foo", string(f.Data))
-			foundTemplate = true
-		}
-		if f.Name == "templates/_helpers.tpl" {
-			require.Equal(t, "helpers", string(f.Data))
-			foundHelper = true
-		}
+
+	actualFileNames := make([]string, len(files))
+	for i, f := range files {
+		actualFileNames[i] = f.Name
 	}
-	require.True(t, foundChart)
-	require.True(t, foundValues)
-	require.True(t, foundTemplate)
-	require.True(t, foundHelper)
+
+	for _, expectedFileName := range expectedFileNames {
+		require.Contains(t, actualFileNames, expectedFileName)
+	}
 }
