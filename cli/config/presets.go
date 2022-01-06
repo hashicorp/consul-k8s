@@ -16,10 +16,10 @@ var Presets = map[string]interface{}{
 // demo is a preset of common values for setting up Consul.
 const demo = `
 global:
- name: consul
- metrics:
-   enabled: true
-   enableAgentMetrics: true
+  name: consul
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
 connectInject:
   enabled: true
   metrics:
