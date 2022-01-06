@@ -9,19 +9,20 @@ import (
 )
 
 // Diff returns a string representation of the difference between two maps as YAML.
+// The returned string is sorted alphabetically by key. If the maps are identical, the returned string is empty.
 func Diff(a, b map[string]interface{}) (string, error) {
 	if len(a) == 0 && len(b) == 0 {
 		return "", nil
 	}
 
 	buf := new(strings.Builder)
-	err := diffRecursively(a, b, buf)
+	err := diffRecursively(a, b, 0, buf)
 
 	return buf.String(), err
 }
 
-// diffRecursively recursively iterates over both maps and writes the differences to the given buffer.
-func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
+// diffRecursively iterates over both maps and writes the differences to the given buffer.
+func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings.Builder) error {
 	// Get the union of keys in a and b sorted alphabetically.
 	keys := collectKeys(a, b)
 
@@ -45,14 +46,14 @@ func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
 					return err
 				}
 
-				lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
-				writeWithPrepend("  ", lines, buf)
+				writeWithPrepend("  ", string(asYaml), recurseDepth, buf)
 				continue
 			}
 
 			// If the map slices are different and there is another level of depth to the map, recurse.
-			if len(aSlice) > 1 && len(bSlice) > 1 {
-				diffRecursively(aSlice, bSlice, buf)
+			if !isMaxDepth(aSlice) && !isMaxDepth(bSlice) {
+				writeWithPrepend("  ", key+":", recurseDepth, buf)
+				diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1, buf)
 				continue
 			}
 
@@ -67,8 +68,8 @@ func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
 				return err
 			}
 
-			writeWithPrepend("- ", strings.Split(strings.TrimSpace(string(aSliceAsYaml)), "\n"), buf)
-			writeWithPrepend("+ ", strings.Split(strings.TrimSpace(string(bSliceAsYaml)), "\n"), buf)
+			writeWithPrepend("- ", string(aSliceAsYaml), recurseDepth, buf)
+			writeWithPrepend("+ ", string(bSliceAsYaml), recurseDepth, buf)
 		}
 
 		// If the key is in a but not in b, write as removed.
@@ -78,8 +79,7 @@ func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
 				return err
 			}
 
-			lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
-			writeWithPrepend("- ", lines, buf)
+			writeWithPrepend("- ", string(asYaml), recurseDepth, buf)
 			continue
 		}
 
@@ -90,8 +90,7 @@ func diffRecursively(a, b map[string]interface{}, buf *strings.Builder) error {
 				return err
 			}
 
-			lines := strings.Split(strings.TrimSpace(string(asYaml)), "\n")
-			writeWithPrepend("+ ", lines, buf)
+			writeWithPrepend("+ ", string(asYaml), recurseDepth, buf)
 			continue
 		}
 	}
@@ -115,11 +114,26 @@ func collectKeys(a, b map[string]interface{}) []string {
 	return keys
 }
 
-// writeWithPrepend writes each line to the buffer with the given prefix.
-func writeWithPrepend(prepend string, lines []string, buf *strings.Builder) {
+// writeWithPrepend writes each line to the buffer with the given prefix and indentation matching the recurse depth.
+func writeWithPrepend(prepend, text string, recurseDepth int, buf *strings.Builder) {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
 	for _, line := range lines {
 		buf.WriteString(prepend)
+		for i := 0; i < recurseDepth; i++ {
+			buf.WriteString("  ")
+		}
 		buf.WriteString(line)
 		buf.WriteString("\n")
 	}
+}
+
+// isMaxDepth returns false if any of the values in the map are maps.
+func isMaxDepth(m map[string]interface{}) bool {
+	for _, value := range m {
+		if reflect.TypeOf(value).Kind() == reflect.Map {
+			return false
+		}
+	}
+
+	return true
 }

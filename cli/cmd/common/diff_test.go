@@ -1,10 +1,8 @@
 package common
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,12 +71,64 @@ func TestDiff(t *testing.T) {
 			expected: "+ baz:\n+ - qux\n  foo: bar\n+ qux:\n+   quux: corge\n",
 		},
 		{
-			name: "Upgrade from demo to secure",
+			name: "Diff between two complex maps should be correct",
 			args: args{
-				a: config.Presets["demo"].(map[string]interface{}),
-				b: config.Presets["secure"].(map[string]interface{}),
+				a: map[string]interface{}{
+					"global": map[string]interface{}{
+						"name": "consul",
+						"metrics": map[string]interface{}{
+							"enabled":            true,
+							"enableAgentMetrics": true,
+						},
+					},
+					"connectInject": map[string]interface{}{
+						"enabled": true,
+						"metrics": map[string]interface{}{
+							"defaultEnabled":       true,
+							"defaultEnableMerging": true,
+							"enableGatewayMetrics": true,
+						},
+					},
+					"server": map[string]interface{}{
+						"replicas": 1,
+					},
+					"controller": map[string]interface{}{
+						"enabled": true,
+					},
+					"ui": map[string]interface{}{
+						"enabled": true,
+						"service": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+					"prometheus": map[string]interface{}{
+						"enabled": true,
+					},
+				},
+				b: map[string]interface{}{
+					"global": map[string]interface{}{
+						"name": "consul",
+						"gossipEncryption": map[string]interface{}{
+							"autoGenerate": true,
+						},
+						"tls": map[string]interface{}{
+							"enabled":           true,
+							"enableAutoEncrypt": true,
+						},
+						"acls": map[string]interface{}{
+							"manageSystemACLs": true,
+						},
+					},
+					"server": map[string]interface{}{"replicas": 1},
+					"connectInject": map[string]interface{}{
+						"enabled": true,
+					},
+					"controller": map[string]interface{}{
+						"enabled": true,
+					},
+				},
 			},
-			expected: "",
+			expected: "  connectInject:\n    enabled: true\n-   metrics:\n-     defaultEnableMerging: true\n-     defaultEnabled: true\n-     enableGatewayMetrics: true\n  controller:\n    enabled: true\n  global:\n+   acls:\n+     manageSystemACLs: true\n+   gossipEncryption:\n+     autoGenerate: true\n-   metrics:\n-     enableAgentMetrics: true\n-     enabled: true\n    name: consul\n+   tls:\n+     enableAutoEncrypt: true\n+     enabled: true\n- prometheus:\n-   enabled: true\n  server:\n    replicas: 1\n- ui:\n-   enabled: true\n-   service:\n-     enabled: true\n",
 		},
 	}
 
@@ -86,67 +136,7 @@ func TestDiff(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			actual, err := Diff(tt.args.a, tt.args.b)
 			require.NoError(t, err)
-			fmt.Println(tt.expected)
-			fmt.Println(actual)
 			require.Equal(t, tt.expected, actual)
-		})
-	}
-}
-
-func TestCollectKeys(t *testing.T) {
-	type args struct {
-		a map[string]interface{}
-		b map[string]interface{}
-	}
-
-	tests := []struct {
-		name     string
-		args     args
-		expected []string
-	}{
-		{
-			name: "Two empty maps should return an empty slice",
-			args: args{
-				a: map[string]interface{}{},
-				b: map[string]interface{}{},
-			},
-			expected: []string{},
-		},
-		{
-			name: "Two maps without repeated keys should return the union of the keys",
-			args: args{
-				a: map[string]interface{}{
-					"foo": "bar",
-					"baz": "qux",
-				},
-				b: map[string]interface{}{
-					"liz": "qux",
-				},
-			},
-			expected: []string{"foo", "baz", "liz"},
-		},
-		{
-			name: "Two maps with repeated keys should return the deduplicated union of the keys",
-			args: args{
-				a: map[string]interface{}{
-					"foo": "bar",
-					"baz": "qux",
-				},
-				b: map[string]interface{}{
-					"baz": "qux",
-					"liz": "qux",
-				},
-			},
-			expected: []string{"foo", "baz", "liz"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := collectKeys(tt.args.a, tt.args.b)
-			for _, key := range tt.expected {
-				require.Contains(t, actual, key)
-			}
 		})
 	}
 }
