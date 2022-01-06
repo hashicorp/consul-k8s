@@ -127,7 +127,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-disruptionbudget.yaml \
-      --api-versions 'policy/v1' \
+      --api-versions 'policy/v1/PodDisruptionBudget' \
       . | tee /dev/stderr |
       yq -r '.apiVersion' | tee /dev/stderr)
   [ "${actual}" = "policy/v1" ]
