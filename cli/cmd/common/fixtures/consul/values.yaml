@@ -1,1 +1,2 @@
-values
+# This is a mock Helm values.yaml file used for testing.
+key: value
