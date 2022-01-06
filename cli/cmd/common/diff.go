@@ -53,7 +53,12 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			// If the map slices are different and there is another level of depth to the map, recurse.
 			if !isMaxDepth(aSlice) && !isMaxDepth(bSlice) {
 				writeWithPrepend("  ", key+":", recurseDepth, buf)
-				diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1, buf)
+
+				err := diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1, buf)
+				if err != nil {
+					return err
+				}
+
 				continue
 			}
 
