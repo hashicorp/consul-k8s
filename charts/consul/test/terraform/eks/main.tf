@@ -28,6 +28,7 @@ module "vpc" {
   version = "3.11.0"
 
   name                 = "consul-k8s-${random_id.suffix[count.index].dec}"
+  # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
   cidr                 = format("10.%s.0.0/16", count.index)
   azs                  = data.aws_availability_zones.available.names
   private_subnets      = [format("10.%s.1.0/24", count.index), format("10.%s.2.0/24", count.index), format("10.%s.3.0/24", count.index)]
@@ -88,6 +89,11 @@ data "aws_eks_cluster_auth" "cluster" {
   name  = module.eks[count.index].cluster_id
 }
 
+# The following resources are meant to apply when cluster_count=2 to set up vpc peering and the appropriate routes and
+# security groups so traffic between vpc's is allowed. Since the pipeline only ever deploys with a cluster_count of 2,
+# these resources are hardcoded to work in an environment with 2 clusters.
+
+# Each EKS cluster needs to allow ingress traffic from the other VPC.
 resource "aws_security_group_rule" "allowingressfrom1-0" {
   type              = "ingress"
   from_port         = 0
@@ -106,7 +112,7 @@ resource "aws_security_group_rule" "allowingressfrom0-1" {
   security_group_id = module.eks[1].cluster_primary_security_group_id
 }
 
-# Requester's side of the connection.
+# Create a peering connection. This is the requester's side of the connection.
 resource "aws_vpc_peering_connection" "peer" {
   vpc_id        = module.vpc[0].vpc_id
   peer_vpc_id   = module.vpc[1].vpc_id
@@ -119,7 +125,7 @@ resource "aws_vpc_peering_connection" "peer" {
   }
 }
 
-# Accepter's side of the connection.
+# Accepter's side of the vpc peering connection.
 resource "aws_vpc_peering_connection_accepter" "peer" {
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
   auto_accept               = true
@@ -129,7 +135,7 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
   }
 }
 
-# Get the route table ids that are associated with eks cluster 0
+# Get the route table ids that are associated with eks cluster 0, so we can create routes in those route tables.
 data "aws_route_tables" "rtseks0" {
   vpc_id = module.vpc[0].vpc_id
 
@@ -138,7 +144,8 @@ data "aws_route_tables" "rtseks0" {
     values = [format("%s-*", module.eks[0].cluster_id)]
   }
 }
-# Get the route table ids that are associated with eks cluster 1
+
+# Get the route table ids that are associated with eks cluster 1, so we can create routes in those route tables.
 data "aws_route_tables" "rtseks1" {
   vpc_id = module.vpc[1].vpc_id
 
@@ -148,12 +155,15 @@ data "aws_route_tables" "rtseks1" {
   }
 }
 
+# Add routes that so traffic going from VPC 0 to VPC 1 is routed through the peering connection.
 resource "aws_route" "peering0" {
   count                     = 2 # we know its the public and private route tables
   route_table_id            = tolist(data.aws_route_tables.rtseks0.ids)[count.index]
   destination_cidr_block    = module.vpc[1].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
 }
+
+# Add routes that so traffic going from VPC 1 to VPC 0 is routed through the peering connection.
 resource "aws_route" "peering1" {
   count                     = 2
   route_table_id            = tolist(data.aws_route_tables.rtseks1.ids)[count.index]
