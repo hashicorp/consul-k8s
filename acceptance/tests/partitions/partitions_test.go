@@ -57,30 +57,30 @@ func TestPartitions(t *testing.T) {
 			false,
 			true,
 		},
-		//{
-		//	"single destination namespace",
-		//	staticServerNamespace,
-		//	false,
-		//	false,
-		//},
-		//{
-		//	"single destination namespace; secure",
-		//	staticServerNamespace,
-		//	false,
-		//	true,
-		//},
-		//{
-		//	"mirror k8s namespaces",
-		//	staticServerNamespace,
-		//	true,
-		//	false,
-		//},
-		//{
-		//	"mirror k8s namespaces; secure",
-		//	staticServerNamespace,
-		//	true,
-		//	true,
-		//},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			false,
+		},
+		{
+			"single destination namespace; secure",
+			staticServerNamespace,
+			false,
+			true,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
+			false,
+		},
+		{
+			"mirror k8s namespaces; secure",
+			staticServerNamespace,
+			true,
+			true,
+		},
 	}
 
 	for _, c := range cases {
