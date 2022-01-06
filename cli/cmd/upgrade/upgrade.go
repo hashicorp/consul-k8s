@@ -168,13 +168,17 @@ func (c *Command) Run(args []string) int {
 
 	defer common.CloseWithError(c.BaseCommand)
 
-	if err := c.validateFlags(args); err != nil {
+	err := c.validateFlags(args)
+	if err != nil {
 		c.UI.Output(err.Error())
 		return 1
 	}
 
-	// Format is already checked in validateFlags() so the error is ignored.
-	c.timeoutDuration, _ = time.ParseDuration(c.flagTimeout)
+	c.timeoutDuration, err = time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Output(fmt.Sprintf("Invalid timeout: %s", err))
+		return 1
+	}
 
 	if c.flagDryRun {
 		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
