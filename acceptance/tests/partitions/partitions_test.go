@@ -181,7 +181,13 @@ func TestPartitions(t *testing.T) {
 			}
 
 			var k8sAuthMethodHost string
-			// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service.
+			//if cfg.UseKind {
+			//	// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
+			//	// this can be identified by reading the cluster config.
+			//	kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
+			//	require.NoError(t, err)
+			//	k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			//}
 			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
 			require.NoError(t, err)
 			k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
