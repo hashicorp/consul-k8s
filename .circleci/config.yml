@@ -719,9 +719,9 @@ jobs:
             terraform destroy -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-eks-1-19:
     environment:
@@ -972,9 +972,7 @@ workflows:
             - unit-acceptance-framework
             - unit-cli
       - cleanup-eks-resources
-      - acceptance-eks-1-19:
-          requires:
-            - cleanup-eks-resources
+      - acceptance-aks-1-21
   nightly-acceptance-tests:
     triggers:
       - schedule:
