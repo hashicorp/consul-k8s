@@ -972,7 +972,7 @@ workflows:
             - unit-acceptance-framework
             - unit-cli
       - cleanup-eks-resources
-      - acceptance-eks-1-18:
+      - acceptance-eks-1-19:
           requires:
             - cleanup-eks-resources
   nightly-acceptance-tests:
