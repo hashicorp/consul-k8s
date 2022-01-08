@@ -175,11 +175,7 @@ func TestPartitions(t *testing.T) {
 				}
 			}
 
-			var k8sAuthMethodHost string
-			// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
-			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
-			require.NoError(t, err)
-			k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			k8sAuthMethodHost := helpers.KubernetesAPIServerHostFromOptions(t, clientClusterContext.KubectlOptions(t))
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
