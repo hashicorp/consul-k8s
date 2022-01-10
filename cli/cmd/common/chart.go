@@ -69,7 +69,7 @@ func FetchChartValues(namespace string, settings *helmCLI.EnvSettings, uiLogger 
 	status := action.NewStatus(cfg)
 	release, err := status.Run(namespace)
 	if err != nil {
-	       return nil, err
+		return nil, err
 	}
 
 	return release.Config, nil
