@@ -33,17 +33,24 @@ func TestLoadChart(t *testing.T) {
 
 func TestReadChartFiles(t *testing.T) {
 	directory := "fixtures/consul"
-	expectedFileNames := []string{"Chart.yaml", "values.yaml", "templates/_helpers.tpl", "templates/foo.yaml"}
+	expectedFiles := map[string]string{
+		"Chart.yaml":             "# This is a mock Helm Chart.yaml file used for testing.\napiVersion: v2\nname: Foo\nversion: 0.1.0\ndescription: Mock Helm Chart for testing.",
+		"values.yaml":            "# This is a mock Helm values.yaml file used for testing.\nkey: value",
+		"templates/_helpers.tpl": "helpers",
+		"templates/foo.yaml":     "foo: bar\n",
+	}
 
 	files, err := ReadChartFiles(testChartFiles, directory)
 	require.NoError(t, err)
 
-	actualFileNames := make([]string, len(files))
-	for i, f := range files {
-		actualFileNames[i] = f.Name
+	actualFiles := make(map[string]string, len(files))
+	for _, f := range files {
+		actualFiles[f.Name] = string(f.Data)
 	}
 
-	for _, expectedFileName := range expectedFileNames {
-		require.Contains(t, actualFileNames, expectedFileName)
+	for expectedName, expectedContents := range expectedFiles {
+		actualContents, ok := actualFiles[expectedName]
+		require.True(t, ok, "Expected file %s not found", expectedName)
+		require.Equal(t, expectedContents, actualContents)
 	}
 }
