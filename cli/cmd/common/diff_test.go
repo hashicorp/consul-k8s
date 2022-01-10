@@ -71,6 +71,35 @@ func TestDiff(t *testing.T) {
 			expected: "+ baz:\n+ - qux\n  foo: bar\n+ qux:\n+   quux: corge\n",
 		},
 		{
+			name: "Deleted elements should be prefixed with a minus sign",
+			args: args{
+				a: map[string]interface{}{
+					"foo": "bar",
+					"baz": "qux",
+				},
+				b: map[string]interface{}{
+					"foo": "bar",
+				},
+			},
+			expected: "- baz: qux\n  foo: bar\n",
+		},
+		{
+			name: "Deleted non-string elements should be prefixed with a minus sign",
+			args: args{
+				a: map[string]interface{}{
+					"foo": "bar",
+					"baz": []string{"qux"},
+					"qux": map[string]string{
+						"quux": "corge",
+					},
+				},
+				b: map[string]interface{}{
+					"foo": "bar",
+				},
+			},
+			expected: "- baz:\n- - qux\n  foo: bar\n- qux:\n-   quux: corge\n",
+		},
+		{
 			name: "Diff between two complex maps should be correct",
 			args: args{
 				a: map[string]interface{}{
