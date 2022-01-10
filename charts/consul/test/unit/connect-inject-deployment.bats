@@ -1165,19 +1165,19 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-request=25Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-request=20m"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-request=20m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-limit=50Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-limit=50Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-limit=20m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1194,19 +1194,19 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-request=100Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-request=100Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-request=100m"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-request=100m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-limit=200Mi"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-limit=200Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-limit=200m"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1223,19 +1223,19 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-request=0"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-request=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-request=0"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-request=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-limit=0"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-limit=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-limit=0"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-limit=0"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1252,19 +1252,19 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-request"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-request"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1278,19 +1278,19 @@ EOF
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-request"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-request"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-request"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-memory-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-memory-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
+    yq 'any(contains("-default-consul-sidecar-cpu-limit"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
