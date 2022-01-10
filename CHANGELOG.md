@@ -1,7 +1,11 @@
 ## UNRELEASED
 IMPROVEMENTS:
 * Helm
-  * Allow customization of `terminationGracePeriodSeconds` on the ingress gateways. [[GH-947](https://github.com/hashicorp/consul-k8s/pull/947)] 
+  * Allow customization of `terminationGracePeriodSeconds` on the ingress gateways. [[GH-947](https://github.com/hashicorp/consul-k8s/pull/947)]
+
+BUG FIXES:
+* Helm
+  * Add PodDisruptionBudget Kind when checking for existing versions so that `helm template` can generate the right version. [[GH-923](https://github.com/hashicorp/consul-k8s/pull/923)]
 
 ## 0.39.0 (December 15, 2021)
 
