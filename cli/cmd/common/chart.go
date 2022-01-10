@@ -68,8 +68,11 @@ func FetchChartValues(namespace string, settings *helmCLI.EnvSettings, uiLogger 
 
 	status := action.NewStatus(cfg)
 	release, err := status.Run(namespace)
+	if err != nil {
+	       return nil, err
+	}
 
-	return release.Config, err
+	return release.Config, nil
 }
 
 func readFile(chart embed.FS, f string, pathPrefix string) (*loader.BufferedFile, error) {
