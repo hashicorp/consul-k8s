@@ -175,7 +175,18 @@ func TestPartitions(t *testing.T) {
 				}
 			}
 
-			k8sAuthMethodHost := helpers.KubernetesAPIServerHostFromOptions(t, clientClusterContext.KubectlOptions(t))
+			var k8sAuthMethodHost string
+			// When running on kind, the kube API address in kubeconfig will have a localhost address
+			// which will not work from inside the container. That's why we need to use the endpoints address instead
+			// which will point the node IP.
+			if cfg.UseKind {
+				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
+				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
+				require.NoError(t, err)
+				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			} else {
+				k8sAuthMethodHost = helpers.KubernetesAPIServerHostFromOptions(t, clientClusterContext.KubectlOptions(t))
+			}
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
