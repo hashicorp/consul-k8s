@@ -14,6 +14,8 @@ func TestIsValidLabel(t *testing.T) {
 	}{
 		{"Valid label", "such-a-good-label", true},
 		{"Invalid label empty", "", false},
+		{"Invalid label contains capital letters", "Peppertrout", false},
+		{"Invalid label contains underscores", "this_is_not_python", false},
 		{"Invalid label too long", "a-very-very-very-long-label-that-is-more-than-63-characters-long", false},
 		{"Invalid label starts with a dash", "-invalid-label", false},
 		{"Invalid label ends with a dash", "invalid-label-", false},
