@@ -89,9 +89,8 @@ data "aws_eks_cluster_auth" "cluster" {
   name  = module.eks[count.index].cluster_id
 }
 
-# The following resources are meant to apply when cluster_count=2 to set up vpc peering and the appropriate routes and
-# security groups so traffic between vpc's is allowed. Since the pipeline only ever deploys with a cluster_count of 2,
-# these resources are hardcoded to work in an environment with 2 clusters.
+# The following resources are only applied when cluster_count=2 to set up vpc peering and the appropriate routes and
+# security groups so traffic between vpcs is allowed. There is validation to ensure cluster_count can be 1 or 2.
 
 # Each EKS cluster needs to allow ingress traffic from the other VPC.
 resource "aws_security_group_rule" "allowingressfrom1-0" {
