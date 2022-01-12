@@ -971,8 +971,8 @@ workflows:
             - unit-test-helm-templates
             - unit-acceptance-framework
             - unit-cli
-      - cleanup-eks-resources
-      - acceptance-aks-1-21
+      - cleanup-gcp-resources
+      - acceptance-gke-1-20
   nightly-acceptance-tests:
     triggers:
       - schedule:

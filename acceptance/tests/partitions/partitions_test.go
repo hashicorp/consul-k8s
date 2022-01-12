@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -166,13 +167,18 @@ func TestPartitions(t *testing.T) {
 				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
 				require.NoError(t, err)
 
-				// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
-				// load balancers have IPs.
-				if partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname != "" {
-					partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname
-				} else {
-					partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
-				}
+				// It can take some time for the load balancers to be ready and have an IP/Hostname.
+				// Wait for 2 minutes before failing.
+				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 120}, t, func(r *retry.R) {
+					require.NotZero(r, len(partitionsSvc.Status.LoadBalancer.Ingress))
+					// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
+					// load balancers have IPs.
+					if partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname
+					} else {
+						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
+					}
+				})
 			}
 
 			var k8sAuthMethodHost string
