@@ -164,13 +164,13 @@ func TestPartitions(t *testing.T) {
 				// Get the IP of the partition service to configure the external server address in the values file for the clients cluster.
 				partitionServiceName := fmt.Sprintf("%s-consul-partition-service", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external address for servers")
-				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
-				require.NoError(t, err)
 
 				// It can take some time for the load balancers to be ready and have an IP/Hostname.
-				// Wait for 2 minutes before failing.
-				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 300}, t, func(r *retry.R) {
-					require.NotZero(r, len(partitionsSvc.Status.LoadBalancer.Ingress))
+				// Wait for 60 seconds before failing.
+				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
+					partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
+					require.NoError(t, err)
+					require.NotEmpty(r, partitionsSvc.Status.LoadBalancer.Ingress)
 					// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
 					// load balancers have IPs.
 					if partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname != "" {

@@ -664,9 +664,9 @@ jobs:
             terraform destroy -var project=${CLOUDSDK_CORE_PROJECT} -auto-approve
           when: always
 
-      - slack/status:
-          fail_only: true
-          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
+#      - slack/status:
+#          fail_only: true
+#          failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
   acceptance-aks-1-21:
     environment:
@@ -971,7 +971,6 @@ workflows:
             - unit-test-helm-templates
             - unit-acceptance-framework
             - unit-cli
-      - cleanup-gcp-resources
       - acceptance-gke-1-20
   nightly-acceptance-tests:
     triggers:
