@@ -169,7 +169,7 @@ func TestPartitions(t *testing.T) {
 
 				// It can take some time for the load balancers to be ready and have an IP/Hostname.
 				// Wait for 2 minutes before failing.
-				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 120}, t, func(r *retry.R) {
+				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 300}, t, func(r *retry.R) {
 					require.NotZero(r, len(partitionsSvc.Status.LoadBalancer.Ingress))
 					// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
 					// load balancers have IPs.
