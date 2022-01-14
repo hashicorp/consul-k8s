@@ -451,7 +451,21 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.createAnonymousPolicy(isPrimary) {
-		err := c.configureAnonymousPolicy(consulClient)
+		// When the default partition is in a VM, the anonymous policy does not allow cross-partition
+		// DNS lookups. The anonymous policy in the default partition needs to be updated in order to
+		// support this use-case. Creating a separate anonymous token client that updates the anonymous
+		// policy and token in the default partition ensures this works.
+		anonTokenConfig := clientConfig
+		if c.flagEnablePartitions {
+			anonTokenConfig.Partition = consulDefaultPartition
+		}
+		anonTokenClient, err := consul.NewClient(anonTokenConfig)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+
+		err = c.configureAnonymousPolicy(anonTokenClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -793,12 +807,6 @@ type Config struct {
 // createAnonymousPolicy returns whether we should create a policy for the
 // anonymous ACL token, i.e. queries without ACL tokens.
 func (c *Command) createAnonymousPolicy(isPrimary bool) bool {
-	// Don't try to create the anonymous policy in non-default partitions because
-	// non-default partitions will use the anonymous policy from the default
-	// partition.
-	if c.flagEnablePartitions && c.flagPartitionName != "default" {
-		return false
-	}
 	// If isPrimary is not set then we're in a secondary DC.
 	// In this case we assume that the primary datacenter has already created
 	// the anonymous policy and attached it to the anonymous token.
