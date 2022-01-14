@@ -1789,6 +1789,17 @@ load _helpers
 #--------------------------------------------------------------------
 # ui.dashboardURLTemplates.service
 
+@test "server/StatefulSet: dashboard_url_templates not set by default" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r ".spec.template.spec.containers[0].command | any(contains(\"dashboard_url_templates\"))" | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
 @test "server/StatefulSet: ui.dashboardURLTemplates.service sets the template" {
   cd `chart_dir`
 
