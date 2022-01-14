@@ -1,10 +1,10 @@
 package common
 
 import (
-	"reflect"
 	"sort"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 )
 
@@ -40,7 +40,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 		// If the key is in both a and b, compare the values.
 		if inA && inB {
 			// If the map slices are the same, write as unchanged YAML.
-			if reflect.DeepEqual(aMapWithKey, bMapWithKey) {
+			if cmp.Equal(aMapWithKey, bMapWithKey) {
 				asYaml, err := yaml.Marshal(aMapWithKey)
 				if err != nil {
 					return err
@@ -135,7 +135,7 @@ func writeWithPrepend(prepend, text string, recurseDepth int, buf *strings.Build
 // isMaxDepth returns false if any of the values in the map are maps.
 func isMaxDepth(m map[string]interface{}) bool {
 	for _, value := range m {
-		if reflect.TypeOf(value).Kind() == reflect.Map {
+		if _, ok := value.(map[string]interface{}); ok {
 			return false
 		}
 	}
