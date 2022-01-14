@@ -38,7 +38,7 @@ resource "google_compute_firewall" "firewall-rules" {
   project     = var.project
   name        = "consul-k8s-acceptance-firewall-${random_id.suffix[count.index].dec}"
   network     = "default"
-  description = "Creates firewall rule targeting tagged instances"
+  description = "Creates firewall rule allowing traffic from nodes and pods of the ${random_id.suffix[count.index == 0 ? 1 : 0].dec} Kubernetes cluster."
 
   count = var.cluster_count > 1 ? var.cluster_count : 0
 
