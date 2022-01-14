@@ -30,18 +30,18 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 		valueInA, inA := a[key]
 		valueInB, inB := b[key]
 
-		aSlice := map[string]interface{}{
+		aMapWithKey := map[string]interface{}{
 			key: valueInA,
 		}
-		bSlice := map[string]interface{}{
+		bMapWithKey := map[string]interface{}{
 			key: valueInB,
 		}
 
 		// If the key is in both a and b, compare the values.
 		if inA && inB {
 			// If the map slices are the same, write as unchanged YAML.
-			if reflect.DeepEqual(aSlice, bSlice) {
-				asYaml, err := yaml.Marshal(aSlice)
+			if reflect.DeepEqual(aMapWithKey, bMapWithKey) {
+				asYaml, err := yaml.Marshal(aMapWithKey)
 				if err != nil {
 					return err
 				}
@@ -51,7 +51,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			}
 
 			// If the maps are different and there is another level of depth to the map, recurse.
-			if !isMaxDepth(aSlice) && !isMaxDepth(bSlice) {
+			if !isMaxDepth(aMapWithKey) && !isMaxDepth(bMapWithKey) {
 				writeWithPrepend("  ", key+":", recurseDepth, buf)
 
 				err := diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1, buf)
@@ -63,12 +63,12 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			}
 
 			// If the map slices are different and there is no other level of depth to the map, write as changed YAML.
-			aSliceAsYaml, err := yaml.Marshal(aSlice)
+			aSliceAsYaml, err := yaml.Marshal(aMapWithKey)
 			if err != nil {
 				return err
 			}
 
-			bSliceAsYaml, err := yaml.Marshal(bSlice)
+			bSliceAsYaml, err := yaml.Marshal(bMapWithKey)
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 
 		// If the key is in a but not in b, write as removed.
 		if inA && !inB {
-			asYaml, err := yaml.Marshal(aSlice)
+			asYaml, err := yaml.Marshal(aMapWithKey)
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 
 		// If the key is in b but not in a, write as added.
 		if !inA && inB {
-			asYaml, err := yaml.Marshal(bSlice)
+			asYaml, err := yaml.Marshal(bMapWithKey)
 			if err != nil {
 				return err
 			}
