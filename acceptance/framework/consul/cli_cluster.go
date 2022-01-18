@@ -74,8 +74,8 @@ func NewCLICluster(
 	require.NoError(t, err)
 
 	// Merge all helm values
-	mergeMaps(values, valuesFromConfig)
-	mergeMaps(values, helmValues)
+	MergeMaps(values, valuesFromConfig)
+	MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
@@ -179,7 +179,7 @@ func (h *CLICluster) Destroy(t *testing.T) {
 func (h *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
-	mergeMaps(h.helmOptions.SetValues, helmValues)
+	MergeMaps(h.helmOptions.SetValues, helmValues)
 	helm.Upgrade(t, h.helmOptions, config.HelmChartPath, h.releaseName)
 	helpers.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
