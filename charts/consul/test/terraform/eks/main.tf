@@ -27,7 +27,7 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "3.11.0"
 
-  name                 = "consul-k8s-${random_id.suffix[count.index].dec}"
+  name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
   cidr                 = format("10.%s.0.0/16", count.index)
   azs                  = data.aws_availability_zones.available.names
