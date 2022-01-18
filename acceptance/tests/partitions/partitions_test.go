@@ -32,10 +32,6 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	if !cfg.UseKind {
-		t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
-	}
-
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
@@ -168,11 +164,11 @@ func TestPartitions(t *testing.T) {
 			var partitionSvcIP string
 			if !cfg.UseKind {
 				// Get the IP of the partition service to configure the external server address in the values file for the workload cluster.
-				partitionSecretName := fmt.Sprintf("%s-partition-secret", releaseName)
+				partitionServiceName := fmt.Sprintf("%s-consul-partition-service", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external IP for servers")
-				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionSecretName, metav1.GetOptions{})
+				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
 				require.NoError(t, err)
-				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
+				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname
 			} else {
 				nodeList, err := serverClusterContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				require.NoError(t, err)
@@ -181,13 +177,10 @@ func TestPartitions(t *testing.T) {
 			}
 
 			var k8sAuthMethodHost string
-			if cfg.UseKind {
-				// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
-				// this can be identified by reading the cluster config.
-				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
-				require.NoError(t, err)
-				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
-			}
+			// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service.
+			kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
+			require.NoError(t, err)
+			k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
@@ -258,7 +251,6 @@ func TestPartitions(t *testing.T) {
 			// Ensure consul client are created.
 			agentPodList, err := clientClusterContext.KubernetesClient(t).CoreV1().Pods(clientClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 			require.NoError(t, err)
-			require.Len(t, agentPodList.Items, 1)
 
 			output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", clientClusterContext.KubectlOptions(t).Namespace)
 			require.NoError(t, err)
