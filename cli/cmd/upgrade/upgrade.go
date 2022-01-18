@@ -18,7 +18,6 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -297,7 +296,7 @@ func (c *Command) Run(args []string) int {
 	upgrade.Timeout = c.timeoutDuration
 
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
-	release, err := upgrade.Run(common.DefaultReleaseName, chart, chartValues)
+	_, err = upgrade.Run(common.DefaultReleaseName, chart, chartValues)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -306,19 +305,6 @@ func (c *Command) Run(args []string) int {
 	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
 		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
-
-		configYaml, err := yaml.Marshal(release.Config)
-		if err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
-		}
-
-		if len(release.Config) == 0 {
-			c.UI.Output("Config: "+string(configYaml), terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
-		}
-
 		return 0
 	}
 
