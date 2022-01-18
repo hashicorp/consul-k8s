@@ -173,6 +173,19 @@ func KubernetesContextFromOptions(t *testing.T, options *terratestk8s.KubectlOpt
 	return rawConfig.CurrentContext
 }
 
+// KubernetesAPIServerHostFromOptions returns the Kubernetes API server host from options.
+func KubernetesAPIServerHostFromOptions(t *testing.T, options *terratestk8s.KubectlOptions) string {
+	t.Helper()
+
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	config, err := terratestk8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	return config.Host
+}
+
 // IsReady returns true if pod is ready.
 func IsReady(pod corev1.Pod) bool {
 	if pod.Status.Phase == corev1.PodPending {
