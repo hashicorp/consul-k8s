@@ -9,9 +9,9 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/kubernetes"

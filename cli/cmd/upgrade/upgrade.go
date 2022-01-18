@@ -9,9 +9,9 @@ import (
 	"time"
 
 	consulChart "github.com/hashicorp/consul-k8s/charts"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
