@@ -286,6 +286,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"-terminating-gateway-name=gw",
 				"-terminating-gateway-name=anothergw",
 				"-create-controller-token",
+				"-create-component-auth-method",
 			}
 			// Our second run, we're going to update from partitions and namespaces disabled to
 			// namespaces enabled with a single destination ns and partitions enabled.
@@ -748,10 +749,10 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			LocalToken:  false,
 		},
 		"controller token": {
-			TokenFlags:  []string{"-create-controller-token"},
+			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
 			PolicyNames: []string{"controller-token"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			SecretNames: nil,
 			LocalToken:  false,
 		},
 		"partitions token": {
@@ -797,21 +798,28 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 			})
 			require.NoError(err)
 
+			// Check that the expected policy was created.
+			policyNames := map[string]bool{}
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
-
+				policyNames[policy.Name] = true
+			}
+			tokens := []string{}
+			for i := range c.SecretNames {
 				// Test that the token was created as a Kubernetes Secret.
 				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
 				require.True(ok)
-
+				tokens = append(tokens, string(token))
+			}
+			for i := range tokens {
 				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: tokens[i]})
 				require.NoError(err)
-				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+				require.True(policyNames[tokenData.Policies[0].Name])
 				require.Equal(c.LocalToken, tokenData.Local)
 			}
 

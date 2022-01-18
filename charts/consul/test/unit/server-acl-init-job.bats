@@ -1641,14 +1641,21 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: -create-controller-token set when controller.enabled=true" {
+@test "serverACLInit/Job: -create-controller-token set when controller.enabled=true and -create-component-auth-method is passed" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'controller.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("create-controller-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+    yq '.command | any(contains("-create-controller-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$object" |
+    yq '.command | any(contains("-create-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

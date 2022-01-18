@@ -172,7 +172,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			if c.acls {
-				test.SetupK8sAuthMethodWithNamespaces(t, consulClient, testServiceAccountName, "default-ns", c.authMethodNamespace, c.authMethodNamespace != c.consulServiceNamespace, "")
+				test.SetupK8sAuthMethodWithNamespaces(t, consulClient, testServiceAccountName, "default-ns", c.authMethodNamespace, c.authMethodNamespace != c.consulServiceNamespace, "", test.AuthMethod)
 			}
 
 			// Register Consul services.

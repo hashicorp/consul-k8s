@@ -22,8 +22,8 @@ func TestController(t *testing.T) {
 		secure      bool
 		autoEncrypt bool
 	}{
-		{false, false},
-		{true, false},
+		//	{false, false},
+		//	{true, false},
 		{true, true},
 	}
 
@@ -38,6 +38,7 @@ func TestController(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
+				"global.imageK8S":              "kschoche/consul-k8s-mdc",
 				"controller.enabled":           "true",
 				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),

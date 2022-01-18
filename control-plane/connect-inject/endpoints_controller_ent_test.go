@@ -1220,7 +1220,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							if ts.Mirror {
 								writeOpts.Namespace = "default"
 							}
-							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
+							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, test.AuthMethod)
 							token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,
@@ -1550,7 +1550,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 							if ts.Mirror {
 								writeOpts.Namespace = "default"
 							}
-							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
+							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, test.AuthMethod)
 							token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,

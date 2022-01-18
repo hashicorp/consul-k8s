@@ -238,6 +238,7 @@ spec:
 
                 {{- if .Values.controller.enabled }}
                 -create-controller-token=true \
+                -create-component-auth-method=true \
                 {{- end }}
 
                 {{- if .Values.apiGateway.enabled }}

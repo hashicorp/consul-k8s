@@ -59,14 +59,14 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 
 // SetupK8sAuthMethod create a k8s auth method and a binding rule in Consul for the
 // given k8s service and namespace.
-func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "")
+func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string, authMethodName string) {
+	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", authMethodName)
 }
 
 // SetupK8sAuthMethodWithNamespaces creates a k8s auth method and binding rule
 // in Consul for the k8s service name and namespace. It sets up the auth method and the binding
 // rule so that it works with consul namespaces.
-func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string) {
+func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string, authMethodName string) {
 	t.Helper()
 	// Start the mock k8s server.
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +83,7 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 
 	// Set up Consul's auth method.
 	authMethodTmpl := api.ACLAuthMethod{
-		Name:        AuthMethod,
+		Name:        authMethodName,
 		Type:        "kubernetes",
 		Description: "Kubernetes Auth Method",
 		Config: map[string]interface{}{
@@ -105,7 +105,7 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	// Create the binding rule.
 	aclBindingRule := api.ACLBindingRule{
 		Description: "Kubernetes binding rule",
-		AuthMethod:  AuthMethod,
+		AuthMethod:  authMethodName,
 		BindType:    api.BindingRuleBindTypeService,
 		BindName:    "${serviceaccount.name}",
 		Selector:    "serviceaccount.name!=default",

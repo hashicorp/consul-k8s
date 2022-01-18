@@ -2,6 +2,9 @@ package aclinit
 
 import (
 	"context"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -152,4 +155,66 @@ func TestRun_TokenSinkFileTwice(t *testing.T) {
 		require.NoError(err)
 		require.Equal(token, string(bytes), "exp: %s, got: %s", token, string(bytes))
 	}
+}
+
+// TestRun_PerformsConsulLogin executes the consul login path and validates the token
+// is written to disk.
+func TestRun_PerformsConsulLogin(t *testing.T) {
+	var caFile, certFile, keyFile string
+	// This is the test file that we will write the token to so consul-logout can read it.
+	tokenFile := common.WriteTempFile(t, "")
+	bearerFile := common.WriteTempFile(t, test.ServiceAccountJWTToken)
+	t.Cleanup(func() {
+		os.Remove(tokenFile)
+	})
+
+	k8s := fake.NewSimpleClientset()
+
+	// Start Consul server with ACLs enabled and default deny policy.
+	masterToken := "b78d37c7-0ca7-5f4d-99ee-6d9975ce4586"
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.DefaultPolicy = "deny"
+		c.ACL.Tokens.InitialManagement = masterToken
+		caFile, certFile, keyFile = test.GenerateServerCerts(t)
+		c.CAFile = caFile
+		c.CertFile = certFile
+		c.KeyFile = keyFile
+	})
+	require.NoError(t, err)
+	defer server.Stop()
+	server.WaitForLeader(t)
+	cfg := &api.Config{
+		Scheme:  "http",
+		Address: server.HTTPAddr,
+		Token:   masterToken,
+	}
+	cfg.Address = server.HTTPSAddr
+	cfg.Scheme = "https"
+	cfg.TLSConfig = api.TLSConfig{
+		CAFile: caFile,
+	}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+
+	test.SetupK8sAuthMethod(t, consulClient, "test-sa", "default", common.ComponentAuthMethod)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:              ui,
+		k8sClient:       k8s,
+		bearerTokenFile: bearerFile,
+		consulClient:    consulClient,
+		tokenSinkFile:   tokenFile,
+	}
+
+	code := cmd.Run([]string{
+		"-acl-auth-method", "consul-k8s-component-auth-method",
+	})
+	require.Equal(t, 0, code, ui.ErrorWriter.String())
+
+	bytes, err := ioutil.ReadFile(tokenFile)
+	require.NoError(t, err)
+	require.NotEqual(t, 0, len(bytes))
+
 }

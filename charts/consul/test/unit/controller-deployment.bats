@@ -46,18 +46,18 @@ load _helpers
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 
-@test "controller/Deployment: CONSUL_HTTP_TOKEN env variable created when global.acls.manageSystemACLs=true" {
+@test "controller/Deployment: consul-logout preStop hook is added when ACLs are enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/controller-deployment.yaml \
       --set 'controller.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul-k8s-control-plane consul-logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true" {
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/controller-deployment.yaml \
@@ -73,8 +73,123 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].value] | any(contains("http://$(HOST_IP):8500"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
 }
 
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-enable-partitions=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls enabled and autoencrypt enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "controller-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[1].name] | any(contains("CONSUL_CACERT"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].name] | any(contains("CONSUL_HTTP_ADDR"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[2].value] | any(contains("https://$(HOST_IP):8501"))' | tee /dev/stderr)
+      echo $actual
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 #--------------------------------------------------------------------
 # global.tls.enabled
 
@@ -486,28 +601,6 @@ load _helpers
 #--------------------------------------------------------------------
 # aclToken
 
-@test "controller/Deployment: aclToken disabled when secretName is missing" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'controller.aclToken.secretKey=bar' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "controller/Deployment: aclToken disabled when secretKey is missing" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/controller-deployment.yaml  \
-      --set 'controller.enabled=true' \
-      --set 'controller.aclToken.secretName=foo' \
-      . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
 @test "controller/Deployment: aclToken enabled when secretName and secretKey is provided" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -518,6 +611,27 @@ load _helpers
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: aclToken env is set when ACLs are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: aclToken env is not set when ACLs are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml  \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------

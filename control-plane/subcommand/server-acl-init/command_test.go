@@ -65,6 +65,14 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags: []string{
 				"-server-address=localhost",
 				"-resource-prefix=prefix",
+				"-create-controller-token",
+			},
+			ExpErr: "-create-component-auth-method is required with -create-controller-token",
+		},
+		{
+			Flags: []string{
+				"-server-address=localhost",
+				"-resource-prefix=prefix",
 				"-sync-consul-node-name=Speci@l_Chars",
 			},
 			ExpErr: "-sync-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
@@ -143,6 +151,45 @@ func TestRun_Defaults(t *testing.T) {
 	// that in another test when we're using an httptest server instead of
 	// the test agent and we can assert that the /v1/agent/token/agent
 	// endpoint was called.
+}
+
+// Test that the component auth method gets created.
+func TestRun_ComponentAuthMethod(t *testing.T) {
+	t.Parallel()
+
+	k8s, testSvr := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+	defer testSvr.Stop()
+	require := require.New(t)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+		"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-component-auth-method"}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(0, responseCode, ui.ErrorWriter.String())
+
+	// Check that the expected policy was created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testSvr.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+	authMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(err)
+	require.NotNil(authMethod)
 }
 
 // Test the different flags that should create tokens and save them as
@@ -244,10 +291,10 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-controller-token"},
+			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
 			PolicyNames: []string{"controller-token"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			SecretNames: nil,
 			LocalToken:  false,
 		},
 		{
@@ -292,21 +339,27 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			})
 			require.NoError(err)
 
+			policyNames := map[string]bool{}
 			for i := range c.PolicyNames {
 				policy := policyExists(t, c.PolicyNames[i], consul)
 				require.Equal(c.PolicyDCs, policy.Datacenters)
-
+				policyNames[policy.Name] = true
+			}
+			tokens := []string{}
+			for i := range c.SecretNames {
 				// Test that the token was created as a Kubernetes Secret.
 				tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
 				require.NoError(err)
 				require.NotNil(tokenSecret)
 				token, ok := tokenSecret.Data["token"]
 				require.True(ok)
-
+				tokens = append(tokens, string(token))
+			}
+			for i := range tokens {
 				// Test that the token has the expected policies in Consul.
-				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
+				tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: tokens[i]})
 				require.NoError(err)
-				require.Equal(c.PolicyNames[i], tokenData.Policies[0].Name)
+				require.True(policyNames[tokenData.Policies[0].Name])
 				require.Equal(c.LocalToken, tokenData.Local)
 			}
 
@@ -423,10 +476,10 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-controller-token"},
+			TokenFlags:  []string{"-create-component-auth-method", "-create-controller-token"},
 			PolicyNames: []string{"controller-token-dc2"},
 			PolicyDCs:   nil,
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			SecretNames: nil,
 			LocalToken:  false,
 		},
 	}
@@ -435,7 +488,7 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile := common.WriteTempFile(t, bootToken)
 
-			k8s, consul, secondaryAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			k8s, consul, secondaryAddr, _, sec, cleanup := mockReplicatedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
@@ -459,24 +512,34 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			responseCode := cmd.Run(cmdArgs)
 			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
+			// Sometimes it takes a moment for the policies to be settled when there
+			// is no kube secret being created.
+			sec.WaitForServiceIntentions(t)
 			// Check that the expected policy was created.
 			retry.Run(t, func(r *retry.R) {
+				policyNames := map[string]bool{}
 				for i := range c.PolicyNames {
-					policy := policyExists(r, c.PolicyNames[i], consul)
-					require.Equal(r, c.PolicyDCs, policy.Datacenters)
-
+					policy := policyExists(t, c.PolicyNames[i], consul)
+					require.Equal(t, c.PolicyDCs, policy.Datacenters)
+					policyNames[policy.Name] = true
+				}
+				tokens := []string{}
+				for i := range c.SecretNames {
 					// Test that the token was created as a Kubernetes Secret.
 					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-					require.NoError(r, err)
-					require.NotNil(r, tokenSecret)
+					require.NoError(t, err)
+					require.NotNil(t, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
-					require.True(r, ok)
-
+					require.True(t, ok)
+					tokens = append(tokens, string(token))
+				}
+				time.Sleep(time.Second * 1)
+				for i := range tokens {
 					// Test that the token has the expected policies in Consul.
-					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-					require.NoError(r, err)
-					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
-					require.Equal(r, c.LocalToken, tokenData.Local)
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: tokens[i]})
+					require.NoError(t, err)
+					require.True(t, policyNames[tokenData.Policies[0].Name])
+					require.Equal(t, c.LocalToken, tokenData.Local)
 				}
 			})
 		})
@@ -567,9 +630,9 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 		},
 		{
 			TestName:    "Controller token",
-			TokenFlags:  []string{"-create-controller-token"},
+			TokenFlags:  []string{"-create-controller-token", "-create-component-auth-method"},
 			PolicyNames: []string{"controller-token"},
-			SecretNames: []string{resourcePrefix + "-controller-acl-token"},
+			SecretNames: nil,
 		},
 	}
 	for _, c := range cases {
@@ -607,20 +670,26 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 
 			// Check that the expected policy was created.
 			retry.Run(t, func(r *retry.R) {
+				policyNames := map[string]bool{}
 				for i := range c.PolicyNames {
-					policyExists(r, c.PolicyNames[i], consul)
-
+					policy := policyExists(t, c.PolicyNames[i], consul)
+					policyNames[policy.Name] = true
+				}
+				tokens := []string{}
+				for i := range c.SecretNames {
 					// Test that the token was created as a Kubernetes Secret.
 					tokenSecret, err := k8s.CoreV1().Secrets(ns).Get(context.Background(), c.SecretNames[i], metav1.GetOptions{})
-					require.NoError(r, err)
-					require.NotNil(r, tokenSecret)
+					require.NoError(t, err)
+					require.NotNil(t, tokenSecret)
 					token, ok := tokenSecret.Data["token"]
-					require.True(r, ok)
-
+					require.True(t, ok)
+					tokens = append(tokens, string(token))
+				}
+				for i := range tokens {
 					// Test that the token has the expected policies in Consul.
-					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: string(token)})
-					require.NoError(r, err)
-					require.Equal(r, c.PolicyNames[i], tokenData.Policies[0].Name)
+					tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: tokens[i]})
+					require.NoError(t, err)
+					require.True(t, policyNames[tokenData.Policies[0].Name])
 				}
 			})
 		})
@@ -688,7 +757,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 			if c.SecondaryDC {
 				var cleanup func()
 				bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-				k8s, consul, consulHTTPAddr, cleanup = mockReplicatedSetup(t, bootToken)
+				k8s, consul, consulHTTPAddr, _, _, cleanup = mockReplicatedSetup(t, bootToken)
 				defer cleanup()
 
 				tmp, err := ioutil.TempFile("", "")
@@ -1913,7 +1982,7 @@ func TestRun_HTTPS(t *testing.T) {
 func TestRun_ACLReplicationTokenValid(t *testing.T) {
 	t.Parallel()
 
-	secondaryK8s, secondaryConsulClient, secondaryAddr, aclReplicationToken, clean := completeReplicatedSetup(t)
+	secondaryK8s, secondaryConsulClient, secondaryAddr, aclReplicationToken, _, _, clean := completeReplicatedSetup(t)
 	defer clean()
 
 	// completeReplicatedSetup ran the command in our primary dc so now we
@@ -1969,7 +2038,7 @@ func TestRun_AnonPolicy_IgnoredWithReplication(t *testing.T) {
 		t.Run(flag, func(t *testing.T) {
 			bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 			tokenFile := common.WriteTempFile(t, bootToken)
-			k8s, consul, serverAddr, cleanup := mockReplicatedSetup(t, bootToken)
+			k8s, consul, serverAddr, _, _, cleanup := mockReplicatedSetup(t, bootToken)
 			setUpK8sServiceAccount(t, k8s, ns)
 			defer cleanup()
 
@@ -2146,7 +2215,7 @@ func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientse
 // the address of the secondary Consul server,
 // the replication token generated and a cleanup function
 // that should be called at the end of the test that cleans up resources.
-func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string, string, func()) {
+func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string, string, *testutil.TestServer, *testutil.TestServer, func()) {
 	return replicatedSetup(t, "")
 }
 
@@ -2159,9 +2228,9 @@ func completeReplicatedSetup(t *testing.T) (*fake.Clientset, *api.Client, string
 // the address of the secondary Consul server, and a
 // cleanup function that should be called at the end of the test that cleans
 // up resources.
-func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, func()) {
-	k8sClient, consulClient, serverAddr, _, cleanup := replicatedSetup(t, bootToken)
-	return k8sClient, consulClient, serverAddr, cleanup
+func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, *testutil.TestServer, *testutil.TestServer, func()) {
+	k8sClient, consulClient, serverAddr, _, primary, secondary, cleanup := replicatedSetup(t, bootToken)
+	return k8sClient, consulClient, serverAddr, primary, secondary, cleanup
 }
 
 // replicatedSetup is a helper function for completeReplicatedSetup and
@@ -2172,7 +2241,7 @@ func mockReplicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.
 // the address of the secondary Consul server, ACL replication token, and a
 // cleanup function that should be called at the end of the test that cleans
 // up resources.
-func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, string, func()) {
+func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Client, string, string, *testutil.TestServer, *testutil.TestServer, func()) {
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		if bootToken != "" {
@@ -2264,7 +2333,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	// Finally, set up our kube cluster. It will use the secondary dc.
 	k8s := fake.NewSimpleClientset()
 
-	return k8s, consul, secondarySvr.HTTPAddr, aclReplicationToken, func() {
+	return k8s, consul, secondarySvr.HTTPAddr, aclReplicationToken, primarySvr, secondarySvr, func() {
 		primarySvr.Stop()
 		secondarySvr.Stop()
 	}

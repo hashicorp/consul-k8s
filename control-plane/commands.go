@@ -5,6 +5,7 @@ import (
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
+	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdConsulSidecar "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-sidecar"
 	cmdController "github.com/hashicorp/consul-k8s/control-plane/subcommand/controller"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
@@ -44,6 +45,10 @@ func init() {
 
 		"consul-sidecar": func() (cli.Command, error) {
 			return &cmdConsulSidecar.Command{UI: ui}, nil
+		},
+
+		"consul-logout": func() (cli.Command, error) {
+			return &cmdConsulLogout.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {

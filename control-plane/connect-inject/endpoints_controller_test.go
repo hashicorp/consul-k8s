@@ -2374,7 +2374,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				// Create a token for this service if ACLs are enabled.
 				if tt.enableACLs {
 					if svc.Kind != api.ServiceKindConnectProxy {
-						test.SetupK8sAuthMethod(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS])
+						test.SetupK8sAuthMethod(t, consulClient, svc.Name, svc.Meta[MetaKeyKubeNS], test.AuthMethod)
 						token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -2706,7 +2706,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 
 				// Create a token for it if ACLs are enabled.
 				if tt.enableACLs {
-					test.SetupK8sAuthMethod(t, consulClient, svc.Name, "default")
+					test.SetupK8sAuthMethod(t, consulClient, svc.Name, "default", test.AuthMethod)
 					if svc.Kind != api.ServiceKindConnectProxy {
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,

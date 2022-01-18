@@ -12,22 +12,22 @@ import (
 
 // createLocalACL creates a policy and acl token for this dc (datacenter), i.e.
 // the policy is only valid for this datacenter and the token is a local token.
-func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
-	return c.createACL(name, rules, true, dc, isPrimary, consulClient)
+func (c *Command) createLocalACL(name, rules, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, true, dc, isPrimary, createKubeSecret, consulClient)
 }
 
 // createGlobalACL creates a global policy and acl token. The policy is valid
 // for all datacenters and the token is global. dc must be passed because the
 // policy name may have the datacenter name appended.
-func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, consulClient *api.Client) error {
-	return c.createACL(name, rules, false, dc, isPrimary, consulClient)
+func (c *Command) createGlobalACL(name, rules, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client) error {
+	return c.createACL(name, rules, false, dc, isPrimary, createKubeSecret, consulClient)
 }
 
 // createACL creates a policy with rules and name. If localToken is true then
 // the token will be a local token and the policy will be scoped to only dc.
 // If localToken is false, the policy will be global.
 // The token will be written to a Kubernetes secret.
-func (c *Command) createACL(name, rules string, localToken bool, dc string, isPrimary bool, consulClient *api.Client) error {
+func (c *Command) createACL(name, rules string, localToken bool, dc string, isPrimary bool, createKubeSecret bool, consulClient *api.Client) error {
 	// Create policy with the given rules.
 	policyName := fmt.Sprintf("%s-token", name)
 	if c.flagFederation && !isPrimary {
@@ -53,6 +53,10 @@ func (c *Command) createACL(name, rules string, localToken bool, dc string, isPr
 		return err
 	}
 
+	if !createKubeSecret {
+		c.log.Info(fmt.Sprintf("skipping creating kube secret for %s", policyName))
+		return err
+	}
 	// Check if the secret already exists, if so, we assume the ACL has already been
 	// created and return.
 	secretName := c.withPrefix(name + "-acl-token")
