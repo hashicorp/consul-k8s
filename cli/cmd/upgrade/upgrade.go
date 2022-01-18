@@ -309,7 +309,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output("Upgraded Consul into namespace %q", namespace, terminal.WithSuccessStyle())
-
 	return 0
 }
 

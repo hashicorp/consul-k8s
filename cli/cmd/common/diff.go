@@ -15,14 +15,13 @@ func Diff(a, b map[string]interface{}) (string, error) {
 		return "", nil
 	}
 
-	buf := new(strings.Builder)
-	err := diffRecursively(a, b, 0, buf)
-
-	return buf.String(), err
+	return diffRecursively(a, b, 0)
 }
 
 // diffRecursively iterates over both maps and writes the differences to the given buffer.
-func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings.Builder) error {
+func diffRecursively(a, b map[string]interface{}, recurseDepth int) (string, error) {
+	buf := new(strings.Builder)
+
 	// Get the union of keys in a and b sorted alphabetically.
 	keys := collectKeys(a, b)
 
@@ -43,7 +42,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			if cmp.Equal(aMapWithKey, bMapWithKey) {
 				asYaml, err := yaml.Marshal(aMapWithKey)
 				if err != nil {
-					return err
+					return "", err
 				}
 
 				writeWithPrepend("  ", string(asYaml), recurseDepth, buf)
@@ -54,10 +53,12 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			if !isMaxDepth(aMapWithKey) && !isMaxDepth(bMapWithKey) {
 				writeWithPrepend("  ", key+":", recurseDepth, buf)
 
-				err := diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1, buf)
+				childDiff, err := diffRecursively(valueInA.(map[string]interface{}), valueInB.(map[string]interface{}), recurseDepth+1)
 				if err != nil {
-					return err
+					return "", err
 				}
+
+				buf.WriteString(childDiff)
 
 				continue
 			}
@@ -65,12 +66,12 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 			// If the map slices are different and there is no other level of depth to the map, write as changed YAML.
 			aSliceAsYaml, err := yaml.Marshal(aMapWithKey)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			bSliceAsYaml, err := yaml.Marshal(bMapWithKey)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			writeWithPrepend("- ", string(aSliceAsYaml), recurseDepth, buf)
@@ -81,7 +82,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 		if inA && !inB {
 			asYaml, err := yaml.Marshal(aMapWithKey)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			writeWithPrepend("- ", string(asYaml), recurseDepth, buf)
@@ -92,7 +93,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 		if !inA && inB {
 			asYaml, err := yaml.Marshal(bMapWithKey)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			writeWithPrepend("+ ", string(asYaml), recurseDepth, buf)
@@ -100,7 +101,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int, buf *strings
 		}
 	}
 
-	return nil
+	return buf.String(), nil
 }
 
 // collectKeys iterates over both maps and collects all keys sorted alphabetically, ignoring duplicates.
