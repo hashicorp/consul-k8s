@@ -138,33 +138,11 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
   }
 }
 
-# Get the route table ids that are associated with eks cluster 0, so we can create routes in those route tables.
-data "aws_route_tables" "rtseks0" {
-  count  = var.cluster_count > 1 ? 1 : 0
-  vpc_id = module.vpc[0].vpc_id
-
-  filter {
-    name   = "tag:Name"
-    values = [format("%s-*", module.eks[0].cluster_id)]
-  }
-}
-
-# Get the route table ids that are associated with eks cluster 1, so we can create routes in those route tables.
-data "aws_route_tables" "rtseks1" {
-  count  = var.cluster_count > 1 ? 1 : 0
-  vpc_id = module.vpc[1].vpc_id
-
-  filter {
-    name   = "tag:Name"
-    values = [format("%s-*", module.eks[1].cluster_id)]
-  }
-}
-
 # Add routes that so traffic going from VPC 0 to VPC 1 is routed through the peering connection.
 resource "aws_route" "peering0" {
   # We have 2 route tables to add a route to, the public and private route tables.
   count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = tolist(data.aws_route_tables.rtseks0[0].ids)[count.index]
+  route_table_id            = [module.vpc[0].public_route_table_ids[0], module.vpc[0].private_route_table_ids[0]][count.index]
   destination_cidr_block    = module.vpc[1].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
@@ -173,7 +151,7 @@ resource "aws_route" "peering0" {
 resource "aws_route" "peering1" {
   # We have 2 route tables to add a route to, the public and private route tables.
   count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = tolist(data.aws_route_tables.rtseks1[0].ids)[count.index]
+  route_table_id            = [module.vpc[1].public_route_table_ids[0], module.vpc[1].private_route_table_ids[0]][count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
