@@ -103,7 +103,6 @@ commands:
                           ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                           -enable-multi-cluster \
                           -debug-directory="$TEST_RESULTS/debug" \
-                          -run TestPartitions \
                           -consul-k8s-image=<< parameters.consul-k8s-image >>
                     then
                       echo "Tests in ${pkg} failed, aborting early"
@@ -135,7 +134,6 @@ commands:
                       -enable-multi-cluster \
                       ${ENABLE_ENTERPRISE:+-enable-enterprise} \
                       -debug-directory="$TEST_RESULTS/debug" \
-                      -run TestPartitions \
                       -consul-k8s-image=<< parameters.consul-k8s-image >>
 
 jobs:
@@ -971,10 +969,6 @@ workflows:
             - unit-test-helm-templates
             - unit-acceptance-framework
             - unit-cli
-      - cleanup-eks-resources
-      - acceptance-eks-1-19:
-          requires:
-            - cleanup-eks-resources
   nightly-acceptance-tests:
     triggers:
       - schedule:
