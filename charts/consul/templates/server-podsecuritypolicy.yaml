@@ -27,6 +27,15 @@ spec:
     - 'downwardAPI'
     - 'persistentVolumeClaim'
   hostNetwork: false
+  hostPorts:
+  {{- if .Values.server.exposeGossipAndRPCPorts }}
+  - min: 8300
+    max: 8300
+  - min: {{ .Values.server.ports.serflan.port }}
+    max: {{ .Values.server.ports.serflan.port }}
+  - min: 8302
+    max: 8302
+  {{- end }}
   hostIPC: false
   hostPID: false
   runAsUser:
