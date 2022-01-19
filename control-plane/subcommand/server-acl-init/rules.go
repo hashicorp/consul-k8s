@@ -139,7 +139,7 @@ partition_prefix "" {
 }
 
 func (c *Command) apiGatewayControllerRules() (string, error) {
-  apiGatewayRulesTpl := `
+	apiGatewayRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
@@ -163,7 +163,7 @@ partition "{{ .PartitionName }}" {
 {{- end }}
   `
 
-  return c.renderRules(apiGatewayRulesTpl)
+	return c.renderRules(apiGatewayRulesTpl)
 }
 
 // This assumes users are using the default name for the service, i.e.
