@@ -13,15 +13,12 @@ metadata:
 spec:
   consul:
     authentication:
+      {{- if .Values.global.acls.manageSystemACLs }}
+      managed: true
+      method: {{ template "consul.fullname" . }}-k8s-auth-method
+      {{- end }}
     {{- if .Values.global.tls.enabled }}
     scheme: https
-    {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-    {{- if .Values.global.tls.caCert.secretName }}
-    caSecret: {{ .Values.global.tls.caCert.secretName }}
-    {{- else }}
-    caSecret: {{ template "consul.fullname" . }}-ca-cert
-    {{- end }}
-    {{- end }}
     {{- else }}
     scheme: http
     {{- end }}
