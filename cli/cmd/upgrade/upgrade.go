@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -222,14 +223,14 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
 	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
-	chart, err := common.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
 
-	currentChartValues, err := common.FetchChartValues(namespace, settings, uiLogger)
+	currentChartValues, err := helm.FetchChartValues(namespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -282,7 +283,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, namespace, settings, uiLogger)
+	actionConfig, err = helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1

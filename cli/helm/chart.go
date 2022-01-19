@@ -1,4 +1,4 @@
-package common
+package helm
 
 import (
 	"embed"
@@ -8,6 +8,12 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
+)
+
+const (
+	chartFileName    = "Chart.yaml"
+	valuesFileName   = "values.yaml"
+	templatesDirName = "templates"
 )
 
 // LoadChart will attempt to load a chart from the embedded file system.

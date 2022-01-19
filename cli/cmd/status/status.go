@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/kubernetes"
@@ -137,7 +138,7 @@ func (c *Command) validateFlags(args []string) error {
 func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) error {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
-	statusConfig, err := common.InitActionConfig(statusConfig, namespace, settings, uiLogger)
+	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)
 	if err != nil {
 		return err
 	}

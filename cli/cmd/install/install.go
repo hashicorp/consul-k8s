@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -342,7 +343,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -357,7 +358,7 @@ func (c *Command) Run(args []string) int {
 	install.Timeout = c.timeoutDuration
 
 	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	chartFiles, err := helm.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1

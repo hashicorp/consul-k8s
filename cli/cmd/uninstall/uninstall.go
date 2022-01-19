@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,7 +177,7 @@ func (c *Command) Run(args []string) int {
 
 	// Search for Consul installation by calling `helm list`. Depends on what's already specified.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -210,7 +211,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		// Actually call out to `helm delete`.
-		actionConfig, err = common.InitActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
+		actionConfig, err = helm.InitActionConfig(actionConfig, foundReleaseNamespace, settings, uiLogger)
 		if err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
