@@ -123,7 +123,7 @@ type Handler struct {
 
 	// Resource settings for Consul sidecar. All of these fields
 	// will be populated by the defaults provided in the initial flags.
-	ConsulSidecarResources corev1.ResourceRequirements
+	DefaultConsulSidecarResources corev1.ResourceRequirements
 
 	// EnableTransparentProxy enables transparent proxy mode.
 	// This means that the injected init container will apply traffic redirection rules

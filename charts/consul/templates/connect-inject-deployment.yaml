@@ -201,16 +201,16 @@ spec:
                 {{- if .Values.global.consulSidecarContainer }}
                 {{- $consulSidecarResources := .Values.global.consulSidecarContainer.resources }}
                 {{- if not (kindIs "invalid" $consulSidecarResources.limits.memory) }}
-                -consul-sidecar-memory-limit={{ $consulSidecarResources.limits.memory }} \
+                -default-consul-sidecar-memory-limit={{ $consulSidecarResources.limits.memory }} \
                 {{- end }}
                 {{- if not (kindIs "invalid" $consulSidecarResources.requests.memory) }}
-                -consul-sidecar-memory-request={{ $consulSidecarResources.requests.memory }} \
+                -default-consul-sidecar-memory-request={{ $consulSidecarResources.requests.memory }} \
                 {{- end }}
                 {{- if not (kindIs "invalid" $consulSidecarResources.limits.cpu) }}
-                -consul-sidecar-cpu-limit={{ $consulSidecarResources.limits.cpu }} \
+                -default-consul-sidecar-cpu-limit={{ $consulSidecarResources.limits.cpu }} \
                 {{- end }}
                 {{- if not (kindIs "invalid" $consulSidecarResources.requests.cpu) }}
-                -consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
+                -default-consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
           startupProbe:
