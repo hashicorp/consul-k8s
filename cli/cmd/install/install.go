@@ -470,7 +470,7 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
-		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
+		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
@@ -487,7 +487,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return fmt.Errorf("File '%s' does not exist.", filename)
+				return fmt.Errorf("file '%s' does not exist", filename)
 			}
 		}
 	}
