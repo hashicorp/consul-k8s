@@ -165,7 +165,7 @@ func (c *Command) init() {
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
 	c.flags.BoolVar(&c.flagCreateAPIGatewayToken, "create-api-gateway-token", false,
-        "Toggle for creating a token for the API Gateway controller integration.")
+		"Toggle for creating a token for the API Gateway controller integration.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagServerAddresses), "server-address",
 		"The IP, DNS name or the cloud auto-join string of the Consul server(s). If providing IPs or DNS names, may be specified multiple times. "+
@@ -533,7 +533,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagCreateAPIGatewayToken {
 		apigwRules, err := c.apiGatewayControllerRules()
-		if err != nil  {
+		if err != nil {
 			c.log.Error("Error templating api gateway rules", "err", err)
 			return 1
 		}
