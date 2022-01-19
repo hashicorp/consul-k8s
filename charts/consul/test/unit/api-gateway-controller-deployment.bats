@@ -9,12 +9,24 @@ load _helpers
       .
 }
 
+@test "apiGateway/Deployment: fails if no image is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "apiGateway.image must be set to enable api gateway" ]]
+}
+
 @test "apiGateway/Deployment: enable with global.enabled false, apiGateway.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -42,10 +54,10 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.image=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "\"foo\"" ]
+  [ "${actual}" = "\"bar\"" ]
 }
 
 #--------------------------------------------------------------------
@@ -56,6 +68,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -66,6 +79,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'apiGateway.controller.nodeSelector=testing' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
@@ -80,6 +94,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
@@ -91,6 +106,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
@@ -102,6 +118,7 @@ load _helpers
   local ca_cert_volume=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo-ca-cert' \
       --set 'global.tls.caCert.secretKey=key' \
@@ -128,6 +145,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -140,6 +158,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -152,6 +171,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       . | tee /dev/stderr |
@@ -164,6 +184,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
@@ -178,6 +199,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'externalServers.enabled=true' \
@@ -196,6 +218,7 @@ load _helpers
   local object=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '[.spec.template.spec.containers[0].env[].name] ' | tee /dev/stderr)
@@ -214,6 +237,7 @@ load _helpers
   local object=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
@@ -235,6 +259,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
 
@@ -246,6 +271,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'apiGateway.controller.priorityClassName=name' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
@@ -261,6 +287,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
@@ -274,6 +301,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'apiGateway.logLevel=debug' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -291,6 +319,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
 
@@ -302,6 +331,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'apiGateway.controller.replicas=3' \
       . | tee /dev/stderr |
       yq '.spec.replicas' | tee /dev/stderr)
@@ -317,6 +347,7 @@ load _helpers
   local object=$(helm template \
     -s templates/api-gateway-controller-deployment.yaml  \
     --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -338,6 +369,7 @@ load _helpers
   local object=$(helm template \
     -s templates/api-gateway-controller-deployment.yaml  \
     --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -360,6 +392,7 @@ load _helpers
   local object=$(helm template \
     -s templates/api-gateway-controller-deployment.yaml  \
     --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -382,6 +415,7 @@ load _helpers
   local object=$(helm template \
     -s templates/api-gateway-controller-deployment.yaml  \
     --set 'apiGateway.enabled=true' \
+    --set 'apiGateway.image=foo' \
     --set 'global.tls.enabled=true' \
     --set 'global.tls.enableAutoEncrypt=true' \
     --set 'global.tls.caCert.secretName=foo' \
@@ -405,6 +439,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
