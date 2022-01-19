@@ -1785,3 +1785,31 @@ load _helpers
     yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
+
+#--------------------------------------------------------------------
+# ui.dashboardURLTemplates.service
+
+@test "server/StatefulSet: dashboard_url_templates not set by default" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -r ".spec.template.spec.containers[0].command | any(contains(\"dashboard_url_templates\"))" | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: ui.dashboardURLTemplates.service sets the template" {
+  cd `chart_dir`
+
+  local expected='-hcl='\''ui_config { dashboard_url_templates { service = \"http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}\" } }'
+
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'ui.dashboardURLTemplates.service=http://localhost:3000/d/WkFEBmF7z/services?orgId=1&var-Service={{Service.Name}}' \
+      . | tee /dev/stderr |
+      yq -r ".spec.template.spec.containers[0].command | any(contains(\"$expected\"))" | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
