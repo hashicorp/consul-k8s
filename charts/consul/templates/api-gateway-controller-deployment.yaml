@@ -1,5 +1,6 @@
 {{- if (or (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled) (and (eq (.Values.apiGateway.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if not .Values.client.grpc }}{{ fail "client.grpc must be true for api gateway" }}{{ end }}
+{{- if not .Values.apiGateway.image}}{{ fail "apiGateway.image must be set to enable api gateway" }}{{ end }}
 {{- if and .Values.global.adminPartitions.enabled (not .Values.global.enableConsulNamespaces) }}{{ fail "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" }}{{ end }}
 apiVersion: apps/v1
 kind: Deployment

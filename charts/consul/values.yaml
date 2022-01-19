@@ -2465,7 +2465,7 @@ apiGateway:
 
   # Image to use for the api-gateway-controller pods and gateway instances
   # @type: string
-  image: "hashicorp/consul-api-gateway:0.1.0-techpreview"
+  image: null
 
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
