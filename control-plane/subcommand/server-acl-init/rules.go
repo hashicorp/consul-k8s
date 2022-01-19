@@ -163,7 +163,7 @@ partition "{{ .PartitionName }}" {
 {{- end }}
   `
 
-  c.renderRules(apiGatewayRulesTpl)
+  return c.renderRules(apiGatewayRulesTpl)
 }
 
 // This assumes users are using the default name for the service, i.e.

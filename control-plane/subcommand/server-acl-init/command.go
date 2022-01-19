@@ -532,7 +532,12 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagCreateAPIGatewayToken {
-		err := c.createLocalACL("api-gateway-controller", apiGatewayControllerRules, consulDC, isPrimary, consulClient)
+		apigwRules, err := c.apiGatewayControllerRules()
+		if err != nil  {
+			c.log.Error("Error templating api gateway rules", "err", err)
+			return 1
+		}
+		err = c.createLocalACL("api-gateway-controller", apigwRules, consulDC, isPrimary, consulClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
