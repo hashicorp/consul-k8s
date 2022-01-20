@@ -3,6 +3,7 @@
 FEATURES:
 * Helm
   * Support Envoy 1.20.1. [[GH-935](https://github.com/hashicorp/consul-k8s/pull/958)]
+  * Support Consul 1.11.2. [[GH-976](https://github.com/hashicorp/consul-k8s/pull/976)]
 
 IMPROVEMENTS:
 * Helm
