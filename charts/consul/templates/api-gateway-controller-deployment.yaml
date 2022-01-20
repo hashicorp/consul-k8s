@@ -117,7 +117,7 @@ spec:
       {{- if or (and .Values.global.acls.manageSystemACLs) (and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
-      - name: injector-acl-init
+      - name: api-gateway-controller-acl-init
         image: {{ .Values.global.imageK8S }}
         command:
           - "/bin/sh"
