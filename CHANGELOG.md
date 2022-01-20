@@ -10,6 +10,8 @@ IMPROVEMENTS:
   * Allow customization of `terminationGracePeriodSeconds` on the ingress gateways. [[GH-947](https://github.com/hashicorp/consul-k8s/pull/947)]
   * Support `ui.dashboardURLTemplates.service` value for setting [dashboard URL templates](https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates_service). [[GH-937](https://github.com/hashicorp/consul-k8s/pull/937)]
   * Allow using dash-separated names for config entries when using `kubectl`. [[GH-965](https://github.com/hashicorp/consul-k8s/pull/965)]
+* Control Plane
+  * Support the value `$POD_NAME` for the annotation `consul.hashicorp.com/service-meta-pod_name` that will now be interpolated and set to the pod name in the service's metadata. [[GH-982](https://github.com/hashicorp/consul-k8s/pull/982)]
 
 BUG FIXES:
 * Helm

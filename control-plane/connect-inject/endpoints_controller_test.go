@@ -886,6 +886,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[annotationService] = "different-consul-svc-name"
 				pod1.Annotations[fmt.Sprintf("%sname", annotationMeta)] = "abc"
 				pod1.Annotations[fmt.Sprintf("%sversion", annotationMeta)] = "2"
+				pod1.Annotations[fmt.Sprintf("%spod_name", annotationMeta)] = "$POD_NAME"
 				pod1.Annotations[annotationTags] = "abc,123,$POD_NAME"
 				pod1.Annotations[annotationConnectTags] = "def,456,$POD_NAME"
 				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
@@ -925,6 +926,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceMeta: map[string]string{
 						"name":                 "abc",
 						"version":              "2",
+						"pod_name":             "pod1",
 						MetaKeyPodName:         "pod1",
 						MetaKeyKubeServiceName: "service-created",
 						MetaKeyKubeNS:          "default",
@@ -958,6 +960,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceMeta: map[string]string{
 						"name":                 "abc",
 						"version":              "2",
+						"pod_name":             "pod1",
 						MetaKeyPodName:         "pod1",
 						MetaKeyKubeServiceName: "service-created",
 						MetaKeyKubeNS:          "default",
