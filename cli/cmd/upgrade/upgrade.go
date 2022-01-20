@@ -249,9 +249,6 @@ func (c *Command) Run(args []string) int {
 	chartValues = common.MergeMaps(config.Convert(config.GlobalNameConsul), chartValues)
 
 	// Print out the upgrade summary.
-	c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
-	c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-	c.UI.Output("Namespace: %s", namespace, terminal.WithInfoStyle())
 	if err = c.printDiff(currentChartValues, chartValues); err != nil {
 		c.UI.Output("Could not print diff between charts.", terminal.WithErrorStyle())
 		return 1
