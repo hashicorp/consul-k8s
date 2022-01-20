@@ -122,7 +122,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.ACL.Enabled = true
 				c.ACL.DefaultPolicy = "deny"
-				c.ACL.Tokens.Master = masterToken
+				c.ACL.Tokens.InitialManagement = masterToken
 				if tt.tls {
 					caFile, certFile, keyFile = test.GenerateServerCerts(t)
 					c.CAFile = caFile

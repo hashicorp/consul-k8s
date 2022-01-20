@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
@@ -204,6 +206,54 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			require.Equal("serviceaccount.name!=default", actRule.Selector)
 		})
 	}
+}
+
+// Test that the anonymous token is created in the default partition from
+// a non-default partition.
+func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tokenFile := common.WriteTempFile(t, bootToken)
+	server, stopFn := partitionedSetup(t, bootToken, "test")
+	defer stopFn()
+	k8s := fake.NewSimpleClientset()
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	args := []string{
+		"-server-address=" + strings.Split(server.HTTPAddr, ":")[0],
+		"-server-port=" + strings.Split(server.HTTPAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-k8s-namespace=" + ns,
+		"-bootstrap-token-file", tokenFile,
+		"-enable-partitions",
+		"-allow-dns",
+		"-partition=test",
+		"-enable-namespaces",
+	}
+	responseCode := cmd.Run(args)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	consul, err := api.NewClient(&api.Config{
+		Address: server.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(t, err)
+
+	anonPolicyName := "anonymous-token-policy"
+	// Check that the anonymous token policy was created.
+	policy := policyExists(t, anonPolicyName, consul)
+	// Should be a global policy.
+	require.Len(t, policy.Datacenters, 0)
+
+	// Check that the anonymous token has the policy.
+	tokenData, _, err := consul.ACL().TokenReadSelf(&api.QueryOptions{Token: "anonymous"})
+	require.NoError(t, err)
+	require.Equal(t, anonPolicyName, tokenData.Policies[0].Name)
 }
 
 // Test that ACL policies get updated if namespaces/partition config changes.
@@ -1036,4 +1086,41 @@ func completeEnterpriseSetup(t *testing.T) (*fake.Clientset, *testutil.TestServe
 	require.NoError(t, err)
 
 	return k8s, svr
+}
+
+// partitionedSetup is a helper function which creates a server and a consul agent that runs as
+// a client in the provided partitionName. The bootToken is the token used as the bootstrap token
+// for both the client and the server. The helper creates a server, then creates a partition with
+// the provided partitionName and then creates a client in said partition.
+func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*testutil.TestServer, func()) {
+	server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.InitialManagement = bootToken
+	})
+	require.NoError(t, err)
+	server.WaitForLeader(t)
+
+	serverAPIClient, err := consul.NewClient(&api.Config{
+		Address: server.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(t, err)
+
+	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
+	require.NoError(t, err)
+
+	partitionedClient, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.Server = false
+		c.Bootstrap = false
+		c.Partition = partitionName
+		c.RetryJoin = []string{server.LANAddr}
+		c.ACL.Enabled = true
+		c.ACL.Tokens.Agent = bootToken
+	})
+	require.NoError(t, err)
+
+	return server, func() {
+		server.Stop()
+		partitionedClient.Stop()
+	}
 }
