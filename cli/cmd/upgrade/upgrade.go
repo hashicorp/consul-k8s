@@ -180,10 +180,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if c.flagDryRun {
-		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
-	}
-
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
 	settings := helmCLI.New()
 
