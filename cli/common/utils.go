@@ -13,9 +13,6 @@ import (
 const (
 	DefaultReleaseName      = "consul"
 	DefaultReleaseNamespace = "consul"
-	chartFileName           = "Chart.yaml"
-	valuesFileName          = "values.yaml"
-	templatesDirName        = "templates"
 	TopLevelChartDirName    = "consul"
 
 	// CLILabelKey and CLILabelValue are added to each secret on creation so the CLI knows
