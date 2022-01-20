@@ -648,7 +648,7 @@ jobs:
       - run: mkdir -p $TEST_RESULTS
 
       - run-acceptance-tests:
-          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy
+          additional-flags: -kubeconfig="$primary_kubeconfig" -secondary-kubeconfig="$secondary_kubeconfig" -enable-pod-security-policies -enable-transparent-proxy -run TestVault
 
       - store_test_results:
           path: /tmp/test-results
@@ -969,6 +969,7 @@ workflows:
             - unit-test-helm-templates
             - unit-acceptance-framework
             - unit-cli
+      - acceptance-gke-1-20
   nightly-acceptance-tests:
     triggers:
       - schedule:
