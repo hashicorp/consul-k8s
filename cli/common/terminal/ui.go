@@ -92,17 +92,18 @@ func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
 }
 
 const (
-	HeaderStyle      = "header"
-	ErrorStyle       = "error"
-	ErrorBoldStyle   = "error-bold"
-	WarningStyle     = "warning"
-	WarningBoldStyle = "warning-bold"
-	InfoStyle        = "info"
-	LibraryStyle     = "library"
-	SuccessStyle     = "success"
-	SuccessBoldStyle = "success-bold"
-	DiffAddedStyle   = "diff-added"
-	DiffRemovedStyle = "diff-removed"
+	HeaderStyle        = "header"
+	ErrorStyle         = "error"
+	ErrorBoldStyle     = "error-bold"
+	WarningStyle       = "warning"
+	WarningBoldStyle   = "warning-bold"
+	InfoStyle          = "info"
+	LibraryStyle       = "library"
+	SuccessStyle       = "success"
+	SuccessBoldStyle   = "success-bold"
+	DiffUnchangedStyle = "diff-unchanged"
+	DiffAddedStyle     = "diff-added"
+	DiffRemovedStyle   = "diff-removed"
 )
 
 type config struct {
@@ -160,6 +161,13 @@ func WithLibraryStyle() Option {
 	}
 }
 
+// WithDiffUnchangedStyle colors the output in green.
+func WithDiffUnchangedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffUnchangedStyle
+	}
+}
+
 // WithDiffAddedStyle colors the output in green.
 func WithDiffAddedStyle() Option {
 	return func(c *config) {
@@ -187,15 +195,16 @@ func WithWriter(w io.Writer) Option {
 }
 
 var (
-	colorHeader      = color.New(color.Bold)
-	colorInfo        = color.New()
-	colorError       = color.New(color.FgRed)
-	colorErrorBold   = color.New(color.FgRed, color.Bold)
-	colorLibrary     = color.New(color.FgCyan)
-	colorSuccess     = color.New(color.FgGreen)
-	colorSuccessBold = color.New(color.FgGreen, color.Bold)
-	colorWarning     = color.New(color.FgYellow)
-	colorWarningBold = color.New(color.FgYellow, color.Bold)
-	colorDiffAdded   = color.New(color.FgGreen)
-	colorDiffRemoved = color.New(color.FgRed)
+	colorHeader        = color.New(color.Bold)
+	colorInfo          = color.New()
+	colorError         = color.New(color.FgRed)
+	colorErrorBold     = color.New(color.FgRed, color.Bold)
+	colorLibrary       = color.New(color.FgCyan)
+	colorSuccess       = color.New(color.FgGreen)
+	colorSuccessBold   = color.New(color.FgGreen, color.Bold)
+	colorWarning       = color.New(color.FgYellow)
+	colorWarningBold   = color.New(color.FgYellow, color.Bold)
+	colorDiffUnchanged = color.New()
+	colorDiffAdded     = color.New(color.FgGreen)
+	colorDiffRemoved   = color.New(color.FgRed)
 )

@@ -405,13 +405,14 @@ func (c *Command) printDiff(old, new map[string]interface{}) error {
 		return err
 	}
 
+	c.UI.Output("Diff between user overrides", terminal.WithHeaderStyle())
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			c.UI.Output(line, terminal.WithDiffAddedStyle())
 		} else if strings.HasPrefix(line, "-") {
 			c.UI.Output(line, terminal.WithDiffRemovedStyle())
 		} else {
-			c.UI.Output(line)
+			c.UI.Output(line, terminal.WithDiffUnchangedStyle())
 		}
 	}
 

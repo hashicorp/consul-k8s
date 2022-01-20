@@ -93,10 +93,12 @@ func (ui *basicUI) Output(msg string, raw ...interface{}) {
 		msg = colorSuccessBold.Sprintf(" ✓ %s", msg)
 	case LibraryStyle:
 		msg = colorLibrary.Sprintf(" --> %s", msg)
+	case DiffUnchangedStyle:
+		msg = colorDiffUnchanged.Sprintf("  %s", msg)
 	case DiffAddedStyle:
-		msg = colorDiffAdded.Sprintf("%s", msg)
+		msg = colorDiffAdded.Sprintf("  %s", msg)
 	case DiffRemovedStyle:
-		msg = colorDiffRemoved.Sprintf("%s", msg)
+		msg = colorDiffRemoved.Sprintf("  %s", msg)
 	case InfoStyle:
 		lines := strings.Split(msg, "\n")
 		for i, line := range lines {
