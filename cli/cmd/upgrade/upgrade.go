@@ -400,7 +400,7 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 
 // printDiff marshals both maps to YAML and prints the diff between the two.
 func (c *Command) printDiff(old, new map[string]interface{}) error {
-	diff, err := helm.Diff(old, new)
+	diff, err := common.Diff(old, new)
 	if err != nil {
 		return err
 	}

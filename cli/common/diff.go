@@ -1,4 +1,4 @@
-package helm
+package common
 
 import (
 	"sort"
@@ -18,7 +18,10 @@ func Diff(a, b map[string]interface{}) (string, error) {
 	return diffRecursively(a, b, 0)
 }
 
-// diffRecursively iterates over both maps and writes the differences to the given buffer.
+// diffRecursively iterates over maps `a` and `b` and returns a string representation of the difference between them as YAML.
+// The returned string is sorted alphabetically by key with `+` and `-` prefixed to "diffed" lines.
+// `c` is a map of the default values for the chart. If a key is present in `a`, but not `b` (i.e. removed),
+// the value is compared with the default value in `c` to prevent a false positive "removed" line.
 func diffRecursively(a, b map[string]interface{}, recurseDepth int) (string, error) {
 	buf := new(strings.Builder)
 
@@ -78,7 +81,7 @@ func diffRecursively(a, b map[string]interface{}, recurseDepth int) (string, err
 			writeWithPrepend("+ ", string(bSliceAsYaml), recurseDepth, buf)
 		}
 
-		// If the key is in a but not in b, write as removed.
+		// If the key is in `a` but not in `b`, write as removed unless `a` matches the value in `c`.
 		if inA && !inB {
 			asYaml, err := yaml.Marshal(aMapWithKey)
 			if err != nil {
