@@ -13,6 +13,8 @@ spec:
     kind: TerminatingGateway
     listKind: TerminatingGatewayList
     plural: terminatinggateways
+    shortNames:
+    - terminating-gateway
     singular: terminatinggateway
   scope: Namespaced
   versions:
