@@ -161,7 +161,7 @@ func WithLibraryStyle() Option {
 	}
 }
 
-// WithDiffUnchangedStyle colors the output in green.
+// WithDiffUnchangedStyle colors the diff style in white.
 func WithDiffUnchangedStyle() Option {
 	return func(c *config) {
 		c.Style = DiffUnchangedStyle
