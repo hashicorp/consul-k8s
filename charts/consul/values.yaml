@@ -1398,6 +1398,11 @@ ui:
     # @type: string
     baseURL: http://prometheus-server
 
+  # Corresponds to https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates configuration.
+  dashboardURLTemplates:
+    # Sets https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates_service.
+    service: ""
+
 # Configure the catalog sync process to sync K8S with Consul
 # services. This can run bidirectional (default) or unidirectionally (Consul
 # to K8S or K8S to Consul only).

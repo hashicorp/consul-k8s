@@ -775,7 +775,7 @@ jobs:
           name: terraform destroy
           working_directory: *eks-terraform-path
           command: |
-            terraform destroy -auto-approve
+            terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
       - slack/status:

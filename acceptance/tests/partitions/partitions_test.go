@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -23,7 +24,7 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 const staticClientNamespace = "ns2"
 
-// Test that Connect works in a default installation for X-Partition and in-partition networking.
+// Test that Connect works in a default and ACLsAndAutoEncryptEnabled installations for X-Partition and in-partition networking.
 func TestPartitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
@@ -32,27 +33,23 @@ func TestPartitions(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	if !cfg.UseKind {
-		t.Skipf("skipping this test because Admin Partition tests are only supported in Kind for now")
-	}
-
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
 	cases := []struct {
-		name                 string
-		destinationNamespace string
-		mirrorK8S            bool
-		secure               bool
+		name                      string
+		destinationNamespace      string
+		mirrorK8S                 bool
+		ACLsAndAutoEncryptEnabled bool
 	}{
 		{
-			"default namespace",
+			"default destination namespace",
 			defaultNamespace,
 			false,
 			false,
 		},
 		{
-			"default namespace; secure",
+			"default destination namespace; ACLs and auto-encrypt enabled",
 			defaultNamespace,
 			false,
 			true,
@@ -64,7 +61,7 @@ func TestPartitions(t *testing.T) {
 			false,
 		},
 		{
-			"single destination namespace; secure",
+			"single destination namespace; ACLs and auto-encrypt enabled",
 			staticServerNamespace,
 			false,
 			true,
@@ -76,7 +73,7 @@ func TestPartitions(t *testing.T) {
 			false,
 		},
 		{
-			"mirror k8s namespaces; secure",
+			"mirror k8s namespaces; ACLs and auto-encrypt enabled",
 			staticServerNamespace,
 			true,
 			true,
@@ -90,32 +87,38 @@ func TestPartitions(t *testing.T) {
 
 			ctx := context.Background()
 
-			serverHelmValues := map[string]string{
-				"global.datacenter": "dc1",
-
+			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
-				"global.enableConsulNamespaces":  "true",
-				"global.tls.enabled":             "true",
-				"global.tls.httpsOnly":           strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt":   strconv.FormatBool(c.secure),
 
-				"server.exposeGossipAndRPCPorts": "true",
+				"global.enableConsulNamespaces": "true",
+
+				"global.tls.enabled":           "true",
+				"global.tls.httpsOnly":         strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
+
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsAndAutoEncryptEnabled),
 
 				"connectInject.enabled": "true",
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
 
 				"controller.enabled": "true",
 
-				"dns.enabled": "true",
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
+			serverHelmValues := map[string]string{
+				"server.exposeGossipAndRPCPorts": "true",
+			}
+
+			// On Kind, there are no load balancers but since all clusters
+			// share the same node network (docker bridge), we can use
+			// a NodePort service so that we can access node(s) in a different Kind cluster.
 			if cfg.UseKind {
 				serverHelmValues["global.adminPartitions.service.type"] = "NodePort"
 				serverHelmValues["global.adminPartitions.service.nodePort.https"] = "30000"
@@ -123,121 +126,100 @@ func TestPartitions(t *testing.T) {
 				serverHelmValues["meshGateway.service.nodePort"] = "30100"
 			}
 
-			if cfg.EnableTransparentProxy {
-				serverHelmValues["dns.enableRedirection"] = "true"
-			}
-
 			releaseName := helpers.RandomName()
+
+			consul.MergeMaps(serverHelmValues, commonHelmValues)
 
 			// Install the consul cluster with servers in the default kubernetes context.
 			serverConsulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterContext, cfg, releaseName)
 			serverConsulCluster.Create(t)
 
-			// Get the TLS CA certificate and key secret from the server cluster and apply it to client cluster.
-			tlsCert := fmt.Sprintf("%s-consul-ca-cert", releaseName)
-			tlsKey := fmt.Sprintf("%s-consul-ca-key", releaseName)
+			// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
+			caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
+			caKeySecretName := fmt.Sprintf("%s-consul-ca-key", releaseName)
 
-			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", tlsCert)
-			caCertSecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsCert, metav1.GetOptions{})
-			caCertSecret.ResourceVersion = ""
-			require.NoError(t, err)
-			_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caCertSecret, metav1.CreateOptions{})
-			require.NoError(t, err)
+			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
+			moveSecret(t, serverClusterContext, clientClusterContext, caCertSecretName)
 
-			if !c.secure {
-				// When running in the insecure mode, auto-encrypt is disabled which requires both
-				// the CA cert and CA key to be available in the clients cluster.
-				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", tlsKey)
-				caKeySecret, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, tlsKey, metav1.GetOptions{})
-				caKeySecret.ResourceVersion = ""
-				require.NoError(t, err)
-				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, caKeySecret, metav1.CreateOptions{})
-				require.NoError(t, err)
+			if !c.ACLsAndAutoEncryptEnabled {
+				// When auto-encrypt is disabled, we need both
+				// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
+				logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
+				moveSecret(t, serverClusterContext, clientClusterContext, caKeySecretName)
 			}
 
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-			if c.secure {
-				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", tlsKey)
-				token, err := serverClusterContext.KubernetesClient(t).CoreV1().Secrets(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionToken, metav1.GetOptions{})
-				token.ResourceVersion = ""
-				require.NoError(t, err)
-				_, err = clientClusterContext.KubernetesClient(t).CoreV1().Secrets(clientClusterContext.KubectlOptions(t).Namespace).Create(ctx, token, metav1.CreateOptions{})
-				require.NoError(t, err)
+			if c.ACLsAndAutoEncryptEnabled {
+				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
+				moveSecret(t, serverClusterContext, clientClusterContext, partitionToken)
 			}
 
-			var partitionSvcIP string
-			if !cfg.UseKind {
-				// Get the IP of the partition service to configure the external server address in the values file for the workload cluster.
-				partitionSecretName := fmt.Sprintf("%s-partition-secret", releaseName)
-				logger.Logf(t, "retrieving partition service to determine external IP for servers")
-				partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionSecretName, metav1.GetOptions{})
-				require.NoError(t, err)
-				partitionSvcIP = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
-			} else {
+			var partitionSvcAddress string
+			if cfg.UseKind {
 				nodeList, err := serverClusterContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				require.NoError(t, err)
 				// Get the address of the (only) node from the Kind cluster.
-				partitionSvcIP = nodeList.Items[0].Status.Addresses[0].Address
+				partitionSvcAddress = nodeList.Items[0].Status.Addresses[0].Address
+			} else {
+				// Get the IP of the partition service to configure the external server address in the values file for the clients cluster.
+				partitionServiceName := fmt.Sprintf("%s-consul-partition-service", releaseName)
+				logger.Logf(t, "retrieving partition service to determine external address for servers")
+
+				// It can take some time for the load balancers to be ready and have an IP/Hostname.
+				// Wait for 60 seconds before failing.
+				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
+					partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
+					require.NoError(t, err)
+					require.NotEmpty(r, partitionsSvc.Status.LoadBalancer.Ingress)
+					// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
+					// load balancers have IPs.
+					if partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname
+					} else {
+						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
+					}
+				})
 			}
 
 			var k8sAuthMethodHost string
+			// When running on kind, the kube API address in kubeconfig will have a localhost address
+			// which will not work from inside the container. That's why we need to use the endpoints address instead
+			// which will point the node IP.
 			if cfg.UseKind {
-				// The Kubernetes AuthMethod IP for Kind is read from the endpoint for the Kubernetes service. On other clouds,
-				// this can be identified by reading the cluster config.
+				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
 				require.NoError(t, err)
 				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+			} else {
+				k8sAuthMethodHost = helpers.KubernetesAPIServerHostFromOptions(t, clientClusterContext.KubectlOptions(t))
 			}
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
-				"global.datacenter": "dc1",
-				"global.enabled":    "false",
+				"global.enabled": "false",
 
-				"global.tls.enabled":           "true",
-				"global.tls.httpsOnly":         strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.secure),
+				"global.adminPartitions.name": secondaryPartition,
 
-				"server.exposeGossipAndRPCPorts": "true",
-
-				"connectInject.enabled": "true",
-				// When mirroringK8S is set, this setting is ignored.
-				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
-				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
-
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-
-				"global.adminPartitions.enabled": "true",
-				"global.adminPartitions.name":    secondaryPartition,
-				"global.enableConsulNamespaces":  "true",
-
-				"meshGateway.enabled":  "true",
-				"meshGateway.replicas": "1",
-
-				"controller.enabled": "true",
-
-				"global.tls.caCert.secretName": tlsCert,
+				"global.tls.caCert.secretName": caCertSecretName,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
 				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcIP,
+				"externalServers.hosts[0]":      partitionSvcAddress,
 				"externalServers.tlsServerName": "server.dc1.consul",
 
 				"client.enabled":           "true",
 				"client.exposeGossipPorts": "true",
-				"client.join[0]":           partitionSvcIP,
-
-				"dns.enabled": "true",
+				"client.join[0]":           partitionSvcAddress,
 			}
 
-			if c.secure {
-				// setup partition token if ACLs enabled.
+			if c.ACLsAndAutoEncryptEnabled {
+				// Setup partition token and auth method host if ACLs enabled.
 				clientHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
 				clientHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
 				clientHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
 			} else {
-				// provide CA key when auto-encrypt is disabled.
-				clientHelmValues["global.tls.caKey.secretName"] = tlsKey
+				// Provide CA key when auto-encrypt is disabled.
+				clientHelmValues["global.tls.caKey.secretName"] = caKeySecretName
 				clientHelmValues["global.tls.caKey.secretKey"] = "tls.key"
 			}
 
@@ -247,18 +229,16 @@ func TestPartitions(t *testing.T) {
 				clientHelmValues["meshGateway.service.nodePort"] = "30100"
 			}
 
-			if cfg.EnableTransparentProxy {
-				clientHelmValues["dns.enableRedirection"] = "true"
-			}
+			consul.MergeMaps(clientHelmValues, commonHelmValues)
 
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterContext, cfg, releaseName)
 			clientConsulCluster.Create(t)
 
-			// Ensure consul client are created.
+			// Ensure consul clients are created.
 			agentPodList, err := clientClusterContext.KubernetesClient(t).CoreV1().Pods(clientClusterContext.KubectlOptions(t).Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 			require.NoError(t, err)
-			require.Len(t, agentPodList.Items, 1)
+			require.NotEmpty(t, agentPodList.Items)
 
 			output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterContext.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "-n", clientClusterContext.KubectlOptions(t).Namespace)
 			require.NoError(t, err)
@@ -299,7 +279,7 @@ func TestPartitions(t *testing.T) {
 				k8s.RunKubectl(t, clientClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, staticClientNamespace)
 			})
 
-			consulClient := serverConsulCluster.SetupConsulClient(t, c.secure)
+			consulClient := serverConsulCluster.SetupConsulClient(t, c.ACLsAndAutoEncryptEnabled)
 
 			serverQueryServerOpts := &api.QueryOptions{Namespace: staticServerNamespace, Partition: defaultPartition}
 			clientQueryServerOpts := &api.QueryOptions{Namespace: staticClientNamespace, Partition: defaultPartition}
@@ -315,12 +295,12 @@ func TestPartitions(t *testing.T) {
 			}
 
 			// Check that the ACL token is deleted.
-			if c.secure {
+			if c.ACLsAndAutoEncryptEnabled {
 				// We need to register the cleanup function before we create the deployments
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
 				t.Cleanup(func() {
-					if c.secure {
+					if c.ACLsAndAutoEncryptEnabled {
 						retry.Run(t, func(r *retry.R) {
 							tokens, _, err := consulClient.ACL().TokenList(serverQueryServerOpts)
 							require.NoError(r, err)
@@ -363,7 +343,7 @@ func TestPartitions(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.KubectlDeleteK(t, clientClusterContext.KubectlOptions(t), kustomizeDir)
 			})
-			// This section of the tests run the in-partition networking tests.
+			// This section of the tests runs the in-partition networking tests.
 			t.Run("in-partition", func(t *testing.T) {
 				logger.Log(t, "test in-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
@@ -432,7 +412,7 @@ func TestPartitions(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, services, 1)
 
-				if c.secure {
+				if c.ACLsAndAutoEncryptEnabled {
 					logger.Log(t, "checking that the connection is not successful because there's no intention")
 					if cfg.EnableTransparentProxy {
 						k8s.CheckStaticServerConnectionFailing(t, serverClusterStaticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
@@ -504,7 +484,7 @@ func TestPartitions(t *testing.T) {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, clientClusterStaticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "http://localhost:1234")
 				}
 			})
-			// This section of the tests run the cross-partition networking tests.
+			// This section of the tests runs the cross-partition networking tests.
 			t.Run("cross-partition", func(t *testing.T) {
 				logger.Log(t, "test cross-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
@@ -593,7 +573,7 @@ func TestPartitions(t *testing.T) {
 					})
 				}
 
-				if c.secure {
+				if c.ACLsAndAutoEncryptEnabled {
 					logger.Log(t, "checking that the connection is not successful because there's no intention")
 					if cfg.EnableTransparentProxy {
 						if !c.mirrorK8S {
@@ -628,7 +608,7 @@ func TestPartitions(t *testing.T) {
 						intention.Sources[0].Namespace = c.destinationNamespace
 					}
 
-					logger.Log(t, "creating intention")
+					logger.Log(t, "creating intentions in each partition")
 					intention.Sources[0].Partition = secondaryPartition
 					_, _, err := consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: defaultPartition})
 					require.NoError(t, err)
@@ -684,4 +664,14 @@ func TestPartitions(t *testing.T) {
 			})
 		})
 	}
+}
+
+func moveSecret(t *testing.T, sourceContext, destContext environment.TestContext, secretName string) {
+	t.Helper()
+
+	secret, err := sourceContext.KubernetesClient(t).CoreV1().Secrets(sourceContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	secret.ResourceVersion = ""
+	require.NoError(t, err)
+	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	require.NoError(t, err)
 }
