@@ -13,6 +13,8 @@ spec:
     kind: ServiceSplitter
     listKind: ServiceSplitterList
     plural: servicesplitters
+    shortNames:
+    - service-splitter
     singular: servicesplitter
   scope: Namespaced
   versions:

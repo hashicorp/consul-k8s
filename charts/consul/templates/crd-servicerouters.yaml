@@ -19,6 +19,8 @@ spec:
     kind: ServiceRouter
     listKind: ServiceRouterList
     plural: servicerouters
+    shortNames:
+    - service-router
     singular: servicerouter
   scope: Namespaced
   versions:
