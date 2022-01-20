@@ -19,6 +19,8 @@ spec:
     kind: IngressGateway
     listKind: IngressGatewayList
     plural: ingressgateways
+    shortNames:
+    - ingress-gateway
     singular: ingressgateway
   scope: Namespaced
   versions:

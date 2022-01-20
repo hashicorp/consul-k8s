@@ -19,6 +19,8 @@ spec:
     kind: ExportedServices
     listKind: ExportedServicesList
     plural: exportedservices
+    shortNames:
+    - exported-services
     singular: exportedservices
   scope: Namespaced
   versions:
