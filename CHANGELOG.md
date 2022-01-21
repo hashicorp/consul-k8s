@@ -15,7 +15,6 @@ IMPROVEMENTS:
   * Support the value `$POD_NAME` for the annotation `consul.hashicorp.com/service-meta-*` that will now be interpolated and set to the pod's name in the service's metadata. [[GH-982](https://github.com/hashicorp/consul-k8s/pull/982)]
   * Allow managing Consul sidecar resources via annotations. [[GH-956](https://github.com/hashicorp/consul-k8s/pull/956)]
 
-
 BUG FIXES:
 * Helm
   * Add `PodDisruptionBudget` Kind when checking for existing versions so that `helm template` can generate the right version. [[GH-923](https://github.com/hashicorp/consul-k8s/pull/923)]
