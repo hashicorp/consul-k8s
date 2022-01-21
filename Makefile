@@ -23,7 +23,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/build-support/docker/Dev.dockerfile $(CURDIR)
+       -f $(CURDIR)/control-plane/build-support/docker/Dev.dockerfile $(CURDIR)/control-plane
 
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
