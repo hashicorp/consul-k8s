@@ -6,6 +6,8 @@ IMPROVEMENTS:
 BUG FIXES:
 * Helm
   * Add `PodDisruptionBudget` Kind when checking for existing versions so that `helm template` can generate the right version. [[GH-923](https://github.com/hashicorp/consul-k8s/pull/923)]
+* Control Plane
+  * Admin Partitions **(Consul Enterprise only)**: Create anonymous-policy and anonymous-token from non-default partitions to support DNS queries when the default partition is on a VM. [[GH-966](https://github.com/hashicorp/consul-k8s/pull/966)]
 
 ## 0.39.0 (December 15, 2021)
 
