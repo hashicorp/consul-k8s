@@ -3,6 +3,7 @@
 FEATURES:
 * Helm
   * Support Envoy 1.20.1. [[GH-958](https://github.com/hashicorp/consul-k8s/pull/958)]
+  * Support Consul 1.11.2. [[GH-976](https://github.com/hashicorp/consul-k8s/pull/976)]
 
 IMPROVEMENTS:
 * Helm
@@ -11,6 +12,8 @@ IMPROVEMENTS:
   * Allow using dash-separated names for config entries when using `kubectl`. [[GH-965](https://github.com/hashicorp/consul-k8s/pull/965)]
 * CLI
   * Show a diff when upgrading a Consul installation on Kubernetes [[GH-934](https://github.com/hashicorp/consul-k8s/pull/934)]
+* Control Plane
+  * Support the value `$POD_NAME` for the annotation `consul.hashicorp.com/service-meta-*` that will now be interpolated and set to the pod's name in the service's metadata. [[GH-982](https://github.com/hashicorp/consul-k8s/pull/982)]
 
 BUG FIXES:
 * Helm
