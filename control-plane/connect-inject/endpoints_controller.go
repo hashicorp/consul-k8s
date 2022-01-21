@@ -413,7 +413,11 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 	}
 	for k, v := range pod.Annotations {
 		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
-			meta[strings.TrimPrefix(k, annotationMeta)] = v
+			if v == "$POD_NAME" {
+				meta[strings.TrimPrefix(k, annotationMeta)] = pod.Name
+			} else {
+				meta[strings.TrimPrefix(k, annotationMeta)] = v
+			}
 		}
 	}
 	tags := consulTags(pod)

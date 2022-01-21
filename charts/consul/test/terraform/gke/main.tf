@@ -25,7 +25,8 @@ resource "google_container_cluster" "cluster" {
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
-    tags = ["consul-k8s-${random_id.suffix[count.index].dec}"]
+    tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
+    machine_type = "e2-standard-4"
   }
   pod_security_policy_config {
     enabled = true

@@ -57,9 +57,6 @@ path "pki/cert/ca" {
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
 	cfg := suite.Config()
-	if cfg.EnablePodSecurityPolicies {
-		t.Skipf("skipping this test because PSPs don't yet work with the acceptance test Vault installation")
-	}
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
 
