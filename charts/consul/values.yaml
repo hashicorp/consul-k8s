@@ -432,6 +432,15 @@ global:
   # @recurse: false
   # @type: map
   consulSidecarContainer:
+    # Set default resources for consul sidecar. If null, that resource won't
+    # be set.
+    # These settings can be overridden on a per-pod basis via these annotations:
+    #
+    # - `consul.hashicorp.com/consul-sidecar-cpu-limit`
+    # - `consul.hashicorp.com/consul-sidecar-cpu-request`
+    # - `consul.hashicorp.com/consul-sidecar-memory-limit`
+    # - `consul.hashicorp.com/consul-sidecar-memory-request`
+    # @type: map
     resources:
       requests:
         memory: "25Mi"
