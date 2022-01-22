@@ -14,6 +14,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-clusterrole.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

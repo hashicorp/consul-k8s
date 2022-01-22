@@ -15,6 +15,7 @@ load _helpers
       -s templates/api-gateway-gatewayclass.yaml  \
       --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -41,6 +42,7 @@ load _helpers
   assert_empty helm template \
       -s templates/api-gateway-gatewayclass.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'apiGateway.managedGatewayClass.enabled=false' \
       .
 }

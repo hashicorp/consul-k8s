@@ -15,6 +15,7 @@ load _helpers
       -s templates/api-gateway-controller-service.yaml  \
       --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -25,13 +26,5 @@ load _helpers
   assert_empty helm template \
       -s templates/api-gateway-controller-service.yaml  \
       --set 'apiGateway.enabled=false' \
-      .
-}
-
-@test "apiGateway/Service: disable with global.enabled" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/api-gateway-controller-service.yaml  \
-      --set 'global.enabled=false' \
       .
 }

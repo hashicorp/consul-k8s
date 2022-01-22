@@ -2467,12 +2467,14 @@ apiGateway:
   # @type: string
   image: null
 
-
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: info
+
   managedGatewayClass:
+    # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
     enabled: true
+
     # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
     # labels for gateway pod assignment, formatted as a multi-line string.
     #
@@ -2505,10 +2507,6 @@ apiGateway:
       # @type: string
       service: null
 
-    # Override global log verbosity level for ateway pods. One of "debug", "info", "warn", or "error".
-    # @type: string
-    logLevel: info
-    
   serviceAccount:
     # This value defines additional annotations for the client service account. This should be formatted as a multi-line
     # string.
