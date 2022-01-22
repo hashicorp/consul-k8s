@@ -1,5 +1,4 @@
-{{- if (or (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled) (and (eq (.Values.apiGateway.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if .Values.apiGateway.managedGatewayClass.enabled }}
+{{- if (and .Values.apiGateway.enabled .Values.apiGateway.managedGatewayClass.enabled) }}
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: GatewayClass
 metadata:
@@ -16,5 +15,4 @@ spec:
     group: api-gateway.consul.hashicorp.com
     kind: GatewayClassConfig
     name: consul-api-gateway-class-config
-{{- end }}
 {{- end }}

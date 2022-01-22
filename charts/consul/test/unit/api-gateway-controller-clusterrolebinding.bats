@@ -15,15 +15,8 @@ load _helpers
       -s templates/api-gateway-controller-clusterrolebinding.yaml  \
       --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-@test "apiGateway/ClusterRoleBinding: disabled with connectInject.enabled false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/api-gateway-controller-clusterrolebinding.yaml  \
-      --set 'apiGateway.enabled=false' \
-      .
 }

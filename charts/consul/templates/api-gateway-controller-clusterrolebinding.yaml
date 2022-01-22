@@ -1,4 +1,4 @@
-{{- if (or (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled) (and (eq (.Values.apiGateway.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if .Values.apiGateway.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -18,4 +18,3 @@ subjects:
   name: {{ template "consul.fullname" . }}-api-gateway-controller-svc-account
   namespace: {{ .Release.Namespace }}
 {{- end }}
-

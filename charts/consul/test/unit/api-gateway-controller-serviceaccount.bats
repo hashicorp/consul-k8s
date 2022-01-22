@@ -15,6 +15,7 @@ load _helpers
       -s templates/api-gateway-controller-serviceaccount.yaml  \
       --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -35,6 +36,7 @@ load _helpers
   local object=$(helm template \
       -s templates/api-gateway-controller-serviceaccount.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.imagePullSecrets[0].name=my-secret' \
       --set 'global.imagePullSecrets[1].name=my-secret2' \
       . | tee /dev/stderr)
@@ -56,6 +58,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-serviceaccount.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
       yq '.metadata.annotations | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
@@ -66,6 +69,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-serviceaccount.yaml  \
       --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set "apiGateway.serviceAccount.annotations=foo: bar" \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)
