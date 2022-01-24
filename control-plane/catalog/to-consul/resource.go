@@ -779,7 +779,7 @@ func parseTags(tagsAnno string) []string {
 	// This algorithm parses the tagsAnno string into a slice of strings.
 	// Ideally we'd just split on commas but since Consul tags support commas,
 	// we allow users to escape commas so they're included in the tag, e.g.
-	// the annotation "tag\,with\,commas\,,tag2" will become the tags:
+	// the annotation "tag\,with\,commas,tag2" will become the tags:
 	// ["tag,with,commas", "tag2"].
 
 	var tags []string
