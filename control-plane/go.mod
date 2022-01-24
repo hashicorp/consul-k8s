@@ -129,4 +129,6 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
+replace github.com/hashicorp/consul/sdk v0.9.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20220120214936-7568f3a102a8
+
 go 1.17

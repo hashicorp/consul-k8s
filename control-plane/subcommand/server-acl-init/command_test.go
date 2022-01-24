@@ -2108,7 +2108,7 @@ func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientse
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
-		c.ACL.Tokens.Master = masterToken
+		c.ACL.Tokens.InitialManagement = masterToken
 	})
 	require.NoError(t, err)
 	svr.WaitForActiveCARoot(t)
@@ -2153,7 +2153,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		if bootToken != "" {
-			c.ACL.Tokens.Master = bootToken
+			c.ACL.Tokens.InitialManagement = bootToken
 		}
 	})
 	require.NoError(t, err)
