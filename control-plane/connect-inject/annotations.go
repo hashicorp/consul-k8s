@@ -128,6 +128,9 @@ const (
 	// webhook/handler.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
 
+	// annotationConnectServiceSelector is the name of the service which should be used by the Endpoints Controller.
+	annotationConnectServiceSelector = "consul.hashicorp.com/connect-service-selector"
+
 	// labelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
 	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
