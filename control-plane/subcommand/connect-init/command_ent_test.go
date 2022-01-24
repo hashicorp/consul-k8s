@@ -136,7 +136,7 @@ func TestRun_ServicePollingWithACLsAndTLSWithNamespaces(t *testing.T) {
 				if c.acls {
 					cfg.ACL.Enabled = true
 					cfg.ACL.DefaultPolicy = "deny"
-					cfg.ACL.Tokens.Master = masterToken
+					cfg.ACL.Tokens.InitialManagement = masterToken
 				}
 				if c.tls {
 					caFile, certFile, keyFile = test.GenerateServerCerts(t)
