@@ -244,7 +244,7 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.name' | tee /dev/stderr)
-  [ "${actual}" = "injector-acl-init" ]
+  [ "${actual}" = "api-gateway-controller-acl-init" ]
 
   local actual=$(echo $object |
       yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
