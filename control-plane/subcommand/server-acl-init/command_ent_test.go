@@ -208,7 +208,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 	}
 }
 
-// Test that the anonymous token is created in the default partition from
+// Test that the anonymous token policy is created in the default partition from
 // a non-default partition.
 func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
