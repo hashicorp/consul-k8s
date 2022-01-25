@@ -2762,7 +2762,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			// Set up the fake Kubernetes client with an k8sEndpoint, pod, consul client, and the default namespace.
+			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
 			k8sEndpoint := &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
