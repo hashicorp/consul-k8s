@@ -157,9 +157,9 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// If the endpoints object has the label or annotation "consul.hashicorp.com/connect-service-selector" with a value which does not match
+	// If the endpoints object has the annotation "consul.hashicorp.com/endpoint-service-name" with a value that does not match
 	// the name of the service, deregister all instances in Consul for this service.
-	if isIgnoredBySelector(serviceEndpoints.Annotations, serviceEndpoints.Name) || isIgnoredBySelector(serviceEndpoints.Labels, serviceEndpoints.Name) {
+	if endpointSvcName, hasAnno := serviceEndpoints.Annotations[annotationEndpointServiceName]; hasAnno && endpointSvcName != serviceEndpoints.Name {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		r.Log.Info("Ignoring endpoint because of selector", "name", req.Name, "namespace", req.Namespace)
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
@@ -1034,15 +1034,6 @@ func isLabeledIgnore(labels map[string]string) bool {
 	shouldIgnore, err := strconv.ParseBool(value)
 
 	return shouldIgnore && labelExists && err == nil
-}
-
-// isSelectedService checks if the service has been selected by the annotation or label
-// `consul.hashicorp.com/connect-service-selector` and returns true if the service has been selected or if the
-// annotation or label does not exist. Otherwise, it returns false.
-func isIgnoredBySelector(anno map[string]string, name string) bool {
-	value, hasSelector := anno[annotationConnectServiceSelector]
-
-	return !hasSelector && value != name
 }
 
 // consulTags returns tags that should be added to the Consul service and proxy registrations.
