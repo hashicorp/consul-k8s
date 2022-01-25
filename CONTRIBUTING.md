@@ -16,8 +16,9 @@
     1. [Generating YAML](#generating-yaml)
     1. [Updating consul-helm](#updating-consul-helm)
     1. [Testing a new CRD](#testing-a-new-crd)
-    1. [Update Consul K8s accpetance tests](#update-consul-k8s-acceptance-tests)
-5. [Testing the Helm chart](#testing-the-helm-chart)
+    1. [Update Consul K8s acceptance tests](#update-consul-k8s-acceptance-tests)
+1. [Adding a new ACL Token](#adding-a-new-acl-token)
+1. [Testing the Helm chart](#testing-the-helm-chart)
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
@@ -499,8 +500,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ## Adding a new ACL Token
 
-Checklist for getting server-acl-init to generate a new ACL token assuming the new token
-is named `foo`.
+Checklist for getting server-acl-init to generate a new ACL token. The examples in this checklist use
+a token named `foo`.
 
 ### Control Plane
 
@@ -513,7 +514,7 @@ is named `foo`.
         "<docs for flag>")
       ```
     * Add `if` statement in `Run` to create your token (follow placement of other tokens).
-      You'll need to decide if you need a local token (`createLocalACL`) or global token `createGlobalACL`.
+      You'll need to decide if you need a local token (use `createLocalACL()`) or a global token (use `createGlobalACL()`).
       
       ```go
       if c.flagCreateFooToken {
@@ -526,7 +527,7 @@ is named `foo`.
       ```
 * `control-plane/subcommand/server-acl-init/rules.go`
     * Add a function that outputs your rules using a template
-      (if the rules are always the same us a `const`):
+      (if the rules don't need to be templated just use a `const string`):
       ```go
       func (c *Command) fooRules() (string, error) {
       ```
