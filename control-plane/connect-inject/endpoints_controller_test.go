@@ -2863,6 +2863,78 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	}
 }
 
+// TestReconcileIgnoresServicesWhichAreNotSelected tests that endpoints with the annotation or label
+// "consul.hashicorp.com/connect-service-selector" and a value that does not match the service name
+// do not create endpoints in Consul.
+func TestReconcileIgnoresServicesWhichAreNotSelected(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	serviceName := "test-service"
+	namespace := "default"
+
+	cases := map[string]struct {
+		annotations             map[string]string
+		labels                  map[string]string
+		expectedNumSvcInstances int
+	}{
+		"Without annotation or label, service is registered": {
+			expectedNumSvcInstances: 1,
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			k8sService := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        serviceName,
+					Namespace:   namespace,
+					Labels:      tt.labels,
+					Annotations: tt.annotations,
+				},
+			}
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			k8sObjects := []runtime.Object{&ns, k8sService}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+			cfg := &api.Config{Address: consul.HTTPAddr}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      namespace,
+				ConsulClientCfg:       cfg,
+			}
+
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// Check that the correct number of services are registered with Consul.
+			serviceInstances, _, err := consulClient.Catalog().Service(serviceName, "", nil)
+			require.NoError(t, err)
+			require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(serviceName+"-sidecar-proxy", "", nil)
+			require.NoError(t, err)
+			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
+		})
+	}
+}
+
 func TestFilterAgentPods(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
