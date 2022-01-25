@@ -130,7 +130,7 @@ func TestProcessUpstreamsTLSandACLs(t *testing.T) {
 	consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		c.ACL.DefaultPolicy = "deny"
-		c.ACL.Tokens.Master = masterToken
+		c.ACL.Tokens.InitialManagement = masterToken
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
@@ -2346,7 +2346,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
 					c.ACL.Enabled = tt.enableACLs
-					c.ACL.Tokens.Master = adminToken
+					c.ACL.Tokens.InitialManagement = adminToken
 				}
 				c.NodeName = nodeName
 			})
@@ -2681,7 +2681,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				if tt.enableACLs {
 					c.ACL.Enabled = true
-					c.ACL.Tokens.Master = adminToken
+					c.ACL.Tokens.InitialManagement = adminToken
 				}
 				c.NodeName = nodeName
 			})
