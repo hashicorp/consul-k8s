@@ -497,6 +497,88 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ---
 
+## Adding a new ACL Token
+
+Checklist for getting server-acl-init to generate a new ACL token assuming the new token
+is named `foo`.
+
+### Control Plane
+
+* `control-plane/subcommand/server-acl-init/command.go`
+    * Add `flagCreateFooToken bool` to vars list
+    * Initialize flag in `init`
+
+      ```go
+      c.flags.BoolVar(&c.flagCreateFooToken, "create-foo-token", false,
+        "<docs for flag>")
+      ```
+    * Add `if` statement in `Run` to create your token (follow placement of other tokens).
+      You'll need to decide if you need a local token (`createLocalACL`) or global token `createGlobalACL`.
+      
+      ```go
+      if c.flagCreateFooToken {
+          err := c.createLocalACL("foo", fooRules, consulDC, isPrimary, consulClient)
+          if err != nil {
+              c.log.Error(err.Error())
+              return 1
+          }
+      }
+      ```
+* `control-plane/subcommand/server-acl-init/rules.go`
+    * Add a function that outputs your rules using a template
+      (if the rules are always the same us a `const`):
+      ```go
+      func (c *Command) fooRules() (string, error) {
+      ```
+* `control-plane/subcommand/server-acl-init/rules_test.go`
+    * Add test following the pattern of other tests (`TestFooRules`)
+* `control-plane/subcommand/server-acl-init/command_test.go`
+    * Add test cases using your flag to the following tests:
+        * `TestRun_TokensPrimaryDC`
+        * `TestRun_TokensReplicatedDC`
+        * `TestRun_TokensWithProvidedBootstrapToken`
+
+### Helm
+
+* `charts/consul/templates/server-acl-init-job.yaml`
+    * Add conditional to set your flag:
+
+      ```yaml
+      {{- if .Values.foo.enabled }}
+      -create-foo-token=true \
+      {{- end }}
+* `charts/consul/test/unit/server-acl-init-job.bats`
+    * Test the conditional:
+
+      ```bash
+      #--------------------------------------------------------------------
+      # foo
+
+      @test "serverACLInit/Job: -create-foo-token not set by default" {
+        cd `chart_dir`
+        local actual=$(helm template \
+            -s templates/server-acl-init-job.yaml  \
+            --set 'global.acls.manageSystemACLs=true' \
+            . | tee /dev/stderr |
+            yq '.spec.template.spec.containers[0].command | any(contains("create-foo-token"))' | tee /dev/stderr)
+        [ "${actual}" = "false" ]
+      }
+
+      @test "serverACLInit/Job: -create-foo-token set when foo.enabled=true" {
+        cd `chart_dir`
+        local actual=$(helm template \
+            -s templates/server-acl-init-job.yaml  \
+            --set 'global.acls.manageSystemACLs=true' \
+            --set 'foo.enabled=true' \
+            . | tee /dev/stderr |
+            yq '.spec.template.spec.containers[0].command | any(contains("create-foo-token"))' | tee /dev/stderr)
+        [ "${actual}" = "true" ]
+      }
+      ```
+
+
+
+
 ## Testing the Helm Chart
 The Helm chart ships with both unit and acceptance tests.
 
