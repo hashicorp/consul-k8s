@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ template "consul.fullname" . }}-connect-injector-authmethod-authdelegator-role-binding
+  name: {{ template "consul.fullname" . }}-connect-injector-authmethod-authdelegator
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -16,13 +16,13 @@ roleRef:
   name: "system:auth-delegator"
 subjects:
   - kind: ServiceAccount
-    name: {{ template "consul.fullname" . }}-connect-injector-authmethod-svc-account
+    name: {{ template "consul.fullname" . }}-connect-injector-authmethod
     namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ template "consul.fullname" . }}-connect-injector-authmethod-serviceaccount-role-binding
+  name: {{ template "consul.fullname" . }}-connect-injector-authmethod-serviceaccount
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -31,10 +31,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ template "consul.fullname" . }}-connect-injector-authmethod-role
+  name: {{ template "consul.fullname" . }}-connect-injector-authmethod
 subjects:
   - kind: ServiceAccount
-    name: {{ template "consul.fullname" . }}-connect-injector-authmethod-svc-account
+    name: {{ template "consul.fullname" . }}-connect-injector-authmethod
     namespace: {{ .Release.Namespace }}
 {{- end }}
 {{- end }}

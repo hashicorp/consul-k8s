@@ -16,6 +16,6 @@ roleRef:
   name: {{ template "consul.fullname" . }}-connect-inject-leader-election
 subjects:
 - kind: ServiceAccount
-  name: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
+  name: {{ template "consul.fullname" . }}-connect-injector
   namespace: {{ .Release.Namespace }}
 {{- end }}

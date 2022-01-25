@@ -52,7 +52,7 @@ load _helpers
   local actual=$(echo $cfg | jq '. | length == 1')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $cfg | jq '.[0].name | contains("controller-mutating-webhook-configuration")')
+  local actual=$(echo $cfg | jq '.[0].name | contains("controller")')
   [ "${actual}" = "true" ]
 }
 
@@ -68,7 +68,7 @@ load _helpers
   local actual=$(echo $cfg | jq '. | length == 1')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $cfg | jq '.[0].name | contains("controller-mutating-webhook-configuration")')
+  local actual=$(echo $cfg | jq '.[0].name | contains("controller")')
   [ "${actual}" = "false" ]
 }
 
@@ -85,9 +85,9 @@ load _helpers
   local actual=$(echo $cfg | jq '. | length == 2')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $cfg | jq '.[0].name | contains("connect-injector-cfg")')
+  local actual=$(echo $cfg | jq '.[0].name | contains("connect-injector")')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $cfg | jq '.[1].name | contains("controller-mutating-webhook-configuration")')
+  local actual=$(echo $cfg | jq '.[1].name | contains("controller")')
   [ "${actual}" = "true" ]
 }
