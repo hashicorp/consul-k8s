@@ -2881,13 +2881,13 @@ func TestReconcileHandlesServiceAutoSelection(t *testing.T) {
 		},
 		"With annotation which matches the service name the service is registered as a Consul endpoint": {
 			annotations: map[string]string{
-				"consul.hashicorp.com/endpoint-service-name": serviceName,
+				annotationEndpointServiceName: serviceName,
 			},
 			expectedNumSvcInstances: 1,
 		},
 		"With annotion which does not match the service name the service is not registered as a Consul endpoint": {
 			annotations: map[string]string{
-				"consul.hashicorp.com/endpoint-service-name": "other-service",
+				annotationEndpointServiceName: "other-service",
 			},
 			expectedNumSvcInstances: 0,
 		},
