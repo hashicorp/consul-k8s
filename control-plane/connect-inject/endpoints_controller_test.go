@@ -2762,8 +2762,8 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
-			endpoint := &corev1.Endpoints{
+			// Set up the fake Kubernetes client with an k8sEndpoint, pod, consul client, and the default namespace.
+			k8sEndpoint := &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: namespace,
@@ -2777,7 +2777,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 								NodeName: &nodeName,
 								TargetRef: &corev1.ObjectReference{
 									Kind:      "Pod",
-									Name:      "pod1",
+									Name:      "pod",
 									Namespace: namespace,
 								},
 							},
@@ -2785,11 +2785,11 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 					},
 				},
 			}
-			pod1 := createPod("pod1", "1.2.3.4", true, true)
+			pod := createPod("pod", "1.2.3.4", true, true)
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+			k8sObjects := []runtime.Object{k8sEndpoint, pod, fakeClientPod, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test Consul server.
@@ -2806,7 +2806,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			// Set up the initial Consul services.
 			if tt.svcInitiallyRegistered {
 				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
-					ID:      "pod1-" + serviceName,
+					ID:      "pod-" + serviceName,
 					Name:    serviceName,
 					Port:    0,
 					Address: "1.2.3.4",
@@ -2814,19 +2814,19 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 						"k8s-namespace":    namespace,
 						"k8s-service-name": serviceName,
 						"managed-by":       "consul-k8s-endpoints-controller",
-						"pod-name":         "pod1",
+						"pod-name":         "pod",
 					},
 				})
 				require.NoError(t, err)
 				err = consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
-					ID:   "pod1-sidecar-proxy-" + serviceName,
+					ID:   "pod-sidecar-proxy-" + serviceName,
 					Name: serviceName + "-sidecar-proxy",
 					Port: 0,
 					Meta: map[string]string{
 						"k8s-namespace":    namespace,
 						"k8s-service-name": serviceName,
 						"managed-by":       "consul-k8s-endpoints-controller",
-						"pod-name":         "pod1",
+						"pod-name":         "pod",
 					},
 				})
 				require.NoError(t, err)
@@ -2863,10 +2863,10 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 	}
 }
 
-// TestReconcileIgnoresServicesWhichAreNotSelected tests that endpoints with the annotation or label
-// "consul.hashicorp.com/connect-service-selector" and a value that does not match the service name
+// TestReconcileHandlesServiceAutoSelection tests that endpoints with the annotation or label
+// "consul.hashicorp.com/endpoint-service-name" and a value that does not match the service name
 // do not create endpoints in Consul.
-func TestReconcileIgnoresServicesWhichAreNotSelected(t *testing.T) {
+func TestReconcileHandlesServiceAutoSelection(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	serviceName := "test-service"
@@ -2874,28 +2874,58 @@ func TestReconcileIgnoresServicesWhichAreNotSelected(t *testing.T) {
 
 	cases := map[string]struct {
 		annotations             map[string]string
-		labels                  map[string]string
 		expectedNumSvcInstances int
 	}{
-		"Without annotation or label, service is registered": {
+		"Without annotation the service is registered as a Consul endpoint": {
 			expectedNumSvcInstances: 1,
+		},
+		"With annotation which matches the service name the service is registered as a Consul endpoint": {
+			annotations: map[string]string{
+				"consul.hashicorp.com/endpoint-service-name": serviceName,
+			},
+			expectedNumSvcInstances: 1,
+		},
+		"With annotion which does not match the service name the service is not registered as a Consul endpoint": {
+			annotations: map[string]string{
+				"consul.hashicorp.com/endpoint-service-name": "other-service",
+			},
+			expectedNumSvcInstances: 0,
 		},
 	}
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			k8sService := &corev1.Service{
+			// Set up the fake Kubernetes client with an endpoint, pod, consul client, and default namespace.
+			k8sEndpoint := &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        serviceName,
 					Namespace:   namespace,
-					Labels:      tt.labels,
 					Annotations: tt.annotations,
 				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP:       "1.2.3.4",
+								NodeName: &nodeName,
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod",
+									Namespace: namespace,
+								},
+							},
+						},
+					},
+				},
 			}
+			pod := createPod("pod", "1.2.3.4", true, true)
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			k8sObjects := []runtime.Object{&ns, k8sService}
+			k8sObjects := []runtime.Object{k8sEndpoint, pod, fakeClientPod, &ns}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
 
+			// Create the test Consul server.
 			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) { c.NodeName = nodeName })
 			require.NoError(t, err)
 			defer consul.Stop()
@@ -2906,6 +2936,7 @@ func TestReconcileIgnoresServicesWhichAreNotSelected(t *testing.T) {
 			addr := strings.Split(consul.HTTPAddr, ":")
 			consulPort := addr[1]
 
+			// Create the endpoints controller.
 			ep := &EndpointsController{
 				Client:                fakeClient,
 				Log:                   logrtest.TestLogger{T: t},
@@ -2919,6 +2950,7 @@ func TestReconcileIgnoresServicesWhichAreNotSelected(t *testing.T) {
 				ConsulClientCfg:       cfg,
 			}
 
+			// Run the reconcile process.
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: serviceName}
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 			require.NoError(t, err)
