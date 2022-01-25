@@ -538,6 +538,323 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 }
 
+func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
+	t.Parallel()
+	nodeName := "test-node"
+	cases := []struct {
+		name                          string
+		consulSvcName                 string
+		k8sObjects                    func() []runtime.Object
+		initialConsulSvcs             []*api.AgentServiceRegistration
+		expectedNumSvcInstances       int
+		expectedConsulSvcInstancesMap map[string][]*api.CatalogService
+		expectedProxySvcInstancesMap  map[string][]*api.CatalogService
+		expectedAgentHealthChecks     []*api.AgentCheck
+		expErr                        string
+	}{
+		{
+			name:          "Multiport service",
+			consulSvcName: "web,web-admin",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationPort] = "8080,9090"
+				pod1.Annotations[annotationService] = "web,web-admin"
+				pod1.Annotations[annotationUpstreams] = "upstream1:1234"
+				endpoint1 := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "web",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				endpoint2 := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "web-admin",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "1.2.3.4",
+									NodeName: &nodeName,
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint1, endpoint2}
+			},
+			initialConsulSvcs:       []*api.AgentServiceRegistration{},
+			expectedNumSvcInstances: 1,
+			expectedConsulSvcInstancesMap: map[string][]*api.CatalogService{
+				"web": {
+					{
+						ServiceID:      "pod1-web",
+						ServiceName:    "web",
+						ServiceAddress: "1.2.3.4",
+						ServicePort:    8080,
+						ServiceMeta: map[string]string{
+							MetaKeyPodName:         "pod1",
+							MetaKeyKubeServiceName: "web",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+						},
+						ServiceTags: []string{},
+					},
+				},
+				"web-admin": {
+					{
+						ServiceID:      "pod1-web-admin",
+						ServiceName:    "web-admin",
+						ServiceAddress: "1.2.3.4",
+						ServicePort:    9090,
+						ServiceMeta: map[string]string{
+							MetaKeyPodName:         "pod1",
+							MetaKeyKubeServiceName: "web-admin",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+						},
+						ServiceTags: []string{},
+					},
+				},
+			},
+			expectedProxySvcInstancesMap: map[string][]*api.CatalogService{
+				"web": {
+					{
+						ServiceID:      "pod1-web-sidecar-proxy",
+						ServiceName:    "web-sidecar-proxy",
+						ServiceAddress: "1.2.3.4",
+						ServicePort:    20000,
+						ServiceProxy: &api.AgentServiceConnectProxyConfig{
+							DestinationServiceName: "web",
+							DestinationServiceID:   "pod1-web",
+							LocalServiceAddress:    "127.0.0.1",
+							LocalServicePort:       8080,
+							Upstreams: []api.Upstream{
+								{
+									DestinationType: api.UpstreamDestTypeService,
+									DestinationName: "upstream1",
+									LocalBindPort:   1234,
+								},
+							},
+						},
+						ServiceMeta: map[string]string{
+							MetaKeyPodName:         "pod1",
+							MetaKeyKubeServiceName: "web",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+						},
+						ServiceTags: []string{},
+					},
+				},
+				"web-admin": {
+					{
+						ServiceID:      "pod1-web-admin-sidecar-proxy",
+						ServiceName:    "web-admin-sidecar-proxy",
+						ServiceAddress: "1.2.3.4",
+						ServicePort:    20001,
+						ServiceProxy: &api.AgentServiceConnectProxyConfig{
+							DestinationServiceName: "web-admin",
+							DestinationServiceID:   "pod1-web-admin",
+							LocalServiceAddress:    "127.0.0.1",
+							LocalServicePort:       9090,
+							Upstreams: []api.Upstream{
+								{
+									DestinationType: api.UpstreamDestTypeService,
+									DestinationName: "upstream1",
+									LocalBindPort:   1234,
+								},
+							},
+						},
+						ServiceMeta: map[string]string{
+							MetaKeyPodName:         "pod1",
+							MetaKeyKubeServiceName: "web-admin",
+							MetaKeyKubeNS:          "default",
+							MetaKeyManagedBy:       managedByValue,
+						},
+						ServiceTags: []string{},
+					},
+				},
+			},
+			expectedAgentHealthChecks: []*api.AgentCheck{
+				{
+					CheckID:     "default/pod1-web/kubernetes-health-check",
+					ServiceName: "web",
+					ServiceID:   "pod1-web",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+				{
+					CheckID:     "default/pod1-web-admin/kubernetes-health-check",
+					ServiceName: "web-admin",
+					ServiceID:   "pod1-web-admin",
+					Name:        "Kubernetes Health Check",
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        ttl,
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// The agent pod needs to have the address 127.0.0.1 so when the
+			// code gets the agent pods via the label component=client, and
+			// makes requests against the agent API, it will actually hit the
+			// test server we have on localhost.
+			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), fakeClientPod, &ns)
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			// Create test consul server
+			consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+				c.NodeName = nodeName
+			})
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForServiceIntentions(t)
+
+			cfg := &api.Config{
+				Address: consul.HTTPAddr,
+			}
+			consulClient, err := api.NewClient(cfg)
+			require.NoError(t, err)
+			addr := strings.Split(consul.HTTPAddr, ":")
+			consulPort := addr[1]
+
+			// Register service and proxy in consul.
+			for _, svc := range tt.initialConsulSvcs {
+				err = consulClient.Agent().ServiceRegister(svc)
+				require.NoError(t, err)
+			}
+
+			// Create the endpoints controller
+			ep := &EndpointsController{
+				Client:                fakeClient,
+				Log:                   logrtest.TestLogger{T: t},
+				ConsulClient:          consulClient,
+				ConsulPort:            consulPort,
+				ConsulScheme:          "http",
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "default",
+				ConsulClientCfg:       cfg,
+			}
+			namespacedName := types.NamespacedName{
+				Namespace: "default",
+				Name:      "web",
+			}
+			namespacedName2 := types.NamespacedName{
+				Namespace: "default",
+				Name:      "web-admin",
+			}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			resp, err = ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName2,
+			})
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.False(t, resp.Requeue)
+
+			// After reconciliation, Consul should have the service with the correct number of instances
+			svcs := strings.Split(tt.consulSvcName, ",")
+			for _, service := range svcs {
+				serviceInstances, _, err := consulClient.Catalog().Service(service, "", nil)
+				require.NoError(t, err)
+				require.Len(t, serviceInstances, tt.expectedNumSvcInstances)
+				for i, instance := range serviceInstances {
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServiceID, instance.ServiceID)
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServiceName, instance.ServiceName)
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServiceAddress, instance.ServiceAddress)
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServicePort, instance.ServicePort)
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServiceMeta, instance.ServiceMeta)
+					require.Equal(t, tt.expectedConsulSvcInstancesMap[service][i].ServiceTags, instance.ServiceTags)
+				}
+				proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", service), "", nil)
+				require.NoError(t, err)
+				require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
+				for i, instance := range proxyServiceInstances {
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServiceID, instance.ServiceID)
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServiceName, instance.ServiceName)
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServiceAddress, instance.ServiceAddress)
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServicePort, instance.ServicePort)
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServiceMeta, instance.ServiceMeta)
+					require.Equal(t, tt.expectedProxySvcInstancesMap[service][i].ServiceTags, instance.ServiceTags)
+
+					// When comparing the ServiceProxy field we ignore the DestinationNamespace
+					// field within that struct because on Consul OSS it's set to "" but on Consul Enterprise
+					// it's set to "default" and we want to re-use this test for both OSS and Ent.
+					// This does mean that we don't test that field but that's okay because
+					// it's not getting set specifically in this test.
+					// To do the comparison that ignores that field we use go-cmp instead
+					// of the regular require.Equal call since it supports ignoring certain
+					// fields.
+					diff := cmp.Diff(tt.expectedProxySvcInstancesMap[service][i].ServiceProxy, instance.ServiceProxy,
+						cmpopts.IgnoreFields(api.Upstream{}, "DestinationNamespace", "DestinationPartition"))
+					require.Empty(t, diff, "expected objects to be equal")
+				}
+				_, checkInfos, err := consulClient.Agent().AgentHealthServiceByName(fmt.Sprintf("%s-sidecar-proxy", service))
+				expectedChecks := []string{"Proxy Public Listener", "Destination Alias"}
+				require.NoError(t, err)
+				require.Len(t, checkInfos, tt.expectedNumSvcInstances)
+				for _, checkInfo := range checkInfos {
+					checks := checkInfo.Checks
+					require.Contains(t, expectedChecks, checks[0].Name)
+					require.Contains(t, expectedChecks, checks[1].Name)
+				}
+			}
+
+			// Check that the Consul health check was created for the k8s pod.
+			if tt.expectedAgentHealthChecks != nil {
+				for i := range tt.expectedAgentHealthChecks {
+					filter := fmt.Sprintf("CheckID == `%s`", tt.expectedAgentHealthChecks[i].CheckID)
+					check, err := consulClient.Agent().ChecksWithFilter(filter)
+					require.NoError(t, err)
+					require.EqualValues(t, len(check), 1)
+					// Ignoring Namespace because the response from ENT includes it and OSS does not.
+					var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition"}
+					require.True(t, cmp.Equal(check[tt.expectedAgentHealthChecks[i].CheckID], tt.expectedAgentHealthChecks[i], cmpopts.IgnoreFields(api.AgentCheck{}, ignoredFields...)))
+				}
+			}
+		})
+	}
+}
+
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
 // object. The cases test an empty endpoints object, a basic endpoints object with one address, a basic endpoints object
 // with two addresses, and an endpoints object with every possible customization.
