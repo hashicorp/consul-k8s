@@ -9,18 +9,16 @@ import (
 	"time"
 
 	consulChart "github.com/hashicorp/consul-k8s/charts"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/cmd/install"
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -170,8 +168,19 @@ func (c *Command) Run(args []string) int {
 
 	defer common.CloseWithError(c.BaseCommand)
 
-	if err := c.validateFlags(args); err != nil {
+	err := c.validateFlags(args)
+	if err != nil {
 		c.UI.Output(err.Error())
+		return 1
+	}
+
+	if c.flagDryRun {
+		c.UI.Output("Dry Run Upgrade: No changes will be made to the cluster.")
+	}
+
+	c.timeoutDuration, err = time.ParseDuration(c.flagTimeout)
+	if err != nil {
+		c.UI.Output(fmt.Sprintf("Invalid timeout: %s", err))
 		return 1
 	}
 
@@ -186,21 +195,6 @@ func (c *Command) Run(args []string) int {
 	}
 	if c.flagKubeContext != "" {
 		settings.KubeContext = c.flagKubeContext
-	}
-
-	// Setup logger to stream Helm library logs
-	var uiLogger = func(s string, args ...interface{}) {
-		logMsg := fmt.Sprintf(s, args...)
-
-		if c.flagVerbose {
-			// Only output all logs when verbose is enabled
-			c.UI.Output(logMsg, terminal.WithLibraryStyle())
-		} else {
-			// When verbose is not enabled, output all logs except not ready messages for resources
-			if !strings.Contains(logMsg, "not ready") {
-				c.UI.Output(logMsg, terminal.WithLibraryStyle())
-			}
-		}
 	}
 
 	// Set up the kubernetes client to use for non Helm SDK calls to the Kubernetes API
@@ -220,51 +214,47 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
-
-	// Note the logic here, common's CheckForInstallations function returns an error if
-	// the release is not found. In `upgrade` we should indeed error if a user doesn't currently have a release.
-	var foundNamespace string
-	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err != nil {
-		c.UI.Output("could not find existing Consul installation - run `consul-k8s install`")
+	uiLogger := c.createUILogger()
+	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
+	if err != nil {
+		c.UI.Output("Could not find existing Consul installation. Run 'consul-k8s install' to create one.")
 		return 1
-	} else {
-		c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
-		c.UI.Output("Name: %s", name, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", ns, terminal.WithInfoStyle())
+	}
+	c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
+	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
-		foundNamespace = ns
+	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
+	}
+	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
+
+	currentChartValues, err := helm.FetchChartValues(namespace, settings, uiLogger)
+	if err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		return 1
 	}
 
 	// Handle preset, value files, and set values logic.
-	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
+	chartValues, err := c.mergeValuesFlagsWithPrecedence(settings)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
-	}
-	valuesYaml, err := yaml.Marshal(vals)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Print out the upgrade summary.
-	if !c.flagAutoApprove {
-		c.UI.Output("Consul Upgrade Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
-		c.UI.Output("Namespace: %s", foundNamespace, terminal.WithInfoStyle())
-
-		if len(vals) == 0 {
-			c.UI.Output("Overrides: "+string(valuesYaml), terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("Overrides:"+"\n"+string(valuesYaml), terminal.WithInfoStyle())
-		}
 	}
 
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = install.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
+	chartValues = common.MergeMaps(config.Convert(config.GlobalNameConsul), chartValues)
 
+	// Print out the upgrade summary.
+	if err = c.printDiff(currentChartValues, chartValues); err != nil {
+		c.UI.Output("Could not print diff between charts.", terminal.WithErrorStyle())
+		return 1
+	}
+
+	// Check if the user is OK with the upgrade unless the auto approve or dry run flags are true.
 	if !c.flagAutoApprove && !c.flagDryRun {
 		confirmation, err := c.UI.Input(&terminal.Input{
 			Prompt: "Proceed with upgrade? (y/N)",
@@ -290,7 +280,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, foundNamespace, settings, uiLogger)
+	actionConfig, err = helm.InitActionConfig(actionConfig, namespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -298,28 +288,13 @@ func (c *Command) Run(args []string) int {
 
 	// Setup the upgrade action.
 	upgrade := action.NewUpgrade(actionConfig)
-	upgrade.Namespace = foundNamespace
+	upgrade.Namespace = namespace
 	upgrade.DryRun = c.flagDryRun
 	upgrade.Wait = c.flagWait
 	upgrade.Timeout = c.timeoutDuration
 
-	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-
-	// Create a *chart.Chart object from the files to run the upgrade from.
-	chart, err := loader.LoadFiles(chartFiles)
-	if err != nil {
-		c.UI.Output(err.Error(), terminal.WithErrorStyle())
-		return 1
-	}
-	c.UI.Output("Loaded charts", terminal.WithSuccessStyle())
-
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
-	re, err := upgrade.Run(common.DefaultReleaseName, chart, vals)
+	_, err = upgrade.Run(common.DefaultReleaseName, chart, chartValues)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -327,23 +302,11 @@ func (c *Command) Run(args []string) int {
 
 	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
-		configYaml, err := yaml.Marshal(re.Config)
-		if err != nil {
-			c.UI.Output(err.Error(), terminal.WithErrorStyle())
-			return 1
-		}
-
-		if len(re.Config) == 0 {
-			c.UI.Output("Config: "+string(configYaml), terminal.WithInfoStyle())
-		} else {
-			c.UI.Output("Config:"+"\n"+string(configYaml), terminal.WithInfoStyle())
-		}
-		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithSuccessStyle())
+		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", foundNamespace, terminal.WithSuccessStyle())
-
+	c.UI.Output("Upgraded Consul into namespace %q", namespace, terminal.WithSuccessStyle())
 	return 0
 }
 
@@ -361,11 +324,9 @@ func (c *Command) validateFlags(args []string) error {
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
-	duration, err := time.ParseDuration(c.flagTimeout)
-	if err != nil {
+	if _, err := time.ParseDuration(c.flagTimeout); err != nil {
 		return fmt.Errorf("unable to parse -%s: %s", flagNameTimeout, err)
 	}
-	c.timeoutDuration = duration
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
@@ -374,9 +335,6 @@ func (c *Command) validateFlags(args []string) error {
 		}
 	}
 
-	if c.flagDryRun {
-		c.UI.Output("Performing dry run upgrade.", terminal.WithInfoStyle())
-	}
 	return nil
 }
 
@@ -404,17 +362,56 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
 		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
-		vals = install.MergeMaps(presetMap, vals)
+		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
 }
 
+// Help returns a description of this command and how it can be used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s upgrade [flags]" + "\n" + "Upgrade Consul from an existing installation." + "\n"
-	return s + "\n" + c.help
+	return fmt.Sprintf("Usage: consul-k8s upgrade [flags]\n%s\n\n%s", c.Synopsis(), c.help)
 }
 
+// Synopsis returns a short string describing the command.
 func (c *Command) Synopsis() string {
-	return "Upgrade Consul on Kubernetes."
+	return "Upgrade Consul on Kubernetes from an existing installation."
+}
+
+// createUILogger creates a logger that will write to the UI.
+func (c *Command) createUILogger() func(string, ...interface{}) {
+	return func(s string, args ...interface{}) {
+		logMsg := fmt.Sprintf(s, args...)
+
+		if c.flagVerbose {
+			// Only output all logs when verbose is enabled
+			c.UI.Output(logMsg, terminal.WithLibraryStyle())
+		} else {
+			// When verbose is not enabled, output all logs except not ready messages for resources
+			if !strings.Contains(logMsg, "not ready") {
+				c.UI.Output(logMsg, terminal.WithLibraryStyle())
+			}
+		}
+	}
+}
+
+// printDiff marshals both maps to YAML and prints the diff between the two.
+func (c *Command) printDiff(old, new map[string]interface{}) error {
+	diff, err := common.Diff(old, new)
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output("Diff between user overrides", terminal.WithHeaderStyle())
+	for _, line := range strings.Split(diff, "\n") {
+		if strings.HasPrefix(line, "+") {
+			c.UI.Output(line, terminal.WithDiffAddedStyle())
+		} else if strings.HasPrefix(line, "-") {
+			c.UI.Output(line, terminal.WithDiffRemovedStyle())
+		} else {
+			c.UI.Output(line, terminal.WithDiffUnchangedStyle())
+		}
+	}
+
+	return nil
 }

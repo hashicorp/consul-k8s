@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
+	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"

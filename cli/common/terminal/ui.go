@@ -92,15 +92,18 @@ func Interpret(msg string, raw ...interface{}) (string, string, io.Writer) {
 }
 
 const (
-	HeaderStyle      = "header"
-	ErrorStyle       = "error"
-	ErrorBoldStyle   = "error-bold"
-	WarningStyle     = "warning"
-	WarningBoldStyle = "warning-bold"
-	InfoStyle        = "info"
-	LibraryStyle     = "library"
-	SuccessStyle     = "success"
-	SuccessBoldStyle = "success-bold"
+	HeaderStyle        = "header"
+	ErrorStyle         = "error"
+	ErrorBoldStyle     = "error-bold"
+	WarningStyle       = "warning"
+	WarningBoldStyle   = "warning-bold"
+	InfoStyle          = "info"
+	LibraryStyle       = "library"
+	SuccessStyle       = "success"
+	SuccessBoldStyle   = "success-bold"
+	DiffUnchangedStyle = "diff-unchanged"
+	DiffAddedStyle     = "diff-added"
+	DiffRemovedStyle   = "diff-removed"
 )
 
 type config struct {
@@ -137,7 +140,7 @@ func WithErrorStyle() Option {
 	}
 }
 
-// WithWarningStyle styles the output as an error message.
+// WithWarningStyle styles the output as an warning message.
 func WithWarningStyle() Option {
 	return func(c *config) {
 		c.Style = WarningStyle
@@ -151,13 +154,35 @@ func WithSuccessStyle() Option {
 	}
 }
 
-// WithLibraryStyle styles the output as a success message.
+// WithLibraryStyle styles the output with an arrow pointing to a section.
 func WithLibraryStyle() Option {
 	return func(c *config) {
 		c.Style = LibraryStyle
 	}
 }
 
+// WithDiffUnchangedStyle colors the diff style in white.
+func WithDiffUnchangedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffUnchangedStyle
+	}
+}
+
+// WithDiffAddedStyle colors the output in green.
+func WithDiffAddedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffAddedStyle
+	}
+}
+
+// WithDiffRemovedStyle colors the output in red.
+func WithDiffRemovedStyle() Option {
+	return func(c *config) {
+		c.Style = DiffRemovedStyle
+	}
+}
+
+// WithStyle allows for setting a style by passing a string.
 func WithStyle(style string) Option {
 	return func(c *config) {
 		c.Style = style
@@ -170,13 +195,16 @@ func WithWriter(w io.Writer) Option {
 }
 
 var (
-	colorHeader      = color.New(color.Bold)
-	colorInfo        = color.New()
-	colorError       = color.New(color.FgRed)
-	colorErrorBold   = color.New(color.FgRed, color.Bold)
-	colorLibrary     = color.New(color.FgCyan)
-	colorSuccess     = color.New(color.FgGreen)
-	colorSuccessBold = color.New(color.FgGreen, color.Bold)
-	colorWarning     = color.New(color.FgYellow)
-	colorWarningBold = color.New(color.FgYellow, color.Bold)
+	colorHeader        = color.New(color.Bold)
+	colorInfo          = color.New()
+	colorError         = color.New(color.FgRed)
+	colorErrorBold     = color.New(color.FgRed, color.Bold)
+	colorLibrary       = color.New(color.FgCyan)
+	colorSuccess       = color.New(color.FgGreen)
+	colorSuccessBold   = color.New(color.FgGreen, color.Bold)
+	colorWarning       = color.New(color.FgYellow)
+	colorWarningBold   = color.New(color.FgYellow, color.Bold)
+	colorDiffUnchanged = color.New()
+	colorDiffAdded     = color.New(color.FgGreen)
+	colorDiffRemoved   = color.New(color.FgRed)
 )
