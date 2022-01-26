@@ -6,6 +6,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMergeMaps(t *testing.T) {
+	cases := map[string]struct {
+		a        map[string]interface{}
+		b        map[string]interface{}
+		expected map[string]interface{}
+	}{
+		"a is empty": {
+			a:        map[string]interface{}{},
+			b:        map[string]interface{}{"foo": "bar"},
+			expected: map[string]interface{}{"foo": "bar"},
+		},
+		"b is empty": {
+			a:        map[string]interface{}{"foo": "bar"},
+			b:        map[string]interface{}{},
+			expected: map[string]interface{}{"foo": "bar"},
+		},
+		"b overrides a": {
+			a:        map[string]interface{}{"foo": "bar"},
+			b:        map[string]interface{}{"foo": "baz"},
+			expected: map[string]interface{}{"foo": "baz"},
+		},
+		"b partially overrides a": {
+			a:        map[string]interface{}{"foo": "bar", "baz": "qux"},
+			b:        map[string]interface{}{"foo": "baz"},
+			expected: map[string]interface{}{"foo": "baz", "baz": "qux"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			actual := MergeMaps(tc.a, tc.b)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func TestIsValidLabel(t *testing.T) {
 	cases := []struct {
 		name     string
