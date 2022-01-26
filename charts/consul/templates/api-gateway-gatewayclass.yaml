@@ -14,5 +14,5 @@ spec:
   parametersRef:
     group: api-gateway.consul.hashicorp.com
     kind: GatewayClassConfig
-    name: consul-api-gateway-class-config
+    name: consul-api-gateway
 {{- end }}
