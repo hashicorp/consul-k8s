@@ -15,18 +15,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/freeport"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-discover"
-	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-discover"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
@@ -187,6 +188,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+			LocalToken:  true,
+		},
+		{
+			TestName:    "API gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 			LocalToken:  true,
 		},
 		{
@@ -361,6 +370,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
+			LocalToken:  true,
+		},
+		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token-dc2"},
@@ -505,6 +522,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+		},
+		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 		},
 		{
 			TestName:    "Mesh gateway token",
