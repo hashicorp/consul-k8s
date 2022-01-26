@@ -9,11 +9,10 @@ load _helpers
       .
 }
 
-@test "apiGateway/ServiceAccount: enabled with global.enabled false" {
+@test "apiGateway/ServiceAccount: enabled with apiGateway.enabled true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-serviceaccount.yaml  \
-      --set 'global.enabled=false' \
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=foo' \
       . | tee /dev/stderr |
