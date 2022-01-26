@@ -13,7 +13,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "consul.fullname" . }}-connect-injector-webhook-deployment
+  name: {{ template "consul.fullname" . }}-connect-injector
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
@@ -50,7 +50,7 @@ spec:
         {{- end }}
         {{- end }}
     spec:
-      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
+      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"

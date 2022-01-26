@@ -2288,7 +2288,7 @@ func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace
 func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string) (string, string) {
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
-	serviceAccountName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	serviceAccountName := resourcePrefix + "-connect-injector"
 	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 	if sa == nil {
 		// Create a service account that references two secrets.
@@ -2305,7 +2305,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 						Name: resourcePrefix + "-some-other-secret",
 					},
 					{
-						Name: resourcePrefix + "-connect-injector-authmethod-svc-account",
+						Name: resourcePrefix + "-connect-injector",
 					},
 				},
 			},
@@ -2320,7 +2320,7 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	require.NoError(t, err)
 
 	// Create a Kubernetes secret if it doesn't exist, otherwise update it
-	secretName := resourcePrefix + "-connect-injector-authmethod-svc-account"
+	secretName := resourcePrefix + "-connect-injector"
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   secretName,

@@ -1,5 +1,10 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm
+  * Some Consul components from the Helm chart have been renamed to ensure consistency in naming across the components.
+  This will not be a breaking change if Consul components are not referred to by name externally. Check the PR for the list of renamed components. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/985)]
+
 FEATURES:
 * Helm
   * Support Envoy 1.20.1. [[GH-958](https://github.com/hashicorp/consul-k8s/pull/958)]
@@ -12,6 +17,7 @@ IMPROVEMENTS:
   * Support `ui.dashboardURLTemplates.service` value for setting [dashboard URL templates](https://www.consul.io/docs/agent/options#ui_config_dashboard_url_templates_service). [[GH-937](https://github.com/hashicorp/consul-k8s/pull/937)]
   * Allow using dash-separated names for config entries when using `kubectl`. [[GH-965](https://github.com/hashicorp/consul-k8s/pull/965)]
   * Support Pod Security Policies with Vault integration. [[GH-985](https://github.com/hashicorp/consul-k8s/pull/985)]
+  * Rename Consul resources to remove resource kind suffixes from the resource names to standardize resource names across the Helm chart. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/985)]
 * CLI
   * Show a diff when upgrading a Consul installation on Kubernetes [[GH-934](https://github.com/hashicorp/consul-k8s/pull/934)]
 * Control Plane

@@ -24,7 +24,7 @@ rules:
     resources:
       - serviceaccounts
     resourceNames:
-      - {{ template "consul.fullname" . }}-connect-injector-authmethod-svc-account
+      - {{ template "consul.fullname" . }}-connect-injector
     verbs:
       - get
 {{- end }}
