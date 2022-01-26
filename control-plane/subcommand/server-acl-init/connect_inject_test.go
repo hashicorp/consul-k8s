@@ -30,8 +30,8 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 		ctx:                ctx,
 	}
 
-	serviceAccountName := resourcePrefix + "-connect-injector-authmethod"
-	secretName := resourcePrefix + "-connect-injector-authmethod"
+	serviceAccountName := resourcePrefix + "-connect-injector"
+	secretName := resourcePrefix + "-connect-injector"
 
 	// Create a service account referencing secretName
 	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(ctx, serviceAccountName, metav1.GetOptions{})
@@ -65,5 +65,5 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = cmd.createAuthMethodTmpl("test")
-	require.EqualError(t, err, "found no secret of type 'kubernetes.io/service-account-token' associated with the release-name-consul-connect-injector-authmethod service account")
+	require.EqualError(t, err, "found no secret of type 'kubernetes.io/service-account-token' associated with the release-name-consul-connect-injector service account")
 }
