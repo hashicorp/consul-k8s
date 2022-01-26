@@ -4,6 +4,7 @@ FEATURES:
 * Helm
   * Support Envoy 1.20.1. [[GH-958](https://github.com/hashicorp/consul-k8s/pull/958)]
   * Support Consul 1.11.2. [[GH-976](https://github.com/hashicorp/consul-k8s/pull/976)]
+  * Support [Consul API Gateway](https://github.com/hashicorp/consul-api-gateway) Controller deployment through the Helm chart and provision an ACL token to for API Gateway via server-acl-init [[GH-925](https://github.com/hashicorp/consul-k8s/pull/925)]
 
 IMPROVEMENTS:
 * Helm
