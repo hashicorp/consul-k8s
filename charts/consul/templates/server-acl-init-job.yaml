@@ -237,6 +237,10 @@ spec:
                 -create-controller-token=true \
                 {{- end }}
 
+                {{- if .Values.apiGateway.enabled }}
+                -create-api-gateway-token=true \
+                {{- end }}
+
                 {{- if .Values.global.enableConsulNamespaces }}
                 -enable-namespaces=true \
 
