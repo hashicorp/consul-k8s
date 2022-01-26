@@ -2,6 +2,7 @@ package serveraclinit
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -135,6 +136,51 @@ partition_prefix "" {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.Expected, rules)
+		})
+	}
+}
+
+func TestAPIGatewayControllerRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		EnableNamespaces bool
+		Expected         string
+	}{
+		{
+			Name: "Namespaces are disabled",
+			Expected: `
+operator = "write"
+acl = "write"
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }`,
+		},
+		{
+			Name:             "Namespaces are enabled",
+			EnableNamespaces: true,
+			Expected: `
+operator = "write"
+acl = "write"
+namespace_prefix "" {
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+
+			meshGatewayRules, err := cmd.apiGatewayControllerRules()
+
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, strings.Trim(meshGatewayRules, " "))
 		})
 	}
 }

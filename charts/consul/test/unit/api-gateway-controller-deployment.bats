@@ -20,18 +20,6 @@ load _helpers
   [[ "$output" =~ "apiGateway.image must be set to enable api gateway" ]]
 }
 
-@test "apiGateway/Deployment: enable with global.enabled false, apiGateway.enabled true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'global.enabled=false' \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 @test "apiGateway/Deployment: disable with apiGateway.enabled" {
   cd `chart_dir`
   assert_empty helm template \

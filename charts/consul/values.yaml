@@ -2471,6 +2471,7 @@ apiGateway:
   # @type: string
   logLevel: info
 
+  # Configuration settings for the optional GatewayClass installed by consul-k8s (enabled by default)
   managedGatewayClass:
     # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
     enabled: true
@@ -2494,6 +2495,7 @@ apiGateway:
     # This value toggles if the gateway ports should be mapped to host ports
     useHostPorts: false
 
+    # Configuration settings for annotations to be copied from the Gateway to other child resources.
     copyAnnotations:
       # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
       #
@@ -2507,6 +2509,7 @@ apiGateway:
       # @type: string
       service: null
 
+  # Configuration for the ServiceAccount created for the api-gateway component
   serviceAccount:
     # This value defines additional annotations for the client service account. This should be formatted as a multi-line
     # string.
@@ -2520,7 +2523,9 @@ apiGateway:
     # @type: string
     annotations: null
 
+  # Configuration for the api-gateway controller component
   controller:
+    # This value sets the number of controller replicas to deploy.
     replicas: 1
 
     # Annotations to apply to the api-gateway-controller pods.
@@ -2550,6 +2555,8 @@ apiGateway:
     #
     # @type: string
     nodeSelector: null
+
+    # Configuration for the Service created for the api-gateway-controller
     service:
       # Annotations to apply to the api-gateway-controller service.
       #
