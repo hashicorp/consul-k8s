@@ -174,6 +174,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if c.flagDryRun {
+		c.UI.Output("Dry Run Upgrade: No changes will be made to the cluster.")
+	}
+
 	c.timeoutDuration, err = time.ParseDuration(c.flagTimeout)
 	if err != nil {
 		c.UI.Output(fmt.Sprintf("Invalid timeout: %s", err))
