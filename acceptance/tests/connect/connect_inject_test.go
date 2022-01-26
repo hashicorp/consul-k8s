@@ -143,8 +143,8 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 	}
 
 	logger.Log(t, "restarting Consul client daemonset")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul", releaseName))
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul", releaseName))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul-client", releaseName))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul-client", releaseName))
 
 	logger.Log(t, "checking that connection is still successful")
 	if cfg.EnableTransparentProxy {

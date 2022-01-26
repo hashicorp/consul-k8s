@@ -3,7 +3,7 @@
 BREAKING CHANGES:
 * Helm
   * Some Consul components from the Helm chart have been renamed to ensure consistency in naming across the components.
-  This will not be a breaking change if Consul components are not referred to by name externally. Check the PR for the list of renamed components. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/993)]
+  This will not be a breaking change if Consul components are not referred to by name externally. Check the PR for the list of renamed components. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/993)][[GH-1000](https://github.com/hashicorp/consul-k8s/pull/1000)]
 
 FEATURES:
 * Helm
@@ -18,6 +18,7 @@ IMPROVEMENTS:
   * Allow using dash-separated names for config entries when using `kubectl`. [[GH-965](https://github.com/hashicorp/consul-k8s/pull/965)]
   * Support Pod Security Policies with Vault integration. [[GH-985](https://github.com/hashicorp/consul-k8s/pull/985)]
   * Rename Consul resources to remove resource kind suffixes from the resource names to standardize resource names across the Helm chart. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/993)]
+  * Append `-client` to the Consul Daemonset name to standardize resource names across the Helm chart. [[GH-1000](https://github.com/hashicorp/consul-k8s/pull/1000)]
 * CLI
   * Show a diff when upgrading a Consul installation on Kubernetes [[GH-934](https://github.com/hashicorp/consul-k8s/pull/934)]
 * Control Plane

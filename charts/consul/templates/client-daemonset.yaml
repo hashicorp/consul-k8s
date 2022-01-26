@@ -11,7 +11,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ template "consul.fullname" . }}
+  name: {{ template "consul.fullname" . }}-client
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}

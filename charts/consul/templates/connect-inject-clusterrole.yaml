@@ -11,6 +11,13 @@ metadata:
     release: {{ .Release.Name }}
     component: connect-injector
 rules:
+{{- if .Values.global.acls.manageSystemACLs }}
+- apiGroups: [""]
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+{{- end }}
 - apiGroups: [""]
   resources: ["pods", "endpoints", "services", "namespaces"]
   verbs:
