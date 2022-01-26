@@ -24,6 +24,7 @@ IMPROVEMENTS:
   * Support the value `$POD_NAME` for the annotation `consul.hashicorp.com/service-meta-*` that will now be interpolated and set to the pod's name in the service's metadata. [[GH-982](https://github.com/hashicorp/consul-k8s/pull/982)]
   * Allow managing Consul sidecar resources via annotations. [[GH-956](https://github.com/hashicorp/consul-k8s/pull/956)]
   * Support using a backslash to escape commas in `consul.hashicorp.com/service-tags` annotation. [[GH-983](https://github.com/hashicorp/consul-k8s/pull/983)]
+  * Avoid making unnecessary calls to Consul in the endpoints controller to improve application startup time when Consul is down. [[GH-779](https://github.com/hashicorp/consul-k8s/issues/779)]
 
 BUG FIXES:
 * Helm

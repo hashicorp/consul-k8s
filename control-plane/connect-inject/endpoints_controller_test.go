@@ -3,6 +3,9 @@ package connectinject
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -2492,16 +2495,17 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
 	cases := []struct {
-		name              string
-		consulSvcName     string
-		legacyService     bool
-		initialConsulSvcs []*api.AgentServiceRegistration
-		enableACLs        bool
+		name                      string
+		consulSvcName             string
+		expectServicesToBeDeleted bool
+		initialConsulSvcs         []*api.AgentServiceRegistration
+		enableACLs                bool
+		consulClientReady         bool
 	}{
 		{
-			name:          "Legacy service: does not delete",
-			consulSvcName: "service-deleted",
-			legacyService: true,
+			name:                      "Legacy service: does not delete",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: false,
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
 					ID:      "pod1-service-deleted",
@@ -2523,10 +2527,12 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default"},
 				},
 			},
+			consulClientReady: true,
 		},
 		{
-			name:          "Consul service name matches K8s service name",
-			consulSvcName: "service-deleted",
+			name:                      "Consul service name matches K8s service name",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
 					ID:      "pod1-service-deleted",
@@ -2548,10 +2554,12 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
+			consulClientReady: true,
 		},
 		{
-			name:          "Consul service name does not match K8s service name",
-			consulSvcName: "different-consul-svc-name",
+			name:                      "Consul service name does not match K8s service name",
+			consulSvcName:             "different-consul-svc-name",
+			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
 					ID:      "pod1-different-consul-svc-name",
@@ -2573,10 +2581,12 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					Meta: map[string]string{"k8s-service-name": "service-deleted", "k8s-namespace": "default", MetaKeyManagedBy: managedByValue},
 				},
 			},
+			consulClientReady: true,
 		},
 		{
-			name:          "When ACLs are enabled, the token should be deleted",
-			consulSvcName: "service-deleted",
+			name:                      "When ACLs are enabled, the token should be deleted",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentServiceRegistration{
 				{
 					ID:      "pod1-service-deleted",
@@ -2608,7 +2618,45 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					},
 				},
 			},
-			enableACLs: true,
+			enableACLs:        true,
+			consulClientReady: true,
+		},
+		{
+			name:                      "When Consul client pod is not ready, services are not deleted",
+			consulSvcName:             "service-deleted",
+			expectServicesToBeDeleted: false,
+			initialConsulSvcs: []*api.AgentServiceRegistration{
+				{
+					ID:      "pod1-service-deleted",
+					Name:    "service-deleted",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-deleted-sidecar-proxy",
+					Name:    "service-deleted-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-deleted",
+						DestinationServiceID:   "pod1-service-deleted",
+					},
+					Meta: map[string]string{
+						MetaKeyKubeServiceName: "service-deleted",
+						MetaKeyKubeNS:          "default",
+						MetaKeyManagedBy:       managedByValue,
+						MetaKeyPodName:         "pod1",
+					},
+				},
+			},
+			consulClientReady: false,
 		},
 	}
 	for _, tt := range cases {
@@ -2619,6 +2667,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// test server we have on localhost.
 			fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
 			fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+			if !tt.consulClientReady {
+				fakeClientPod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}
+			}
 
 			// Add the default namespace.
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
@@ -2701,16 +2752,16 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// After reconciliation, Consul should not have any instances of service-deleted
 			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
 			// If it's not managed by endpoints controller (legacy service), Consul should have service instances
-			if tt.legacyService {
+			if tt.expectServicesToBeDeleted {
+				require.NoError(t, err)
+				require.Empty(t, serviceInstances)
+				proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
+				require.NoError(t, err)
+				require.Empty(t, proxyServiceInstances)
+			} else {
 				require.NoError(t, err)
 				require.NotEmpty(t, serviceInstances)
-				return
 			}
-			require.NoError(t, err)
-			require.Empty(t, serviceInstances)
-			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
-			require.NoError(t, err)
-			require.Empty(t, proxyServiceInstances)
 
 			if tt.enableACLs {
 				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
@@ -2861,6 +2912,81 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			require.Len(t, proxyServiceInstances, tt.expectedNumSvcInstances)
 		})
 	}
+}
+
+// Test that when endpoints pods have not been connect-injected (i.e. not in the service mesh)
+// we don't make any API calls to Consul.
+// This is because we want to avoid any unnecessary calls. Especially if the client agent is unreachable
+// and any calls to it will result in an i/o timeout errors, it will
+// slow down processing of the events by the endpoints controller making unnecessary calls and waiting for ~30sec.
+func TestReconcile_endpointsIgnoredWhenNotInjected(t *testing.T) {
+	nodeName := "test-node"
+	namespace := "default"
+
+	// Set up the fake Kubernetes client with an endpoint, pod, consul client, and the default namespace.
+	endpoint := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-in-mesh",
+			Namespace: namespace,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "1.2.3.4",
+						NodeName: &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      "pod1",
+							Namespace: namespace,
+						},
+					},
+				},
+			},
+		},
+	}
+	pod1 := createPod("pod1", "1.2.3.4", false, true)
+	fakeClientPod := createPod("fake-consul-client", "127.0.0.1", false, true)
+	fakeClientPod.Labels = map[string]string{"component": "client", "app": "consul", "release": "consul"}
+	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+	k8sObjects := []runtime.Object{endpoint, pod1, fakeClientPod, &ns}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+	// Create test Consul server.
+	consul := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		if r != nil {
+			t.Fatalf("should not receive any calls to Consul client")
+		}
+	}))
+	t.Cleanup(consul.Close)
+
+	cfg := &api.Config{Address: consul.URL}
+	consulClient, err := api.NewClient(cfg)
+	require.NoError(t, err)
+	parsedURL, err := url.Parse(consul.URL)
+	require.NoError(t, err)
+	consulPort := parsedURL.Port()
+
+	// Create the endpoints controller.
+	ep := &EndpointsController{
+		Client:                fakeClient,
+		Log:                   logrtest.TestLogger{T: t},
+		ConsulClient:          consulClient,
+		ConsulPort:            consulPort,
+		ConsulScheme:          "http",
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		ReleaseName:           "consul",
+		ReleaseNamespace:      namespace,
+		ConsulClientCfg:       cfg,
+	}
+
+	// Run the reconcile process to deregister the service if it was registered before.
+	namespacedName := types.NamespacedName{Namespace: namespace, Name: "not-in-mesh"}
+	resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
 }
 
 func TestFilterAgentPods(t *testing.T) {
@@ -4986,6 +5112,12 @@ func createPod(name, ip string, inject bool, managedByEndpointsController bool) 
 		Status: corev1.PodStatus{
 			PodIP:  ip,
 			HostIP: "127.0.0.1",
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
 		},
 	}
 	if inject {
