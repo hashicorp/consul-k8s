@@ -3,7 +3,7 @@
 BREAKING CHANGES:
 * Helm
   * Some Consul components from the Helm chart have been renamed to ensure consistency in naming across the components.
-  This will not be a breaking change if Consul components are not referred to by name externally. Check the PR for the list of renamed components. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/985)]
+  This will not be a breaking change if Consul components are not referred to by name externally. Check the PR for the list of renamed components. [[GH-993](https://github.com/hashicorp/consul-k8s/pull/993)]
 
 FEATURES:
 * Helm
