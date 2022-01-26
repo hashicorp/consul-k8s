@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
+	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/go-hclog"
 )
 

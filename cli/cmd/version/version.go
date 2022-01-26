@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
+	"github.com/hashicorp/consul-k8s/cli/common"
 )
 
 type Command struct {

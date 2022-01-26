@@ -9,10 +9,11 @@ import (
 	"time"
 
 	consulChart "github.com/hashicorp/consul-k8s/charts"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/config"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
@@ -313,7 +314,7 @@ func (c *Command) Run(args []string) int {
 	// Without informing the user, default global.name to consul if it hasn't been set already. We don't allow setting
 	// the release name, and since that is hardcoded to "consul", setting global.name to "consul" makes it so resources
 	// aren't double prefixed with "consul-consul-...".
-	vals = MergeMaps(config.Convert(config.GlobalNameConsul), vals)
+	vals = common.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
 	// Dry Run should exit here, no need to actual locate/download the charts.
 	if c.flagDryRun {
@@ -342,7 +343,7 @@ func (c *Command) Run(args []string) int {
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
-	actionConfig, err = common.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
+	actionConfig, err = helm.InitActionConfig(actionConfig, c.flagNamespace, settings, uiLogger)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -357,7 +358,7 @@ func (c *Command) Run(args []string) int {
 	install.Timeout = c.timeoutDuration
 
 	// Read the embedded chart files into []*loader.BufferedFile.
-	chartFiles, err := common.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
+	chartFiles, err := helm.ReadChartFiles(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
 	if err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
@@ -455,30 +456,9 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	if c.flagPreset != defaultPreset {
 		// Note the ordering of the function call, presets have lower precedence than set vals.
 		presetMap := config.Presets[c.flagPreset].(map[string]interface{})
-		vals = MergeMaps(presetMap, vals)
+		vals = common.MergeMaps(presetMap, vals)
 	}
 	return vals, err
-}
-
-// MergeMaps is a helper function used in Run. Merges two maps giving b precedent.
-// @source: https://github.com/helm/helm/blob/main/pkg/cli/values/options.go
-func MergeMaps(a, b map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(a))
-	for k, v := range a {
-		out[k] = v
-	}
-	for k, v := range b {
-		if v, ok := v.(map[string]interface{}); ok {
-			if bv, ok := out[k]; ok {
-				if bv, ok := bv.(map[string]interface{}); ok {
-					out[k] = MergeMaps(bv, v)
-					continue
-				}
-			}
-		}
-		out[k] = v
-	}
-	return out
 }
 
 // validateFlags is a helper function that performs sanity checks on the user's provided flags.
@@ -490,14 +470,14 @@ func (c *Command) validateFlags(args []string) error {
 		return errors.New("should have no non-flag arguments")
 	}
 	if len(c.flagValueFiles) != 0 && c.flagPreset != defaultPreset {
-		return fmt.Errorf("Cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
+		return fmt.Errorf("cannot set both -%s and -%s", flagNameConfigFile, flagNamePreset)
 	}
 	if _, ok := config.Presets[c.flagPreset]; c.flagPreset != defaultPreset && !ok {
 		return fmt.Errorf("'%s' is not a valid preset", c.flagPreset)
 	}
-	if !validLabel(c.flagNamespace) {
+	if !common.IsValidLabel(c.flagNamespace) {
 		return fmt.Errorf("'%s' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must "+
-			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric", c.flagNamespace)
+			"consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character", c.flagNamespace)
 	}
 	duration, err := time.ParseDuration(c.flagTimeout)
 	if err != nil {
@@ -507,7 +487,7 @@ func (c *Command) validateFlags(args []string) error {
 	if len(c.flagValueFiles) != 0 {
 		for _, filename := range c.flagValueFiles {
 			if _, err := os.Stat(filename); err != nil && os.IsNotExist(err) {
-				return fmt.Errorf("File '%s' does not exist.", filename)
+				return fmt.Errorf("file '%s' does not exist", filename)
 			}
 		}
 	}
@@ -516,21 +496,6 @@ func (c *Command) validateFlags(args []string) error {
 		c.UI.Output("Performing dry run installation.", terminal.WithInfoStyle())
 	}
 	return nil
-}
-
-// validLabel is a helper function that checks if a string follows RFC 1123 labels.
-func validLabel(s string) bool {
-	for i, c := range s {
-		alphanum := ('a' <= c && c <= 'z') || ('0' <= c && c <= '9')
-		// If the character is not the last or first, it can be a dash.
-		if i != 0 && i != (len(s)-1) {
-			alphanum = alphanum || (c == '-')
-		}
-		if !alphanum {
-			return false
-		}
-	}
-	return true
 }
 
 // checkValidEnterprise checks and validates an enterprise installation.

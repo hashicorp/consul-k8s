@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
 )
 
