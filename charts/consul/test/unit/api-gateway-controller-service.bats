@@ -9,7 +9,7 @@ load _helpers
       .
 }
 
-@test "apiGateway/Service: enable with global.enabled false" {
+@test "apiGateway/Service: enable with apiGateway.enabled set to true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-service.yaml  \
