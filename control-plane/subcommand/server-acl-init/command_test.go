@@ -370,6 +370,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			LocalToken:  true,
 		},
 		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
+			LocalToken:  true,
+		},
+		{
 			TestName:    "Mesh gateway token",
 			TokenFlags:  []string{"-create-mesh-gateway-token"},
 			PolicyNames: []string{"mesh-gateway-token-dc2"},
@@ -514,6 +522,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-snapshot-agent-token"},
 			PolicyNames: []string{"client-snapshot-agent-token"},
 			SecretNames: []string{resourcePrefix + "-client-snapshot-agent-acl-token"},
+		},
+		{
+			TestName:    "API Gateway token",
+			TokenFlags:  []string{"-create-api-gateway-token"},
+			PolicyNames: []string{"api-gateway-controller-token"},
+			SecretNames: []string{resourcePrefix + "-api-gateway-controller-acl-token"},
 		},
 		{
 			TestName:    "Mesh gateway token",
