@@ -139,24 +139,23 @@ partition_prefix "" {
 }
 
 func (c *Command) apiGatewayControllerRules() (string, error) {
-	apiGatewayRulesTpl := `
-{{- if .EnablePartitions }}
+	apiGatewayRulesTpl := `{{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
-  operator = "write"
-  acl = "write"
+operator = "write"
+acl = "write"
 {{- end }}
 {{- if .EnableNamespaces }}
-  namespace_prefix "" {
+namespace_prefix "" {
 {{- end }}
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-{{- if .EnableNamespaces }}
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
   }
+{{- if .EnableNamespaces }}
+}
 {{- end }}
 {{- if .EnablePartitions }}
 }
