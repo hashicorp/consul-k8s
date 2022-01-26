@@ -13,6 +13,7 @@ func TestIsValidLabel(t *testing.T) {
 		expected bool
 	}{
 		{"Valid label", "such-a-good-label", true},
+		{"Valid label with leading numbers", "123-such-a-good-label", true},
 		{"Invalid label empty", "", false},
 		{"Invalid label contains capital letters", "Peppertrout", false},
 		{"Invalid label contains underscores", "this_is_not_python", false},
