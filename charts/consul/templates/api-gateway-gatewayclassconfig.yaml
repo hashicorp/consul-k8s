@@ -2,7 +2,7 @@
 apiVersion: api-gateway.consul.hashicorp.com/v1alpha1
 kind: GatewayClassConfig
 metadata:
-  name: consul-api-gateway-class-config
+  name: consul-api-gateway
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}

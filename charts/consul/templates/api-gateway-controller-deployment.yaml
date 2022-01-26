@@ -42,7 +42,7 @@ spec:
         release: {{ .Release.Name }}
         component: api-gateway-controller
     spec:
-      serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller-svc-account
+      serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller
       containers:
       - name: api-gateway-controller
         image: {{ .Values.apiGateway.image }}
