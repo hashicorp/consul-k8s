@@ -159,7 +159,7 @@ func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// If the endpoints object has the annotation "consul.hashicorp.com/endpoint-service-name" with a value that does not match
 	// the name of the service, deregister all instances in Consul for this service.
-	if endpointSvcName, hasAnno := serviceEndpoints.Annotations[annotationEndpointServiceName]; hasAnno && endpointSvcName != serviceEndpoints.Name {
+	if endpointSvcName, hasAnno := serviceEndpoints.Annotations[annotationKubernetesService]; hasAnno && endpointSvcName != serviceEndpoints.Name {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		r.Log.Info("Ignoring endpoint because of selector", "name", req.Name, "namespace", req.Namespace)
 		err = r.deregisterServiceOnAllAgents(ctx, req.Name, req.Namespace, nil, endpointPods)
