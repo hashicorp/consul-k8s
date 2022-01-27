@@ -162,7 +162,7 @@ func TestPartitions(t *testing.T) {
 				partitionSvcAddress = nodeList.Items[0].Status.Addresses[0].Address
 			} else {
 				// Get the IP of the partition service to configure the external server address in the values file for the clients cluster.
-				partitionServiceName := fmt.Sprintf("%s-consul-partition-service", releaseName)
+				partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)
 				logger.Logf(t, "retrieving partition service to determine external address for servers")
 
 				// It can take some time for the load balancers to be ready and have an IP/Hostname.
