@@ -39,31 +39,25 @@ You will also need to install the Docker engine:
 Clone the repository:
 
 ```shell
-$ git clone https://github.com/hashicorp/consul-k8s.git
+git clone https://github.com/hashicorp/consul-k8s.git
 ```
 
-Change directories into the appropriate folder:
+Compile the `consul-k8s-control-plane` binary for your local machine:
 
 ```shell
-$ cd control-plane
+make control-plane-dev
 ```
 
-To compile the `consul-k8s-control-plane` binary for your local machine:
-
-```shell
-$ make dev
-```
-
-This will compile the `consul-k8s-control-plane` binary into `bin/consul-k8s-control-plane` as
+This will compile the `consul-k8s-control-plane` binary into `control-plane/bin/consul-k8s-control-plane` as
 well as your `$GOPATH` and run the test suite.
 
-If you just want to run the tests:
+Run the tests:
 
 ```shell
-$ make test
+make control-plane-test
 ```
 
-Or to run a specific test in the suite:
+Run a specific test in the suite. Change directory into `control-plane`.
 
 ```shell
 go test ./... -run SomeTestFunction_name
@@ -72,22 +66,14 @@ go test ./... -run SomeTestFunction_name
 To create a docker image with your local changes:
 
 ```shell
-$ make dev-docker
+make control-plane-dev-docker
 ```
 
-If you'd like to use your docker images in a dev deployment of Consul K8s, you would need to push those images to Docker Hub since 
-deploying off of local images is not supported unless you host your own local Docker registry:
+To use your Docker image in a dev deployment of Consul K8s, push the image to Docker Hub or your own registry. Deploying from local images is not supported.
 
 ```
-$ docker tag consul-k8s-control-plane-dev <insert-docker-hub-username>/consul-k8s-control-plane-dev
-$ docker push <insert-docker-hub-username>/consul-k8s-control-plane-dev
-Using default tag: latest
-The push refers to repository [docker.io/<hub-username>/consul-k8s-control-plane-dev]
-4c5225fbac5e: Pushed
-737cd00c4260: Pushed
-7a9c7d9855c2: Pushed
-e2eb06d8af82: Pushed
-latest: digest: sha256:0b3e90e0b32da8aba1b11cda6a6a768a5eb4d83664a408d53f1502db8703ef8a size: 1160
+docker tag consul-k8s-control-plane-dev <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
+docker push <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
 ```
 
 Create a `values.dev.yaml` file that includes the `global.imageK8S` flag to point to dev images you just pushed:
@@ -96,7 +82,7 @@ Create a `values.dev.yaml` file that includes the `global.imageK8S` flag to poin
 global:
   tls:
     enabled: true
-  imageK8S: <insert-docker-hub-username>/consul-k8s-control-plane-dev
+  imageK8S: <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev
 server:
   replicas: 1
 connectInject:
