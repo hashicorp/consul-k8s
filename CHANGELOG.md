@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BUG FIXES:
+* API Gateway
+  * Fix issue where if the API gateway controller pods restarted, gateway pods would become disconnected from the secret discovery service. [[GH-1007](https://github.com/hashicorp/consul-k8s/pull/1007)]
+
 ## 0.40.0 (January 27, 2022)
 
 BREAKING CHANGES:
