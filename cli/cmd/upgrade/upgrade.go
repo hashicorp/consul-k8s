@@ -403,7 +403,7 @@ func (c *Command) printDiff(old, new map[string]interface{}) error {
 		return err
 	}
 
-	c.UI.Output("Diff between user overrides", terminal.WithHeaderStyle())
+	c.UI.Output("\nDifference between user overrides for current and upgraded charts\n--------------------------------------------------------------", terminal.WithInfoStyle())
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "+") {
 			c.UI.Output(line, terminal.WithDiffAddedStyle())
