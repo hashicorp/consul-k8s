@@ -59,10 +59,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_HTTP_TOKEN
           valueFrom:
@@ -81,7 +77,7 @@ spec:
           - "-ec"
           - |
             consul-api-gateway server \
-              -sds-server-host $(IP) \
+              -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
               -k8s-namespace {{ .Release.Namespace }} \
               -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
         volumeMounts:

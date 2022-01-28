@@ -48,6 +48,17 @@ load _helpers
   [ "${actual}" = "\"bar\"" ]
 }
 
+@test "apiGateway/Deployment: SDS host set correctly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-sds-server-host RELEASE-NAME-consul-api-gateway-controller.default.svc")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # nodeSelector
 
