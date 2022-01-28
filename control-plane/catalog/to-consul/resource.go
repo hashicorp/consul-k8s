@@ -146,10 +146,22 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				if t.AllowK8sNamespacesSet.Cardinality() == 1 {
+					allowNS := t.AllowK8sNamespacesSet.ToSlice()[0].(string)
+					if allowNS != namespaces.WildcardNamespace {
+						return t.Client.CoreV1().Services(allowNS).List(t.Ctx, options)
+					}
+				}
 				return t.Client.CoreV1().Services(metav1.NamespaceAll).List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				if t.AllowK8sNamespacesSet.Cardinality() == 1 {
+					allowNS := t.AllowK8sNamespacesSet.ToSlice()[0].(string)
+					if allowNS != namespaces.WildcardNamespace {
+						return t.Client.CoreV1().Services(allowNS).Watch(t.Ctx, options)
+					}
+				}
 				return t.Client.CoreV1().Services(metav1.NamespaceAll).Watch(t.Ctx, options)
 			},
 		},
@@ -695,12 +707,28 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				if t.Service.AllowK8sNamespacesSet.Cardinality() == 1 {
+					allowNS := t.Service.AllowK8sNamespacesSet.ToSlice()[0].(string)
+					if allowNS != namespaces.WildcardNamespace {
+						return t.Service.Client.CoreV1().
+							Endpoints(allowNS).
+							List(t.Ctx, options)
+					}
+				}
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
 					List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				if t.Service.AllowK8sNamespacesSet.Cardinality() == 1 {
+					allowNS := t.Service.AllowK8sNamespacesSet.ToSlice()[0].(string)
+					if allowNS != namespaces.WildcardNamespace {
+						return t.Service.Client.CoreV1().
+							Endpoints(allowNS).
+							Watch(t.Ctx, options)
+					}
+				}
 				return t.Service.Client.CoreV1().
 					Endpoints(metav1.NamespaceAll).
 					Watch(t.Ctx, options)

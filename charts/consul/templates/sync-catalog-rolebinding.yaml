@@ -1,10 +1,11 @@
 {{- $syncEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if $syncEnabled }}
-{{- if not (eq (len .Values.syncCatalog.k8sAllowNamespaces) 1) }}
+{{- if and (eq (len .Values.syncCatalog.k8sAllowNamespaces) 1) (not (eq (first .Values.syncCatalog.k8sAllowNamespaces) "*"))}}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ template "consul.fullname" . }}-sync-catalog
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
