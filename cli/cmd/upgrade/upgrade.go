@@ -91,13 +91,13 @@ func (c *Command) init() {
 		Name:    flagNameDryRun,
 		Target:  &c.flagDryRun,
 		Default: defaultDryRun,
-		Usage:   "Run pre-upgrade checks and display summary of upgrade.",
+		Usage:   "Perform pre-upgrade checks and display summary of upgrade.",
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:    flagNameConfigFile,
 		Aliases: []string{"f"},
 		Target:  &c.flagValueFiles,
-		Usage:   "Path to a file to customize the upgrade, such as Consul Helm chart values file. Can be specified multiple times.",
+		Usage:   "Set the path to a file to customize the upgrade, such as Consul Helm chart values file. Can be specified multiple times.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamePreset,
@@ -113,8 +113,8 @@ func (c *Command) init() {
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameFileValues,
 		Target: &c.flagFileValues,
-		Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
-			"specified multiple times. Supports Consul Helm chart values.",
+		Usage: "Set a value to customize using a file. The contents of the file will be set as the value." +
+			"Can be specified multiple times. Supports Consul Helm chart values.",
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetStringValues,
@@ -125,20 +125,20 @@ func (c *Command) init() {
 		Name:    flagNameTimeout,
 		Target:  &c.flagTimeout,
 		Default: defaultTimeout,
-		Usage:   "Timeout to wait for upgrade to be ready.",
+		Usage:   "Set a timeout to wait for upgrade to be ready.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameVerbose,
 		Aliases: []string{"v"},
 		Target:  &c.flagVerbose,
 		Default: defaultVerbose,
-		Usage:   "Output verbose logs from the upgrade command with the status of resources being upgraded.",
+		Usage:   "Output verbose logs from the command with the status of resources being upgraded.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameWait,
 		Target:  &c.flagWait,
 		Default: defaultWait,
-		Usage:   "Determines whether to wait for resources in upgrade to be ready before exiting command.",
+		Usage:   "Wait for Kubernetes resources in upgrade to be ready before exiting command.",
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -147,13 +147,13 @@ func (c *Command) init() {
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
-		Usage:   "Path to kubeconfig file.",
+		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    "context",
 		Target:  &c.flagKubeContext,
 		Default: "",
-		Usage:   "Kubernetes context to use.",
+		Usage:   "Set the Kubernetes context to use.",
 	})
 
 	c.help = c.set.Help()
@@ -175,7 +175,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagDryRun {
-		c.UI.Output("Dry Run Upgrade: No changes will be made to the cluster.")
+		c.UI.Output("Performing dry run upgrade. No changes will be made to the cluster.", terminal.WithInfoStyle())
 	}
 
 	c.timeoutDuration, err = time.ParseDuration(c.flagTimeout)
@@ -203,24 +203,24 @@ func (c *Command) Run(args []string) int {
 	if c.kubernetes == nil {
 		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 		if err != nil {
-			c.UI.Output("Retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error retrieving Kubernetes authentication:\n%v", err, terminal.WithErrorStyle())
 			return 1
 		}
 		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
 		if err != nil {
-			c.UI.Output("Initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error initializing Kubernetes client:\n%v", err, terminal.WithErrorStyle())
 			return 1
 		}
 	}
 
-	c.UI.Output("Pre-Upgrade Checks", terminal.WithHeaderStyle())
+	c.UI.Output("Checking if Consul can be upgraded", terminal.WithHeaderStyle())
 	uiLogger := c.createUILogger()
 	name, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
-		c.UI.Output("Could not find existing Consul installation. Run 'consul-k8s install' to create one.")
+		c.UI.Output("Cannot upgrade Consul. Existing Consul installation not found. Use the command `consul-k8s install` to install Consul.", terminal.WithErrorStyle())
 		return 1
 	}
-	c.UI.Output("Existing installation found to be upgraded.", terminal.WithSuccessStyle())
+	c.UI.Output("Existing Consul installation found to be upgraded.", terminal.WithSuccessStyle())
 	c.UI.Output("Name: %s\nNamespace: %s", name, namespace, terminal.WithInfoStyle())
 
 	chart, err := helm.LoadChart(consulChart.ConsulHelmChart, common.TopLevelChartDirName)
@@ -250,7 +250,7 @@ func (c *Command) Run(args []string) int {
 
 	// Print out the upgrade summary.
 	if err = c.printDiff(currentChartValues, chartValues); err != nil {
-		c.UI.Output("Could not print diff between charts.", terminal.WithErrorStyle())
+		c.UI.Output("Could not print the different between current and upgraded charts: %v", err, terminal.WithErrorStyle())
 		return 1
 	}
 
@@ -267,13 +267,14 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		if common.Abort(confirmation) {
-			c.UI.Output("Upgrade aborted. To learn how to customize your upgrade, run:\nconsul-k8s upgrade --help", terminal.WithInfoStyle())
+			c.UI.Output("Upgrade aborted. Use the command `consul-k8s upgrade -help` to learn how to customize your upgrade.",
+				terminal.WithInfoStyle())
 			return 1
 		}
 	}
 
 	if !c.flagDryRun {
-		c.UI.Output("Running Upgrade", terminal.WithHeaderStyle())
+		c.UI.Output("Upgrading Consul", terminal.WithHeaderStyle())
 	} else {
 		c.UI.Output("Performing Dry Run Upgrade", terminal.WithHeaderStyle())
 	}
@@ -300,13 +301,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Dry Run should exit here, printing the release's config.
 	if c.flagDryRun {
-		c.UI.Output("Dry run complete - upgrade can proceed.", terminal.WithInfoStyle())
+		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
+			"Upgrade can proceed with this configuration.", terminal.WithInfoStyle())
 		return 0
 	}
 
-	c.UI.Output("Upgraded Consul into namespace %q", namespace, terminal.WithSuccessStyle())
+	c.UI.Output("Consul upgraded in namespace %q.", namespace, terminal.WithSuccessStyle())
 	return 0
 }
 
@@ -367,13 +368,13 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	return vals, err
 }
 
-// Help returns a description of this command and how it can be used.
+// Help returns a description of the command and how it is used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	return fmt.Sprintf("Usage: consul-k8s upgrade [flags]\n%s\n\n%s", c.Synopsis(), c.help)
+	return c.Synopsis() + "\n\nUsage: consul-k8s upgrade [flags]\n\n" + c.help
 }
 
-// Synopsis returns a short string describing the command.
+// Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
 	return "Upgrade Consul on Kubernetes from an existing installation."
 }
