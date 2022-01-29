@@ -414,7 +414,7 @@ func (c *Command) checkForPreviousPVCs() error {
 	}
 
 	if len(previousPVCs) > 0 {
-		return fmt.Errorf("found persistent volume claims from previous installations, delete before re-installing: %s",
+		return fmt.Errorf("found persistent volume claims from previous installations, delete before reinstalling: %s",
 			strings.Join(previousPVCs, ","))
 	}
 	return nil
