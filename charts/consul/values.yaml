@@ -140,8 +140,8 @@ global:
       # have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul server, run
-      #     ```
-      #     helm template -s templates/server-serviceaccount.yaml <release-name> hashicorp/consul
+      #     ```shell-session
+      #     $ helm template --show-only templates/server-serviceaccount.yaml <release-name> hashicorp/consul
       #     ```
       # and check the name of `metadata.name`.
       consulServerRole: ""
@@ -152,7 +152,7 @@ global:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul server, run
       #     ```shell-session
-      #     helm template --show-only templates/client-daemonset.yaml <release-name> charts/consul
+      #     $ helm template --show-only templates/client-daemonset.yaml <release-name> charts/consul
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
@@ -220,12 +220,12 @@ global:
   # If `global.secretsBackend.vault.enabled=true`, be sure to add the "data" component of the secretName path as required by
   # the Vault KV-2 secrets engine [see example].
   #
-  # ```
+  # ```shell-session
   # $ kubectl create secret generic consul-gossip-encryption-key --from-literal=key=$(consul keygen)
   # ```
   #
   # Vault CLI Example:
-  # ```
+  # ```shell-session
   # $ vault kv put consul/secrets/gossip key=$(consul keygen)
   # ```
   # `gossipEncryption.secretName="consul/data/secrets/gossip"`
@@ -289,8 +289,8 @@ global:
     # If you have generated the CA yourself with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
-    # ```bash
-    # kubectl create secret generic consul-ca-cert \
+    # ```shell-session
+    # $ kubectl create secret generic consul-ca-cert \
     #     --from-file='tls.crt=./consul-agent-ca.pem'
     # ```
     # If you are using Vault as a secrets backend with TLS, `caCert.secretName` must be provided and should reference
@@ -309,8 +309,8 @@ global:
     # with the consul CLI, you could use the following command to create the secret
     # in Kubernetes:
     #
-    # ```bash
-    # kubectl create secret generic consul-ca-key \
+    # ```shell-session
+    # $ kubectl create secret generic consul-ca-key \
     #     --from-file='tls.key=./consul-agent-ca-key.pem'
     # ```
     #
@@ -682,7 +682,7 @@ server:
   #
   # This can also be set using Helm's `--set` flag using the following syntax:
   #
-  # ```shell
+  # ```shell-session
   # --set 'server.extraConfig="{"log_level": "DEBUG"}"'
   # ```
   extraConfig: |
@@ -889,8 +889,8 @@ externalServers:
   #
   # You could retrieve this value from your `kubeconfig` by running:
   #
-  # ```shell
-  # kubectl config view \
+  # ```shell-session
+  # $ kubectl config view \
   #   -o jsonpath="{.clusters[?(@.name=='<your cluster name>')].cluster.server}"
   # ```
   #
@@ -1024,7 +1024,7 @@ client:
   #
   # This can also be set using Helm's `--set` flag using the following syntax:
   #
-  # ```shell
+  # ```shell-session
   # --set 'client.extraConfig="{"log_level": "DEBUG"}"'
   # ```
   extraConfig: |
