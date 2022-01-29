@@ -122,9 +122,9 @@ global:
   # and have necessary secrets, policies and roles created prior to installing Consul.
   # See https://www.consul.io/docs/k8s/installation/vault for full instructions.
   #
-  # The Vault cluster *must* not have the Consul cluster installed by this Helm chart as its storage backend
+  # The Vault cluster _must_ not have the Consul cluster installed by this Helm chart as its storage backend
   # as that would cause a circular dependency.
-  # It can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
+  # Vault can have Consul as its storage backend as long as that Consul cluster is not running on this Kubernetes cluster
   # and is being managed separately from this Helm installation.
   #
   # Note: When using Vault KV2 secrets engines the "data" field is implicitly required for Vault API calls,
@@ -151,8 +151,8 @@ global:
       # have a policy with read capabilities for the following secrets:
       # - gossip encryption key defined by `global.gossipEncryption.secretName`.
       # To discover the service account name of the Consul server, run
-      #     ```
-      #     helm template -s templates/client-daemonset.yaml <release-name> charts/consul
+      #     ```shell-session
+      #     helm template --show-only templates/client-daemonset.yaml <release-name> charts/consul
       #     ```
       # and check the name of `metadata.name`.
       consulClientRole: ""
