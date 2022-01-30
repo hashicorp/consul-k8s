@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        'consul.hashicorp.com/connect-service': 'static-server,static-server-admin'
+        'consul.hashicorp.com/connect-service-port': '8080,9090'
+        'consul.hashicorp.com/transparent-proxy': 'false'
+        'consul.hashicorp.com/enable-metrics': 'false'
+        'consul.hashicorp.com/enable-metrics-merging': 'false'
+    spec:
+      containers:
+        - name: static-server
+          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          args:
+            - -text="hello world"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-static-server']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+        - name: static-server-admin
+          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          args:
+            - -text="hello world from 9090 admin"
+            - -listen=:9090
+          ports:
+            - containerPort: 9090
+              name: http
+          livenessProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-static-server-admin']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+      serviceAccountName: static-server

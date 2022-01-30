@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-server-admin
+spec:
+  selector:
+    app: static-server
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9090

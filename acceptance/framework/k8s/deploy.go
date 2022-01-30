@@ -77,10 +77,10 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 // to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, curlArgs ...string) {
+func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
 
-	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, failureMessages, curlArgs...)
+	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
@@ -90,8 +90,13 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expe
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions. If multiple failureMessages are provided it will assert
 // on the existence of any of them.
-func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, curlArgs ...string) {
+func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
+
+	expectedOutput := "hello world"
+	if expectedSuccessOutput != "" {
+		expectedOutput = expectedSuccessOutput
+	}
 
 	retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
 
@@ -102,7 +107,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 		output, err := RunKubectlAndGetOutputE(t, options, args...)
 		if expectSuccess {
 			require.NoError(r, err)
-			require.Contains(r, output, "hello world")
+			require.Contains(r, output, expectedOutput)
 		} else {
 			require.Error(r, err)
 			require.Condition(r, func() bool {
@@ -118,12 +123,21 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 	})
 }
 
+// CheckStaticServerConnectionSuccessfulWithMessage is just like CheckStaticServerConnectionSuccessful
+// but it asserts on a non-default expected message.
+func CheckStaticServerConnectionSuccessfulWithMessage(t *testing.T, options *k8s.KubectlOptions, message string, curlArgs ...string) {
+	t.Helper()
+	start := time.Now()
+	CheckStaticServerConnection(t, options, true, nil, message, curlArgs...)
+	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
+}
+
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
 func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, true, nil, curlArgs...)
+	CheckStaticServerConnection(t, options, true, nil, "", curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
@@ -135,7 +149,7 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		"curl: (52) Empty reply from server",
 		"curl: (7) Failed to connect",
 		"curl: (56) Recv failure: Connection reset by peer",
-	}, curlArgs...)
+	}, "", curlArgs...)
 }
 
 // labelMapToString takes a label map[string]string

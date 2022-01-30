@@ -1,0 +1,7 @@
+resources:
+  - ../../bases/static-server
+  - static-server-admin-service.yaml
+  - static-server-admin-service-account.yaml
+
+patchesStrategicMerge:
+  - patch.yaml
