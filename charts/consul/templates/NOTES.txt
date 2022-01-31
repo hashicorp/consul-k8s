@@ -4,7 +4,7 @@ Thank you for installing HashiCorp Consul!
 Now that you have deployed Consul, you should look over the docs on using 
 Consul with Kubernetes available here: 
 
-https://www.consul.io/docs/platform/k8s/index.html
+https://www.consul.io/docs/platform/k8s
 
 
 Your release is named {{ .Release.Name }}.
