@@ -266,7 +266,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// those tokens if not already specified via the pod's serviceAccountName.
 	if multiPort {
 		h.Log.Info("processing multiport pod")
-		err := h.checkUnsupportedMultiportCases(*ns, pod)
+		err := h.checkUnsupportedMultiPortCases(*ns, pod)
 		if err != nil {
 			h.Log.Error(err, "checking unsupported cases for multi port pods")
 			return admission.Errored(http.StatusInternalServerError, err)
@@ -600,7 +600,7 @@ func (h *Handler) annotatedServiceNames(pod corev1.Pod) []string {
 	return annotatedSvcNames
 }
 
-func (h *Handler) checkUnsupportedMultiportCases(ns corev1.Namespace, pod corev1.Pod) error {
+func (h *Handler) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
 	tproxyEnabled, err := transparentProxyEnabled(ns, pod, h.EnableTransparentProxy)
 	if err != nil {
 		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
