@@ -15,6 +15,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         'consul.hashicorp.com/connect-service': 'multiport,multiport-admin'
+        'consul.hashicorp.com/connect-service-upstreams': 'static-server:3234'
         'consul.hashicorp.com/connect-service-port': '8080,9090'
         'consul.hashicorp.com/transparent-proxy': 'false'
         'consul.hashicorp.com/enable-metrics': 'false'
@@ -22,7 +23,7 @@ spec:
     spec:
       containers:
         - name: multiport
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
+          image: ndhanushkodi/http-echo:latest
           args:
             - -text="hello world"
             - -listen=:8080
@@ -48,7 +49,7 @@ spec:
             failureThreshold: 1
             periodSeconds: 1
         - name: multiport-admin
-          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          image: ndhanushkodi/http-echo:latest
           args:
             - -text="hello world from 9090 admin"
             - -listen=:9090
