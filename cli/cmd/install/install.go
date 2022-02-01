@@ -99,19 +99,19 @@ func (c *Command) init() {
 		Name:    flagNameDryRun,
 		Target:  &c.flagDryRun,
 		Default: defaultDryRun,
-		Usage:   "Run pre-install checks and display summary of installation.",
+		Usage:   "Perform pre-install checks and display a summary of the installation.",
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:    flagNameConfigFile,
 		Aliases: []string{"f"},
 		Target:  &c.flagValueFiles,
-		Usage:   "Path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
+		Usage:   "Set the path to a file to customize the installation, such as Consul Helm chart values file. Can be specified multiple times.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Default: common.DefaultReleaseNamespace,
-		Usage:   "Namespace for the Consul installation.",
+		Usage:   "Set the namespace for the Consul installation.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNamePreset,
@@ -127,8 +127,8 @@ func (c *Command) init() {
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameFileValues,
 		Target: &c.flagFileValues,
-		Usage: "Set a value to customize via a file. The contents of the file will be set as the value. Can be " +
-			"specified multiple times. Supports Consul Helm chart values.",
+		Usage: "Set a value to customize using a file. The contents of the file will be set as the value." +
+			"Can be specified multiple times. Supports Consul Helm chart values.",
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
 		Name:   flagNameSetStringValues,
@@ -139,20 +139,20 @@ func (c *Command) init() {
 		Name:    flagNameTimeout,
 		Target:  &c.flagTimeout,
 		Default: defaultTimeout,
-		Usage:   "Timeout to wait for installation to be ready.",
+		Usage:   "Set a timeout to wait for installation to be ready.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameVerbose,
 		Aliases: []string{"v"},
 		Target:  &c.flagVerbose,
 		Default: defaultVerbose,
-		Usage:   "Output verbose logs from the install command with the status of resources being installed.",
+		Usage:   "Output verbose logs from the command with the status of resources being installed.",
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameWait,
 		Target:  &c.flagWait,
 		Default: defaultWait,
-		Usage:   "Determines whether to wait for resources in installation to be ready before exiting command.",
+		Usage:   "Wait for Kubernetes resources in installation to be ready before exiting command.",
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -161,13 +161,13 @@ func (c *Command) init() {
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
-		Usage:   "Path to kubeconfig file.",
+		Usage:   "Set the path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    "context",
 		Target:  &c.flagKubeContext,
 		Default: "",
-		Usage:   "Kubernetes context to use.",
+		Usage:   "Set the Kubernetes context to use.",
 	})
 
 	c.help = c.set.Help()
@@ -189,6 +189,7 @@ type enterpriseLicense struct {
 	SecretKey  string `yaml:"secretKey"`
 }
 
+// Run installs Consul into a Kubernetes cluster.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
@@ -200,6 +201,10 @@ func (c *Command) Run(args []string) int {
 	if err := c.validateFlags(args); err != nil {
 		c.UI.Output(err.Error())
 		return 1
+	}
+
+	if c.flagDryRun {
+		c.UI.Output("Performing dry run install. No changes will be made to the cluster.", terminal.WithHeaderStyle())
 	}
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
@@ -236,39 +241,39 @@ func (c *Command) Run(args []string) int {
 	if c.kubernetes == nil {
 		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 		if err != nil {
-			c.UI.Output("Retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error retrieving Kubernetes authentication:\n%v", err, terminal.WithErrorStyle())
 			return 1
 		}
 		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
 		if err != nil {
-			c.UI.Output("Initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error initializing Kubernetes client:\n%v", err, terminal.WithErrorStyle())
 			return 1
 		}
 	}
 
-	c.UI.Output("Pre-Install Checks", terminal.WithHeaderStyle())
+	c.UI.Output("Checking if Consul can be installed", terminal.WithHeaderStyle())
 
-	// Note the logic here, common's CheckForInstallations function returns an error if
-	// the release is not found, which in the install command is what we need for a successful install.
+	// Ensure there is not an existing Consul installation which would cause a conflict.
 	if name, ns, err := common.CheckForInstallations(settings, uiLogger); err == nil {
-		c.UI.Output(fmt.Sprintf("existing Consul installation found (name=%s, namespace=%s) - run "+
-			"consul-k8s uninstall if you wish to re-install", name, ns), terminal.WithErrorStyle())
+		c.UI.Output("Cannot install Consul. A Consul cluster is already installed in namespace %s with name %s.", ns, name, terminal.WithErrorStyle())
+		c.UI.Output("Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.", terminal.WithInfoStyle())
 		return 1
-	} else {
-		c.UI.Output("No existing installations found.")
 	}
+	c.UI.Output("No existing Consul installations found.", terminal.WithSuccessStyle())
 
 	// Ensure there's no previous PVCs lying around.
 	if err := c.checkForPreviousPVCs(); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
+	c.UI.Output("No existing Consul persistent volume claims found", terminal.WithSuccessStyle())
 
 	// Ensure there's no previous bootstrap secret lying around.
 	if err := c.checkForPreviousSecrets(); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
+	c.UI.Output("No existing Consul secrets found", terminal.WithSuccessStyle())
 
 	// Handle preset, value files, and set values logic.
 	vals, err := c.mergeValuesFlagsWithPrecedence(settings)
@@ -289,25 +294,25 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// If an enterprise license secret was provided check that the secret exists
-	// and that the enterprise Consul image is set.
+	// If an enterprise license secret was provided, check that the secret exists and that the enterprise Consul image is set.
 	if v.Global.EnterpriseLicense.SecretName != "" {
 		if err := c.checkValidEnterprise(v.Global.EnterpriseLicense.SecretName); err != nil {
 			c.UI.Output(err.Error(), terminal.WithErrorStyle())
 			return 1
 		}
+		c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
 	}
 
 	// Print out the installation summary.
 	if !c.flagAutoApprove {
 		c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
-		c.UI.Output("Installation name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
+		c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
 		c.UI.Output("Namespace: %s", c.flagNamespace, terminal.WithInfoStyle())
 
 		if len(vals) == 0 {
-			c.UI.Output("Overrides: "+string(valuesYaml), terminal.WithInfoStyle())
+			c.UI.Output("\nNo overrides provided, using the default Helm values.", terminal.WithInfoStyle())
 		} else {
-			c.UI.Output("Overrides:"+"\n"+string(valuesYaml), terminal.WithInfoStyle())
+			c.UI.Output("\nHelm value overrides\n-------------------\n"+string(valuesYaml), terminal.WithInfoStyle())
 		}
 	}
 
@@ -316,9 +321,9 @@ func (c *Command) Run(args []string) int {
 	// aren't double prefixed with "consul-consul-...".
 	vals = common.MergeMaps(config.Convert(config.GlobalNameConsul), vals)
 
-	// Dry Run should exit here, no need to actual locate/download the charts.
 	if c.flagDryRun {
-		c.UI.Output("Dry run complete - installation can proceed.", terminal.WithInfoStyle())
+		c.UI.Output("Dry run complete. No changes were made to the Kubernetes cluster.\n"+
+			"Installation can proceed with this configuration.", terminal.WithInfoStyle())
 		return 0
 	}
 
@@ -334,12 +339,13 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		if common.Abort(confirmation) {
-			c.UI.Output("Install aborted. To learn how to customize your installation, run:\nconsul-k8s install --help", terminal.WithInfoStyle())
+			c.UI.Output("Install aborted. Use the command `consul-k8s install -help` to learn how to customize your installation.",
+				terminal.WithInfoStyle())
 			return 1
 		}
 	}
 
-	c.UI.Output("Running Installation", terminal.WithHeaderStyle())
+	c.UI.Output("Installing Consul", terminal.WithHeaderStyle())
 
 	// Setup action configuration for Helm Go SDK function calls.
 	actionConfig := new(action.Configuration)
@@ -373,31 +379,32 @@ func (c *Command) Run(args []string) int {
 	c.UI.Output("Downloaded charts", terminal.WithSuccessStyle())
 
 	// Run the install.
-	_, err = install.Run(chart, vals)
-	if err != nil {
+	if _, err = install.Run(chart, vals); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	c.UI.Output("Consul installed into namespace %q", c.flagNamespace, terminal.WithSuccessStyle())
 
+	c.UI.Output("Consul installed in namespace %q.", c.flagNamespace, terminal.WithSuccessStyle())
 	return 0
 }
+
+// Help returns a description of the command and how it is used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s install [flags]" + "\n" + "Install Consul onto a Kubernetes cluster." + "\n"
-	return s + "\n" + c.help
+	return c.Synopsis() + "\n\nUsage: consul-k8s install [flags]\n\n" + c.help
 }
 
+// Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
 	return "Install Consul on Kubernetes."
 }
 
-// checkForPreviousPVCs checks for existing PVCs with a name containing "consul-server" and returns an error and lists
-// the PVCs it finds matches.
+// checkForPreviousPVCs checks for existing Kubernetes persistent volume claims with a name containing "consul-server"
+// and returns an error with a list of PVCs it finds if any match.
 func (c *Command) checkForPreviousPVCs() error {
 	pvcs, err := c.kubernetes.CoreV1().PersistentVolumeClaims("").List(c.Ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("error listing PVCs: %s", err)
+		return fmt.Errorf("error listing persistent volume claims: %s", err)
 	}
 	var previousPVCs []string
 	for _, pvc := range pvcs.Items {
@@ -407,10 +414,9 @@ func (c *Command) checkForPreviousPVCs() error {
 	}
 
 	if len(previousPVCs) > 0 {
-		return fmt.Errorf("found PVCs from previous installations (%s), delete before re-installing",
+		return fmt.Errorf("found persistent volume claims from previous installations, delete before reinstalling: %s",
 			strings.Join(previousPVCs, ","))
 	}
-	c.UI.Output("No previous persistent volume claims found", terminal.WithSuccessStyle())
 	return nil
 }
 
@@ -423,12 +429,11 @@ func (c *Command) checkForPreviousSecrets() error {
 	for _, secret := range secrets.Items {
 		// future TODO: also check for federation secret
 		if secret.ObjectMeta.Labels[common.CLILabelKey] == common.CLILabelValue {
-			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. To delete, run kubectl delete secret %s --namespace %s",
+			return fmt.Errorf("found Consul secret from previous installation: %q in namespace %q. Use the command `kubectl delete secret %s --namespace %s` to delete",
 				secret.Name, secret.Namespace, secret.Name, secret.Namespace)
 		}
 	}
 
-	c.UI.Output("No previous secrets found", terminal.WithSuccessStyle())
 	return nil
 }
 
@@ -461,7 +466,7 @@ func (c *Command) mergeValuesFlagsWithPrecedence(settings *helmCLI.EnvSettings) 
 	return vals, err
 }
 
-// validateFlags is a helper function that performs sanity checks on the user's provided flags.
+// validateFlags checks the command line flags and values for errors.
 func (c *Command) validateFlags(args []string) error {
 	if err := c.set.Parse(args); err != nil {
 		return err
@@ -492,15 +497,11 @@ func (c *Command) validateFlags(args []string) error {
 		}
 	}
 
-	if c.flagDryRun {
-		c.UI.Output("Performing dry run installation.", terminal.WithInfoStyle())
-	}
 	return nil
 }
 
 // checkValidEnterprise checks and validates an enterprise installation.
-// When an enterprise license secret is provided, check that the secret exists
-// in the "consul" namespace.
+// When an enterprise license secret is provided, check that the secret exists in the "consul" namespace.
 func (c *Command) checkValidEnterprise(secretName string) error {
 
 	_, err := c.kubernetes.CoreV1().Secrets(c.flagNamespace).Get(c.Ctx, secretName, metav1.GetOptions{})
@@ -509,6 +510,5 @@ func (c *Command) checkValidEnterprise(secretName string) error {
 	} else if err != nil {
 		return fmt.Errorf("error getting the enterprise license secret %q in the %q namespace: %s", secretName, c.flagNamespace, err)
 	}
-	c.UI.Output("Valid enterprise Consul secret found.", terminal.WithSuccessStyle())
 	return nil
 }

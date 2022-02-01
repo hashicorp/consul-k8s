@@ -30,7 +30,7 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc2, metav1.CreateOptions{})
 	err := c.checkForPreviousPVCs()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "found PVCs from previous installations (default/consul-server-test1,default/consul-server-test2), delete before re-installing")
+	require.Equal(t, err.Error(), "found persistent volume claims from previous installations, delete before reinstalling: default/consul-server-test1,default/consul-server-test2")
 
 	// Clear out the client and make sure the check now passes.
 	c.kubernetes = fake.NewSimpleClientset()

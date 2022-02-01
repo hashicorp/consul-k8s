@@ -57,6 +57,7 @@ func (c *Command) init() {
 	c.Init()
 }
 
+// Run checks the status of a Consul installation on Kubernetes.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 
@@ -95,7 +96,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
-	c.UI.Output("Consul-K8s Status Summary", terminal.WithHeaderStyle())
+	c.UI.Output("Consul Status Summary", terminal.WithHeaderStyle())
 
 	releaseName, namespace, err := common.CheckForInstallations(settings, uiLogger)
 	if err != nil {
@@ -125,7 +126,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// validateFlags is a helper function that performs checks on the user's provided flags.
+// validateFlags checks the command line flags and values for errors.
 func (c *Command) validateFlags(args []string) error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
@@ -151,7 +152,7 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 
 	timezone, _ := rel.Info.LastDeployed.Zone()
 
-	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "ChartVersion", "AppVersion", "Revision", "Last Updated"}...)
+	tbl := terminal.NewTable([]string{"Name", "Namespace", "Status", "Chart Version", "AppVersion", "Revision", "Last Updated"}...)
 	trow := []terminal.TableEntry{
 		{
 			Value: releaseName,
@@ -264,12 +265,12 @@ func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
 	if c.kubernetes == nil {
 		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 		if err != nil {
-			c.UI.Output("Retrieving Kubernetes auth: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error retrieving Kubernetes authentication: %v", err, terminal.WithErrorStyle())
 			return err
 		}
 		c.kubernetes, err = kubernetes.NewForConfig(restConfig)
 		if err != nil {
-			c.UI.Output("Initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
+			c.UI.Output("Error initializing Kubernetes client: %v", err, terminal.WithErrorStyle())
 			return err
 		}
 	}
@@ -277,12 +278,13 @@ func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
 	return nil
 }
 
+// Help returns a description of the command and how it is used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	s := "Usage: consul-k8s status" + "\n\n" + "Get the status of the current Consul installation." + "\n"
-	return s
+	return c.Synopsis() + "\n\nUsage: consul-k8s status [flags]\n\n" + c.help
 }
 
+// Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
-	return "Status of Consul-K8s installation."
+	return "Check the status of a Consul installation on Kubernetes."
 }
