@@ -164,6 +164,8 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi 
 
 	if multiPort {
 		data.ServiceName = mpi.serviceName
+	} else {
+		data.ServiceName = pod.Annotations[annotationService]
 	}
 	if h.AuthMethod != "" {
 		if multiPort {
