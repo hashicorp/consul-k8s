@@ -10,20 +10,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, serviceName string, multiPort bool, multiPortSvcIdx int) (corev1.Container, error) {
+func (h *Handler) envoySidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	resources, err := h.envoySidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
-	cmd, err := h.getContainerSidecarCommand(pod, serviceName, multiPortSvcIdx)
+	multiPort := mpi != multiPortInfo{}
+	cmd, err := h.getContainerSidecarCommand(pod, mpi.serviceName, mpi.serviceIndex)
 	if err != nil {
 		return corev1.Container{}, err
 	}
 
 	containerName := envoySidecarContainer
 	if multiPort {
-		containerName = fmt.Sprintf("%s-%s", envoySidecarContainer, serviceName)
+		containerName = fmt.Sprintf("%s-%s", envoySidecarContainer, mpi.serviceName)
 	}
 
 	container := corev1.Container{

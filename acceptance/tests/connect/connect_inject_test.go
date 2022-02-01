@@ -216,7 +216,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			//	k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../../../web.yaml")
 			//})
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
 			// TODO check for injection
 

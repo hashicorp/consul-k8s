@@ -111,7 +111,7 @@ func (h *Handler) initCopyContainer() corev1.Container {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id
-func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcName string, multiPort bool, multiPortIdx int) (corev1.Container, error) {
+func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
@@ -134,6 +134,8 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcN
 		}
 	}
 
+	multiPort := mpi != multiPortInfo{}
+
 	data := initContainerCommandData{
 		AuthMethod:                 h.AuthMethod,
 		ConsulPartition:            h.ConsulPartition,
@@ -148,8 +150,8 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcN
 		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 		MultiPort:                  multiPort,
-		EnvoyAddressPort:           20000 + multiPortIdx,
-		EnvoyAdminPort:             19000 + multiPortIdx,
+		EnvoyAddressPort:           20000 + mpi.serviceIndex,
+		EnvoyAdminPort:             19000 + mpi.serviceIndex,
 	}
 
 	// Create expected volume mounts
@@ -161,18 +163,18 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcN
 	}
 
 	if multiPort {
-		data.ServiceName = svcName
+		data.ServiceName = mpi.serviceName
 	}
 	if h.AuthMethod != "" {
 		if multiPort {
 			// If multi port then we require that the service account name
 			// matches the service name.
-			data.ServiceAccountName = svcName
+			data.ServiceAccountName = mpi.serviceName
 		} else {
 			data.ServiceAccountName = pod.Spec.ServiceAccountName
 		}
 		// Extract the service account token's volume mount
-		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, svcName)
+		saTokenVolumeMount, bearerTokenFile, err := findServiceAccountVolumeMount(pod, multiPort, mpi.serviceName)
 		if err != nil {
 			return corev1.Container{}, err
 		}
@@ -210,7 +212,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod, svcN
 
 	initContainerName := InjectInitContainerName
 	if multiPort {
-		initContainerName = fmt.Sprintf("%s-%s", InjectInitContainerName, svcName)
+		initContainerName = fmt.Sprintf("%s-%s", InjectInitContainerName, mpi.serviceName)
 	}
 	container := corev1.Container{
 		Name:  initContainerName,

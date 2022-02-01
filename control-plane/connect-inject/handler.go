@@ -157,6 +157,10 @@ type Handler struct {
 
 	decoder *admission.Decoder
 }
+type multiPortInfo struct {
+	serviceIndex int
+	serviceName  string
+}
 
 // Handle is the admission.Handler implementation that actually handles the
 // webhook request for admission control. This should be registered or
@@ -227,68 +231,18 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
-	h.Log.Info("about to process if multiport")
-	// Figure out if the pod has multiple ports to register as services in Consul and get the service names.
-	multiPort, annotatedSvcNames := h.multiPortPod(pod)
-	if multiPort {
-		tproxyEnabled, err := transparentProxyEnabled(*ns, pod, h.EnableTransparentProxy)
-		if err != nil {
-			h.Log.Error(err, "couldn't check if tproxy is enabled")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("couldn't check if tproxy is enabled: %s", err))
-		}
-		metricsEnabled, err := h.MetricsConfig.enableMetrics(pod)
-		if err != nil {
-			h.Log.Error(err, "couldn't check if metrics is enabled")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("couldn't check if metrics is enabled: %s", err))
-		}
-		metricsMergingEnabled, err := h.MetricsConfig.enableMetricsMerging(pod)
-		if err != nil {
-			h.Log.Error(err, "couldn't check if metrics merging is enabled")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("couldn't check if metrics merging is enabled: %s", err))
-		}
-		if tproxyEnabled {
-			h.Log.Error(err, "multi port services are not compatible with transparent proxy")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("multi port services are not compatible with transparent proxy"))
-		}
-		if metricsEnabled {
-			h.Log.Error(err, "multi port services are not compatible with metrics")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("multi port services are not compatible with metrics"))
-		}
-		if metricsMergingEnabled {
-			h.Log.Error(err, "multi port services are not compatible with metrics merging")
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("multi port services are not compatible with metrics merging"))
-		}
-	}
-	// For every annotated service on this pod, mount all the corresponding service account tokens, add an init container per service, and add an envoy sidecar per service.
-	h.Log.Info(fmt.Sprintf("pod name: %s", pod.Name))
-	for i, svc := range annotatedSvcNames {
-		h.Log.Info(fmt.Sprintf("service: %s", svc))
-		if h.AuthMethod != "" {
-			if svc != "" && pod.Spec.ServiceAccountName != svc {
-				sa, err := h.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
-				if err != nil {
-					h.Log.Error(err, "couldn't get service accounts")
-					return admission.Errored(http.StatusInternalServerError, err)
-				}
-				if len(sa.Secrets) == 0 {
-					h.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
-					return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
-				}
-				saSecret := sa.Secrets[0].Name
-				h.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
-				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-					Name: fmt.Sprintf("%s-service-account", svc),
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: saSecret,
-						},
-					},
-				})
-			}
-		}
+	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi
+	// port.
+	annotatedSvcNames := h.annotatedServiceNames(pod)
+	multiPort := len(annotatedSvcNames) > 1
+	//if len(annotatedSvcNames) == 0 {
+	//	annotatedSvcNames = []string{""}
+	//}
 
+	// For single port pods, add the single init container and envoy sidecar.
+	if len(annotatedSvcNames) == 0 || len(annotatedSvcNames) == 1 {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := h.containerInit(*ns, pod, svc, multiPort, i)
+		initContainer, err := h.containerInit(*ns, pod, multiPortInfo{})
 		if err != nil {
 			h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -296,12 +250,75 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 		// Add the Envoy sidecar.
-		envoySidecar, err := h.envoySidecar(*ns, pod, svc, multiPort, i)
+		envoySidecar, err := h.envoySidecar(*ns, pod, multiPortInfo{})
 		if err != nil {
 			h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+	}
+
+	// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
+	// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
+	// In a single port pod, the service account specified in the pod is sufficient for mounting the service account
+	// token to the pod. In a multi port pod, where multiple services are registered with Consul, we also require a
+	// service account per service. So, this will look for service accounts whose name matches the service and mount
+	// those tokens if not already specified via the pod's serviceAccountName.
+	if multiPort {
+		h.Log.Info("processing multiport pod")
+		err := h.checkUnsupportedMultiportCases(*ns, pod)
+		if err != nil {
+			h.Log.Error(err, "checking unsupported cases for multi port pods")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		for i, svc := range annotatedSvcNames {
+			h.Log.Info(fmt.Sprintf("service: %s", svc))
+			if h.AuthMethod != "" {
+				if svc != "" && pod.Spec.ServiceAccountName != svc {
+					sa, err := h.Clientset.CoreV1().ServiceAccounts(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
+					if err != nil {
+						h.Log.Error(err, "couldn't get service accounts")
+						return admission.Errored(http.StatusInternalServerError, err)
+					}
+					if len(sa.Secrets) == 0 {
+						h.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
+						return admission.Errored(http.StatusInternalServerError, fmt.Errorf("service account %s has zero secrets, expected at least one", svc))
+					}
+					saSecret := sa.Secrets[0].Name
+					h.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", sa.Name)
+					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+						Name: fmt.Sprintf("%s-service-account", svc),
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: saSecret,
+							},
+						},
+					})
+				}
+			}
+
+			// This will get passed to the init and sidecar containers so they are configured correctly.
+			mpi := multiPortInfo{
+				serviceIndex: i,
+				serviceName:  svc,
+			}
+
+			// Add the init container that registers the service and sets up the Envoy configuration.
+			initContainer, err := h.containerInit(*ns, pod, mpi)
+			if err != nil {
+				h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
+			}
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+
+			// Add the Envoy sidecar.
+			envoySidecar, err := h.envoySidecar(*ns, pod, mpi)
+			if err != nil {
+				h.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		}
 	}
 
 	// Now that the consul-sidecar no longer needs to re-register services periodically
@@ -575,12 +592,37 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPort bool, multiPortSvcN
 	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
 }
 
-func (h *Handler) multiPortPod(pod corev1.Pod) (bool, []string) {
-	annotatedSvcNames := []string{""}
+func (h *Handler) annotatedServiceNames(pod corev1.Pod) []string {
+	var annotatedSvcNames []string
 	if anno, ok := pod.Annotations[annotationService]; ok {
 		annotatedSvcNames = strings.Split(anno, ",")
 	}
-	return len(annotatedSvcNames) > 1, annotatedSvcNames
+	return annotatedSvcNames
+}
+
+func (h *Handler) checkUnsupportedMultiportCases(ns corev1.Namespace, pod corev1.Pod) error {
+	tproxyEnabled, err := transparentProxyEnabled(ns, pod, h.EnableTransparentProxy)
+	if err != nil {
+		return fmt.Errorf("couldn't check if tproxy is enabled: %s", err)
+	}
+	metricsEnabled, err := h.MetricsConfig.enableMetrics(pod)
+	if err != nil {
+		return fmt.Errorf("couldn't check if metrics is enabled: %s", err)
+	}
+	metricsMergingEnabled, err := h.MetricsConfig.enableMetricsMerging(pod)
+	if err != nil {
+		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
+	}
+	if tproxyEnabled {
+		return fmt.Errorf("multi port services are not compatible with transparent proxy")
+	}
+	if metricsEnabled {
+		return fmt.Errorf("multi port services are not compatible with metrics")
+	}
+	if metricsMergingEnabled {
+		return fmt.Errorf("multi port services are not compatible with metrics merging")
+	}
+	return nil
 }
 
 func (h *Handler) InjectDecoder(d *admission.Decoder) error {
