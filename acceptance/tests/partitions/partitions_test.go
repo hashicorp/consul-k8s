@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -128,7 +127,7 @@ func TestPartitions(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 
-			consul.MergeMaps(serverHelmValues, commonHelmValues)
+			helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
 			// Install the consul cluster with servers in the default kubernetes context.
 			serverConsulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterContext, cfg, releaseName)
@@ -154,45 +153,10 @@ func TestPartitions(t *testing.T) {
 				moveSecret(t, serverClusterContext, clientClusterContext, partitionToken)
 			}
 
-			var partitionSvcAddress string
-			if cfg.UseKind {
-				nodeList, err := serverClusterContext.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-				require.NoError(t, err)
-				// Get the address of the (only) node from the Kind cluster.
-				partitionSvcAddress = nodeList.Items[0].Status.Addresses[0].Address
-			} else {
-				// Get the IP of the partition service to configure the external server address in the values file for the clients cluster.
-				partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)
-				logger.Logf(t, "retrieving partition service to determine external address for servers")
+			partitionServiceName := fmt.Sprintf("%s-consul-partition", releaseName)
+			partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterContext, partitionServiceName)
 
-				// It can take some time for the load balancers to be ready and have an IP/Hostname.
-				// Wait for 60 seconds before failing.
-				retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
-					partitionsSvc, err := serverClusterContext.KubernetesClient(t).CoreV1().Services(serverClusterContext.KubectlOptions(t).Namespace).Get(ctx, partitionServiceName, metav1.GetOptions{})
-					require.NoError(t, err)
-					require.NotEmpty(r, partitionsSvc.Status.LoadBalancer.Ingress)
-					// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
-					// load balancers have IPs.
-					if partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname != "" {
-						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].Hostname
-					} else {
-						partitionSvcAddress = partitionsSvc.Status.LoadBalancer.Ingress[0].IP
-					}
-				})
-			}
-
-			var k8sAuthMethodHost string
-			// When running on kind, the kube API address in kubeconfig will have a localhost address
-			// which will not work from inside the container. That's why we need to use the endpoints address instead
-			// which will point the node IP.
-			if cfg.UseKind {
-				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
-				kubernetesEndpoint, err := clientClusterContext.KubernetesClient(t).CoreV1().Endpoints(defaultNamespace).Get(ctx, "kubernetes", metav1.GetOptions{})
-				require.NoError(t, err)
-				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
-			} else {
-				k8sAuthMethodHost = helpers.KubernetesAPIServerHostFromOptions(t, clientClusterContext.KubectlOptions(t))
-			}
+			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterContext)
 
 			// Create client cluster.
 			clientHelmValues := map[string]string{
@@ -229,7 +193,7 @@ func TestPartitions(t *testing.T) {
 				clientHelmValues["meshGateway.service.nodePort"] = "30100"
 			}
 
-			consul.MergeMaps(clientHelmValues, commonHelmValues)
+			helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterContext, cfg, releaseName)
