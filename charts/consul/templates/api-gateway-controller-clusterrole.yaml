@@ -34,6 +34,7 @@ rules:
   - create
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - coordination.k8s.io
