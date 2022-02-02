@@ -65,6 +65,9 @@ spec:
         "vault.hashicorp.com/agent-extra-secret": {{ $root.Values.global.secretsBackend.vault.ca.secretName }}
         "vault.hashicorp.com/ca-cert": /vault/custom/{{ $root.Values.global.secretsBackend.vault.ca.secretKey }}
         {{- end }}
+        {{- if $root.Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl $root.Values.global.secretsBackend.vault.agentAnnotations $root | nindent 8 | trim }}
+        {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}

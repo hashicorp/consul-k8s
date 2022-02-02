@@ -157,6 +157,19 @@ global:
       # and check the name of `metadata.name`.
       consulClientRole: ""
 
+      # This value defines additional annotations for
+      # Vault agent on any pods where it'll be running.
+      # This should be formatted as a multi-line string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      agentAnnotations: null
+
       # The Vault role for all Consul components to read the Consul's server's CA Certificate (unauthenticated).
       # The role should be connected to the service accounts of all Consul components, or alternatively `*` since it
       # will be used only against the `pki/cert/ca` endpoint which is unauthenticated. A policy must be created which grants
