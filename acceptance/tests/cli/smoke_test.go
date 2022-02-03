@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/tests/connect"
 )
 
@@ -28,8 +29,17 @@ func TestCLIConnectInject(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			connect.ConnectInjectConnectivityCheck(t, ctx, cfg, c.secure, c.autoEncrypt, true)
+			helper := connect.ConnectHelper{
+				ClusterGenerator: consul.NewCLICluster,
+				ReleaseName:      consul.CLIReleaseName,
+				Secure:           c.secure,
+				AutoEncrypt:      c.autoEncrypt,
+				T:                t,
+				Ctx:              ctx,
+				Cfg:              cfg,
+			}
 
+			helper.InstallThenCheckConnectInjection()
 		})
 	}
 }

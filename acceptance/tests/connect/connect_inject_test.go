@@ -35,8 +35,17 @@ func TestConnectInject(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			ConnectInjectConnectivityCheck(t, ctx, cfg, c.secure, c.autoEncrypt, false)
+			helper := ConnectHelper{
+				ClusterGenerator: consul.NewHelmCluster,
+				ReleaseName:      helpers.RandomName(),
+				Secure:           c.secure,
+				AutoEncrypt:      c.autoEncrypt,
+				T:                t,
+				Ctx:              ctx,
+				Cfg:              cfg,
+			}
 
+			helper.InstallThenCheckConnectInjection()
 		})
 	}
 }
