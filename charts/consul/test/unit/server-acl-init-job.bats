@@ -727,6 +727,42 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# Vault agent annotations
+
+@test "serverACLInit/Job: no vault agent annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "serverACLInit/Job: vault agent annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
 # namespaces
 
 @test "serverACLInit/Job: namespace options disabled by default" {

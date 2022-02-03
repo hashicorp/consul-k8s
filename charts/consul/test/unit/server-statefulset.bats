@@ -1787,6 +1787,34 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# Vault agent annotations
+
+@test "server/StatefulSet: no vault agent annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "server/StatefulSet: vault agent annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
 # ui.dashboardURLTemplates.service
 
 @test "server/StatefulSet: dashboard_url_templates not set by default" {
