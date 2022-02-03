@@ -43,3 +43,43 @@ func TestCLIConnectInject(t *testing.T) {
 		})
 	}
 }
+
+// TestUpgrade is a smoke test that the CLI handles upgrades correctly.
+// It sets an initial set of Helm override values with `installation`, installs the chart using the CLI,
+// then upgrades the chart with the `upgrade` Helm overrides and verifies that the upgrade was successful.
+// Then the installed chart is uninstalled.
+func TestCLIConnectInjectOnUpgrade(t *testing.T) {
+	cases := map[string]struct {
+		installation map[string]string
+		upgrade      map[string]string
+		secure       bool
+		autoEncrypt  bool
+	}{
+		"Upgrade changes nothing": {
+			installation: map[string]string{},
+			upgrade:      map[string]string{},
+			secure:       false,
+			autoEncrypt:  false,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := suite.Config()
+			ctx := suite.Environment().DefaultContext(t)
+
+			conCheck := connect.ConnectHelper{
+				ClusterGenerator: consul.NewCLICluster,
+				ReleaseName:      consul.CLIReleaseName,
+				Secure:           c.secure,
+				AutoEncrypt:      c.autoEncrypt,
+				T:                t,
+				Ctx:              ctx,
+				Cfg:              cfg,
+			}
+
+			conCheck.InstallThenCheckConnectInjection()
+			// TODO upgrade
+		})
+	}
+}
