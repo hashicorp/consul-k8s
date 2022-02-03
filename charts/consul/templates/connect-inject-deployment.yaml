@@ -48,6 +48,9 @@ spec:
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
         "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
         {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
         {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector

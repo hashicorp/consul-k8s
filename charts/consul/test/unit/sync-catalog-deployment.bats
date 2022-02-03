@@ -1102,6 +1102,42 @@ load _helpers
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
+#--------------------------------------------------------------------
+# Vault agent annotations
+
+@test "syncCatalog/Deployment: no vault agent annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "syncCatalog/Deployment: vault agent annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
 # consulDestinationNamespace reserved name
 
 @test "syncCatalog/Deployment: fails when consulDestinationNamespace=system" {
