@@ -64,14 +64,14 @@ spec:
                   description: IngressListener manages the configuration for a listener
                     on a specific port.
                   properties:
-                    gatewayTLSConfig:
+                    tls:
                       description: TLS config for this listener.
                       properties:
                         enabled:
                           description: Indicates that TLS should be enabled for this
                             gateway service.
                           type: boolean
-                        gatewayTLSSDSConfig:
+                        sds:
                           description: SDS allows configuring TLS certificate from
                             an SDS service.
                           properties:
@@ -103,11 +103,11 @@ spec:
                         description: IngressService manages configuration for services
                           that are exposed to ingress traffic.
                         properties:
-                          gatewayServiceTLSConfig:
+                          tls:
                             description: TLS allows specifying some TLS configuration
                               per listener.
                             properties:
-                              gatewayTLSSDSConfig:
+                              sds:
                                 description: SDS allows configuring TLS certificate
                                   from an SDS service.
                                 properties:
@@ -212,7 +212,7 @@ spec:
                     description: Indicates that TLS should be enabled for this gateway
                       service.
                     type: boolean
-                  gatewayTLSSDSConfig:
+                  sds:
                     description: SDS allows configuring TLS certificate from an SDS
                       service.
                     properties:

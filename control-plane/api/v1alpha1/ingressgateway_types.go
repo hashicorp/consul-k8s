@@ -64,12 +64,12 @@ type GatewayTLSConfig struct {
 	Enabled bool `json:"enabled"`
 
 	// SDS allows configuring TLS certificate from an SDS service.
-	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+	SDS *GatewayTLSSDSConfig `json:"sds,omitempty"`
 }
 
 type GatewayServiceTLSConfig struct {
 	// SDS allows configuring TLS certificate from an SDS service.
-	SDS *GatewayTLSSDSConfig `json:"gatewayTLSSDSConfig,omitempty"`
+	SDS *GatewayTLSSDSConfig `json:"sds,omitempty"`
 }
 
 type GatewayTLSSDSConfig struct {
@@ -89,7 +89,7 @@ type IngressListener struct {
 	Protocol string `json:"protocol,omitempty"`
 
 	// TLS config for this listener.
-	TLS *GatewayTLSConfig `json:"gatewayTLSConfig,omitempty"`
+	TLS *GatewayTLSConfig `json:"tls,omitempty"`
 
 	// Services declares the set of services to which the listener forwards
 	// traffic.
@@ -134,7 +134,7 @@ type IngressService struct {
 	Partition string `json:"partition,omitempty"`
 
 	// TLS allows specifying some TLS configuration per listener.
-	TLS *GatewayServiceTLSConfig `json:"gatewayServiceTLSConfig,omitempty"`
+	TLS *GatewayServiceTLSConfig `json:"tls,omitempty"`
 
 	// Allow HTTP header manipulation to be configured.
 	RequestHeaders  *HTTPHeaderModifiers `json:"requestHeaders,omitempty"`
