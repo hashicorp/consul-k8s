@@ -1,5 +1,9 @@
 ## UNRELEASED
 
+BREAKING CHANGES:
+* Helm
+  * Rename fields of IngressGateway CRD to fix incorrect names (`gatewayTLSConfig` => `tls`, `gatewayServiceTLSConfig` => `tls`, `gatewayTLSSDSConfig` => `sds`). [[GH-1017](https://github.com/hashicorp/consul-k8s/pull/1017)]
+
 ## 0.40.0 (January 27, 2022)
 
 BREAKING CHANGES:
