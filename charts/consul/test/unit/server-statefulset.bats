@@ -1174,54 +1174,6 @@ load _helpers
   [ "${actual}" = "key" ]
 }
 
-@test "server/StatefulSet: can set additional alt_names on server cert when tls is enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
-    --set 'global.datacenter=dc2' \
-    --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'server.tls.serverAdditionalDNSSANs[0]=*.foo.com' \
-    --set 'server.tls.serverAdditionalDNSSANs[1]=*.bar.com' \
-    . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
-  [ "${actual}" = "${expected}" ]
-
-  local actual="$(echo $object |
-      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
-  [ "${actual}" = "${expected}" ]
-}
-
-@test "server/StatefulSet: can set additional ip_sans on server cert when tls is enabled" {
-  cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml  \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.enableAutoEncrypt=true' \
-    --set 'global.datacenter=dc2' \
-    --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'server.tls.serverAdditionalIPSANs[0]=1.1.1.1' \
-    --set 'server.tls.serverAdditionalIPSANs[1]=2.2.2.2' \
-    . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
-  [ "${actual}" = "${expected}" ]
-
-  local actual="$(echo $object |
-      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
-  [ "${actual}" = "${expected}" ]
-}
-
 #--------------------------------------------------------------------
 # global.federation.enabled
 
@@ -1832,6 +1784,66 @@ load _helpers
   local actual=$(echo $object |
     yq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-key")' | tee /dev/stderr)
   [ "${actual}" = "" ]
+}
+
+@test "server/StatefulSet: vault - can set additional alt_names on server cert when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'server.tls.serverAdditionalDNSSANs[0]=*.foo.com' \
+    --set 'server.tls.serverAdditionalDNSSANs[1]=*.bar.com' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  echo "Expected: ${expected}"
+  echo "Actual: ${actual}"
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "server/StatefulSet: vault - can set additional ip_sans on server cert when tls is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.datacenter=dc2' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=test' \
+    --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+    --set 'server.serverCert.secretName=pki_int/issue/test' \
+    --set 'server.tls.serverAdditionalIPSANs[0]=1.1.1.1' \
+    --set 'server.tls.serverAdditionalIPSANs[1]=2.2.2.2' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.certificate -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"ttl=1h\" \"alt_names=localhost,RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server,*.RELEASE-NAME-consul-server.default,*.RELEASE-NAME-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,1.1.1.1,2.2.2.2\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
 }
 
 #--------------------------------------------------------------------
