@@ -2,6 +2,7 @@
 IMPROVEMENTS:
 * Helm
   * Vault: Allow passing arbitrary annotations to the vault agent. [[GH-1015](https://github.com/hashicorp/consul-k8s/pull/1015)]
+  * Vault: Add support customized IPSans and DNSSans for server-tls server cert for vault [GH-1020](https://github.com/hashicorp/consul-k8s/pull/1020)
 
 BUG FIXES:
 * API Gateway
