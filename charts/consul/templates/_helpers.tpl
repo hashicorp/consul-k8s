@@ -32,7 +32,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}" "ip_sans=127.0.0.1{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}" "ip_sans=127.0.0.1{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -40,7 +40,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}" "ip_sans=127.0.0.1{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}" "ip_sans=127.0.0.1{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
