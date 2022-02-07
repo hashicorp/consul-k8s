@@ -225,7 +225,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
-	// Add the init container that registers the service and sets up the Envoy configuration.
+	// Add the init container that listens for the service and proxy service and sets up the Envoy configuration.
 	initContainer, err := h.containerInit(*ns, pod)
 	if err != nil {
 		h.Log.Error(err, "error configuring injection init container", "request name", req.Name)
