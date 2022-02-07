@@ -154,6 +154,9 @@ acl = "write"
   service_prefix "" {
     policy = "write"
     intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
   }`,
 		},
 		{
@@ -166,6 +169,9 @@ namespace_prefix "" {
   service_prefix "" {
     policy = "write"
     intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
   }
 }`,
 		},

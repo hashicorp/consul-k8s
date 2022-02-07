@@ -154,6 +154,9 @@ namespace_prefix "" {
     policy = "write"
     intentions = "write"
   }
+  node_prefix "" {
+    policy = "read"
+  }
 {{- if .EnableNamespaces }}
 }
 {{- end }}
