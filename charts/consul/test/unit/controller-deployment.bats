@@ -57,7 +57,28 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment" {
+@test "controller/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "controller/Deployment: CONSUL_HTTP_TOKEN_FILE is set when acls are enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/controller-deployment.yaml \
+      --set 'controller.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[0].name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "controller/Deployment: init container is created when global.acls.manageSystemACLs=true and has correct command and environment with tls disabled" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/controller-deployment.yaml \
@@ -190,6 +211,7 @@ load _helpers
       yq '.volumeMounts[1] | any(contains("consul-auto-encrypt-ca-cert"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 
