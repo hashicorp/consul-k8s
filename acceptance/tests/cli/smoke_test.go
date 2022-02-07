@@ -63,22 +63,6 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 			initialState:  TestCase{},
 			upgradedState: TestCase{},
 		},
-		// "Upgrade to secure": {
-		// 	initialState: TestCase{
-		// 		secure: false,
-		// 	},
-		// 	upgradedState: TestCase{
-		// 		secure: true,
-		// 	},
-		// },
-		// "Upgrade to auto-encrypt": {
-		// 	initialState: TestCase{
-		// 		autoEncrypt: false,
-		// 	},
-		// 	upgradedState: TestCase{
-		// 		autoEncrypt: true,
-		// 	},
-		// },
 	}
 
 	for name, c := range cases {
@@ -88,8 +72,9 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 
 			conCheck := connect.ConnectHelper{
 				ClusterGenerator:     consul.NewCLICluster,
-				AdditionalHelmValues: c.initialState.helmValues,
 				Secure:               c.initialState.secure,
+				AutoEncrypt:          c.initialState.autoEncrypt,
+				AdditionalHelmValues: c.initialState.helmValues,
 				ReleaseName:          consul.CLIReleaseName,
 				T:                    t,
 				Ctx:                  ctx,
@@ -98,8 +83,9 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 
 			conCheck.InstallThenCheckConnectInjection()
 
-			conCheck.AdditionalHelmValues = c.upgradedState.helmValues
 			conCheck.Secure = c.upgradedState.secure
+			conCheck.AutoEncrypt = c.upgradedState.autoEncrypt
+			conCheck.AdditionalHelmValues = c.upgradedState.helmValues
 			conCheck.UpgradeThenCheckConnectInjection()
 		})
 	}
