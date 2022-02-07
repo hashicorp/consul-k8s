@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
@@ -130,7 +129,7 @@ func Test_RunUsingLogin(t *testing.T) {
 
 	// Do the login.
 	req := &api.ACLLoginParams{
-		AuthMethod:  common.ComponentAuthMethod,
+		AuthMethod:  test.AuthMethod,
 		BearerToken: test.ServiceAccountJWTToken,
 		Meta:        map[string]string{},
 	}
