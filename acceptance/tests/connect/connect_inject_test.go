@@ -32,14 +32,21 @@ func TestConnectInject(t *testing.T) {
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
 		t.Run(name, func(t *testing.T) {
+			helmValues := map[string]string{
+				"connectInject.enabled":        "true",
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+			}
+
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
 			helper := ConnectHelper{
 				ClusterGenerator: consul.NewHelmCluster,
+				HelmValues:       helmValues,
+				IsSecure:         c.secure,
 				ReleaseName:      helpers.RandomName(),
-				Secure:           c.secure,
-				AutoEncrypt:      c.autoEncrypt,
 				T:                t,
 				Ctx:              ctx,
 				Cfg:              cfg,

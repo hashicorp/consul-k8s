@@ -26,11 +26,20 @@ func TestCLIConnectInject(t *testing.T) {
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
 		t.Run(name, func(t *testing.T) {
+			helmValues := map[string]string{
+				"connectInject.enabled":        "true",
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+			}
+
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
 			helper := connect.ConnectHelper{
 				ClusterGenerator: consul.NewCLICluster,
+				HelmValues:       helmValues,
+				IsSecure:         c.secure,
 				ReleaseName:      consul.CLIReleaseName,
 				Secure:           c.secure,
 				AutoEncrypt:      c.autoEncrypt,
@@ -70,6 +79,8 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 
 			conCheck := connect.ConnectHelper{
 				ClusterGenerator: consul.NewCLICluster,
+				HelmValues:       c.installation,
+				IsSecure:         c.secure,
 				ReleaseName:      consul.CLIReleaseName,
 				Secure:           c.secure,
 				AutoEncrypt:      c.autoEncrypt,
