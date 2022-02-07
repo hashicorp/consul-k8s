@@ -104,8 +104,8 @@ func (h *Handler) initCopyContainer() corev1.Container {
 	return container
 }
 
-// containerInit returns the init container spec for registering the Consul
-// service, setting up the Envoy bootstrap, etc.
+// containerInit returns the init container spec for that polls for the service and the connect proxy service to be registered
+// so that it can save theproxy service id to the shared volume and boostrap Envoy with the proxy-id
 func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
