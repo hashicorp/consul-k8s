@@ -148,7 +148,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			consulClient, err := api.NewClient(cfg)
 			require.NoError(t, err)
 
-			test.SetupK8sAuthMethod(t, consulClient, testServiceAccountName, "default", test.AuthMethod)
+			test.SetupK8sAuthMethod(t, consulClient, testServiceAccountName, "default")
 
 			// Register Consul services.
 			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
