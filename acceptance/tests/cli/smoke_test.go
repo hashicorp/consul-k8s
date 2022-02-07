@@ -26,23 +26,14 @@ func TestCLIConnectInject(t *testing.T) {
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
 		t.Run(name, func(t *testing.T) {
-			helmValues := map[string]string{
-				"connectInject.enabled":        "true",
-				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt": strconv.FormatBool(c.autoEncrypt),
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-			}
-
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
 			helper := connect.ConnectHelper{
 				ClusterGenerator: consul.NewCLICluster,
-				HelmValues:       helmValues,
-				IsSecure:         c.secure,
-				ReleaseName:      consul.CLIReleaseName,
 				Secure:           c.secure,
 				AutoEncrypt:      c.autoEncrypt,
+				ReleaseName:      consul.CLIReleaseName,
 				T:                t,
 				Ctx:              ctx,
 				Cfg:              cfg,
@@ -58,18 +49,36 @@ func TestCLIConnectInject(t *testing.T) {
 // then upgrades the chart with the `upgrade` Helm overrides and verifies that the upgrade was successful.
 // Then the installed chart is uninstalled.
 func TestCLIConnectInjectOnUpgrade(t *testing.T) {
+	type TestCase struct {
+		secure      bool
+		autoEncrypt bool
+		helmValues  map[string]string
+	}
+
 	cases := map[string]struct {
-		installation map[string]string
-		upgrade      map[string]string
-		secure       bool
-		autoEncrypt  bool
+		initialState  TestCase
+		upgradedState TestCase
 	}{
 		"Upgrade changes nothing": {
-			installation: map[string]string{},
-			upgrade:      map[string]string{},
-			secure:       false,
-			autoEncrypt:  false,
+			initialState:  TestCase{},
+			upgradedState: TestCase{},
 		},
+		// "Upgrade to secure": {
+		// 	initialState: TestCase{
+		// 		secure: false,
+		// 	},
+		// 	upgradedState: TestCase{
+		// 		secure: true,
+		// 	},
+		// },
+		// "Upgrade to auto-encrypt": {
+		// 	initialState: TestCase{
+		// 		autoEncrypt: false,
+		// 	},
+		// 	upgradedState: TestCase{
+		// 		autoEncrypt: true,
+		// 	},
+		// },
 	}
 
 	for name, c := range cases {
@@ -78,19 +87,20 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			conCheck := connect.ConnectHelper{
-				ClusterGenerator: consul.NewCLICluster,
-				HelmValues:       c.installation,
-				IsSecure:         c.secure,
-				ReleaseName:      consul.CLIReleaseName,
-				Secure:           c.secure,
-				AutoEncrypt:      c.autoEncrypt,
-				T:                t,
-				Ctx:              ctx,
-				Cfg:              cfg,
+				ClusterGenerator:     consul.NewCLICluster,
+				AdditionalHelmValues: c.initialState.helmValues,
+				Secure:               c.initialState.secure,
+				ReleaseName:          consul.CLIReleaseName,
+				T:                    t,
+				Ctx:                  ctx,
+				Cfg:                  cfg,
 			}
 
 			conCheck.InstallThenCheckConnectInjection()
-			// TODO upgrade
+
+			conCheck.AdditionalHelmValues = c.upgradedState.helmValues
+			conCheck.Secure = c.upgradedState.secure
+			conCheck.UpgradeThenCheckConnectInjection()
 		})
 	}
 }

@@ -46,6 +46,8 @@ type CLICluster struct {
 	logger             terratestLogger.TestLogger
 }
 
+// NewCLICluster creates a new Consul cluster struct which can be used to create and destroy a Consul cluster using the
+// Consul K8s CLI.
 func NewCLICluster(
 	t *testing.T,
 	helmValues map[string]string,
