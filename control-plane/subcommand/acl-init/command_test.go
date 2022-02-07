@@ -197,7 +197,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
 
-	test.SetupK8sAuthMethod(t, consulClient, "test-sa", "default", common.ComponentAuthMethod)
+	test.SetupK8sAuthMethod(t, consulClient, "test-sa", "default")
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -209,7 +209,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	}
 
 	code := cmd.Run([]string{
-		"-acl-auth-method", "consul-k8s-component-auth-method",
+		"-acl-auth-method", test.AuthMethod,
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 
