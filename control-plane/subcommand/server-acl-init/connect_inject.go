@@ -77,6 +77,9 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 	return c.updateOrCreateBindingRule(consulClient, authMethodName, &abr, false)
 }
 
+// createAuthMethodTmpl sets up the auth method template based on the connect-injector's service account
+// jwt token. It is common for both the connect inject auth method and the component auth method
+// with the option to add namespace specific configuration to the auth method template via `useNS`.
 func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.ACLAuthMethod, error) {
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
@@ -138,8 +141,8 @@ func (c *Command) createAuthMethodTmpl(authMethodName string, useNS bool) (api.A
 		},
 	}
 
-	// TODO: find out what MapNS/etc do here.
-	// Add options for mirroring namespaces
+	// Add options for mirroring namespaces, this is only used by the connect inject auth method
+	// and so can be disabled for the component auth method.
 	if useNS && c.flagEnableNamespaces && c.flagEnableInjectK8SNSMirroring {
 		authMethodTmpl.Config["MapNamespaces"] = true
 		authMethodTmpl.Config["ConsulNamespacePrefix"] = c.flagInjectK8SNSMirroringPrefix

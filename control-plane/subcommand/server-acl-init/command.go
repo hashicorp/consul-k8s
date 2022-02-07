@@ -1038,11 +1038,9 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 	return err
 }
 
-// configureConnectInject sets up auth methods so that connect injection will
-// work.
+// configureComponentAuthMethod sets up an auth method that the components will use to issue ACL logins with.
 func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
-	// Create the auth method template. This requires calls to the
-	// kubernetes environment.
+	// Create the auth method template. This requires calls to the kubernetes environment.
 	authMethodName := c.withPrefix("k8s-component-auth-method")
 	authMethodTmpl, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {

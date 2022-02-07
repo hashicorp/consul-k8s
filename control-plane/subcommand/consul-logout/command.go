@@ -2,16 +2,22 @@ package consullogout
 
 import (
 	"flag"
+	"io/ioutil"
+	"sync"
+
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
-	"io/ioutil"
-	"sync"
 )
 
+const (
+	defaultAclTokenLocation = "/consul/connect-inject/acl-token"
+)
+
+// The consul-logout Command just issues a consul logout API request to destroy a token.
 type Command struct {
 	UI cli.Ui
 
@@ -21,8 +27,9 @@ type Command struct {
 	flagSet *flag.FlagSet
 	http    *flags.HTTPFlags
 
-	tokenSinkFile string
-	consulClient  *api.Client
+	tokenSinkFile string // This is the path to the ACL token to be destroyed.
+
+	consulClient *api.Client
 
 	once   sync.Once
 	help   string
@@ -43,10 +50,6 @@ func (c *Command) init() {
 
 }
 
-const (
-	defaultAclTokenLocation = "/consul/connect-inject/acl-token"
-)
-
 func (c *Command) Run(args []string) int {
 	var err error
 	c.once.Do(c.init)
@@ -61,6 +64,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+	// This will always be /consul/connect-inject/acl-token
 	if c.tokenSinkFile == "" {
 		c.tokenSinkFile = defaultAclTokenLocation
 	}
@@ -88,7 +92,7 @@ func (c *Command) Run(args []string) int {
 		c.logger.Error("Unable to destroy consul ACL token", "error", err)
 		return 1
 	}
-	c.logger.Error("ACL token succesfully destroyed")
+	c.logger.Error("ACL token successfully destroyed")
 	return 0
 }
 
