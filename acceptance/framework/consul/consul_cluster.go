@@ -40,6 +40,11 @@ type Cluster interface {
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul
 type HelmCluster struct {
+	// ACLToken is an optional ACL token that will be used to create
+	// a Consul API client. If not provided, we will attempt to read
+	// a bootstrap token from a Kubernetes secret stored in the cluster.
+	ACLToken string
+
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -55,7 +60,7 @@ func NewHelmCluster(
 	ctx environment.TestContext,
 	cfg *config.TestConfig,
 	releaseName string,
-) Cluster {
+) *HelmCluster {
 
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
@@ -234,21 +239,26 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) *api.Client {
 		config.TLSConfig.InsecureSkipVerify = true
 		config.Scheme = "https"
 
-		// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
-		// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
-		// and will try to read the replication token from the federation secret.
-		// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
-		// Instead, we provide a replication token that serves the role of the bootstrap token.
-		aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
-			aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
-			require.NoError(t, err)
-			config.Token = string(aclSecret.Data["replicationToken"])
-		} else if err == nil {
-			config.Token = string(aclSecret.Data["token"])
+		// If an ACL token is provided, we'll use that instead of trying to find it.
+		if h.ACLToken != "" {
+			config.Token = h.ACLToken
 		} else {
-			require.NoError(t, err)
+			// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
+			// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
+			// and will try to read the replication token from the federation secret.
+			// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
+			// Instead, we provide a replication token that serves the role of the bootstrap token.
+			aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+			if err != nil && errors.IsNotFound(err) {
+				federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
+				aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
+				require.NoError(t, err)
+				config.Token = string(aclSecret.Data["replicationToken"])
+			} else if err == nil {
+				config.Token = string(aclSecret.Data["token"])
+			} else {
+				require.NoError(t, err)
+			}
 		}
 	}
 

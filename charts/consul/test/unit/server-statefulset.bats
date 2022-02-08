@@ -1873,6 +1873,40 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# Vault replication token
+
+@test "server/StatefulSet: vault replication token is configured when secret provided and createReplicationToken is false" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/server-statefulset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=test' \
+    --set 'global.secretsBackend.vault.consulServerRole=foo' \
+    --set 'global.acls.replicationToken.secretName=vault/replication-token' \
+    --set 'global.acls.replicationToken.secretKey=token' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check that Vault annotations are set.
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl"]' | tee /dev/stderr)"
+  [ "${actual}" = "vault/replication-token" ]
+
+  local actual="$(echo $object |
+      yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-replication-token-config.hcl"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"vault/replication-token\" -}}\nacl { tokens { agent = \"{{- .Data.data.token -}}\", replication = \"{{- .Data.data.token -}}\" }}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that ACL_REPLICATION_TOKEN env var is not provided.
+  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").env[] | select(.name=="ACL_REPLICATION_TOKEN")' | tee /dev/stderr)"
+  [ "${actual}" = "" ]
+
+  # Check that path to Vault secret config is provided to the command.
+  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # ui.dashboardURLTemplates.service
 
 @test "server/StatefulSet: dashboard_url_templates not set by default" {
