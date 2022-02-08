@@ -63,6 +63,30 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 			initialState:  TestCase{},
 			upgradedState: TestCase{},
 		},
+		"Upgrade to secure": {
+			initialState:  TestCase{},
+			upgradedState: TestCase{secure: true},
+		},
+		"Upgrade to auto-encrypt": {
+			initialState:  TestCase{},
+			upgradedState: TestCase{autoEncrypt: true},
+		},
+		"Upgrade to secure and auto-encrypt": {
+			initialState:  TestCase{},
+			upgradedState: TestCase{secure: true, autoEncrypt: true},
+		},
+		"Upgrade from Consul 1.10 to Consul 1.11": {
+			initialState: TestCase{
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.10.0",
+				},
+			},
+			upgradedState: TestCase{
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.11.2",
+				},
+			},
+		},
 	}
 
 	for name, c := range cases {
