@@ -1799,8 +1799,8 @@ load _helpers
     --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'server.tls.serverAdditionalDNSSANs[0]=*.foo.com' \
-    --set 'server.tls.serverAdditionalDNSSANs[1]=*.bar.com' \
+    --set 'global.tls.serverAdditionalDNSSANs[0]=*.foo.com' \
+    --set 'global.tls.serverAdditionalDNSSANs[1]=*.bar.com' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -1828,8 +1828,8 @@ load _helpers
     --set 'global.secretsBackend.vault.consulCARole=test' \
     --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
-    --set 'server.tls.serverAdditionalIPSANs[0]=1.1.1.1' \
-    --set 'server.tls.serverAdditionalIPSANs[1]=2.2.2.2' \
+    --set 'global.tls.serverAdditionalIPSANs[0]=1.1.1.1' \
+    --set 'global.tls.serverAdditionalIPSANs[1]=2.2.2.2' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 

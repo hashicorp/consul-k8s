@@ -32,7 +32,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}" "ip_sans=127.0.0.1{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -40,7 +40,7 @@ as well as the global.name setting.
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.server.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}" "ip_sans=127.0.0.1{{- if .Values.server.tls -}}{{- if .Values.server.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.server.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}" -{{ "}}" }}
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
@@ -48,7 +48,15 @@ as well as the global.name setting.
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
-{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
+{{- end -}}
+
+{{- define "consul.serverAdditionalDNSSANs" -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalDNSSANs -}}{{- range $san := .Values.global.tls.serverAdditionalDNSSANs }},{{ $san }} {{- end -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "consul.serverAdditionalIPSANs" -}}
+{{- if .Values.global.tls -}}{{- if .Values.global.tls.serverAdditionalIPSANs -}}{{- range $ipsan := .Values.global.tls.serverAdditionalIPSANs }},{{ $ipsan }} {{- end -}}{{- end -}}{{- end -}}
 {{- end -}}
 
 {{/*
