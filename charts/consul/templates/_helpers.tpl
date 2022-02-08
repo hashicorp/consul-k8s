@@ -15,6 +15,42 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.vaultGossipTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
+            {{ "{{" }}- {{ printf ".Data.data.%s" .secretKey }} -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSCATemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.tls.caCert.secretName }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
+            "ttl=1h" "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.serverTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,*.%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}
+{{- end -}}
+
 {{/*
 Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
 substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file
@@ -28,6 +64,18 @@ is passed to consul as a -config-file param on command line.
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
 {{- end -}}
 
+{{/*
+Sets up a list of recusor flags for Consul agents by iterating over the IPs of every nameserver
+in /etc/resolv.conf and concatenating them into a string of arguments that can be passed directly
+to the consul agent command.
+*/}}
+{{- define "consul.recursors" -}}
+              recursor_flags=""
+              for ip in $(cat /etc/resolv.conf | grep nameserver | cut -d' ' -f2)
+              do
+                 recursor_flags="$recursor_flags -recursor=$ip"
+              done
+{{- end -}}
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -102,12 +150,18 @@ This template is for an init container.
         {{- else }}
         -server-addr={{ template "consul.fullname" . }}-server \
         -server-port=8501 \
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        -ca-file=/vault/secrets/serverca.crt
+        {{- else }}
         -ca-file=/consul/tls/ca/tls.crt
+        {{- end }}
         {{- end }}
   volumeMounts:
     {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+    {{- if not .Values.global.secretsBackend.vault.enabled }}
     - name: consul-ca-cert
       mountPath: /consul/tls/ca
+    {{- end }}
     {{- end }}
     - name: consul-auto-encrypt-ca-cert
       mountPath: /consul/tls/client/ca
@@ -118,4 +172,22 @@ This template is for an init container.
     limits:
       memory: "50Mi"
       cpu: "50m"
+{{- end -}}
+
+{{/*
+Fails when a reserved name is passed in. This should be used to test against
+Consul namespaces and partition names.
+This template accepts an array that contains two elements. The first element
+is the name that's being checked and the second is the name of the values.yaml
+key that's setting the name.
+
+Usage: {{ template "consul.reservedNamesFailer" (list .Values.key "key") }}
+
+*/}}
+{{- define "consul.reservedNamesFailer" -}}
+{{- $name := index . 0 -}}
+{{- $key := index . 1 -}}
+{{- if or (eq "system" $name) (eq "universal" $name) (eq "consul" $name) (eq "operator" $name) (eq "root" $name) }}
+{{- fail (cat "The name" $name "set for key" $key "is reserved by Consul for future use." ) }}
+{{- end }}
 {{- end -}}

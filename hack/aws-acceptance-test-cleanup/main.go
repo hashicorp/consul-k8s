@@ -219,11 +219,24 @@ func realMain(ctx context.Context) error {
 			}
 
 			if err := destroyBackoff(ctx, "NAT gateway", *gateway.NatGatewayId, func() error {
+				// We only care about Nat gateways whose state is not "deleted."
+				// Deleted Nat gateways will show in the output for about 1hr
+				// (https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html#nat-gateway-deleting),
+				// but we can proceed with deleting other resources once its state is deleted.
 				currNatGateways, err := ec2Client.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 					Filter: []*ec2.Filter{
 						{
 							Name:   aws.String("vpc-id"),
 							Values: []*string{vpcID},
+						},
+						{
+							Name: aws.String("state"),
+							Values: []*string{
+								aws.String(ec2.NatGatewayStatePending),
+								aws.String(ec2.NatGatewayStateFailed),
+								aws.String(ec2.NatGatewayStateDeleting),
+								aws.String(ec2.NatGatewayStateAvailable),
+							},
 						},
 					},
 				})
@@ -238,6 +251,18 @@ func realMain(ctx context.Context) error {
 				return err
 			}
 			fmt.Printf("NAT gateway: Destroyed [id=%s]\n", *gateway.NatGatewayId)
+
+			// Release Elastic IP associated with the NAT gateway (if any).
+			for _, address := range gateway.NatGatewayAddresses {
+				if address.AllocationId != nil {
+					fmt.Printf("NAT gateway: Releasing Elastic IP... [id=%s]\n", *address.AllocationId)
+					_, err := ec2Client.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId})
+					if err != nil {
+						return err
+					}
+					fmt.Printf("NAT gateway: Elastic IP released [id=%s]\n", *address.AllocationId)
+				}
+			}
 		}
 
 		// Delete ELBs (usually left from mesh gateway tests).
@@ -276,6 +301,124 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("ELB: Destroyed [id=%s]\n", *elbDescrip.LoadBalancerName)
 		}
 
+		// Delete internet gateways.
+		igws, err := ec2Client.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("attachment.vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+		for _, igw := range igws.InternetGateways {
+			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", *igw.InternetGatewayId)
+			_, err := ec2Client.DetachInternetGatewayWithContext(ctx, &ec2.DetachInternetGatewayInput{
+				InternetGatewayId: igw.InternetGatewayId,
+				VpcId:             vpcID,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Internet gateway: Detached [id=%s]\n", *igw.InternetGatewayId)
+
+			fmt.Printf("Internet gateway: Destroying... [id=%s]\n", *igw.InternetGatewayId)
+			_, err = ec2Client.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
+				InternetGatewayId: igw.InternetGatewayId,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
+		}
+
+		// Delete subnets.
+		subnets, err := ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+		for _, subnet := range subnets.Subnets {
+			fmt.Printf("Subnet: Destroying... [id=%s]\n", *subnet.SubnetId)
+			_, err := ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
+				SubnetId: subnet.SubnetId,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Subnet: Destroyed [id=%s]\n", *subnet.SubnetId)
+		}
+
+		// Delete route tables.
+		routeTables, err := ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+		for _, routeTable := range routeTables.RouteTables {
+			// Find out if this is the main route table.
+			var mainRouteTable bool
+			for _, association := range routeTable.Associations {
+				if association.Main != nil && *association.Main {
+					mainRouteTable = true
+					break
+				}
+			}
+
+			if mainRouteTable {
+				fmt.Printf("Route table: Skipping the main route table [id=%s]\n", *routeTable.RouteTableId)
+			} else {
+				fmt.Printf("Route table: Destroying... [id=%s]\n", *routeTable.RouteTableId)
+				_, err := ec2Client.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{
+					RouteTableId: routeTable.RouteTableId,
+				})
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Route table: Destroyed [id=%s]\n", *routeTable.RouteTableId)
+			}
+		}
+
+		// Delete security groups.
+		sgs, err := ec2Client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+		for _, sg := range sgs.SecurityGroups {
+			revokeSGInput := &ec2.RevokeSecurityGroupIngressInput{GroupId: sg.GroupId}
+			revokeSGInput.SetIpPermissions(sg.IpPermissions)
+			fmt.Printf("Security group: Removing security group rules... [id=%s]\n", *sg.GroupId)
+			_, err := ec2Client.RevokeSecurityGroupIngressWithContext(ctx, revokeSGInput)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Security group: Removed security group rules [id=%s]\n", *sg.GroupId)
+		}
+
+		for _, sg := range sgs.SecurityGroups {
+			if sg.GroupName != nil && *sg.GroupName == "default" {
+				fmt.Printf("Security group: Skipping default security group [id=%s]\n", *sg.GroupId)
+				continue
+			}
+			fmt.Printf("Security group: Destroying... [id=%s]\n", *sg.GroupId)
+			_, err = ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
+				GroupId: sg.GroupId,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Security group: Destroyed [id=%s]\n", *sg.GroupId)
+		}
+
 		// Delete VPC. Sometimes there's a race condition where AWS thinks
 		// the VPC still has dependencies but they've already been deleted so
 		// we may need to retry a couple times.
@@ -296,22 +439,6 @@ func realMain(ctx context.Context) error {
 			return errors.New("reached max retry count deleting VPC")
 		}
 
-		// Now that the destroy request went through we still need to wait for
-		// the deletion to complete.
-		if err := destroyBackoff(ctx, "VPC", *vpcID, func() error {
-			currVPCs, err := ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{
-				VpcIds: []*string{vpcID},
-			})
-			if err != nil {
-				return err
-			}
-			if len(currVPCs.Vpcs) > 0 {
-				return errNotDestroyed
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
 		fmt.Printf("VPC: Destroyed [id=%s]\n", *vpcID)
 	}
 

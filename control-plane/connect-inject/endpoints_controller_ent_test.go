@@ -1,4 +1,4 @@
-// +build enterprise
+//go:build enterprise
 
 package connectinject
 
@@ -1180,7 +1180,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
 						c.ACL.Enabled = true
-						c.ACL.Tokens.Master = adminToken
+						c.ACL.Tokens.InitialManagement = adminToken
 					}
 					c.NodeName = nodeName
 				})
@@ -1514,7 +1514,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				consul, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 					if tt.enableACLs {
 						c.ACL.Enabled = true
-						c.ACL.Tokens.Master = adminToken
+						c.ACL.Tokens.InitialManagement = adminToken
 					}
 					c.NodeName = nodeName
 				})

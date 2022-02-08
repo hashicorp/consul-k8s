@@ -566,7 +566,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
-	svc.Annotations[annotationServiceTags] = "one, two,three"
+	svc.Annotations[annotationServiceTags] = `one, leadingwhitespace,trailingwhitespace ,\,leadingcomma,trailingcomma\,,middle\,comma,,`
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
@@ -576,7 +576,7 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(r, []string{"k8s", "one", "two", "three"}, actual[0].Service.Tags)
+		require.Equal(r, []string{"k8s", "one", "leadingwhitespace", "trailingwhitespace", ",leadingcomma", "trailingcomma,", "middle,comma"}, actual[0].Service.Tags)
 	})
 }
 
@@ -1451,6 +1451,50 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 			require.True(r, found, "did not find registration from ns %s", expNS)
 		}
 	})
+}
+
+func TestParseTags(t *testing.T) {
+	cases := []struct {
+		tagsAnno string
+		exp      []string
+	}{
+		{
+			"tag",
+			[]string{"tag"},
+		},
+		{
+			",,removes,,empty,elems,,",
+			[]string{"removes", "empty", "elems"},
+		},
+		{
+			"removes , white  ,space ",
+			[]string{"removes", "white", "space"},
+		},
+		{
+			`\,leading,comma`,
+			[]string{",leading", "comma"},
+		},
+		{
+			`trailing,comma\,`,
+			[]string{"trailing", "comma,"},
+		},
+		{
+			`mid\,dle,com\,ma`,
+			[]string{"mid,dle", "com,ma"},
+		},
+		{
+			`\,\,multi\,\,,\,com\,\,ma`,
+			[]string{",,multi,,", ",com,,ma"},
+		},
+		{
+			`  every\,\,   ,  thing  `,
+			[]string{"every,,", "thing"},
+		},
+	}
+
+	for _, c := range cases {
+		require.Equal(t, c.exp, parseTags(c.tagsAnno))
+	}
 }
 
 // lbService returns a Kubernetes service of type LoadBalancer.

@@ -6,6 +6,13 @@ variable "region" {
 variable "cluster_count" {
   default     = 1
   description = "The number of Kubernetes clusters to create."
+  // We currently cannot support more than 2 clusters
+  // because setting up peering is more complicated if cluster count is
+  // more than two.
+  validation {
+    condition     = var.cluster_count < 3 && var.cluster_count > 0
+    error_message = "The cluster_count value must be 1 or 2."
+  }
 }
 
 variable "role_arn" {

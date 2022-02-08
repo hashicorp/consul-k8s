@@ -194,12 +194,17 @@ func assertNoConnectionAndAddIntention(t *testing.T, consulClient *api.Client, k
 	k8s.CheckStaticServerConnectionFailing(t, k8sOptions, "http://localhost:1234")
 
 	logger.Log(t, "creating static-client => static-server intention")
-	_, err := consulClient.Connect().IntentionUpsert(&api.Intention{
-		SourceName:      staticClientName,
-		SourceNS:        sourceNS,
-		DestinationName: staticServerName,
-		DestinationNS:   destinationNS,
-		Action:          api.IntentionActionAllow,
+	_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+		Kind:      api.ServiceIntentions,
+		Name:      staticServerName,
+		Namespace: destinationNS,
+		Sources: []*api.SourceIntention{
+			{
+				Name:      staticClientName,
+				Namespace: sourceNS,
+				Action:    api.IntentionActionAllow,
+			},
+		},
 	}, nil)
 	require.NoError(t, err)
 }

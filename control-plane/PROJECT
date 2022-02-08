@@ -1,63 +1,62 @@
 domain: hashicorp.com
-layout: go.kubebuilder.io/v2
+layout:
+- go.kubebuilder.io/v2
+plugins:
+  go.operator-sdk.io/v2-alpha: {}
 repo: github.com/hashicorp/consul-k8s
 resources:
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: IngressGateway
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ProxyDefaults
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ServiceIntentions
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ServiceDefaults
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ServiceResolver
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ServiceRouter
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: ServiceSplitter
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: hashicorp.com
   group: consul
   kind: TerminatingGateway
   path: github.com/hashicorp/consul-k8s/api/v1alpha1
   version: v1alpha1
+- controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: ExportedServices
+  path: github.com/hashicorp/consul-k8s/api/v1alpha1
+  version: v1alpha1
 version: "3"
-plugins:
-  go.operator-sdk.io/v2-alpha: {}

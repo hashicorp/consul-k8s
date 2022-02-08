@@ -83,6 +83,36 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -129,6 +159,36 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -224,6 +284,36 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -270,6 +360,36 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -401,6 +521,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceRouter
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -448,6 +569,56 @@ func TestServiceRouter_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destA",
+								Namespace: "namespace-a",
+								Partition: "other",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service: "destA",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"http match queryParam": {
@@ -592,10 +763,61 @@ func TestServiceRouter_Validate(t *testing.T) {
 				"spec.routes[1].destination.namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set destination.namespace",
 			},
 		},
+		"partitions disabled: single destination partition specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"servicerouter.consul.hashicorp.com \"foo\" is invalid: spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
+		"partitions disabled: multiple destination partitions specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-b",
+								Partition: "partition-b",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+				"spec.routes[1].destination.partition: Invalid value: \"partition-b\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
@@ -611,39 +833,44 @@ func TestServiceRouter_Validate(t *testing.T) {
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -712,7 +939,7 @@ func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}

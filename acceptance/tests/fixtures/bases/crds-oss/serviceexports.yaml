@@ -1,0 +1,10 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceExports
+metadata:
+  name: exports
+spec:
+  services:
+  - name: frontend
+    namespace: frontend
+    consumers:
+    - partition: other

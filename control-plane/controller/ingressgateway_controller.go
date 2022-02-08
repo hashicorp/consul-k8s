@@ -36,7 +36,5 @@ func (r *IngressGatewayController) UpdateStatus(ctx context.Context, obj client.
 }
 
 func (r *IngressGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.IngressGateway{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.IngressGateway{}, r)
 }

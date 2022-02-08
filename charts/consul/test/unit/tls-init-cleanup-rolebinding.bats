@@ -58,3 +58,20 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "tlsInitCleanup/RoleBinding: disabled with global.secretsBackend.vault.enabled=true and global.tls.enabled=true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/tls-init-cleanup-rolebinding.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.caCert.secretName=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      .
+}

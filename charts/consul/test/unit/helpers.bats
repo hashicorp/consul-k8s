@@ -115,7 +115,21 @@ load _helpers
 @test "helper/namespace: used everywhere" {
   cd `chart_dir`
   # Grep for files that don't have 'namespace: ' in them
-  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | tee /dev/stderr )
+  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | grep -v 'api-gateway-gateway' | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}
+
+#--------------------------------------------------------------------
+# component label
+#
+# This test ensures that we set a "component: <blah>" in every file.
+#
+# If this test fails, you're likely missing setting that label somewhere.
+
+@test "helper/component-label: used everywhere" {
+  cd `chart_dir`
+  # Grep for files that don't have 'component: ' in them
+  local actual=$(grep -L 'component: ' templates/*.yaml | tee /dev/stderr )
   [ "${actual}" = '' ]
 }
 
@@ -268,5 +282,28 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
 
+  [ "${actual}" = "" ]
+}
+
+@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault is enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/tests/test-runner.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
+      --set 'server.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+
+  actual=$(echo $object | jq '.command | join(" ") | contains("-ca-file=/vault/secrets/serverca.crt")')
+  [ "${actual}" = "true" ]
+
+  actual=$(echo $object | jq '.volumeMounts[] | select(.name == "consul-ca-cert")')
   [ "${actual}" = "" ]
 }

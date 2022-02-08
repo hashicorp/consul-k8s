@@ -2,7 +2,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ template "consul.fullname" . }}-controller-mutating-webhook-configuration
+  name: {{ template "consul.fullname" . }}-controller
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
@@ -12,7 +12,6 @@ metadata:
     component: controller
 webhooks:
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -34,7 +33,6 @@ webhooks:
       - proxydefaults
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -56,7 +54,6 @@ webhooks:
       - meshes
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -78,7 +75,6 @@ webhooks:
     - servicedefaults
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -100,7 +96,6 @@ webhooks:
     - serviceresolvers
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -122,7 +117,6 @@ webhooks:
     - servicerouters
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -144,7 +138,6 @@ webhooks:
     - servicesplitters
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -166,7 +159,6 @@ webhooks:
     - serviceintentions
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -188,7 +180,6 @@ webhooks:
       - ingressgateways
   sideEffects: None
 - clientConfig:
-    caBundle: Cg==
     service:
       name: {{ template "consul.fullname" . }}-controller-webhook
       namespace: {{ .Release.Namespace }}
@@ -208,5 +199,26 @@ webhooks:
       - UPDATE
     resources:
       - terminatinggateways
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-controller-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-exportedservices
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-exportedservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+      - consul.hashicorp.com
+    apiVersions:
+      - v1alpha1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - exportedservices
   sideEffects: None
 {{- end }}

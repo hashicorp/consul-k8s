@@ -6,11 +6,11 @@ orbs:
 executors:
   go:
     docker:
-      - image: docker.mirror.hashicorp.services/circleci/golang:1.16
+      - image: docker.mirror.hashicorp.services/cimg/go:1.17.5
     environment:
       TEST_RESULTS: /tmp/test-results # path to where test results are saved
-      CONSUL_VERSION: 1.11.0-alpha # Consul's OSS version to use in tests
-      CONSUL_ENT_VERSION: 1.11.0+ent-alpha # Consul's enterprise version to use in tests
+      CONSUL_VERSION: 1.11.2 # Consul's OSS version to use in tests
+      CONSUL_ENT_VERSION: 1.11.2+ent # Consul's enterprise version to use in tests
 
 control-plane-path : &control-plane-path control-plane
 cli-path : &cli-path cli
@@ -30,9 +30,9 @@ commands:
       - run:
           name: Install gotestsum, kind, kubectl, and helm
           command: |
-            wget https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-            rm go1.16.5.linux-amd64.tar.gz
+            wget https://golang.org/dl/go1.17.5.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz
+            rm go1.17.5.linux-amd64.tar.gz
             echo 'export PATH=$PATH:/usr/local/go/bin' >> $BASH_ENV
 
             wget https://github.com/gotestyourself/gotestsum/releases/download/v1.6.4/gotestsum_1.6.4_linux_amd64.tar.gz
@@ -145,7 +145,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       - run:
           name: go mod download
@@ -154,9 +154,9 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+          key: consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
@@ -193,7 +193,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
       - run:
@@ -224,7 +224,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
 
       # run go tests with gotestsum
       - run:
@@ -263,7 +263,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-modcache-v1-{{ checksum "control-plane/go.mod" }}
+            - consul-k8s-modcache-v2-{{ checksum "control-plane/go.mod" }}
       - run:
           name: build local
           working_directory: *control-plane-path
@@ -299,7 +299,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+            - consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
 
       - run:
           name: go mod download
@@ -308,9 +308,9 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-k8s-cli-modcache-v1-{{ checksum "cli/go.mod" }}
+          key: consul-k8s-cli-modcache-v2-{{ checksum "cli/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -333,7 +333,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run:
           name: go mod download
@@ -342,9 +342,9 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+          key: consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
@@ -371,7 +371,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run:
           name: go mod download
@@ -380,9 +380,9 @@ jobs:
 
       # Save go module cache if the go.mod file has changed
       - save_cache:
-          key: consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+          key: consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
           paths:
-            - "/go/pkg/mod"
+            - "/home/circleci/go/pkg/mod"
 
       # check go fmt output because it does not report non-zero when there are fmt changes
       - run:
@@ -409,7 +409,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -432,7 +432,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -455,7 +455,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-helm-gen-modcache-v1-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
+            - consul-helm-helm-gen-modcache-v2-{{ checksum "charts/consul/hack/helm-reference-gen/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -488,7 +488,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.2"
+          version: "v1.22.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -520,7 +520,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.21.2"
+          version: "v1.22.4"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -580,7 +580,7 @@ jobs:
 
   cleanup-eks-resources:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.9.0
+      - image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.10.0
     steps:
       - checkout
       - run:
@@ -600,7 +600,7 @@ jobs:
   ########################
   # ACCEPTANCE TESTS
   ########################
-  acceptance-gke-1-19:
+  acceptance-gke-1-20:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -643,7 +643,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -666,7 +666,7 @@ jobs:
           fail_only: true
           failure_message: "GKE acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-aks-1-20:
+  acceptance-aks-1-21:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -698,7 +698,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -721,7 +721,7 @@ jobs:
           fail_only: true
           failure_message: "AKS acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-eks-1-18:
+  acceptance-eks-1-19:
     environment:
       - TEST_RESULTS: /tmp/test-results
     docker:
@@ -759,7 +759,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -775,7 +775,7 @@ jobs:
           name: terraform destroy
           working_directory: *eks-terraform-path
           command: |
-            terraform destroy -auto-approve
+            terraform destroy -var cluster_count=2 -auto-approve
           when: always
 
       - slack/status:
@@ -812,7 +812,7 @@ jobs:
       # Restore go module cache if there is one
       - restore_cache:
           keys:
-            - consul-helm-acceptance-modcache-v1-{{ checksum "acceptance/go.mod" }}
+            - consul-helm-acceptance-modcache-v2-{{ checksum "acceptance/go.mod" }}
 
       - run: mkdir -p $TEST_RESULTS
 
@@ -835,7 +835,7 @@ jobs:
           fail_only: true
           failure_message: "OpenShift acceptance tests failed. Check the logs at: ${CIRCLE_BUILD_URL}"
 
-  acceptance-kind-1-22:
+  acceptance-kind-1-23:
     environment:
       - TEST_RESULTS: /tmp/test-results
     machine:
@@ -845,7 +845,7 @@ jobs:
       - checkout
       - install-prereqs
       - create-kind-clusters:
-          version: "v1.22.1"
+          version: "v1.23.0"
       - restore_cache:
           keys:
             - consul-helm-modcache-v2-{{ checksum "acceptance/go.mod" }}
@@ -985,26 +985,13 @@ workflows:
 #      - acceptance-openshift:
 #          requires:
 #          - cleanup-azure-resources
-      - acceptance-gke-1-19:
+      - acceptance-gke-1-20:
           requires:
             - cleanup-gcp-resources
-      - acceptance-eks-1-18:
+      - acceptance-eks-1-19:
           requires:
             - cleanup-eks-resources
-      - acceptance-aks-1-20:
+      - acceptance-aks-1-21:
           requires:
             - cleanup-azure-resources
-      - acceptance-kind-1-22
-#  update-helm-charts-index: <-- Disable until we can figure out a release workflow. We currently don't want it to trigger on a tag because the tag is pushed by the eco-releases pipeline.
-#    jobs:
-#      - helm-chart-pipeline-approval:
-#          type: approval
-#      - update-helm-charts-index:
-#          requires:
-#            - helm-chart-pipeline-approval
-#          context: helm-charts-trigger-consul
-#          filters:
-#            tags:
-#              only: /^v.*/
-#            branches:
-#              ignore: /.*/
+      - acceptance-kind-1-23

@@ -9,6 +9,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client
   annotations:
     kubernetes.io/description: {{ template "consul.fullname" . }}-client are the security context constraints required
       to run the consul client.

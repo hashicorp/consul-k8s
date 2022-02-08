@@ -74,9 +74,10 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.enableConsulNamespaces": "true",
-				"controller.enabled":            "true",
-				"connectInject.enabled":         "true",
+				"global.enableConsulNamespaces":  "true",
+				"global.adminPartitions.enabled": "true",
+				"controller.enabled":             "true",
+				"connectInject.enabled":          "true",
 
 				// When mirroringK8S is set, this setting is ignored.
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
@@ -122,7 +123,7 @@ func TestControllerNamespaces(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-f", "../fixtures/crds")
+					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-k", "../fixtures/cases/crds-ent")
 					require.NoError(r, err, out)
 					// NOTE: No need to clean up because the namespace will be deleted.
 				})
@@ -152,6 +153,13 @@ func TestControllerNamespaces(t *testing.T) {
 					proxyDefaultEntry, ok := entry.(*api.ProxyConfigEntry)
 					require.True(r, ok, "could not cast to ProxyConfigEntry")
 					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
+					require.NoError(r, err)
+					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "frontend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
@@ -220,6 +228,10 @@ func TestControllerNamespaces(t *testing.T) {
 				patchMeshGatewayMode := "remote"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
 
+				logger.Log(t, "patching partition-exports custom resource")
+				patchServiceName := "backend"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "exportedservices", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s", "namespace": "front", "consumers":[{"partition": "foo"}]}]}}`, patchServiceName), "--type=merge")
+
 				logger.Log(t, "patching mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
 
@@ -263,6 +275,13 @@ func TestControllerNamespaces(t *testing.T) {
 					proxyDefaultsEntry, ok := entry.(*api.ProxyConfigEntry)
 					require.True(r, ok, "could not cast to ProxyConfigEntry")
 					require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
+
+					// partition-exports
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
+					require.NoError(r, err)
+					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "backend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
@@ -321,6 +340,9 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "deleting proxy-defaults custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "proxydefaults", "global")
 
+				logger.Log(t, "deleting partition-exports custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "exportedservices", "default")
+
 				logger.Log(t, "deleting mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "mesh", "mesh")
 
@@ -353,6 +375,11 @@ func TestControllerNamespaces(t *testing.T) {
 
 					// proxy-defaults
 					_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", defaultOpts)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// partition-exports
+					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 

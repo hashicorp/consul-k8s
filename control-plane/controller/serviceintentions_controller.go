@@ -36,7 +36,5 @@ func (r *ServiceIntentionsController) UpdateStatus(ctx context.Context, obj clie
 }
 
 func (r *ServiceIntentionsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.ServiceIntentions{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.ServiceIntentions{}, r)
 }

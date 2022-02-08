@@ -2,6 +2,8 @@ package connectinject
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -16,6 +18,7 @@ const (
 	envoyUserAndGroupID         = 5995
 	copyContainerUserAndGroupID = 5996
 	netAdminCapability          = "NET_ADMIN"
+	dnsServiceHostEnvSuffix     = "DNS_SERVICE_HOST"
 )
 
 type initContainerCommandData struct {
@@ -66,6 +69,9 @@ type initContainerCommandData struct {
 	// TProxyExcludeUIDs is a list of additional user IDs to exclude from traffic redirection via
 	// the consul connect redirect-traffic command.
 	TProxyExcludeUIDs []string
+
+	// ConsulDNSClusterIP is the IP of the Consul DNS Service.
+	ConsulDNSClusterIP string
 }
 
 // initCopyContainer returns the init container spec for the copy container which places
@@ -98,13 +104,29 @@ func (h *Handler) initCopyContainer() corev1.Container {
 	return container
 }
 
-// containerInit returns the init container spec for registering the Consul
-// service, setting up the Envoy bootstrap, etc.
+// containerInit returns the init container spec for that polls for the service and the connect proxy service to be registered
+// so that it can save theproxy service id to the shared volume and boostrap Envoy with the proxy-id
 func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := transparentProxyEnabled(namespace, pod, h.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
+	}
+
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, h.EnableConsulDNS)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	var consulDNSClusterIP string
+	if dnsEnabled {
+		// If Consul DNS is enabled, we find the environment variable that has the value
+		// of the ClusterIP of the Consul DNS Service. constructDNSServiceHostName returns
+		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
+		consulDNSClusterIP = os.Getenv(h.constructDNSServiceHostName())
+		if consulDNSClusterIP == "" {
+			return corev1.Container{}, fmt.Errorf("environment variable %s is not found", h.constructDNSServiceHostName())
+		}
 	}
 
 	data := initContainerCommandData{
@@ -118,6 +140,7 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 		TProxyExcludeOutboundPorts: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundPorts, pod),
 		TProxyExcludeOutboundCIDRs: splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeOutboundCIDRs, pod),
 		TProxyExcludeUIDs:          splitCommaSeparatedItemsFromAnnotation(annotationTProxyExcludeUIDs, pod),
+		ConsulDNSClusterIP:         consulDNSClusterIP,
 		EnvoyUID:                   envoyUserAndGroupID,
 	}
 
@@ -223,6 +246,15 @@ func (h *Handler) containerInit(namespace corev1.Namespace, pod corev1.Pod) (cor
 	return container, nil
 }
 
+// constructDNSServiceHostName use the resource prefix and the DNS Service hostname suffix to construct the
+// key of the env variable whose value is the cluster IP of the Consul DNS Service.
+// It translates "resource-prefix" into "RESOURCE_PREFIX_DNS_SERVICE_HOST".
+func (h *Handler) constructDNSServiceHostName() string {
+	upcaseResourcePrefix := strings.ToUpper(h.ResourcePrefix)
+	upcaseResourcePrefixWithUnderscores := strings.ReplaceAll(upcaseResourcePrefix, "-", "_")
+	return strings.Join([]string{upcaseResourcePrefixWithUnderscores, dnsServiceHostEnvSuffix}, "_")
+}
+
 // transparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
@@ -233,6 +265,22 @@ func transparentProxyEnabled(namespace corev1.Namespace, pod corev1.Pod, globalE
 	}
 	// Next see if the namespace has been defaulted.
 	if raw, ok := namespace.Labels[keyTransparentProxy]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Else fall back to the global default.
+	return globalEnabled, nil
+}
+
+// consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
+// It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
+// to read the pod's namespace label when it exists.
+func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+	// First check to see if the pod annotation exists to override the namespace or global settings.
+	if raw, ok := pod.Annotations[keyConsulDNS]; ok {
+		return strconv.ParseBool(raw)
+	}
+	// Next see if the namespace has been defaulted.
+	if raw, ok := namespace.Labels[keyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.
@@ -330,6 +378,9 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- if .ConsulNamespace }}
   -namespace="{{ .ConsulNamespace }}" \
+  {{- end }}
+  {{- if .ConsulDNSClusterIP }}
+  -consul-dns-ip="{{ .ConsulDNSClusterIP }}" \
   {{- end }}
   {{- range .TProxyExcludeInboundPorts }}
   -exclude-inbound-port="{{ . }}" \

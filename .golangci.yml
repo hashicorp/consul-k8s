@@ -2,7 +2,7 @@ linters:
   # enables all defaults + the below, `golangci-lint linters` to see the list of active linters.
   enable:
     - gofmt
-    # TODO: re-enable things as we have master cleaned up vs the defaults
+    # TODO: re-enable things as we have main cleaned up vs the defaults
     #- stylecheck
     #- goconst
     #- prealloc

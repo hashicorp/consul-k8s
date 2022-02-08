@@ -116,9 +116,6 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 // the services get re-registered and can continue to talk to each other.
 func TestConnectInject_RestartConsulClients(t *testing.T) {
 	cfg := suite.Config()
-	if cfg.EnableTransparentProxy {
-		t.Skip("skipping this test because it's currently flakey when transparent proxy is enabled")
-	}
 	ctx := suite.Environment().DefaultContext(t)
 
 	helmValues := map[string]string{
@@ -146,8 +143,8 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 	}
 
 	logger.Log(t, "restarting Consul client daemonset")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul", releaseName))
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul", releaseName))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "restart", fmt.Sprintf("ds/%s-consul-client", releaseName))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "rollout", "status", fmt.Sprintf("ds/%s-consul-client", releaseName))
 
 	logger.Log(t, "checking that connection is still successful")
 	if cfg.EnableTransparentProxy {

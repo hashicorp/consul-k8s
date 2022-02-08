@@ -30,6 +30,8 @@ func TestNewHelmCluster(t *testing.T) {
 				"connectInject.logLevel":                        "debug",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 				"dns.enabled":                                   "false",
+				"server.extraConfig":                            `"{\"log_level\": \"TRACE\"}"`,
+				"client.extraConfig":                            `"{\"log_level\": \"TRACE\"}"`,
 			},
 		},
 		{
@@ -42,6 +44,8 @@ func TestNewHelmCluster(t *testing.T) {
 				"connectInject.logLevel":                        "debug",
 				"connectInject.transparentProxy.defaultEnabled": "true",
 				"dns.enabled":                                   "true",
+				"server.extraConfig":                            `"{\"foo\": \"bar\"}"`,
+				"client.extraConfig":                            `"{\"foo\": \"bar\"}"`,
 				"feature.enabled":                               "true",
 			},
 			want: map[string]string{
@@ -52,6 +56,8 @@ func TestNewHelmCluster(t *testing.T) {
 				"connectInject.logLevel":                        "debug",
 				"connectInject.transparentProxy.defaultEnabled": "true",
 				"dns.enabled":                                   "true",
+				"server.extraConfig":                            `"{\"foo\": \"bar\"}"`,
+				"client.extraConfig":                            `"{\"foo\": \"bar\"}"`,
 				"feature.enabled":                               "true",
 			},
 		},

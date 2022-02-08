@@ -2,17 +2,23 @@
 {{- if (and (and .Values.global.tls.enabled .Values.global.tls.httpsOnly) (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics))}}{{ fail "global.metrics.enableAgentMetrics cannot be enabled if TLS (HTTPS only) is enabled" }}{{ end -}}
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (and .Values.global.adminPartitions.enabled $serverEnabled (ne .Values.global.adminPartitions.name "default"))}}{{ fail "global.adminPartitions.name has to be \"default\" in the server cluster" }}{{ end -}}
+{{- if (and (not .Values.global.secretsBackend.vault.consulClientRole) .Values.global.secretsBackend.vault.enabled) }}{{ fail "global.secretsBackend.vault.consulClientRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.enableAutoEncrypt)) }}{{ fail "global.tls.enableAutoEncrypt must be true if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.secretsBackend.vault.consulCARole)) }}{{ fail "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" }}{{ end -}}
+{{- if and .Values.global.federation.enabled .Values.global.adminPartitions.enabled }}{{ fail "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" }}{{ end }}
 # DaemonSet to run the Consul clients on every node.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ template "consul.fullname" . }}
+  name: {{ template "consul.fullname" . }}-client
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: client
 spec:
   {{- if .Values.client.updateStrategy }}
   updateStrategy:
@@ -37,6 +43,27 @@ spec:
           {{- toYaml .Values.client.extraLabels | nindent 8 }}
         {{- end }}
       annotations:
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulClientRole }}"
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.gossipEncryption.secretName }}
+        {{- with .Values.global.gossipEncryption }}
+        "vault.hashicorp.com/agent-inject-secret-gossip.txt": {{ .secretName }}
+        "vault.hashicorp.com/agent-inject-template-gossip.txt": {{ template "consul.vaultGossipTemplate" . }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+        {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.client.annotations }}
@@ -89,6 +116,7 @@ spec:
           configMap:
             name: {{ template "consul.fullname" . }}-client-config
         {{- if .Values.global.tls.enabled }}
+        {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
           secret:
             {{- if .Values.global.tls.caCert.secretName }}
@@ -117,6 +145,7 @@ spec:
             medium: "Memory"
         {{- end }}
         {{- end }}
+        {{- end }}
         {{- range .Values.client.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -130,10 +159,10 @@ spec:
         - name: aclconfig
           emptyDir: {}
         {{- else }}
-        {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
         - name: consul-license
           secret:
-            secretName: {{ .Values.server.enterpriseLicense.secretName }}
+            secretName: {{ .Values.global.enterpriseLicense.secretName }}
         {{- end }}
         {{- end }}
       containers:
@@ -169,6 +198,7 @@ spec:
             - name: CONSUL_DISABLE_PERM_MGMT
               value: "true"
             {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
+            {{- if not .Values.global.secretsBackend.vault.enabled }}
             - name: GOSSIP_KEY
               valueFrom:
                 secretKeyRef:
@@ -180,9 +210,10 @@ spec:
                   key: {{ .Values.global.gossipEncryption.secretKey }}
                 {{- end }}
             {{- end }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
             - name: CONSUL_LICENSE_PATH
-              value: /consul/license/{{ .Values.server.enterpriseLicense.secretKey }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
@@ -202,6 +233,13 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
+              GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
+              {{- end }}
+              {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
+              {{ template "consul.recursors" }}
+              {{- end }}
+
               {{ template "consul.extraconfig" }}
 
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
@@ -214,7 +252,11 @@ spec:
                 {{- end }}
                 -hcl='leave_on_terminate = true' \
                 {{- if .Values.global.tls.enabled }}
+                {{- if .Values.global.secretsBackend.vault.enabled }}
+                -hcl='ca_file = "/vault/secrets/serverca.crt"' \
+                {{- else }}
                 -hcl='ca_file = "/consul/tls/ca/tls.crt"' \
+                {{- end }}
                 {{- if .Values.global.tls.enableAutoEncrypt }}
                 -hcl='auto_encrypt = {tls = true}' \
                 -hcl="auto_encrypt = {ip_san = [\"$HOST_IP\",\"$POD_IP\"]}" \
@@ -275,6 +317,9 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
+                {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
+                $recursor_flags \
+                {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
                 -domain={{ .Values.global.domain }}
           volumeMounts:
@@ -283,6 +328,7 @@ spec:
             - name: config
               mountPath: /consul/config
             {{- if .Values.global.tls.enabled }}
+            {{- if not .Values.global.secretsBackend.vault.enabled }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
@@ -290,6 +336,7 @@ spec:
             - name: consul-client-cert
               mountPath: /consul/tls/client
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- end }}
             {{- range .Values.client.extraVolumes }}
@@ -301,7 +348,7 @@ spec:
             - name: aclconfig
               mountPath: /consul/aclconfig
             {{- else }}
-            {{- if (and .Values.server.enterpriseLicense.secretName .Values.server.enterpriseLicense.secretKey .Values.server.enterpriseLicense.enableLicenseAutoload) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload) }}
             - name: consul-license
               mountPath: /consul/license
               readOnly: true
@@ -425,6 +472,7 @@ spec:
             mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0.pem tls.crt
             mv {{ .Values.global.datacenter }}-client-{{ .Values.global.domain }}-0-key.pem tls.key
         volumeMounts:
+          {{- if not .Values.global.secretsBackend.vault.enabled }}
           - name: consul-client-cert
             mountPath: /consul/tls/client
           - name: consul-ca-cert
@@ -433,6 +481,7 @@ spec:
           - name: consul-ca-key
             mountPath: /consul/tls/ca/key
             readOnly: true
+          {{- end }}
         resources:
           requests:
             memory: "50Mi"

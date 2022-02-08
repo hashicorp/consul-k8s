@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -248,12 +249,14 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:                 client,
-				ConsulClient:           nil,
-				Logger:                 logrtest.TestLogger{T: t},
-				decoder:                decoder,
-				EnableConsulNamespaces: true,
-				EnableNSMirroring:      c.mirror,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				decoder:      decoder,
+				ConsulMeta: common.ConsulMeta{
+					NamespacesEnabled: true,
+					Mirroring:         c.mirror,
+				},
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -436,12 +439,14 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:                 client,
-				ConsulClient:           nil,
-				Logger:                 logrtest.TestLogger{T: t},
-				decoder:                decoder,
-				EnableConsulNamespaces: true,
-				EnableNSMirroring:      c.mirror,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				decoder:      decoder,
+				ConsulMeta: common.ConsulMeta{
+					NamespacesEnabled: true,
+					Mirroring:         c.mirror,
+				},
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -595,12 +600,14 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				require.NoError(t, err)
 
 				validator := &ServiceIntentionsWebhook{
-					Client:                 client,
-					ConsulClient:           nil,
-					Logger:                 logrtest.TestLogger{T: t},
-					decoder:                decoder,
-					EnableConsulNamespaces: namespacesEnabled,
-					EnableNSMirroring:      true,
+					Client:       client,
+					ConsulClient: nil,
+					Logger:       logrtest.TestLogger{T: t},
+					decoder:      decoder,
+					ConsulMeta: common.ConsulMeta{
+						NamespacesEnabled: namespacesEnabled,
+						Mirroring:         true,
+					},
 				}
 				response := validator.Handle(ctx, admission.Request{
 					AdmissionRequest: admissionv1.AdmissionRequest{
