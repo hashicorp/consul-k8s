@@ -9,13 +9,13 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: controller
+    component: connect-injector
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ template "consul.fullname" . }}-connect-inject-leader-election
 subjects:
 - kind: ServiceAccount
-  name: {{ template "consul.fullname" . }}-connect-injector-webhook-svc-account
+  name: {{ template "consul.fullname" . }}-connect-injector
   namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -50,7 +50,7 @@ RUN set -eux && \
     apkArch="$(apk --print-arch)" && \
     case "${apkArch}" in \
     aarch64) ARCH='arm64' ;; \
-    armhf) ARCH='armhfv6' ;; \
+    armhf) ARCH='arm' ;; \
     x86) ARCH='386' ;; \
     x86_64) ARCH='amd64' ;; \
     *) echo >&2 "error: unsupported architecture: ${apkArch} (see ${HASHICORP_RELEASES}/${NAME}/${VERSION}/)" && exit 1 ;; \

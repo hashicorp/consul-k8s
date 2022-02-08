@@ -1,4 +1,4 @@
-// +build enterprise
+//go:build enterprise
 
 package controller_test
 
@@ -120,7 +120,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				ConsulKind: capi.ProxyDefaults,
 				KubeResource: &v1alpha1.ProxyDefaults{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "global",
+						Name:      common.Global,
 						Namespace: c.SourceKubeNS,
 					},
 					Spec: v1alpha1.ProxyDefaultsSpec{

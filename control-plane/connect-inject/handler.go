@@ -123,7 +123,7 @@ type Handler struct {
 
 	// Resource settings for Consul sidecar. All of these fields
 	// will be populated by the defaults provided in the initial flags.
-	ConsulSidecarResources corev1.ResourceRequirements
+	DefaultConsulSidecarResources corev1.ResourceRequirements
 
 	// EnableTransparentProxy enables transparent proxy mode.
 	// This means that the injected init container will apply traffic redirection rules
@@ -133,6 +133,14 @@ type Handler struct {
 	// TProxyOverwriteProbes controls whether the webhook should mutate pod's HTTP probes
 	// to point them to the Envoy proxy.
 	TProxyOverwriteProbes bool
+
+	// EnableConsulDNS enables traffic redirection so that DNS requests are directed to Consul
+	// from mesh services.
+	EnableConsulDNS bool
+
+	// ResourcePrefix is the prefix used for the installation which is used to determine the Service
+	// name of the Consul DNS service.
+	ResourcePrefix string
 
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
@@ -217,7 +225,7 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
-	// Add the init container that registers the service and sets up the Envoy configuration.
+	// Add the init container that listens for the service and proxy service and sets up the Envoy configuration.
 	initContainer, err := h.containerInit(*ns, pod)
 	if err != nil {
 		h.Log.Error(err, "error configuring injection init container", "request name", req.Name)

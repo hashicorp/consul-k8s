@@ -335,7 +335,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
-  [ "${actual}" = "envoyproxy/envoy-alpine:v1.18.4" ]
+  [ "${actual}" = "envoyproxy/envoy-alpine:v1.20.1" ]
 }
 
 @test "meshGateway/Deployment: setting meshGateway.imageEnvoy fails" {
@@ -1516,4 +1516,60 @@ EOF
       --set 'meshGateway.globalMode=something' .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
+}
+
+#--------------------------------------------------------------------
+# partitions
+
+@test "meshGateway/Deployment: partitions options disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "meshGateway/Deployment: partition name set on initContainer with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[1].command | any(contains("partition = \"default\""))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: partition name set on container with .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("partition=default"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: fails if namespaces are disabled and .global.adminPartitions.enabled=true" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=false' \
+      --set 'meshGateway.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.enableConsulNamespaces must be true if global.adminPartitions.enabled=true" ]]
 }

@@ -69,6 +69,12 @@ const (
 	annotationSidecarProxyMemoryLimit   = "consul.hashicorp.com/sidecar-proxy-memory-limit"
 	annotationSidecarProxyMemoryRequest = "consul.hashicorp.com/sidecar-proxy-memory-request"
 
+	// annotations for consul sidecar resource limits.
+	annotationConsulSidecarCPULimit      = "consul.hashicorp.com/consul-sidecar-cpu-limit"
+	annotationConsulSidecarCPURequest    = "consul.hashicorp.com/consul-sidecar-cpu-request"
+	annotationConsulSidecarMemoryLimit   = "consul.hashicorp.com/consul-sidecar-memory-limit"
+	annotationConsulSidecarMemoryRequest = "consul.hashicorp.com/consul-sidecar-memory-request"
+
 	// annotations for metrics to configure where Prometheus scrapes
 	// metrics from, whether to run a merged metrics endpoint on the consul
 	// sidecar, and configure the connect service metrics.
@@ -89,6 +95,12 @@ const (
 
 	// annotationConsulNamespace is the Consul namespace the service is registered into.
 	annotationConsulNamespace = "consul.hashicorp.com/consul-namespace"
+
+	// keyConsulDNS enables or disables Consul DNS for a given pod. It can also be set as a label
+	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
+	// with their own annotation.
+	// This annotation/label takes a boolean value (true/false).
+	keyConsulDNS = "consul.hashicorp.com/consul-dns"
 
 	// keyTransparentProxy enables or disables transparent proxy for a given pod. It can also be set as a label
 	// on a namespace to define the default behaviour for connect-injected pods which do not otherwise override this setting
@@ -115,6 +127,10 @@ const (
 	// annotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/handler.
 	annotationOriginalPod = "consul.hashicorp.com/original-pod"
+
+	// labelServiceIgnore is a label that can be added to a service to prevent it from being
+	// registered with Consul.
+	labelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
 	// injected is used as the annotation value for annotationInjected.
 	injected = "injected"

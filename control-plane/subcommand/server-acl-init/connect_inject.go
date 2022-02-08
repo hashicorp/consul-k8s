@@ -139,7 +139,7 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client) err
 func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod, error) {
 	// Get the Secret name for the auth method ServiceAccount.
 	var authMethodServiceAccount *apiv1.ServiceAccount
-	saName := c.withPrefix("connect-injector-authmethod-svc-account")
+	saName := c.withPrefix("connect-injector")
 	err := c.untilSucceeds(fmt.Sprintf("getting %s ServiceAccount", saName),
 		func() error {
 			var err error

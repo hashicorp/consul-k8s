@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // consulSidecar starts the consul-sidecar command to only run
@@ -12,6 +13,11 @@ import (
 // need to keep services registered as this is handled in the endpoints-controller.
 func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 	metricsPorts, err := h.MetricsConfig.mergedMetricsServerConfiguration(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	resources, err := h.consulSidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -38,6 +44,72 @@ func (h *Handler) consulSidecar(pod corev1.Pod) (corev1.Container, error) {
 			},
 		},
 		Command:   command,
-		Resources: h.ConsulSidecarResources,
+		Resources: resources,
 	}, nil
+}
+
+func (h *Handler) consulSidecarResources(pod corev1.Pod) (corev1.ResourceRequirements, error) {
+	resources := corev1.ResourceRequirements{
+		Limits:   corev1.ResourceList{},
+		Requests: corev1.ResourceList{},
+	}
+	// zeroQuantity is used for comparison to see if a quantity was explicitly
+	// set.
+	var zeroQuantity resource.Quantity
+
+	// NOTE: We only want to set the limit/request if the default or annotation
+	// was explicitly set. If it's not explicitly set, it will be the zero value
+	// which would show up in the pod spec as being explicitly set to zero if we
+	// set that key, e.g. "cpu" to zero.
+	// We want it to not show up in the pod spec at all if if it's not explicitly
+	// set so that users aren't wondering why it's set to 0 when they didn't specify
+	// a request/limit. If they have explicitly set it to 0 then it will be set
+	// to 0 in the pod spec because we're doing a comparison to the zero-valued
+	// struct.
+
+	// CPU Limit.
+	if anno, ok := pod.Annotations[annotationConsulSidecarCPULimit]; ok {
+		cpuLimit, err := resource.ParseQuantity(anno)
+		if err != nil {
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarCPULimit, anno, err)
+		}
+		resources.Limits[corev1.ResourceCPU] = cpuLimit
+	} else if h.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU] != zeroQuantity {
+		resources.Limits[corev1.ResourceCPU] = h.DefaultConsulSidecarResources.Limits[corev1.ResourceCPU]
+	}
+
+	// CPU Request.
+	if anno, ok := pod.Annotations[annotationConsulSidecarCPURequest]; ok {
+		cpuRequest, err := resource.ParseQuantity(anno)
+		if err != nil {
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarCPURequest, anno, err)
+		}
+		resources.Requests[corev1.ResourceCPU] = cpuRequest
+	} else if h.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU] != zeroQuantity {
+		resources.Requests[corev1.ResourceCPU] = h.DefaultConsulSidecarResources.Requests[corev1.ResourceCPU]
+	}
+
+	// Memory Limit.
+	if anno, ok := pod.Annotations[annotationConsulSidecarMemoryLimit]; ok {
+		memoryLimit, err := resource.ParseQuantity(anno)
+		if err != nil {
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarMemoryLimit, anno, err)
+		}
+		resources.Limits[corev1.ResourceMemory] = memoryLimit
+	} else if h.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory] != zeroQuantity {
+		resources.Limits[corev1.ResourceMemory] = h.DefaultConsulSidecarResources.Limits[corev1.ResourceMemory]
+	}
+
+	// Memory Request.
+	if anno, ok := pod.Annotations[annotationConsulSidecarMemoryRequest]; ok {
+		memoryRequest, err := resource.ParseQuantity(anno)
+		if err != nil {
+			return corev1.ResourceRequirements{}, fmt.Errorf("parsing annotation %s:%q: %s", annotationConsulSidecarMemoryRequest, anno, err)
+		}
+		resources.Requests[corev1.ResourceMemory] = memoryRequest
+	} else if h.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory] != zeroQuantity {
+		resources.Requests[corev1.ResourceMemory] = h.DefaultConsulSidecarResources.Requests[corev1.ResourceMemory]
+	}
+
+	return resources, nil
 }

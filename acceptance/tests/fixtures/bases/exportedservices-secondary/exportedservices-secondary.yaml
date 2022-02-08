@@ -1,0 +1,6 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ExportedServices
+metadata:
+  name: secondary
+spec:
+  services: []

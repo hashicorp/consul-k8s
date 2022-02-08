@@ -1,0 +1,3 @@
+resources:
+  - ../../bases/crds-oss
+  - exportedservices.yaml

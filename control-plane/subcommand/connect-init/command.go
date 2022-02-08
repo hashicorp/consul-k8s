@@ -26,6 +26,9 @@ const (
 	numLoginRetries = 3
 	// The number of times to attempt to read this service (120s).
 	defaultServicePollingRetries = 120
+
+	raftReplicationTimeout   = 2 * time.Second
+	tokenReadPollingInterval = 100 * time.Millisecond
 )
 
 type Command struct {
@@ -138,6 +141,12 @@ func (c *Command) Run(args []string) int {
 			return err
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), numLoginRetries))
 		if err != nil {
+			if c.flagServiceAccountName == "default" {
+				c.logger.Warn("The service account name for this Pod is \"default\"." +
+					" In default installations this is not a supported service account name." +
+					" The service account name must match the name of the Kubernetes Service" +
+					" or the consul.hashicorp.com/connect-service annotation.")
+			}
 			c.logger.Error("Hit maximum retries for consul login", "error", err)
 			return 1
 		}
@@ -149,6 +158,49 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		c.logger.Info("Consul login complete")
+
+		// A workaround to check that the ACL token is replicated to other Consul servers.
+		//
+		// A consul client may reach out to a follower instead of a leader to resolve the token during the
+		// call to get services below. This is because clients talk to servers in the stale consistency mode
+		// to decrease the load on the servers (see https://www.consul.io/docs/architecture/consensus#stale).
+		// In that case, it's possible that the token isn't replicated
+		// to that server instance yet. The client will then get an "ACL not found" error
+		// and subsequently cache this not found response. Then our call below
+		// to get services from the agent will keep hitting the same "ACL not found" error
+		// until the cache entry expires (determined by the `acl_token_ttl` which defaults to 30 seconds).
+		// This is not great because it will delay app start up time by 30 seconds in most cases
+		// (if you are running 3 servers, then the probability of ending up on a follower is close to 2/3).
+		//
+		// To help with that, we try to first read the token in the stale consistency mode until we
+		// get a successful response. This should not take more than 100ms because raft replication
+		// should in most cases take less than that (see https://www.consul.io/docs/install/performance#read-write-tuning)
+		// but we set the timeout to 2s to be sure.
+		//
+		// Note though that this workaround does not eliminate this problem completely. It's still possible
+		// for this call and the next call to reach different servers and those servers to have different
+		// states from each other.
+		// For example, this call can reach a leader and succeed, while the call below can go to a follower
+		// that is still behind the leader and get an "ACL not found" error.
+		// However, this is a pretty unlikely case because
+		// clients have sticky connections to a server, and those connections get rebalanced only every 2-3min.
+		// And so, this workaround should work in a vast majority of cases.
+		c.logger.Info("Checking that the ACL token exists when reading it in the stale consistency mode")
+		// Use raft timeout and polling interval to determine the number of retries.
+		numTokenReadRetries := uint64(raftReplicationTimeout.Milliseconds() / tokenReadPollingInterval.Milliseconds())
+		err = backoff.Retry(func() error {
+			_, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{AllowStale: true})
+			if err != nil {
+				c.logger.Error("Unable to read ACL token; retrying", "err", err)
+			}
+			return err
+		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(tokenReadPollingInterval), numTokenReadRetries))
+		if err != nil {
+			c.logger.Error("Unable to read ACL token from a Consul server; "+
+				"please check that your server cluster is healthy", "err", err)
+			return 1
+		}
+		c.logger.Info("Successfully read ACL token from the server")
 	}
 
 	// Now wait for the service to be registered. Do this by querying the Agent for a service
@@ -173,6 +225,12 @@ func (c *Command) Run(args []string) int {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
+			if len(serviceList) > 2 {
+				c.logger.Error("There are multiple Consul services registered for this pod when there must only be one." +
+					" Check if there are multiple Kubernetes services selecting this pod and add the label" +
+					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
+			}
+
 			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
 		}
 		for _, svc := range serviceList {

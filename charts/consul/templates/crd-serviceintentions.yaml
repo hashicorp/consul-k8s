@@ -19,6 +19,8 @@ spec:
     kind: ServiceIntentions
     listKind: ServiceIntentionsList
     plural: serviceintentions
+    shortNames:
+    - service-intentions
     singular: serviceintentions
   scope: Namespaced
   versions:

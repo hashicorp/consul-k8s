@@ -1,4 +1,4 @@
-// +build enterprise
+//go:build enterprise
 
 package namespaces
 
@@ -33,7 +33,7 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.ACL.Enabled = c.ACLsEnabled
 				cfg.ACL.DefaultPolicy = "deny"
-				cfg.ACL.Tokens.Master = masterToken
+				cfg.ACL.Tokens.InitialManagement = masterToken
 			})
 			req.NoError(err)
 			defer consul.Stop()
@@ -104,7 +104,7 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 			consul, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.ACL.Enabled = c.ACLsEnabled
 				cfg.ACL.DefaultPolicy = "deny"
-				cfg.ACL.Tokens.Master = masterToken
+				cfg.ACL.Tokens.InitialManagement = masterToken
 			})
 			req.NoError(err)
 			defer consul.Stop()

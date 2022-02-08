@@ -1,0 +1,46 @@
+{{- if (and .Values.apiGateway.enabled .Values.apiGateway.managedGatewayClass.enabled) }}
+apiVersion: api-gateway.consul.hashicorp.com/v1alpha1
+kind: GatewayClassConfig
+metadata:
+  name: consul-api-gateway
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: api-gateway
+spec:
+  consul:
+    authentication:
+      {{- if .Values.global.acls.manageSystemACLs }}
+      managed: true
+      method: {{ template "consul.fullname" . }}-k8s-auth-method
+      {{- end }}
+    {{- if .Values.global.tls.enabled }}
+    scheme: https
+    {{- else }}
+    scheme: http
+    {{- end }}
+    ports:
+      grpc: 8502
+    {{- if .Values.global.tls.enabled }}
+      http: 8501
+    {{- else }}
+      http: 8500
+    {{- end }}
+  image:
+    consulAPIGateway: {{ .Values.apiGateway.image }}
+    envoy: {{ .Values.global.imageEnvoy }}
+  {{- if .Values.apiGateway.nodeSelector }}
+  nodeSelector:
+    {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
+  copyAnnotations:
+    service: 
+      {{ tpl .Values.apiGateway.managedGatewayClass.copyAnnotations.service.annotations . | nindent 6 | trim }}
+  {{- end }}
+  serviceType: {{ .Values.apiGateway.managedGatewayClass.serviceType }}
+  useHostPorts: {{ .Values.apiGateway.managedGatewayClass.useHostPorts }}
+  logLevel: {{ default .Values.global.logLevel .Values.apiGateway.managedGatewayClass.logLevel }}
+{{- end }}

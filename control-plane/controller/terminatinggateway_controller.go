@@ -36,7 +36,5 @@ func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj cli
 }
 
 func (r *TerminatingGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&consulv1alpha1.TerminatingGateway{}).
-		Complete(r)
+	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
 }

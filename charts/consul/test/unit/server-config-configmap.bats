@@ -86,6 +86,28 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/ConfigMap: does not create ui config when .ui.enabled=false and .ui.metrics.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'ui.metrics.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: does not create ui config when .ui.enabled=true and .global.metrics.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'global.metrics.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "server/ConfigMap: does not create ui config when .ui.enabled=true and .ui.metrics.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -177,5 +199,300 @@ load _helpers
       --set 'global.acls.replicationToken.secretKey=key' \
       . | tee /dev/stderr |
       yq -r '.data["acl-config.json"]' | yq -r '.acl.enable_token_replication' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Vault Connect CA
+
+@test "server/ConfigMap: doesn't add connect CA config by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled but vault address, root and int PKI paths are not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and vault address is set, but root and int PKI paths are not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and root pki path is set, but vault address and int PKI paths are not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and int path is set, but vault address and root PKI paths are not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and root and int paths are set, but vault address is not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and root path and address are set, but int path is not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't add connect CA config when vault is enabled and int path and address are set, but root path is not set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.intPKIPath=int' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.intPKIPath=int' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: adds connect CA config when vault is enabled and connect CA are configured" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = '"{\n  \"connect\": [\n    {\n      \"ca_config\": [\n        {\n          \"address\": \"example.com\",\n          \"intermediate_pki_path\": \"int\",\n          \"root_pki_path\": \"root\",\n          \"auth_method\": {\n            \"type\": \"kubernetes\",\n            \"params\": {\n              \"role\": \"foo\"\n            }\n          }\n        }\n      ],\n      \"ca_provider\": \"vault\"\n    }\n  ]\n}\n"' ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = '"{}\n"' ]
+}
+
+@test "server/ConfigMap: can set additional connect CA config" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.connectCA.additionalConfig="{\"hello\": \"world\"}"' \
+      . | tee /dev/stderr |
+      yq '.data["additional-connect-ca-config.json"]' | tee /dev/stderr)
+  [ "${actual}" = '"{\"hello\": \"world\"}\n"' ]
+}
+
+@test "server/ConfigMap: doesn't set Vault CA cert in connect CA config by default" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"ca_file\": \"/consul/vault-ca/tls.crt\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't set Vault CA cert in connect CA config when vault CA secret name is set but secret key is not" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"ca_file\": \"/consul/vault-ca/tls.crt\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't set Vault CA cert in connect CA config when vault CA secret key is set but secret name is not" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"ca_file\": \"/consul/vault-ca/tls.crt\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: doesn't set Vault CA cert in connect CA config when both vault CA secret name and key are set" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"ca_file\": \"/consul/vault-ca/tls.crt\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

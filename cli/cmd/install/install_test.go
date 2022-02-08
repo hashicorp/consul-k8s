@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/cmd/common"
+	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +30,7 @@ func TestCheckForPreviousPVCs(t *testing.T) {
 	c.kubernetes.CoreV1().PersistentVolumeClaims("default").Create(context.Background(), pvc2, metav1.CreateOptions{})
 	err := c.checkForPreviousPVCs()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "found PVCs from previous installations (default/consul-server-test1,default/consul-server-test2), delete before re-installing")
+	require.Equal(t, err.Error(), "found persistent volume claims from previous installations, delete before reinstalling: default/consul-server-test1,default/consul-server-test2")
 
 	// Clear out the client and make sure the check now passes.
 	c.kubernetes = fake.NewSimpleClientset()
@@ -53,13 +53,14 @@ func TestCheckForPreviousSecrets(t *testing.T) {
 	c.kubernetes = fake.NewSimpleClientset()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-consul-bootstrap-acl-token",
+			Name:   "test-consul-bootstrap-acl-token",
+			Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
 		},
 	}
 	c.kubernetes.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
 	err := c.checkForPreviousSecrets()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "found consul-acl-bootstrap-token secret from previous installations: \"test-consul-bootstrap-acl-token\" in namespace \"default\". To delete, run kubectl delete secret test-consul-bootstrap-acl-token --namespace default")
+	require.Contains(t, err.Error(), "found Consul secret from previous installation")
 
 	// Clear out the client and make sure the check now passes.
 	c.kubernetes = fake.NewSimpleClientset()
@@ -120,54 +121,6 @@ func TestValidateFlags(t *testing.T) {
 	}
 }
 
-// TestValidLabel calls validLabel() which checks strings match RFC 1123 label convention.
-func TestValidLabel(t *testing.T) {
-	testCases := []struct {
-		description string
-		input       string
-		expected    bool
-	}{
-		{
-			"Standard name with leading numbers works.",
-			"1234-abc",
-			true,
-		},
-		{
-			"All lower case letters works.",
-			"peppertrout",
-			true,
-		},
-		{
-			"Test that dashes in the middle are allowed.",
-			"pepper-trout",
-			true,
-		},
-		{
-			"Capitals violate RFC 1123 lower case label.",
-			"Peppertrout",
-			false,
-		},
-		{
-			"Underscores are not permitted anywhere.",
-			"ab_cd",
-			false,
-		},
-		{
-			"The dash must be in the middle of the word, not on the start/end character.",
-			"peppertrout-",
-			false,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.description, func(t *testing.T) {
-			if result := validLabel(testCase.input); result != testCase.expected {
-				t.Errorf("Incorrect output, got %v and expected %v", result, testCase.expected)
-			}
-		})
-	}
-}
-
 // getInitializedCommand sets up a command struct for tests.
 func getInitializedCommand(t *testing.T) *Command {
 	t.Helper()
@@ -186,4 +139,35 @@ func getInitializedCommand(t *testing.T) *Command {
 	}
 	c.init()
 	return c
+}
+
+func TestCheckValidEnterprise(t *testing.T) {
+	c := getInitializedCommand(t)
+	c.kubernetes = fake.NewSimpleClientset()
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-secret",
+		},
+	}
+	secret2 := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-secret2",
+		},
+	}
+
+	// Enterprise secret is valid.
+	c.kubernetes.CoreV1().Secrets("consul").Create(context.Background(), secret, metav1.CreateOptions{})
+	err := c.checkValidEnterprise(secret.Name)
+	require.NoError(t, err)
+
+	// Enterprise secret does not exist.
+	err = c.checkValidEnterprise("consul-unrelated-secret")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "please make sure that the secret exists")
+
+	// Enterprise secret exists in a different namespace.
+	c.kubernetes.CoreV1().Secrets("unrelated").Create(context.Background(), secret2, metav1.CreateOptions{})
+	err = c.checkValidEnterprise(secret2.Name)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "please make sure that the secret exists")
 }
