@@ -52,31 +52,14 @@ type ConnectHelper struct {
 }
 
 // InstallThenCheckConnectInjection creates a new cluster using the ClusterGenerator function then runs its Create method
-// to install Consul. It then sets up a consulClient and passes that to the testConnectInject method to test service
-// mesh connectivity.
+// to install Consul. It sets up static-server and static-client pods for the test.
+// It then sets up a consulClient and runs testConnectInject to test service mesh connectivity.
 func (c *ConnectHelper) InstallThenCheckConnectInjection() {
 	c.consulCluster = c.ClusterGenerator(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	c.consulCluster.Create(c.T)
 
 	c.consulClient = c.consulCluster.SetupConsulClient(c.T, c.Secure)
 
-	c.testConnectInject()
-}
-
-func (c *ConnectHelper) UpgradeThenCheckConnectInjection() {
-	require.True(c.T, c.consulCluster != nil,
-		"consulCluster must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
-	require.True(c.T, c.consulClient != nil,
-		"consulClient must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
-
-	c.consulCluster.Upgrade(c.T, c.helmValues())
-
-	c.testConnectInject()
-}
-
-// ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service
-// mesh connectivity.
-func (c *ConnectHelper) testConnectInject() {
 	// Check that the ACL token is deleted.
 	if c.Secure {
 		// We need to register the cleanup function before we create the deployments
@@ -101,6 +84,26 @@ func (c *ConnectHelper) testConnectInject() {
 	} else {
 		k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 	}
+
+	c.testConnectInject()
+}
+
+// UpgradeThenCheckConnectInjection usese the existing Consul cluster and upgrades it using Helm values set by the Secure,
+// AutoEncrypt, and AdditionalHelmValues fields. It then runs testConnectInject to test service mesh connectivity.
+func (c *ConnectHelper) UpgradeThenCheckConnectInjection() {
+	require.True(c.T, c.consulCluster != nil,
+		"consulCluster must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
+	require.True(c.T, c.consulClient != nil,
+		"consulClient must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
+
+	c.consulCluster.Upgrade(c.T, c.helmValues())
+
+	c.testConnectInject()
+}
+
+// ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service
+// mesh connectivity.
+func (c *ConnectHelper) testConnectInject() {
 
 	// Check that both static-server and static-client have been injected and now have 2 containers.
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
