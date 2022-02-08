@@ -36,6 +36,44 @@ load _helpers
       .
 }
 
+@test "apiGateway/Deployment: enable namespaces" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-consul-destination-namespace=default")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: enable namespace mirroring" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'apiGateway.consulNamespaces.mirroringK8S=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-mirror-k8s-namespaces=true")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "apiGateway/Deployment: enable namespace mirroring prefixes" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'apiGateway.consulNamespaces.mirroringK8S=true' \
+      --set 'apiGateway.consulNamespaces.mirroringK8SPrefix=foo' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | join(" ") | contains("-mirror-k8s-namespace-prefix=foo")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 
 @test "apiGateway/Deployment: container image overrides" {
   cd `chart_dir`
