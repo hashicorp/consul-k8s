@@ -67,17 +67,57 @@ func TestCLIConnectInjectOnUpgrade(t *testing.T) {
 			initialState:  TestCase{},
 			upgradedState: TestCase{autoEncrypt: true},
 		},
-		"Upgrade to auto-encrypt with secure": {
-			initialState:  TestCase{secure: true},
-			upgradedState: TestCase{secure: true, autoEncrypt: true},
-		},
-		"Upgrade from Consul 1.10 to Consul 1.11": {
+		"Upgrade Consul image": {
 			initialState: TestCase{
 				helmValues: map[string]string{
 					"global.image": "hashicorp/consul:1.10.0",
 				},
 			},
 			upgradedState: TestCase{
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.11.2",
+				},
+			},
+		},
+		"Upgrade Consul image with secure": {
+			initialState: TestCase{
+				secure: true,
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.10.0",
+				},
+			},
+			upgradedState: TestCase{
+				secure: true,
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.11.2",
+				},
+			},
+		},
+		"Upgrade Consul image with autoEncrypt": {
+			initialState: TestCase{
+				autoEncrypt: true,
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.10.0",
+				},
+			},
+			upgradedState: TestCase{
+				autoEncrypt: true,
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.11.2",
+				},
+			},
+		},
+		"Upgrade Consul image with secure and autoEncrypt": {
+			initialState: TestCase{
+				secure:      true,
+				autoEncrypt: true,
+				helmValues: map[string]string{
+					"global.image": "hashicorp/consul:1.10.0",
+				},
+			},
+			upgradedState: TestCase{
+				secure:      true,
+				autoEncrypt: true,
 				helmValues: map[string]string{
 					"global.image": "hashicorp/consul:1.11.2",
 				},
