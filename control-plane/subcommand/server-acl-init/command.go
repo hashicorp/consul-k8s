@@ -1087,7 +1087,9 @@ func (c *Command) createACLPolicyRoleAndBindingRule(componentName string, rules 
 }
 
 const globalTokenTrue = true
-const globalTokenFalse = false
+
+// stupid linter: uncomment this when we add a non-global token
+// const globalTokenFalse = false
 
 const consulDefaultNamespace = "default"
 const consulDefaultPartition = "default"
