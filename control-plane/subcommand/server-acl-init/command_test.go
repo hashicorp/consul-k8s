@@ -2339,6 +2339,83 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	}
 }
 
+// Test creating the correct ACL policies and Binding Rules for components that use the auth method.
+// The test works by running the command and then ensuring that:
+// * A binding rule exists which references the acl-role
+// * The ACL role has the correct policyName
+func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		TestName    string
+		TokenFlags  []string
+		PolicyNames []string
+		Roles       []string
+	}{
+		{
+			TestName:    "Controller",
+			TokenFlags:  []string{"-create-component-auth-method", "-create-controller-token"},
+			PolicyNames: []string{"controller-token"},
+			Roles:       []string{"controller-acl-role"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.TestName, func(t *testing.T) {
+			k8s, testSvr := completeSetup(t)
+			defer testSvr.Stop()
+			setUpK8sServiceAccount(t, k8s, ns)
+
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+			}
+			cmdArgs := append([]string{
+				"-timeout=500ms",
+				"-resource-prefix=" + resourcePrefix,
+				"-k8s-namespace=" + ns,
+				"-server-address", strings.Split(testSvr.HTTPAddr, ":")[0],
+				"-server-port", strings.Split(testSvr.HTTPAddr, ":")[1],
+			}, c.TokenFlags...)
+			cmd.init()
+			responseCode := cmd.Run(cmdArgs)
+			require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+			bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+			consul, err := api.NewClient(&api.Config{
+				Address: testSvr.HTTPAddr,
+				Token:   bootToken,
+			})
+			require.NoError(t, err)
+
+			// Check that the expected policy was created.
+			time.Sleep(time.Second * 5)
+			// Check that the Role exists + has correct Policy
+			for i := range c.Roles {
+				const releaseName = "release-name"
+				roleName := fmt.Sprintf("%s-consul-%s", releaseName, c.Roles[i])
+				role, _, err := consul.ACL().RoleReadByName(roleName, &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, role)
+
+				// Check that there exists a RoleBinding that references this Role.
+				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s", releaseName, common.ComponentAuthMethod), &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, rb)
+				found := false
+				for i := range rb {
+					if rb[i].BindName == roleName {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+			}
+		})
+	}
+}
+
 // getBootToken gets the bootstrap token from the Kubernetes secret. It will
 // cause a test failure if the Secret doesn't exist or is malformed.
 func getBootToken(t *testing.T, k8s *fake.Clientset, prefix string, k8sNamespace string) string {

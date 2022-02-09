@@ -1034,6 +1034,7 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 				_, _, err := client.ACL().BindingRuleCreate(abr, nil)
 				return err
 			})
+
 	}
 	return err
 }

@@ -197,7 +197,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
 
-	test.SetupK8sAuthMethod(t, consulClient, "test-sa", "default")
+	test.SetupK8sComponentAuthMethod(t, consulClient, "test-sa", "default")
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -209,12 +209,12 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	}
 
 	code := cmd.Run([]string{
-		"-acl-auth-method", test.AuthMethod,
+		"-acl-auth-method", common.ComponentAuthMethod,
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 
 	bytes, err := ioutil.ReadFile(tokenFile)
 	require.NoError(t, err)
-	require.NotEqual(t, 0, len(bytes))
+	require.Equal(t, 36, len(bytes))
 
 }
