@@ -1,4 +1,7 @@
-# Consul + Kubernetes (consul-k8s)
+<h1>
+  <img src="./assets/logo.svg" align="left" height="46px" alt="Consul logo"/>
+  <span>Consul + Kubernetes</span>
+</h1>
 
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
 
