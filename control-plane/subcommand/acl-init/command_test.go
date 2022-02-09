@@ -197,6 +197,8 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 	consulClient, err := api.NewClient(cfg)
 	require.NoError(t, err)
 
+	// Set up the Component Auth Method, this pre-loads Consul with bindingrule, roles and an acl:write policy so we
+	// can issue an ACL.Login().
 	test.SetupK8sComponentAuthMethod(t, consulClient, "test-sa", "default")
 
 	ui := cli.NewMockUi()
@@ -212,7 +214,7 @@ func TestRun_PerformsConsulLogin(t *testing.T) {
 		"-acl-auth-method", common.ComponentAuthMethod,
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
-
+	// Validate the Token got written.
 	bytes, err := ioutil.ReadFile(tokenFile)
 	require.NoError(t, err)
 	require.Equal(t, 36, len(bytes))

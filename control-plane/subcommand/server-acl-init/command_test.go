@@ -2341,8 +2341,9 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 
 // Test creating the correct ACL policies and Binding Rules for components that use the auth method.
 // The test works by running the command and then ensuring that:
-// * A binding rule exists which references the acl-role
-// * The ACL role has the correct policyName
+// * An ACLBindingRule exists which references the ACLRole.
+// * An ACLRole exists and has the correct PolicyName in it's ACLPolicyLinkRule list.
+// * The ACLPolicy exists.
 func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 	t.Parallel()
 
@@ -2356,7 +2357,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 			TestName:    "Controller",
 			TokenFlags:  []string{"-create-component-auth-method", "-create-controller-token"},
 			PolicyNames: []string{"controller-token"},
-			Roles:       []string{"controller-acl-role"},
+			Roles:       []string{resourcePrefix + "-controller-acl-role"},
 		},
 	}
 	for _, c := range cases {
@@ -2389,23 +2390,35 @@ func TestRun_PoliciesAndBindingRulesForACLLogin(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Check that the expected policy was created.
-			time.Sleep(time.Second * 5)
-			// Check that the Role exists + has correct Policy
+			// Check that the Role exists + has correct Policy and is associated with a BindingRule.
 			for i := range c.Roles {
-				const releaseName = "release-name"
-				roleName := fmt.Sprintf("%s-consul-%s", releaseName, c.Roles[i])
-				role, _, err := consul.ACL().RoleReadByName(roleName, &api.QueryOptions{})
+				// Check that the Policy exists.
+				policy, _, err := consul.ACL().PolicyReadByName(c.PolicyNames[i], &api.QueryOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+
+				// Check that the Role exists.
+				role, _, err := consul.ACL().RoleReadByName(c.Roles[i], &api.QueryOptions{})
 				require.NoError(t, err)
 				require.NotNil(t, role)
 
-				// Check that there exists a RoleBinding that references this Role.
-				rb, _, err := consul.ACL().BindingRuleList(fmt.Sprintf("%s-%s", releaseName, common.ComponentAuthMethod), &api.QueryOptions{})
+				// Check that the Role references the Policy.
+				found := false
+				for x := range role.Policies {
+					if role.Policies[x].Name == policy.Name {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+
+				// Check that there exists a BindingRule that references this Role.
+				rb, _, err := consul.ACL().BindingRuleList("release-name-"+common.ComponentAuthMethod, &api.QueryOptions{})
 				require.NoError(t, err)
 				require.NotNil(t, rb)
-				found := false
-				for i := range rb {
-					if rb[i].BindName == roleName {
+				found = false
+				for x := range rb {
+					if rb[x].BindName == c.Roles[i] {
 						found = true
 						break
 					}

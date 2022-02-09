@@ -736,12 +736,14 @@ func (c *Command) Run(args []string) int {
 			// globally unique so we append the datacenter name but only in secondary datacenters..
 			policyName += fmt.Sprintf("-%s", consulDC)
 		}
+		// Create an ACLRolePolicyLink list to attach to the ACLRole.
 		ap := &api.ACLRolePolicyLink{
 			Name: policyName,
 		}
 		apl := []*api.ACLRolePolicyLink{}
 		apl = append(apl, ap)
 
+		// Add the ACLRole and ACLBindingRule.
 		authMethodName := c.withPrefix("k8s-component-auth-method")
 		serviceAccountName := fmt.Sprintf("%s-controller", c.flagResourcePrefix)
 		err = c.addRoleAndBindingRule(consulClient, serviceAccountName, authMethodName, apl)
@@ -919,25 +921,24 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-// addRoleAndBindingRule adds a Role and Binding Rule which reference the authMethod.
+// addRoleAndBindingRule adds an ACLRole and ACLBindingRule which reference the authMethod.
 func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName string, authMethodName string, policies []*api.ACLRolePolicyLink) error {
 
-	// This is the ACL Role which will allow the component which uses the service account
-	// to be able to do a Consul Login.
+	// This is the ACLRole which will allow the component which uses the serviceaccount
+	// to be able to do a consul login.
 	aclRoleName := fmt.Sprintf("%s-acl-role", serviceAccountName)
 	role := &api.ACLRole{
 		Name:        aclRoleName,
 		Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
 		Policies:    policies,
 	}
-
 	err := c.updateOrCreateACLRole(client, role)
 	if err != nil {
 		c.log.Error("unable to update or create ACL Role", err)
 		return err
 	}
 
-	// Create the binding rule, this ties the Policies defined in the Role to the service-account and authMethod.
+	// Create the ACLBindingRule, this ties the Policies defined in the Role to the authMethod via serviceaccount.
 	abr := api.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
@@ -945,7 +946,6 @@ func (c *Command) addRoleAndBindingRule(client *api.Client, serviceAccountName s
 		BindType:    api.BindingRuleBindTypeRole,
 		BindName:    aclRoleName,
 	}
-
 	return c.updateOrCreateBindingRule(client, authMethodName, &abr, true)
 }
 
@@ -979,10 +979,9 @@ func (c *Command) updateOrCreateACLRole(client *api.Client, role *api.ACLRole) e
 // updateOrCreateBindingRule will query to see if existing binding rules are in place and update them
 // or create them if they do not yet exist.
 func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName string, abr *api.ACLBindingRule, skipNamespacing bool) error {
-	// Binding rule list api call query options
+	// Binding rule list api call query options.
 	queryOptions := api.QueryOptions{}
 
-	// Add a namespace if appropriate
 	// If namespaces and mirroring are enabled, this is not necessary because
 	// the binding rule will fall back to being created in the Consul `default`
 	// namespace automatically, as is necessary for mirroring.
@@ -1039,7 +1038,7 @@ func (c *Command) updateOrCreateBindingRule(client *api.Client, authMethodName s
 	return err
 }
 
-// configureComponentAuthMethod sets up an auth method that the components will use to issue ACL logins with.
+// configureComponentAuthMethod sets up an AuthMethod that the Consul components will use to issue ACL logins with.
 func (c *Command) configureComponentAuthMethod(consulClient *api.Client) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
 	authMethodName := c.withPrefix("k8s-component-auth-method")
