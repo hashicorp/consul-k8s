@@ -52,8 +52,6 @@ type HelmCluster struct {
 	noCleanupOnFailure bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
-
-	ACLToken string
 }
 
 func NewHelmCluster(

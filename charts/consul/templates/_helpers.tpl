@@ -73,20 +73,6 @@ as well as the global.name setting.
           {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
-{{- define "consul.vaultReplicationTokenTemplate" -}}
-|
-          {{ "{{" }}- with secret "{{ .Values.global.acls.replicationToken.secretName }}" -{{ "}}" }}
-          {{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}
-          {{ "{{" }}- end -{{ "}}" }}
-{{- end -}}
-
-{{- define "consul.vaultReplicationTokenConfigTemplate" -}}
-|
-          {{ "{{" }}- with secret "{{ .Values.global.acls.replicationToken.secretName }}" -{{ "}}" }}
-          acl { tokens { agent = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}", replication = "{{ "{{" }}- {{ printf ".Data.data.%s" .Values.global.acls.replicationToken.secretKey }} -{{ "}}" }}" }}
-          {{ "{{" }}- end -{{ "}}" }}
-{{- end -}}
-
 {{/*
 Sets up the extra-from-values config file passed to consul and then uses sed to do any necessary
 substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The output file
