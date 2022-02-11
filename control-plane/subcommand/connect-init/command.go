@@ -209,10 +209,8 @@ func (c *Command) Run(args []string) int {
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
 			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
 		if c.flagMultiPort && c.flagServiceName != "" {
-			// If the service name is set then potentially this is a multi-port service
-			// and there may be multiple services registered for this one Pod.
-			// If so, we want to ensure the service and proxy matching our expected
-			// name is registered.
+			// If the service name is set and this is a multi-port pod there may be multiple services registered for
+			// this one Pod. If so, we want to ensure the service and proxy matching our expected name is registered.
 			filter += fmt.Sprintf(` and (Service == %q or Service == "%s-sidecar-proxy")`, c.flagServiceName, c.flagServiceName)
 		}
 		serviceList, err := consulClient.Agent().ServicesWithFilter(filter)
@@ -229,14 +227,13 @@ func (c *Command) Run(args []string) int {
 				c.logger.Info("Check to ensure a Kubernetes service has been created for this application." +
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
-			if !c.flagMultiPort && len(serviceList) > 2 {
+			if len(serviceList) > 2 {
 				c.logger.Error("There are multiple Consul services registered for this pod when there must only be one." +
 					" Check if there are multiple Kubernetes services selecting this pod and add the label" +
 					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
 			}
 
-			c.logger.Info("About to error, here's servicelist: %+v", serviceList)
-			return fmt.Errorf("did not find correct number of services: %d", len(serviceList))
+			return fmt.Errorf("did not find correct number of services, found: %d, services: %+v", len(serviceList), serviceList)
 		}
 		for _, svc := range serviceList {
 			c.logger.Info("Registered service has been detected", "service", svc.Service)
