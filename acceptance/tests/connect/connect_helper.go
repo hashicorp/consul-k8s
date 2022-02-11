@@ -52,10 +52,10 @@ type ConnectHelper struct {
 	consulClient *api.Client
 }
 
-// InstallThenCheckConnectInjection creates a new cluster using the ClusterGenerator function then runs its Create method
+// Install creates a new cluster using the ClusterGenerator function then runs its Create method
 // to install Consul. It sets up static-server and static-client pods for the test.
 // It then sets up a consulClient and runs testConnectInject to test service mesh connectivity.
-func (c *ConnectHelper) InstallThenCheckConnectInjection() {
+func (c *ConnectHelper) Install() error {
 	c.consulCluster = c.ClusterGenerator(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	c.consulCluster.Create(c.T)
 
@@ -87,11 +87,12 @@ func (c *ConnectHelper) InstallThenCheckConnectInjection() {
 	}
 
 	c.testConnectInject()
+	return nil
 }
 
-// UpgradeThenCheckConnectInjection usese the existing Consul cluster and upgrades it using Helm values set by the Secure,
+// Upgrade usese the existing Consul cluster and upgrades it using Helm values set by the Secure,
 // AutoEncrypt, and AdditionalHelmValues fields. It then runs testConnectInject to test service mesh connectivity.
-func (c *ConnectHelper) UpgradeThenCheckConnectInjection() {
+func (c *ConnectHelper) Upgrade() error {
 	require.True(c.T, c.consulCluster != nil,
 		"consulCluster must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
 	require.True(c.T, c.consulClient != nil,
@@ -100,6 +101,15 @@ func (c *ConnectHelper) UpgradeThenCheckConnectInjection() {
 	c.consulCluster.Upgrade(c.T, c.helmValues())
 
 	c.testConnectInject()
+	return nil
+}
+
+func (c *ConnectHelper) TestInstallation() error {
+	return nil
+}
+
+func (c *ConnectHelper) TestUpgrade() error {
+	return nil
 }
 
 // ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service

@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -18,34 +20,123 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test that Connect works in a default and a secure installation.
+// TestConnectInject tests that Connect works in a default and a secure installation.
 func TestConnectInject(t *testing.T) {
-	cases := []struct {
+	cases := map[string]struct {
+		clusterGen  func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+		releaseName string
 		secure      bool
 		autoEncrypt bool
 	}{
-		{false, false},
-		{true, false},
-		{true, true},
+		"Helm install without secure or auto-encrypt": {
+			clusterGen:  consul.NewHelmCluster,
+			releaseName: helpers.RandomName(),
+		},
+		"Helm install with secure": {
+			clusterGen:  consul.NewHelmCluster,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+		},
+		"Helm install with secure and auto-encrypt": {
+			clusterGen:  consul.NewHelmCluster,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+			autoEncrypt: true,
+		},
+		"CLI install without secure or auto-encrypt": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+		},
+		"CLI install with secure": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+		},
+		"CLI install with secure and auto-encrypt": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+			secure:      true,
+			autoEncrypt: true,
+		},
 	}
 
-	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t; auto-encrypt: %t", c.secure, c.autoEncrypt)
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			helper := ConnectHelper{
-				ClusterGenerator: consul.NewHelmCluster,
+			connHelper := ConnectHelper{
+				ClusterGenerator: c.clusterGen,
 				Secure:           c.secure,
 				AutoEncrypt:      c.autoEncrypt,
-				ReleaseName:      helpers.RandomName(),
+				ReleaseName:      c.releaseName,
 				T:                t,
 				Ctx:              ctx,
 				Cfg:              cfg,
 			}
 
-			helper.InstallThenCheckConnectInjection()
+			err := connHelper.Install()
+			require.NoError(t, err)
+
+			err = connHelper.TestInstallation()
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestConnectInjectOnUpgrade tests that Connect works before and after an upgrade is performed on the cluster.
+func TestConnectInjectOnUpgrade(t *testing.T) {
+	type TestCase struct {
+		secure      bool
+		autoEncrypt bool
+		helmValues  map[string]string
+	}
+
+	cases := map[string]struct {
+		clusterGen       func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+		releaseName      string
+		initial, upgrade TestCase
+	}{
+		"Helm upgrade changes nothing": {
+			clusterGen:  consul.NewHelmCluster,
+			releaseName: helpers.RandomName(),
+		},
+		"CLI upgrade changes nothing": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: consul.CLIReleaseName,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := suite.Config()
+			ctx := suite.Environment().DefaultContext(t)
+
+			connHelper := ConnectHelper{
+				ClusterGenerator: c.clusterGen,
+				Secure:           c.initial.secure,
+				AutoEncrypt:      c.initial.autoEncrypt,
+				ReleaseName:      c.releaseName,
+				T:                t,
+				Ctx:              ctx,
+				Cfg:              cfg,
+			}
+
+			err := connHelper.Install()
+			require.NoError(t, err)
+
+			err = connHelper.TestInstallation()
+			require.NoError(t, err)
+
+			connHelper.Secure = c.upgrade.secure
+			connHelper.AutoEncrypt = c.upgrade.autoEncrypt
+			connHelper.AdditionalHelmValues = c.upgrade.helmValues
+
+			err = connHelper.Upgrade()
+			require.NoError(t, err)
+
+			err = connHelper.TestInstallation()
+			require.NoError(t, err)
 		})
 	}
 }
