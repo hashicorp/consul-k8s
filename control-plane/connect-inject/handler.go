@@ -235,9 +235,6 @@ func (h *Handler) Handle(ctx context.Context, req admission.Request) admission.R
 	// port.
 	annotatedSvcNames := h.annotatedServiceNames(pod)
 	multiPort := len(annotatedSvcNames) > 1
-	//if len(annotatedSvcNames) == 0 {
-	//	annotatedSvcNames = []string{""}
-	//}
 
 	// For single port pods, add the single init container and envoy sidecar.
 	if len(annotatedSvcNames) == 0 || len(annotatedSvcNames) == 1 {

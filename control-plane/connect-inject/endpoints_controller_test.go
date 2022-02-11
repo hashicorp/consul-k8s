@@ -538,6 +538,69 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 }
 
+func TestGetServiceName(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name       string
+		pod        func() *corev1.Pod
+		endpoint   *corev1.Endpoints
+		expSvcName string
+	}{
+		{
+			name: "single port, with annotation",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationService] = "web"
+				return pod1
+			},
+			endpoint: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "not-web",
+					Namespace: "default",
+				},
+			},
+			expSvcName: "web",
+		},
+		{
+			name: "single port, without annotation",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				return pod1
+			},
+			endpoint: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ep-name",
+					Namespace: "default",
+				},
+			},
+			expSvcName: "ep-name",
+		},
+		{
+			name: "multi port, with annotation",
+			pod: func() *corev1.Pod {
+				pod1 := createPod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[annotationService] = "web,web-admin"
+				return pod1
+			},
+			endpoint: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ep-name-multiport",
+					Namespace: "default",
+				},
+			},
+			expSvcName: "ep-name-multiport",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+
+			svcName := getServiceName(*tt.pod(), *tt.endpoint)
+			require.Equal(t, tt.expSvcName, svcName)
+
+		})
+	}
+}
+
 func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 	t.Parallel()
 	nodeName := "test-node"
