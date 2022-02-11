@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -68,6 +69,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 		includeServiceAccountName  bool
 		serviceAccountNameMismatch bool
 		expFail                    bool
+		multiport                  bool
 	}{
 		{
 			name:               "ACLs enabled, no tls",
@@ -90,6 +92,13 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			tls:                false,
 			serviceAccountName: "web",
 			serviceName:        "web",
+		},
+		{
+			name:               "ACLs enabled, multiport service",
+			tls:                false,
+			serviceAccountName: "counting-admin",
+			serviceName:        "counting-admin",
+			multiport:          true,
 		},
 		{
 			name:               "ACLs enabled, service name annotation doesn't match service account name",
@@ -152,6 +161,9 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 
 			// Register Consul services.
 			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+			if tt.multiport {
+				testConsulServices = append(testConsulServices, consulCountingSvcMultiport, consulCountingSvcSidecarMultiport)
+			}
 			for _, svc := range testConsulServices {
 				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
 			}
@@ -173,6 +185,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-bearer-token-file", bearerFile,
 				"-acl-token-sink", tokenFile,
 				"-proxy-id-file", proxyFile,
+				"-multiport=" + strconv.FormatBool(tt.multiport),
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
@@ -201,7 +214,11 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			// Validate contents of proxyFile.
 			data, err := ioutil.ReadFile(proxyFile)
 			require.NoError(t, err)
-			require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+			if tt.multiport {
+				require.Contains(t, string(data), "counting-admin-sidecar-proxy-id")
+			} else {
+				require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+			}
 		})
 	}
 }
@@ -210,8 +227,10 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 func TestRun_ServicePollingOnly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		tls  bool
+		name        string
+		tls         bool
+		serviceName string
+		multiport   bool
 	}{
 		{
 			name: "ACLs disabled, no tls",
@@ -220,6 +239,12 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 		{
 			name: "ACLs disabled, tls",
 			tls:  true,
+		},
+		{
+			name:        "Multiport, ACLs disabled, no tls",
+			tls:         false,
+			serviceName: "counting-admin",
+			multiport:   true,
 		},
 	}
 	for _, tt := range cases {
@@ -260,6 +285,9 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 
 			// Register Consul services.
 			testConsulServices := []api.AgentServiceRegistration{consulCountingSvc, consulCountingSvcSidecar}
+			if tt.multiport {
+				testConsulServices = append(testConsulServices, consulCountingSvcMultiport, consulCountingSvcSidecarMultiport)
+			}
 			for _, svc := range testConsulServices {
 				require.NoError(t, consulClient.Agent().ServiceRegister(&svc))
 			}
@@ -275,7 +303,13 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
+				"-multiport=" + strconv.FormatBool(tt.multiport),
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
+
+			// In a multiport case, the service name will be passed in to the test.
+			if tt.serviceName != "" {
+				flags = append(flags, "-service-name", tt.serviceName)
+			}
 
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
@@ -289,7 +323,11 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			// Validate contents of proxyFile.
 			data, err := ioutil.ReadFile(proxyFile)
 			require.NoError(t, err)
-			require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+			if tt.multiport {
+				require.Contains(t, string(data), "counting-admin-sidecar-proxy-id")
+			} else {
+				require.Contains(t, string(data), "counting-counting-sidecar-proxy")
+			}
 		})
 	}
 
@@ -938,6 +976,34 @@ var (
 			metaKeyPodName:         "counting-pod",
 			metaKeyKubeNS:          "default-ns",
 			metaKeyKubeServiceName: "counting",
+		},
+	}
+	consulCountingSvcMultiport = api.AgentServiceRegistration{
+		ID:      "counting-admin-id",
+		Name:    "counting-admin",
+		Address: "127.0.0.1",
+		Meta: map[string]string{
+			metaKeyPodName:         "counting-pod",
+			metaKeyKubeNS:          "default-ns",
+			metaKeyKubeServiceName: "counting-admin",
+		},
+	}
+	consulCountingSvcSidecarMultiport = api.AgentServiceRegistration{
+		ID:   "counting-admin-sidecar-proxy-id",
+		Name: "counting-admin-sidecar-proxy",
+		Kind: "connect-proxy",
+		Proxy: &api.AgentServiceConnectProxyConfig{
+			DestinationServiceName: "counting-admin",
+			DestinationServiceID:   "counting-admin-id",
+			Config:                 nil,
+			Upstreams:              nil,
+		},
+		Port:    9999,
+		Address: "127.0.0.1",
+		Meta: map[string]string{
+			metaKeyPodName:         "counting-pod",
+			metaKeyKubeNS:          "default-ns",
+			metaKeyKubeServiceName: "counting-admin",
 		},
 	}
 )
