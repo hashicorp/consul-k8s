@@ -205,6 +205,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 							require.NotContains(r, token.Description, multiport)
 							require.NotContains(r, token.Description, multiportAdmin)
 							require.NotContains(r, token.Description, staticClientName)
+							require.NotContains(r, token.Description, staticServerName)
 						}
 					})
 				})
