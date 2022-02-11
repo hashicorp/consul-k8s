@@ -212,14 +212,24 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			//k8s.KubectlApply(t, ctx.KubectlOptions(t), "../../../web.yaml")
-			//helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-			//	k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../../../web.yaml")
-			//})
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
-			// TODO check for injection
+			// Check that static-client has been injected and now has 2 containers.
+			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "app=static-client",
+			})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1)
+			require.Len(t, podList.Items[0].Spec.Containers, 2)
+
+			// Check that multiport has been injected and now has 4 containers.
+			podList, err = ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "app=multiport",
+			})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1)
+			require.Len(t, podList.Items[0].Spec.Containers, 4)
 
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
@@ -252,35 +262,23 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Check connection to web
-			// TODO replace with CheckStaticServer functions
+			// Check connection from static-client to multiport.
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
-			//argsweb := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
-			//argsweb = append(args, "http://localhost:2234")
-			//retry.RunWith(retrier, t, func(r *retry.R) {
-			//	output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), argsweb...)
-			//	require.NoError(r, err)
-			//	require.Contains(r, output, "hello world")
-			//})
 
-			// Check connection to web-admin
-			// TODO replace with CheckStaticServer functions
+			// Check connection from static-client to multiport-admin.
 			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), staticClientName, "hello world from 9090 admin", "http://localhost:2234")
-			//retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
-			//args := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
-			//args = append(args, "http://localhost:1234")
-			//retry.RunWith(retrier, t, func(r *retry.R) {
-			//	output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-			//	require.NoError(r, err)
-			//	require.Contains(r, output, "hello world from 9090 admin")
-			//})
 
-			// Check outbound connection from multiport service to static-server
+			// Now that we've checked inbound connections to a multi port pod, check outbound connection from multi port
+			// pod to static-server.
+
+			// Deploy static-server.
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+
+			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
+			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 
-				// TODO pull this into a func
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
 
 				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerName))
@@ -297,14 +295,15 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// TODO pull this into a func
+			// Check the connection from the multi port pod to static-server.
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
 
-			// Test that kubernetes readiness status is synced to Consul.
-			// Create the file so that the readiness probe of the static-server pod fails.
-			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
+			// Test that kubernetes readiness status is synced to Consul. This will make the multi port pods unhealthy
+			// and check inbound connections to the multi port pods' services.
+			// Create the files so that the readiness probes of the multi port pod fails.
+			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "touch", "/tmp/unhealthy-multiport")
-			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server-admin unhealthy")
+			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "touch", "/tmp/unhealthy-multiport-admin")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
@@ -314,9 +313,6 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
-
-			//t.FailNow()
-
 		})
 	}
 }
