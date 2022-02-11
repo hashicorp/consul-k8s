@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
@@ -176,7 +177,7 @@ func (c ConnectHelper) helmValues() map[string]string {
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
 	}
 
-	consul.MergeMaps(helmValues, c.AdditionalHelmValues)
+	helpers.MergeMaps(helmValues, c.AdditionalHelmValues)
 
 	return helmValues
 }

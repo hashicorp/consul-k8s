@@ -148,3 +148,11 @@ func MergeMaps(a, b map[string]string) {
 		a[k] = v
 	}
 }
+
+// MergeMaps will merge the values in b with values in a and save in a.
+// If there are conflicts, the values in b will overwrite the values in a.
+func MergeMaps(a, b map[string]string) {
+	for k, v := range b {
+		a[k] = v
+	}
+}

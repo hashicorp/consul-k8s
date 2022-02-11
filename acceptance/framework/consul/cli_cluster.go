@@ -149,7 +149,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	args := []string{"upgrade"}
 	args = c.setKube(args)
 
-	MergeMaps(c.helmOptions.SetValues, helmValues)
+	helpers.MergeMaps(c.helmOptions.SetValues, helmValues)
 	for k, v := range c.helmOptions.SetValues {
 		args = append(args, "-set", fmt.Sprintf("%s=%s", k, v))
 	}
