@@ -16,8 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-const staticClientName = "static-client"
-
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
 // sets up a cleanup function and waits for the deployment to become available.
 func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, filepath string) {
