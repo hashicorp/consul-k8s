@@ -750,6 +750,11 @@ func TestHandlerContainerInit_authMethodMultiport(t *testing.T) {
 			},
 
 			Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{
+						Name: "web-admin-service-account",
+					},
+				},
 				Containers: []corev1.Container{
 					{
 						Name: "web",
@@ -769,15 +774,6 @@ func TestHandlerContainerInit_authMethodMultiport(t *testing.T) {
 							{
 								Name:      "service-account-secret",
 								MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
-							},
-						},
-					},
-					{
-						Name: "web-admin-service-account",
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "service-account-secret",
-								MountPath: "/consul/serviceaccount-web-admin",
 							},
 						},
 					},
@@ -889,7 +885,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -acl-auth-method="auth-method" \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
-  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
+  -bearer-token-file=/consul/serviceaccount-web-admin/token \
   -acl-token-sink=/consul/connect-inject/acl-token-web-admin \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
