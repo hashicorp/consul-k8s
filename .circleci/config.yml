@@ -70,7 +70,7 @@ commands:
         type: string
       consul-k8s-image:
         type: string
-        default: "ndhanushkodi/consul-k8s-dev:multiport17"
+        default: "ndhanushkodi/consul-k8s-dev:multiport19"
       go-path:
         type: string
         default: "/home/circleci/.go_workspace"
