@@ -208,7 +208,7 @@ func (c *Command) Run(args []string) int {
 		registrationRetryCount++
 		filter := fmt.Sprintf("Meta[%q] == %q and Meta[%q] == %q ",
 			connectinject.MetaKeyPodName, c.flagPodName, connectinject.MetaKeyKubeNS, c.flagPodNamespace)
-		if c.flagServiceName != "" {
+		if c.flagMultiPort && c.flagServiceName != "" {
 			// If the service name is set then potentially this is a multi-port service
 			// and there may be multiple services registered for this one Pod.
 			// If so, we want to ensure the service and proxy matching our expected

@@ -28,7 +28,7 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			},
 		},
 	}
-	container, err := h.envoySidecar(testNS, pod)
+	container, err := h.envoySidecar(testNS, pod, multiPortInfo{})
 	require.NoError(err)
 	require.Equal(container.Command, []string{
 		"envoy",
@@ -41,6 +41,55 @@ func TestHandlerEnvoySidecar(t *testing.T) {
 			MountPath: "/consul/connect-inject",
 		},
 	})
+}
+
+func TestHandlerEnvoySidecar_Multiport(t *testing.T) {
+	require := require.New(t)
+	h := Handler{}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				annotationService: "web,web-admin",
+			},
+		},
+
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
+				},
+				{
+					Name: "web-admin",
+				},
+			},
+		},
+	}
+	multiPortInfos := []multiPortInfo{
+		{
+			serviceIndex: 0,
+			serviceName:  "web",
+		},
+		{
+			serviceIndex: 1,
+			serviceName:  "web-admin",
+		},
+	}
+	expCommand := map[int][]string{
+		0: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web.yaml", "--base-id", "0"},
+		1: {"envoy", "--config-path", "/consul/connect-inject/envoy-bootstrap-web-admin.yaml", "--base-id", "1"},
+	}
+	for i := 0; i < 2; i++ {
+		container, err := h.envoySidecar(testNS, pod, multiPortInfos[i])
+		require.NoError(err)
+		require.Equal(expCommand[i], container.Command)
+
+		require.Equal(container.VolumeMounts, []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			},
+		})
+	}
 }
 
 func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
@@ -106,7 +155,7 @@ func TestHandlerEnvoySidecar_withSecurityContext(t *testing.T) {
 					},
 				},
 			}
-			ec, err := h.envoySidecar(testNS, pod)
+			ec, err := h.envoySidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
 		})
@@ -130,37 +179,88 @@ func TestHandlerEnvoySidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.
 			},
 		},
 	}
-	_, err := h.envoySidecar(testNS, pod)
+	_, err := h.envoySidecar(testNS, pod, multiPortInfo{})
 	require.Error(err, fmt.Sprintf("pod security context cannot have the same uid as envoy: %v", envoyUserAndGroupID))
 }
 
-// Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID`
-// that we return an error to the handler.
+// Test that if the user specifies a container with security context with the same uid as `envoyUserAndGroupID` that we
+// return an error to the handler. If a container using the envoy image has the same uid, we don't return an error
+// because in multiport pod there can be multiple envoy sidecars.
 func TestHandlerEnvoySidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
-	require := require.New(t)
-	h := Handler{}
-	pod := corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
-					// Setting RunAsUser: 1 should succeed.
-					SecurityContext: &corev1.SecurityContext{
-						RunAsUser: pointerToInt64(1),
-					},
-				},
-				{
-					Name: "app",
-					// Setting RunAsUser: 5995 should fail.
-					SecurityContext: &corev1.SecurityContext{
-						RunAsUser: pointerToInt64(envoyUserAndGroupID),
+	cases := []struct {
+		name          string
+		pod           corev1.Pod
+		handler       Handler
+		expErr        bool
+		expErrMessage error
+	}{
+		{
+			name: "fails with non envoy image",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							// Setting RunAsUser: 1 should succeed.
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser: pointerToInt64(1),
+							},
+						},
+						{
+							Name: "app",
+							// Setting RunAsUser: 5995 should fail.
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser: pointerToInt64(envoyUserAndGroupID),
+							},
+							Image: "not-envoy",
+						},
 					},
 				},
 			},
+			handler:       Handler{},
+			expErr:        true,
+			expErrMessage: fmt.Errorf("container app has runAsUser set to the same uid %q as envoy which is not allowed", envoyUserAndGroupID),
+		},
+		{
+			name: "doesn't fail with envoy image",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							// Setting RunAsUser: 1 should succeed.
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser: pointerToInt64(1),
+							},
+						},
+						{
+							Name: "sidecar",
+							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageEnvoy.
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser: pointerToInt64(envoyUserAndGroupID),
+							},
+							Image: "envoy",
+						},
+					},
+				},
+			},
+			handler: Handler{
+				ImageEnvoy: "envoy",
+			},
+			expErr: false,
 		},
 	}
-	_, err := h.envoySidecar(testNS, pod)
-	require.Error(err, fmt.Sprintf("container %q has runAsUser set to the same uid %q as envoy which is not allowed", pod.Spec.Containers[1].Name, envoyUserAndGroupID))
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handler.envoySidecar(testNS, tc.pod, multiPortInfo{})
+			if tc.expErr {
+				require.Error(t, err, tc.expErrMessage)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 // Test that we can pass extra args to envoy via the extraEnvoyArgs flag
@@ -247,7 +347,7 @@ func TestHandlerEnvoySidecar_EnvoyExtraArgs(t *testing.T) {
 				EnvoyExtraArgs: tc.envoyExtraArgs,
 			}
 
-			c, err := h.envoySidecar(testNS, *tc.pod)
+			c, err := h.envoySidecar(testNS, *tc.pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContainerCommand, c.Command)
 		})
@@ -421,7 +521,7 @@ func TestHandlerEnvoySidecar_Resources(t *testing.T) {
 					},
 				},
 			}
-			container, err := c.handler.envoySidecar(testNS, pod)
+			container, err := c.handler.envoySidecar(testNS, pod, multiPortInfo{})
 			if c.expErr != "" {
 				require.NotNil(err)
 				require.Contains(err.Error(), c.expErr)

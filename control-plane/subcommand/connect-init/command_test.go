@@ -159,9 +159,6 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
-				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 3,
 			}
 
@@ -173,6 +170,9 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 				"-service-account-name", tt.serviceAccountName,
 				"-service-name", tt.serviceName,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
+				"-bearer-token-file", bearerFile,
+				"-acl-token-sink", tokenFile,
+				"-proxy-id-file", proxyFile,
 			}
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
@@ -267,7 +267,6 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 3,
 			}
 			// We build the http-addr because normally it's defined by the init container setting
@@ -275,7 +274,9 @@ func TestRun_ServicePollingOnly(t *testing.T) {
 			flags := []string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
+				"-proxy-id-file", proxyFile,
 				"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address)}
+
 			// Add the CA File if necessary since we're not setting CONSUL_CACERT in tt ENV.
 			if tt.tls {
 				flags = append(flags, "-ca-file", caFile)
@@ -460,13 +461,13 @@ func TestRun_ServicePollingErrors(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				proxyIDFile:                        proxyFile,
 				serviceRegistrationPollingAttempts: 1,
 			}
 			flags := []string{
 				"-http-addr", server.HTTPAddr,
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
+				"-proxy-id-file", proxyFile,
 			}
 
 			code := cmd.Run(flags)
@@ -504,13 +505,13 @@ func TestRun_RetryServicePolling(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		proxyIDFile:                        proxyFile,
 		serviceRegistrationPollingAttempts: 10,
 	}
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
 		"-http-addr", server.HTTPAddr,
+		"-proxy-id-file", proxyFile,
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 0, code)
@@ -544,13 +545,13 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI:                                 ui,
-		proxyIDFile:                        randFileName,
 		serviceRegistrationPollingAttempts: 3,
 	}
 	flags := []string{
 		"-pod-name", testPodName,
 		"-pod-namespace", testPodNamespace,
 		"-http-addr", server.HTTPAddr,
+		"-proxy-id-file", randFileName,
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)
@@ -608,8 +609,8 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 			ui := cli.NewMockUi()
 			cmd := Command{
 				UI:                                 ui,
-				bearerTokenFile:                    bearerFile,
-				tokenSinkFile:                      tokenFile,
+				flagBearerTokenFile:                bearerFile,
+				flagACLTokenSink:                   tokenFile,
 				serviceRegistrationPollingAttempts: uint64(servicesGetRetries),
 			}
 
@@ -619,6 +620,8 @@ func TestRun_FailsWithBadServerResponses(t *testing.T) {
 				"-pod-name", testPodName, "-pod-namespace", testPodNamespace,
 				"-acl-auth-method", test.AuthMethod,
 				"-service-account-name", testServiceAccountName,
+				"-bearer-token-file", bearerFile,
+				"-acl-token-sink", tokenFile,
 				"-http-addr", serverURL.String()}
 			code := cmd.Run(flags)
 			require.Equal(t, 1, code)
@@ -683,16 +686,16 @@ func TestRun_LoginWithRetries(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:              ui,
-				tokenSinkFile:   tokenFile,
-				bearerTokenFile: bearerFile,
-				proxyIDFile:     proxyFile,
+				UI: ui,
 			}
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", test.AuthMethod,
 				"-service-account-name", testServiceAccountName,
+				"-acl-token-sink", tokenFile,
+				"-bearer-token-file", bearerFile,
+				"-proxy-id-file", proxyFile,
 				"-http-addr", serverURL.String()})
 			fmt.Println(ui.ErrorWriter.String())
 			require.Equal(t, c.ExpCode, code)
@@ -762,16 +765,16 @@ func TestRun_EnsureTokenExists(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:              ui,
-				tokenSinkFile:   tokenFile,
-				bearerTokenFile: bearerFile,
-				proxyIDFile:     proxyFile,
+				UI: ui,
 			}
 			code := cmd.Run([]string{
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-acl-auth-method", test.AuthMethod,
 				"-service-account-name", testServiceAccountName,
+				"-acl-token-sink", tokenFile,
+				"-bearer-token-file", bearerFile,
+				"-proxy-id-file", proxyFile,
 				"-http-addr", serverURL.String()})
 			if c.neverSucceed {
 				require.Equal(t, 1, code)

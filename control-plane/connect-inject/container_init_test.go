@@ -740,6 +740,186 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
 	}
 }
 
+func TestHandlerContainerInit_authMethodMultiport(t *testing.T) {
+	minimal := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					annotationService: "web,web-admin",
+				},
+			},
+
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: "web",
+					},
+					{
+						Name: "web-side",
+					},
+					{
+						Name: "web-admin",
+					},
+					{
+						Name: "web-admin-side",
+					},
+					{
+						Name: "auth-method-secret",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "service-account-secret",
+								MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+							},
+						},
+					},
+					{
+						Name: "web-admin-service-account",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "service-account-secret",
+								MountPath: "/consul/serviceaccount-web-admin",
+							},
+						},
+					},
+				},
+				ServiceAccountName: "web",
+			},
+		}
+	}
+
+	cases := []struct {
+		Name              string
+		Pod               func(*corev1.Pod) *corev1.Pod
+		Handler           Handler
+		NumInitContainers int
+		MultiPortInfos    []multiPortInfo
+		Cmd               []string // Strings.Contains test
+	}{
+		{
+			"Whole template, multiport",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			Handler{},
+			2,
+			[]multiPortInfo{
+				{
+					serviceIndex: 0,
+					serviceName:  "web",
+				},
+				{
+					serviceIndex: 1,
+					serviceName:  "web-admin",
+				},
+			},
+			[]string{`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web \
+  -service-name="web" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
+  -address=127.0.0.1:20000 \
+  -admin-bind=127.0.0.1:19000 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
+
+				`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
+  -service-name="web-admin" \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
+  -address=127.0.0.1:20001 \
+  -admin-bind=127.0.0.1:19001 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
+			},
+		},
+		{
+			"Whole template, multiport, auth method",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			Handler{
+				AuthMethod: "auth-method",
+			},
+			2,
+			[]multiPortInfo{
+				{
+					serviceIndex: 0,
+					serviceName:  "web",
+				},
+				{
+					serviceIndex: 1,
+					serviceName:  "web-admin",
+				},
+			},
+			[]string{`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="auth-method" \
+  -service-account-name="web" \
+  -service-name="web" \
+  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
+  -acl-token-sink=/consul/connect-inject/acl-token-web \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web)" \
+  -token-file="/consul/connect-inject/acl-token-web" \
+  -address=127.0.0.1:20000 \
+  -admin-bind=127.0.0.1:19000 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web.yaml`,
+
+				`/bin/sh -ec 
+export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+export CONSUL_GRPC_ADDR="${HOST_IP}:8502"
+consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -acl-auth-method="auth-method" \
+  -service-account-name="web-admin" \
+  -service-name="web-admin" \
+  -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token \
+  -acl-token-sink=/consul/connect-inject/acl-token-web-admin \
+  -multiport=true \
+  -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
+
+# Generate the envoy bootstrap code
+/consul/connect-inject/consul connect envoy \
+  -proxy-id="$(cat /consul/connect-inject/proxyid-web-admin)" \
+  -token-file="/consul/connect-inject/acl-token-web-admin" \
+  -address=127.0.0.1:20001 \
+  -admin-bind=127.0.0.1:19001 \
+  -bootstrap > /consul/connect-inject/envoy-bootstrap-web-admin.yaml`,
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+
+			h := tt.Handler
+			for i := 0; i < tt.NumInitContainers; i++ {
+				container, err := h.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
+				require.NoError(err)
+				actual := strings.Join(container.Command, " ")
+				require.Equal(tt.Cmd[i], actual)
+			}
+		})
+	}
+}
+
 func TestHandlerContainerInit_authMethod(t *testing.T) {
 	require := require.New(t)
 	h := Handler{

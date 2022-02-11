@@ -365,8 +365,10 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- end }}
   {{- if .MultiPort }}
   -multiport=true \
-  -service-name="{{ .ServiceName }}" \
   -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
+  {{- if not .AuthMethod }}
+  -service-name="{{ .ServiceName }}" \
+  {{- end }}
   {{- end }}
   {{- if .ConsulPartition }}
   -partition="{{ .ConsulPartition }}" \
