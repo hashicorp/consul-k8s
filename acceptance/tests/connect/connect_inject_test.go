@@ -139,9 +139,9 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 
 	logger.Log(t, "restarting Consul client daemonset")
@@ -150,9 +150,9 @@ func TestConnectInject_RestartConsulClients(t *testing.T) {
 
 	logger.Log(t, "checking that connection is still successful")
 	if cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 	}
 }
 
@@ -223,8 +223,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), "http://localhost:1234")
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), "http://localhost:2234")
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:2234")
 
 				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerName))
 				_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -254,7 +254,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			// Check connection to web
 			// TODO replace with CheckStaticServer functions
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "http://localhost:1234")
 			//argsweb := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
 			//argsweb = append(args, "http://localhost:2234")
 			//retry.RunWith(retrier, t, func(r *retry.R) {
@@ -265,7 +265,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			// Check connection to web-admin
 			// TODO replace with CheckStaticServer functions
-			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), "hello world from 9090 admin", "http://localhost:2234")
+			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), staticClientName, "hello world from 9090 admin", "http://localhost:2234")
 			//retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
 			//args := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
 			//args = append(args, "http://localhost:1234")
@@ -277,31 +277,11 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 			// Check outbound connection from multiport service to static-server
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			// TODO add intention
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 
 				// TODO pull this into a func
-				failureMessages := []string{
-					"curl: (52) Empty reply from server",
-					"curl: (7) Failed to connect",
-					"curl: (56) Recv failure: Connection reset by peer"}
-				retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
-				args := []string{"exec", "deploy/" + multiport, "-c", multiport, "--", "curl", "-vvvsSf"}
-				args = append(args, "http://localhost:3234")
-				retry.RunWith(retrier, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-					require.Error(r, err)
-					require.Condition(r, func() bool {
-						exists := false
-						for _, msg := range failureMessages {
-							if strings.Contains(output, msg) {
-								exists = true
-							}
-						}
-						return exists
-					})
-				})
+				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
 
 				logger.Log(t, fmt.Sprintf("creating intention for %s", staticServerName))
 				_, _, err := consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -318,14 +298,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			// TODO pull this into a func
-			retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
-			args := []string{"exec", "deploy/" + multiport, "-c", multiport, "--", "curl", "-vvvsSf"}
-			args = append(args, "http://localhost:3234")
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-				require.NoError(r, err)
-				require.Contains(r, output, "hello world")
-			})
+			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
 
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
@@ -339,8 +312,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// We are expecting a "connection reset by peer" error because in a case of health checks,
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
 
 			//t.FailNow()
 

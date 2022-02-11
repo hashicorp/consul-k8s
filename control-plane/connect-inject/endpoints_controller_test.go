@@ -550,7 +550,6 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 		expectedConsulSvcInstancesMap map[string][]*api.CatalogService
 		expectedProxySvcInstancesMap  map[string][]*api.CatalogService
 		expectedAgentHealthChecks     []*api.AgentCheck
-		expErr                        string
 	}{
 		{
 			name:          "Multiport service",
@@ -781,14 +780,12 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
 			resp, err = ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName2,
 			})
-			if tt.expErr != "" {
-				require.EqualError(t, err, tt.expErr)
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
 			// After reconciliation, Consul should have the service with the correct number of instances

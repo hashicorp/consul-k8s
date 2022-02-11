@@ -177,9 +177,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			if c.secure {
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 				} else {
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, "http://localhost:1234")
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "http://localhost:1234")
 				}
 
 				intention := &api.ServiceIntentionsConfigEntry{
@@ -209,9 +209,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			logger.Log(t, "checking that connection is successful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, "http://localhost:1234")
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
 
 			// Test that kubernetes readiness status is synced to Consul.
@@ -226,9 +226,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, staticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
 		})
 	}

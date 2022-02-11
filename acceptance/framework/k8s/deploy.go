@@ -77,10 +77,10 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 // to be "hello world" in a case of success.
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions.
-func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, app string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
 
-	CheckStaticServerConnectionMultipleFailureMessages(t, options, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
+	CheckStaticServerConnectionMultipleFailureMessages(t, options, app, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of the deployment given by deploymentName
@@ -90,7 +90,7 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, expe
 // If expectSuccess is true, it will expect connection to succeed,
 // otherwise it will expect failure due to intentions. If multiple failureMessages are provided it will assert
 // on the existence of any of them.
-func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, app string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
 
 	expectedOutput := "hello world"
@@ -100,7 +100,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	retrier := &retry.Timer{Timeout: 80 * time.Second, Wait: 2 * time.Second}
 
-	args := []string{"exec", "deploy/" + staticClientName, "-c", staticClientName, "--", "curl", "-vvvsSf"}
+	args := []string{"exec", "deploy/" + app, "-c", app, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
@@ -125,27 +125,27 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 // CheckStaticServerConnectionSuccessfulWithMessage is just like CheckStaticServerConnectionSuccessful
 // but it asserts on a non-default expected message.
-func CheckStaticServerConnectionSuccessfulWithMessage(t *testing.T, options *k8s.KubectlOptions, message string, curlArgs ...string) {
+func CheckStaticServerConnectionSuccessfulWithMessage(t *testing.T, options *k8s.KubectlOptions, app string, message string, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, true, nil, message, curlArgs...)
+	CheckStaticServerConnection(t, options, app, true, nil, message, curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
-func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, curlArgs ...string) {
+func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, app string, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, true, nil, "", curlArgs...)
+	CheckStaticServerConnection(t, options, app, true, nil, "", curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
 // CheckStaticServerConnectionFailing is just like CheckStaticServerConnection
 // but it always expects a failing connection with various errors.
-func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, curlArgs ...string) {
+func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, app string, curlArgs ...string) {
 	t.Helper()
-	CheckStaticServerConnection(t, options, false, []string{
+	CheckStaticServerConnection(t, options, app, false, []string{
 		"curl: (52) Empty reply from server",
 		"curl: (7) Failed to connect",
 		"curl: (56) Recv failure: Connection reset by peer",
