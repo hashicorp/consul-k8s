@@ -53,14 +53,29 @@ type ConnectHelper struct {
 }
 
 // Install creates a new cluster using the ClusterGenerator function then runs its Create method
-// to install Consul. It sets up static-server and static-client pods for the test.
-// It then sets up a consulClient and runs testConnectInject to test service mesh connectivity.
-func (c *ConnectHelper) Install() error {
+// to install Consul. If the Secure field is true, it checks if ACL tokens relevant to the test do not exist
+// to avoid test pollution. It sets up static-server and static-client pods for the test.
+func (c *ConnectHelper) Install() {
 	c.consulCluster = c.ClusterGenerator(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	c.consulCluster.Create(c.T)
 
 	c.consulClient = c.consulCluster.SetupConsulClient(c.T, c.Secure)
+}
 
+// Upgrade uses the existing Consul cluster and upgrades it using Helm values set by the Secure,
+// AutoEncrypt, and AdditionalHelmValues fields. It then runs testConnectInject to test service mesh connectivity.
+func (c *ConnectHelper) Upgrade() {
+	require.True(c.T, c.consulCluster != nil, "consulCluster must be set before calling Upgrade (Call Install first).")
+	require.True(c.T, c.consulClient != nil, "consulClient must be set before calling Upgrade (Call Install first).")
+
+	c.consulCluster.Upgrade(c.T, c.helmValues())
+}
+
+// DeployClientAndServer deploys a client and server pod to the Kubernetes cluster which will be used
+// to test service mesh connectivity. If the Secure flag is true, a pre-check is done to ensure that the
+// ACL tokens for the test are deleted. The status of the deployment and injection is checked after the
+// deployment is complete to ensure success.
+func (c *ConnectHelper) DeployClientAndServer() {
 	// Check that the ACL token is deleted.
 	if c.Secure {
 		// We need to register the cleanup function before we create the deployments
@@ -79,42 +94,12 @@ func (c *ConnectHelper) Install() error {
 	}
 
 	logger.Log(c.T, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	c.deployFixtureCase("static-server-inject")
 	if c.Cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		c.deployFixtureCase("static-client-tproxy")
 	} else {
-		k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		c.deployFixtureCase("static-client-inject")
 	}
-
-	c.testConnectInject()
-	return nil
-}
-
-// Upgrade usese the existing Consul cluster and upgrades it using Helm values set by the Secure,
-// AutoEncrypt, and AdditionalHelmValues fields. It then runs testConnectInject to test service mesh connectivity.
-func (c *ConnectHelper) Upgrade() error {
-	require.True(c.T, c.consulCluster != nil,
-		"consulCluster must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
-	require.True(c.T, c.consulClient != nil,
-		"consulClient must be set before calling UpgradeThenCheckConnectInjection (Call InstallThenCheckConnectInjection first).")
-
-	c.consulCluster.Upgrade(c.T, c.helmValues())
-
-	c.testConnectInject()
-	return nil
-}
-
-func (c *ConnectHelper) TestInstallation() error {
-	return nil
-}
-
-func (c *ConnectHelper) TestUpgrade() error {
-	return nil
-}
-
-// ConnectInjectConnectivityCheck is a helper function used by the connect tests and cli smoke tests to test service
-// mesh connectivity.
-func (c *ConnectHelper) testConnectInject() {
 
 	// Check that both static-server and static-client have been injected and now have 2 containers.
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
@@ -125,7 +110,9 @@ func (c *ConnectHelper) testConnectInject() {
 		require.Len(c.T, podList.Items, 1)
 		require.Len(c.T, podList.Items[0].Spec.Containers, 2)
 	}
+}
 
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention() {
 	if c.Secure {
 		logger.Log(c.T, "checking that the connection is not successful because there's no intention")
 		if c.Cfg.EnableTransparentProxy {
@@ -133,7 +120,11 @@ func (c *ConnectHelper) testConnectInject() {
 		} else {
 			k8s.CheckStaticServerConnectionFailing(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://localhost:1234")
 		}
+	}
+}
 
+func (c *ConnectHelper) CreateIntention() {
+	if c.Secure {
 		logger.Log(c.T, "creating intention")
 		_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 			Kind: api.ServiceIntentions,
@@ -147,7 +138,9 @@ func (c *ConnectHelper) testConnectInject() {
 		}, nil)
 		require.NoError(c.T, err)
 	}
+}
 
+func (c *ConnectHelper) TestConnectionSuccess() {
 	logger.Log(c.T, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
@@ -155,7 +148,9 @@ func (c *ConnectHelper) testConnectInject() {
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(c.T, c.Ctx.KubectlOptions(c.T), staticClientName, "http://localhost:1234")
 	}
+}
 
+func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy() {
 	// Test that kubernetes readiness status is synced to Consul.
 	// Create the file so that the readiness probe of the static-server pod fails.
 	logger.Log(c.T, "testing k8s -> consul health checks sync by making the static-server unhealthy")
@@ -179,7 +174,7 @@ func (c *ConnectHelper) testConnectInject() {
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm Chart which are merged with the
 // AdditionalHelmValues field with the values set by the Secure and AutoEncrypt fields taking precedence.
-func (c ConnectHelper) helmValues() map[string]string {
+func (c *ConnectHelper) helmValues() map[string]string {
 	helmValues := map[string]string{
 		"connectInject.enabled":        "true",
 		"global.tls.enabled":           strconv.FormatBool(c.Secure),
@@ -190,4 +185,10 @@ func (c ConnectHelper) helmValues() map[string]string {
 	helpers.MergeMaps(helmValues, c.AdditionalHelmValues)
 
 	return helmValues
+}
+
+// deployFixtureCase looks up the fixture case by name in the `../fixtures/cases` directory and deploys it to the
+// Kubernetes cluster.
+func (c *ConnectHelper) deployFixtureCase(name string) {
+	k8s.DeployKustomize(c.T, c.Ctx.KubectlOptions(c.T), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/"+name)
 }

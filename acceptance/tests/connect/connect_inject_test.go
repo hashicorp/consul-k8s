@@ -75,35 +75,97 @@ func TestConnectInject(t *testing.T) {
 				Cfg:              cfg,
 			}
 
-			err := connHelper.Install()
-			require.NoError(t, err)
-
-			err = connHelper.TestInstallation()
-			require.NoError(t, err)
+			connHelper.Install()
+			connHelper.DeployClientAndServer()
+			connHelper.TestConnectionFailureWithoutIntention()
+			connHelper.CreateIntention()
+			connHelper.TestConnectionSuccess()
+			connHelper.TestConnectionFailureWhenUnhealthy()
 		})
 	}
 }
 
 // TestConnectInjectOnUpgrade tests that Connect works before and after an upgrade is performed on the cluster.
 func TestConnectInjectOnUpgrade(t *testing.T) {
-	type TestCase struct {
-		secure      bool
-		autoEncrypt bool
-		helmValues  map[string]string
-	}
-
 	cases := map[string]struct {
-		clusterGen       func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
-		releaseName      string
-		initial, upgrade TestCase
+		clusterGen          func(*testing.T, map[string]string, environment.TestContext, *config.TestConfig, string) consul.Cluster
+		releaseName         string
+		secure, autoEncrypt bool
+		initial, upgrade    map[string]string
 	}{
-		"Helm upgrade changes nothing": {
-			clusterGen:  consul.NewHelmCluster,
-			releaseName: helpers.RandomName(),
-		},
+		// "Helm upgrade changes nothing": {
+		// 	clusterGen:  consul.NewHelmCluster,
+		// 	releaseName: helpers.RandomName(),
+		// },
+		// "Helm upgrade from 1.10 to 1.11": {
+		// 	clusterGen:  consul.NewCLICluster,
+		// 	releaseName: helpers.RandomName(),
+		// 	initial: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.10.7",
+		// 	},
+		// 	upgrade: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.11.2",
+		// 	},
+		// },
+		// "Helm upgrade with secure from 1.10 to 1.11": {
+		// 	clusterGen:  consul.NewCLICluster,
+		// 	releaseName: helpers.RandomName(),
+		// 	secure:      true,
+		// 	initial: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.10.7",
+		// 	},
+		// 	upgrade: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.11.2",
+		// 	},
+		// },
+		// "Helm upgrade with secure and auto-encrypt from 1.10 to 1.11": {
+		// 	clusterGen:  consul.NewHelmCluster,
+		// 	releaseName: helpers.RandomName(),
+		// 	secure:      true,
+		// 	autoEncrypt: true,
+		// 	initial: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.10.7",
+		// 	},
+		// 	upgrade: map[string]string{
+		// 		"global.image": "hashicorp/consul:1.11.2",
+		// 	},
+		// },
 		"CLI upgrade changes nothing": {
 			clusterGen:  consul.NewCLICluster,
 			releaseName: consul.CLIReleaseName,
+		},
+		"CLI upgrade from 1.10 to 1.11": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: helpers.RandomName(),
+			initial: map[string]string{
+				"global.image": "hashicorp/consul:1.10.7",
+			},
+			upgrade: map[string]string{
+				"global.image": "hashicorp/consul:1.11.2",
+			},
+		},
+		"CLI upgrade with secure from 1.10 to 1.11": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+			initial: map[string]string{
+				"global.image": "hashicorp/consul:1.10.7",
+			},
+			upgrade: map[string]string{
+				"global.image": "hashicorp/consul:1.11.2",
+			},
+		},
+		"CLI upgrade with secure and auto-encrypt from 1.10 to 1.11": {
+			clusterGen:  consul.NewCLICluster,
+			releaseName: helpers.RandomName(),
+			secure:      true,
+			autoEncrypt: true,
+			initial: map[string]string{
+				"global.image": "hashicorp/consul:1.10.7",
+			},
+			upgrade: map[string]string{
+				"global.image": "hashicorp/consul:1.11.2",
+			},
 		},
 	}
 
@@ -113,30 +175,28 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := ConnectHelper{
-				ClusterGenerator: c.clusterGen,
-				Secure:           c.initial.secure,
-				AutoEncrypt:      c.initial.autoEncrypt,
-				ReleaseName:      c.releaseName,
-				T:                t,
-				Ctx:              ctx,
-				Cfg:              cfg,
+				ClusterGenerator:     c.clusterGen,
+				Secure:               c.secure,
+				AutoEncrypt:          c.autoEncrypt,
+				AdditionalHelmValues: c.initial,
+				ReleaseName:          c.releaseName,
+				T:                    t,
+				Ctx:                  ctx,
+				Cfg:                  cfg,
 			}
 
-			err := connHelper.Install()
-			require.NoError(t, err)
+			connHelper.Install()
+			connHelper.DeployClientAndServer()
+			connHelper.TestConnectionFailureWithoutIntention()
+			connHelper.CreateIntention()
+			connHelper.TestConnectionSuccess()
+			connHelper.TestConnectionFailureWhenUnhealthy()
 
-			err = connHelper.TestInstallation()
-			require.NoError(t, err)
+			connHelper.AdditionalHelmValues = c.upgrade
 
-			connHelper.Secure = c.upgrade.secure
-			connHelper.AutoEncrypt = c.upgrade.autoEncrypt
-			connHelper.AdditionalHelmValues = c.upgrade.helmValues
-
-			err = connHelper.Upgrade()
-			require.NoError(t, err)
-
-			err = connHelper.TestInstallation()
-			require.NoError(t, err)
+			connHelper.Upgrade()
+			connHelper.TestConnectionSuccess()
+			connHelper.TestConnectionFailureWhenUnhealthy()
 		})
 	}
 }
