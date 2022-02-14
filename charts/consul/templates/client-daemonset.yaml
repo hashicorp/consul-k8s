@@ -63,6 +63,12 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+        {{- if .Values.global.enterpriseLicense.secretName }}
+        {{- with .Values.global.enterpriseLicense }}
+        "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-enterpriselicense.txt": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
@@ -211,7 +217,7 @@ spec:
                 {{- end }}
             {{- end }}
             {{- end }}
-            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs) (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: CONSUL_LICENSE_PATH
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
             {{- end }}
@@ -233,8 +239,13 @@ spec:
             - |
               CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              {{- if .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
+              {{- end }}
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.enterpriseLicense.secretName }}
+              CONSUL_LICENSE_PATH=`cat /vault/secrets/enterpriselicense.txt`
+              {{- end }}
               {{- end }}
               {{- if (and .Values.dns.enabled .Values.dns.enableRedirection) }}
               {{ template "consul.recursors" }}

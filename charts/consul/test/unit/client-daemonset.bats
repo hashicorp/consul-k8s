@@ -1836,6 +1836,51 @@ rollingUpdate:
   [ "${actual}" = "true" ]
 }
 
+@test "client/DaemonSet: vault enterprise license annotations are correct when enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=path/to/secret' \
+    --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
+  [ "${actual}" = "path/to/secret" ]
+  local actual=$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)
+  local actual="$(echo $object |
+      yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
+  local expected=$'{{- with secret \"path/to/secret\" -}}\n{{- .Data.data.enterpriselicense -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+}
+
+@test "client/DaemonSet: vault no CONSUL_LICENSE_PATH env variable and command defines CONSUL_LICENSE_PATH" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/client-daemonset.yaml  \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulServerRole=test' \
+    --set 'global.enterpriseLicense.secretName=a/b/c/d' \
+    --set 'global.enterpriseLicense.secretKey=gossip' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object |
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("CONSUL_LICENSE_PATH="))' \
+      | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 
