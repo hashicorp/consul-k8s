@@ -136,7 +136,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		},
 		"CLI upgrade from 1.10 to 1.11": {
 			clusterGen:  consul.NewCLICluster,
-			releaseName: helpers.RandomName(),
+			releaseName: consul.CLIReleaseName,
 			initial: map[string]string{
 				"global.image": "hashicorp/consul:1.10.7",
 			},
@@ -146,7 +146,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		},
 		"CLI upgrade with secure from 1.10 to 1.11": {
 			clusterGen:  consul.NewCLICluster,
-			releaseName: helpers.RandomName(),
+			releaseName: consul.CLIReleaseName,
 			secure:      true,
 			initial: map[string]string{
 				"global.image": "hashicorp/consul:1.10.7",
@@ -157,7 +157,7 @@ func TestConnectInjectOnUpgrade(t *testing.T) {
 		},
 		"CLI upgrade with secure and auto-encrypt from 1.10 to 1.11": {
 			clusterGen:  consul.NewCLICluster,
-			releaseName: helpers.RandomName(),
+			releaseName: consul.CLIReleaseName,
 			secure:      true,
 			autoEncrypt: true,
 			initial: map[string]string{
