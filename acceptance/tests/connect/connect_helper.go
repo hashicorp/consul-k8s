@@ -56,6 +56,7 @@ type ConnectHelper struct {
 // to install Consul. If the Secure field is true, it checks if ACL tokens relevant to the test do not exist
 // to avoid test pollution. It sets up static-server and static-client pods for the test.
 func (c *ConnectHelper) Install() {
+	logger.Log(c.T, "installing Consul cluster")
 	c.consulCluster = c.ClusterGenerator(c.T, c.helmValues(), c.Ctx, c.Cfg, c.ReleaseName)
 	c.consulCluster.Create(c.T)
 
@@ -68,6 +69,7 @@ func (c *ConnectHelper) Upgrade() {
 	require.True(c.T, c.consulCluster != nil, "consulCluster must be set before calling Upgrade (Call Install first).")
 	require.True(c.T, c.consulClient != nil, "consulClient must be set before calling Upgrade (Call Install first).")
 
+	logger.Log(c.T, "upgrading Consul cluster")
 	c.consulCluster.Upgrade(c.T, c.helmValues())
 }
 
@@ -112,6 +114,7 @@ func (c *ConnectHelper) DeployClientAndServer() {
 	}
 }
 
+// TestConnectionFailureWithoutIntention ensures the connection to the static server fails when no intentions are configured.
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention() {
 	if c.Secure {
 		logger.Log(c.T, "checking that the connection is not successful because there's no intention")
@@ -123,6 +126,7 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention() {
 	}
 }
 
+// CreateIntention creates an intention for the static-server pod to connect to the static-client pod.
 func (c *ConnectHelper) CreateIntention() {
 	if c.Secure {
 		logger.Log(c.T, "creating intention")
@@ -140,6 +144,7 @@ func (c *ConnectHelper) CreateIntention() {
 	}
 }
 
+// TestConnectionSuccessful ensures the static-server pod can connect to the static-client pod once the intention is set.
 func (c *ConnectHelper) TestConnectionSuccess() {
 	logger.Log(c.T, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
@@ -150,6 +155,8 @@ func (c *ConnectHelper) TestConnectionSuccess() {
 	}
 }
 
+// TestConnectionFailureWhenUnhealthy sets the static-server pod to be unhealthy and ensures the connection fails.
+// It restores the pod to a healthy state after this check.
 func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy() {
 	// Test that kubernetes readiness status is synced to Consul.
 	// Create the file so that the readiness probe of the static-server pod fails.
