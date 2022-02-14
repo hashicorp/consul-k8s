@@ -107,7 +107,7 @@ func NewCLICluster(
 }
 
 // Create uses the `consul-k8s install` command to create a Consul cluster. The command itself will fail if there are
-// prior installations of Consul in the cluster so it is sufficient to run the install command without a pre-chekc.
+// prior installations of Consul in the cluster so it is sufficient to run the install command without a pre-check.
 func (c *CLICluster) Create(t *testing.T) {
 	t.Helper()
 
